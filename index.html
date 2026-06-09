@@ -1,0 +1,1460 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="h-full bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OmniAI 商品主图批量生成系统</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            200: '#bbf7d0',
+                            500: '#10b981',
+                            600: '#059669',
+                            700: '#047857',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Vue 3 Global Build -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <!-- Google Fonts for premium typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', 'Noto Sans SC', sans-serif;
+            scrollbar-width: thin;
+            scrollbar-color: #cbd5e1 #f8fafc;
+        }
+        /* Custom scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        /* Glowing neon shadows for light theme */
+        .glow-brand {
+            box-shadow: 0 4px 20px rgba(16, 185, 129, 0.08);
+        }
+        .glow-brand-strong {
+            box-shadow: 0 10px 30px rgba(16, 185, 129, 0.2);
+        }
+    </style>
+</head>
+<body class="h-full text-slate-800 overflow-hidden bg-slate-50">
+
+<div id="app" class="h-full flex flex-col" v-cloak>
+    
+    <!-- 顶部导航栏 -->
+    <header class="h-16 border-b border-slate-200 bg-white/90 backdrop-blur-md px-6 flex items-center justify-between z-30 shadow-sm">
+        <div class="flex items-center space-x-3">
+            <div class="h-9 w-9 rounded-lg bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center shadow-lg shadow-emerald-500/10">
+                <svg class="w-5 h-5 text-white stroke-[2.5]" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                </svg>
+            </div>
+            <div>
+                <h1 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                    OmniAI 
+                    <span class="text-xs px-2 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-600 font-semibold">SaaS Pro</span>
+                </h1>
+                <p class="text-[10px] text-slate-500">商品主图 AI 批量智能生成系统</p>
+            </div>
+        </div>
+
+        <!-- 顶部功能区 -->
+        <div class="flex items-center space-x-6">
+            <!-- 任务积分/余额 -->
+            <div class="flex items-center space-x-2 bg-slate-100 px-3 py-1.5 rounded-full border border-slate-200">
+                <div class="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                <span class="text-xs text-slate-500">额度剩余</span>
+                <span class="text-xs font-bold text-emerald-600">⚡ 1,280 点</span>
+            </div>
+
+            <!-- 批量托管队列入口 -->
+            <button @click="showQueueDrawer = true" class="relative text-slate-600 hover:text-emerald-600 transition-colors py-1 flex items-center gap-1.5 text-xs font-medium">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+                批量托管
+                <span v-if="taskQueue.length > 0" class="absolute -top-1 -right-2 bg-emerald-500 text-white text-[9px] font-bold h-4 w-4 rounded-full flex items-center justify-center animate-bounce">
+                    {{ taskQueue.length }}
+                </span>
+            </button>
+
+            <!-- 生成记录 -->
+            <button @click="showHistoryDrawer = true" class="text-slate-600 hover:text-emerald-600 transition-colors flex items-center gap-1.5 text-xs font-medium">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                生成记录
+            </button>
+
+            <div class="h-6 w-px bg-slate-200"></div>
+
+            <!-- 用户信息 -->
+            <div class="flex items-center space-x-2">
+                <div class="h-8 w-8 rounded-full bg-gradient-to-tr from-emerald-500 to-teal-500 flex items-center justify-center font-bold text-xs text-white shadow-sm">
+                    VIP
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="flex-1 flex overflow-hidden">
+        
+        <!-- 左侧主导航 -->
+        <aside class="w-16 border-r border-slate-200 bg-slate-100/50 flex flex-col items-center py-4 space-y-6">
+            <div class="flex flex-col items-center w-full space-y-4">
+                <button 
+                    v-for="nav in mainNavs" 
+                    :key="nav.id"
+                    @click="activeNav = nav.id"
+                    :class="[
+                        'w-12 h-12 rounded-xl flex flex-col items-center justify-center transition-all duration-300 relative group',
+                        activeNavNav === nav.id || (activeNav === 'main' && nav.id === 'main') ? 'bg-emerald-50 text-emerald-600 border border-emerald-200 shadow-sm' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/50'
+                    ]"
+                >
+                    <div v-html="nav.icon" class="w-5 h-5 mb-0.5"></div>
+                    <span class="text-[9px] font-medium">{{ nav.name }}</span>
+                    <!-- Tooltip -->
+                    <div class="absolute left-16 bg-white border border-slate-200 text-slate-800 text-xs px-2.5 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 pointer-events-none shadow-lg">
+                        {{ nav.desc }}
+                    </div>
+                </button>
+            </div>
+            
+            <div class="flex-1"></div>
+            
+            <!-- 快捷帮助 -->
+            <div class="text-slate-400 hover:text-slate-600 cursor-pointer p-2 rounded-lg transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
+            </div>
+        </aside>
+
+        <!-- 主内容工作区 -->
+        <main class="flex-1 flex overflow-hidden">
+            
+            <!-- 非核心商品原图模块占位 -->
+            <div v-if="activeNav !== 'main'" class="flex-1 flex flex-col items-center justify-center bg-slate-50 p-12 text-center">
+                <div class="w-16 h-16 rounded-2xl bg-emerald-50 border border-emerald-100 text-emerald-500 flex items-center justify-center mb-6">
+                    <svg class="w-8 h-8 animate-pulse" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17L17.25 21A1.79 1.79 0 0114 21.75l-5.83-5.83M11.42 15.17l2.42-2.42m-2.42 2.42L5.58 9.35M14 11.42l5.83-5.83A1.79 1.79 0 0016.5 4.5L10.65 10.3M14 11.42L11.58 9M11.58 9L5.58 3" />
+                    </svg>
+                </div>
+                <h3 class="text-lg font-bold text-slate-800">正在接入新功能</h3>
+                <p class="text-sm text-slate-500 max-w-md mt-2">该功能属于高阶电商AI版块，团队正在基于新一代视觉模型紧密调优。请点击左上角的“商品原图”体验完整的主图批量渲染工作流。</p>
+                <button @click="activeNav = 'main'" class="mt-6 px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold rounded-xl transition-all shadow-md">
+                    返回商品原图模块
+                </button>
+            </div>
+
+            <div v-show="activeNav === 'main'" class="w-[420px] border-r border-slate-200 bg-white flex flex-col h-full overflow-y-auto">
+                
+                <!-- 商品原图上传区 -->
+                <div class="p-5 border-b border-slate-100 bg-slate-50/40">
+                    <div class="flex items-center justify-between mb-3">
+                        <label class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                            商品原图 <span class="text-slate-400 font-normal">(支持最多3张，已选 {{ uploadedImages.length }}/3)</span>
+                        </label>
+                        <button v-if="uploadedImages.length > 0" @click="clearImages" class="text-[10px] text-slate-400 hover:text-rose-500 transition-colors">
+                            清空
+                        </button>
+                    </div>
+
+                    <!-- 上传容器 -->
+                    <div class="grid grid-cols-3 gap-3">
+                        <!-- 已上传图片预览 -->
+                        <div 
+                            v-for="(img, index) in uploadedImages" 
+                            :key="index"
+                            class="relative aspect-square rounded-xl bg-slate-50 border border-slate-200 group overflow-hidden shadow-inner flex items-center justify-center p-1"
+                        >
+                            <img :src="img" class="max-w-full max-h-full object-contain rounded-lg transition-transform duration-300 group-hover:scale-105" alt="商品">
+                            <div class="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all space-x-1.5">
+                                <button @click="setMainImage(index)" :class="['p-1.5 rounded bg-white hover:bg-slate-100 text-xs text-slate-800 shadow', index === mainImageIndex ? 'text-emerald-500 border border-emerald-500' : '']" title="设为渲染主图">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </button>
+                                <button @click="removeImage(index)" class="p-1.5 rounded bg-white hover:bg-rose-50 text-rose-500 shadow border border-slate-100" title="删除">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                </button>
+                            </div>
+                            <!-- 主图角标 -->
+                            <span v-if="index === mainImageIndex" class="absolute bottom-1 right-1 bg-emerald-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded shadow-sm">
+                                主
+                            </span>
+                        </div>
+
+                        <!-- 虚线上传占位框 -->
+                        <div 
+                            v-if="uploadedImages.length < 3"
+                            @click="triggerFileInput"
+                            @dragover.prevent="dragOver = true"
+                            @dragleave.prevent="dragOver = false"
+                            @drop.prevent="handleDrop"
+                            :class="[
+                                'aspect-square rounded-xl border border-dashed transition-all duration-300 flex flex-col items-center justify-center cursor-pointer p-2',
+                                dragOver ? 'border-emerald-500 bg-emerald-50/50 shadow-sm' : 'border-slate-300 bg-slate-50 hover:bg-slate-100/50 hover:border-slate-400'
+                            ]"
+                        >
+                            <svg class="w-5 h-5 text-slate-400 mb-1" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                            </svg>
+                            <span class="text-[10px] text-slate-500 font-semibold text-center">添加图片</span>
+                            <span class="text-[8px] text-slate-400 text-center scale-95 mt-0.5">拖拽或点击</span>
+                            <input ref="fileInput" type="file" accept="image/*" class="hidden" multiple @change="handleFileChange">
+                        </div>
+                    </div>
+
+                   
+                </div>
+
+                <!-- 生成基本设置区 -->
+                <div class="p-5 border-b border-slate-100 space-y-4">
+                    <div class="grid grid-cols-2 gap-3.5">
+                        <!-- 投放渠道/平台 -->
+                        <div>
+                            <label class="text-[11px] font-bold text-slate-500 block mb-1.5">投放平台</label>
+                            <select v-model="settings.platform" class="w-full bg-slate-50 border border-slate-200 text-xs text-slate-800 rounded-lg py-1.5 px-2.5 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none transition-colors">
+                                <option value="抖音电商">抖音电商 (1:1 沉浸)</option>
+                                <option value="淘宝">淘宝 (主重营销)</option>
+                                <option value="拼多多">拼多多 (高性价比)</option>
+                                <option value="小红书">小红书 (清新种草)</option>
+                                <option value="独立站">独立站 (极简高级)</option>
+                            </select>
+                        </div>
+
+                        <!-- 销售地区 -->
+                        <div>
+                            <label class="text-[11px] font-bold text-slate-500 block mb-1.5">销售地区</label>
+                            <select v-model="settings.region" class="w-full bg-slate-50 border border-slate-200 text-xs text-slate-800 rounded-lg py-1.5 px-2.5 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none transition-colors">
+                                <option value="中国">中国大陆 (高饱和营销)</option>
+                                <option value="东南亚">东南亚地区 (彩色明快)</option>
+                                <option value="欧美">欧美市场 (低饱和冷淡)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3.5">
+                        <!-- 目标语言 -->
+                        <div>
+                            <label class="text-[11px] font-bold text-slate-500 block mb-1.5">排版语言</label>
+                            <select v-model="settings.language" class="w-full bg-slate-50 border border-slate-200 text-xs text-slate-800 rounded-lg py-1.5 px-2.5 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none transition-colors">
+                                <option value="中文">中文 (简体)</option>
+                                <option value="英文">英文 (English)</option>
+                                <option value="多语言">中英双语对照</option>
+                            </select>
+                        </div>
+
+                        <!-- 图片比例 -->
+                        <div>
+                            <label class="text-[11px] font-bold text-slate-500 block mb-1.5">图片比例</label>
+                            <select v-model="settings.ratio" class="w-full bg-slate-50 border border-slate-200 text-xs text-slate-800 rounded-lg py-1.5 px-2.5 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none transition-colors">
+                                <option value="1:1">1:1 正方形主图</option>
+                                <option value="3:4">3:4 竖向主图</option>
+                                <option value="9:16">9:16 视频主图</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- 合并文本域：商品名及卖点一并输入 -->
+                    <div>
+                        <div class="flex items-center justify-between mb-1.5">
+                            <label class="text-[11px] font-bold text-slate-500">商品名称及核心亮点</label>
+                            <!-- AI一键写卖点 -->
+                            <button 
+                                @click="generateSellingPointsWithAI" 
+                                :disabled="aiLoading"
+                                class="text-[10px] text-emerald-600 hover:text-emerald-500 transition-colors flex items-center gap-1 cursor-pointer font-semibold disabled:opacity-50"
+                            >
+                                <svg v-if="aiLoading" class="animate-spin w-3 h-3 text-emerald-600" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                                </svg>
+                                <svg v-else class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 21l3.586-3.586m0 0a1 1 0 011.172-.03l5.093 3.472M12 3.75l.132-.012A8.996 8.996 0 003 12c0 2.22.8 4.25 2.128 5.828l3.685-6.83a2.122 2.122 0 011.83-1.077H11.5M12 3.75a8.966 8.966 0 014.223 1.05M12 3.75V1.5m6 7.5h2.25m-3.375 3h1.125m-13.5 0h1.125m-1.125 3h1.125M4 8.25h1.125M16.5 12a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
+                                </svg>
+                                {{ aiLoading ? 'AI极速脑暴中...' : 'AI一键提炼卖点' }}
+                            </button>
+                        </div>
+                        
+                        <div class="relative bg-slate-50 rounded-xl border border-slate-200 overflow-hidden shadow-inner focus-within:border-emerald-500 transition-colors">
+                            <textarea 
+                                v-model="settings.productInput"
+                                rows="6" 
+                                placeholder="建议包含以下信息生成更精准：
+1.产品名称
+2.核心卖点
+3.适用人群
+4.期望场景
+5.具体参数"
+                                class="w-full bg-transparent text-xs text-slate-700 p-3 focus:outline-none resize-none leading-relaxed min-h-[140px]"
+                            ></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 生成模块选择区 -->
+                <div class="p-5 flex-1 space-y-3 bg-slate-50/20">
+                    <div class="flex items-center justify-between">
+                        <label class="text-[11px] font-bold text-slate-500">选择生成图种类型 ({{ selectedModules.length }}项)</label>
+                        <div class="flex space-x-2">
+                            <button @click="toggleSelectAllModules(true)" class="text-[10px] text-slate-400 hover:text-emerald-600 font-semibold">全选</button>
+                            <span class="text-slate-300 text-[10px]">|</span>
+                            <button @click="toggleSelectAllModules(false)" class="text-[10px] text-slate-400 hover:text-slate-600 font-semibold">取消</button>
+                        </div>
+                    </div>
+
+                    <!-- 16个图种多选网格 -->
+                    <div class="grid grid-cols-2 gap-2 pb-6">
+                        <div 
+                            v-for="mod in availableModules" 
+                            :key="mod.id"
+                            @click="toggleModule(mod.id)"
+                            :class="[
+                                'p-2.5 rounded-xl border text-left cursor-pointer transition-all duration-200 select-none flex flex-col justify-between h-20 shadow-sm',
+                                selectedModules.includes(mod.id)
+                                    ? 'bg-emerald-50/80 border-emerald-500/40 text-emerald-950 shadow-emerald-500/5 ring-1 ring-emerald-500/10'
+                                    : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50/50'
+                            ]"
+                        >
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs font-bold truncate max-w-[130px]" :class="selectedModules.includes(mod.id) ? 'text-emerald-700' : 'text-slate-700'">{{ mod.name }}</span>
+                                <div 
+                                    :class="[
+                                        'w-3.5 h-3.5 rounded flex items-center justify-center border',
+                                        selectedModules.includes(mod.id) ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 bg-white'
+                                    ]"
+                                >
+                                    <svg v-if="selectedModules.includes(mod.id)" class="w-2.5 h-2.5 stroke-[3]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                </div>
+                            </div>
+                            <p class="text-[9px] leading-normal line-clamp-2 mt-1" :class="selectedModules.includes(mod.id) ? 'text-emerald-600' : 'text-slate-400'">
+                                {{ mod.desc }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 触发生成按钮区 (底部贴齐，毛玻璃透亮效果) -->
+                <div class="p-5 border-t border-slate-200 bg-white/95 sticky bottom-0 z-10 shadow-[0_-4px_12px_rgba(0,0,0,0.02)] backdrop-blur-sm">
+                    <button 
+                        @click="triggerBatchGeneration" 
+                        :disabled="generating"
+                        :class="[
+                            'w-full py-3 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all duration-300 relative overflow-hidden shadow-md',
+                            uploadedImages.length === 0 
+                                ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
+                                : 'bg-emerald-500 hover:bg-emerald-600 text-white glow-brand-strong transform hover:-translate-y-0.5'
+                        ]"
+                    >
+                        <svg v-if="generating" class="animate-spin w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                        </svg>
+                        <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 21l3.586-3.586m0 0a1 1 0 011.172-.03l5.093 3.472M12 3.75l.132-.012A8.996 8.996 0 003 12c0 2.22.8 4.25 2.128 5.828l3.685-6.83a2.122 2.122 0 011.83-1.077H11.5M12 3.75a8.966 8.966 0 014.223 1.05M12 3.75v3.375m0-3.375a11.241 11.241 0 016.2 1.62m0 0a10.999 10.999 0 014.125 5.83M12 7.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
+                        </svg>
+                        
+                        <span>
+                            {{ uploadedImages.length === 0 ? '请先上传产品图/使用体验图' : (generating ? `AI 高端排版中... (${generatedCount}/${selectedModules.length})` : `立即一键排版生成 ${selectedModules.length} 张主图`) }}
+                        </span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 右侧生成结果预览区 -->
+            <div v-show="activeNav === 'main'" class="flex-1 flex flex-col h-full bg-slate-50 overflow-hidden relative">
+                
+                <!-- 结果面板顶部工具条 -->
+                <div class="h-14 border-b border-slate-200 bg-white/80 flex items-center justify-between px-6 z-10 flex-shrink-0 shadow-sm backdrop-blur-sm">
+                    <div class="flex items-center space-x-3">
+                        <span class="text-xs bg-slate-100 border border-slate-200 text-slate-600 font-semibold px-2.5 py-0.5 rounded-full">本次批任务</span>
+                        <input 
+                            v-model="currentTaskTitle"
+                            type="text" 
+                            class="bg-transparent border-b border-transparent hover:border-slate-300 focus:border-emerald-500 focus:outline-none text-xs font-bold text-slate-800 w-64 transition-all py-0.5"
+                        >
+                    </div>
+
+                    <!-- 批量选择与下载 -->
+                    <div class="flex items-center space-x-4" v-if="outputCards.length > 0">
+                        <div class="flex items-center space-x-2">
+                            <button @click="toggleSelectAllCards(true)" class="text-xs text-slate-500 hover:text-emerald-600 font-semibold">全选</button>
+                            <span class="text-slate-300 text-xs">/</span>
+                            <button @click="toggleSelectAllCards(false)" class="text-xs text-slate-500 hover:text-slate-700 font-semibold">全不选</button>
+                        </div>
+                        <div class="h-4 w-px bg-slate-200"></div>
+                        <button 
+                            @click="previewLongImage" 
+                            class="px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors shadow-sm"
+                        >
+                            <svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                            </svg>
+                            长图拼接预览
+                        </button>
+                        <button 
+                            @click="batchDownload" 
+                            class="px-3.5 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 transition-all shadow-md"
+                        >
+                            <svg class="w-3.5 h-3.5 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                            批量下载 ({{ selectedCardsCount }}张)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 核心内容容器：生成中队列 or 空白占位 or 主图网格 -->
+                <div class="flex-1 overflow-y-auto p-6 relative">
+                    
+                    <!-- 1. 异步生成中排队遮罩与波形动效 (在明亮背景下增加立体蒙版) -->
+                    <div v-if="generating" class="absolute inset-0 bg-white/95 flex flex-col items-center justify-center z-20 p-8">
+                        <div class="max-w-md w-full space-y-6 text-center">
+                            <div class="relative w-24 h-24 mx-auto flex items-center justify-center">
+                                <div class="absolute inset-0 rounded-full bg-emerald-500/10 animate-ping"></div>
+                                <div class="absolute inset-2 rounded-full border border-dashed border-emerald-500/40 animate-spin"></div>
+                                <svg class="w-10 h-10 text-emerald-500 animate-pulse" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 00-3.7-3.7 48.656 48.656 0 00-7.324 0 4.006 4.006 0 00-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3l-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 003.7 3.7 48.656 48.656 0 007.324 0 4.006 4.006 0 003.7-3.7c.017-.22.032-.441.046-.662M4.5 12l-3 3m3-3l3 3" />
+                                </svg>
+                            </div>
+
+                            <div class="space-y-2">
+                                <h4 class="text-base font-bold text-slate-800">AI 批量电商排版渲染引擎就绪</h4>
+                                <p class="text-xs text-slate-500">正在应用 <span class="text-emerald-600 font-semibold">[{{ settings.platform }}]</span> 的排版策略与 <span class="text-teal-600 font-semibold">[{{ settings.region }}]</span> 美学标准渲染高点击主图</p>
+                            </div>
+
+                            <!-- 生成进度条 -->
+                            <div class="bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200">
+                                <div class="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-300" :style="{ width: `${(generatedCount / selectedModules.length) * 100}%` }"></div>
+                            </div>
+                            <div class="flex justify-between text-[10px] text-slate-400 font-bold">
+                                <span>已生成 {{ generatedCount }} / {{ selectedModules.length }}</span>
+                                <span>预计耗时 1~2 秒</span>
+                            </div>
+
+                            <!-- 队列滚动日志 -->
+                            <div class="bg-slate-50 rounded-xl p-3 border border-slate-200 text-left font-mono text-[9px] text-slate-500 h-28 overflow-y-auto space-y-1.5 shadow-inner">
+                                <div v-for="(log, idx) in genLogs" :key="idx" class="flex items-center space-x-2">
+                                    <span class="text-emerald-500 font-bold">▶</span>
+                                    <span>{{ log }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 2. 空白占位状态 (未生成时) -->
+                    <div v-if="outputCards.length === 0 && !generating" class="h-full flex flex-col items-center justify-center text-center p-12">
+                        <div class="w-16 h-16 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-center mb-6 text-slate-400">
+                            <svg class="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" stroke-width="1.2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 002.25 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+                            </svg>
+                        </div>
+                        <h4 class="text-sm font-bold text-slate-700">暂无生成的主图任务</h4>
+                        <p class="text-xs text-slate-500 max-w-sm mt-1">请在左侧上传商品高清白底图/场景图，点击下方「立即一键排版生成」按钮，系统将根据您选定的卖点信息输出多种类型的电商视觉主图。</p>
+                        
+                        <div class="mt-6 flex gap-4 max-w-xl text-left bg-white border border-slate-200 p-4 rounded-2xl shadow-sm">
+                            <div class="flex-1 space-y-1">
+                                <span class="text-[10px] font-bold text-emerald-600">⚡ 高转化主图逻辑</span>
+                                <p class="text-[9px] text-slate-500">采用抖音、淘宝主流“黄金3秒”点击设计，内置高对照详情主页排版参数，极大提升商品点击和转化指标。</p>
+                            </div>
+                            <div class="w-px bg-slate-200"></div>
+                            <div class="flex-1 space-y-1">
+                                <span class="text-[10px] font-bold text-teal-600">🌐 跨地域设计适配</span>
+                                <p class="text-[9px] text-slate-500">根据东南亚、欧美等不同地区市场的用户消费心理和视觉偏好，自动调用冷淡简约或彩色丰富的品牌基调。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 3. 图片展示网格 -->
+                    <div v-else class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-5">
+                        <div 
+                            v-for="card in outputCards" 
+                            :key="card.id"
+                            :class="[
+                                'group rounded-2xl bg-white border overflow-hidden flex flex-col justify-between shadow-sm hover:shadow-md transition-all duration-300 transform hover:-translate-y-1 relative',
+                                card.selected ? 'border-emerald-500 ring-2 ring-emerald-500/10' : 'border-slate-200'
+                            ]"
+                        >
+                            <!-- 图片卡头部：多选勾选 & 类型标签 -->
+                            <div class="absolute top-2.5 left-2.5 z-10 flex items-center space-x-2">
+                                <button 
+                                    @click="toggleCardSelection(card.id)"
+                                    :class="[
+                                        'w-5 h-5 rounded-md flex items-center justify-center border transition-all shadow-sm',
+                                        card.selected ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-white/90 backdrop-blur-sm border-slate-300 hover:border-slate-400 text-transparent'
+                                    ]"
+                                >
+                                    <svg class="w-3 h-3 stroke-[3]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                </button>
+                                <span class="text-[9px] bg-white/90 backdrop-blur-sm border border-slate-200 text-slate-700 font-bold px-2 py-0.5 rounded-full shadow-sm">
+                                    {{ getModuleName(card.typeId) }}
+                                </span>
+                            </div>
+
+                            <!-- 重新生成 / 大图预览控制 -->
+                            <div class="absolute top-2.5 right-2.5 z-10 flex items-center space-x-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button @click="regenerateSingleCard(card)" class="p-1.5 rounded-lg bg-white/95 hover:bg-white border border-slate-200 text-slate-600 hover:text-emerald-600 shadow" title="重算该策略图">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                                    </svg>
+                                </button>
+                                <button @click="zoomCardImage(card)" class="p-1.5 rounded-lg bg-white/95 hover:bg-white border border-slate-200 text-slate-600 hover:text-emerald-600 shadow" title="放大预览">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                    </svg>
+                                </button>
+                            </div>
+
+                            <!-- 图片容器 (白底电商底板) -->
+                            <div class="aspect-square bg-slate-100 flex items-center justify-center p-3 relative overflow-hidden group/img cursor-pointer" @click="toggleCardSelection(card.id)">
+                                <div class="absolute inset-0 bg-gradient-to-b from-transparent to-black/[0.01]"></div>
+                                <img :src="card.dataUrl" class="max-w-full max-h-full object-contain drop-shadow-md transition-transform duration-300 group-hover/img:scale-[1.03]" alt="AI主图">
+                            </div>
+
+                            <!-- 策略说明及行动区 -->
+                            <div class="p-3 bg-white border-t border-slate-100 space-y-1.5 flex-1 flex flex-col justify-between">
+                                <div>
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-[10px] font-bold text-slate-800">{{ getModuleName(card.typeId) }}</span>
+                                        <span class="text-[9px] text-slate-400 font-bold">{{ settings.ratio }}</span>
+                                    </div>
+                                    <p class="text-[9px] text-emerald-600 leading-relaxed font-semibold mt-1">
+                                        🌟 策略解读：{{ getModuleStrategy(card.typeId) }}
+                                    </p>
+                                </div>
+                                <div class="pt-2 border-t border-slate-100 flex items-center justify-between">
+                                    <span class="text-[9px] text-slate-400 font-medium">适配：{{ settings.platform }} / {{ settings.language }}</span>
+                                    <button @click="downloadSingleImage(card)" class="text-[10px] text-emerald-600 hover:text-emerald-500 flex items-center gap-1 font-bold">
+                                        下载单张
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- 详情长图拼接预览 modal -->
+    <div v-if="showLongPreviewModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-6">
+        <div class="bg-white border border-slate-200 rounded-2xl w-full max-w-lg h-[90vh] flex flex-col overflow-hidden shadow-2xl">
+            <!-- 头部 -->
+            <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between flex-shrink-0 bg-slate-50/50">
+                <div>
+                    <h3 class="text-sm font-bold text-slate-800">详情页长图拼接预览</h3>
+                    <p class="text-[10px] text-slate-500">已将选中的 {{ selectedCardsCount }} 张主图无缝拼接为垂直排版长图</p>
+                </div>
+                <button @click="showLongPreviewModal = false" class="text-slate-400 hover:text-slate-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            <!-- 长图滚动预览 -->
+            <div class="flex-1 overflow-y-auto p-8 bg-slate-100 flex justify-center">
+                <div class="w-72 bg-white shadow-lg rounded-xl border border-slate-200 overflow-hidden flex flex-col divide-y divide-slate-100">
+                    <img 
+                        v-for="card in selectedCards" 
+                        :key="card.id" 
+                        :src="card.dataUrl" 
+                        class="w-full object-contain"
+                        alt="主图片段"
+                    >
+                </div>
+            </div>
+
+            <!-- 底部下载 -->
+            <div class="px-5 py-3 border-t border-slate-100 flex items-center justify-between flex-shrink-0 bg-slate-50/50">
+                <span class="text-xs text-slate-400 font-medium">总高度约 {{ selectedCardsCount * 800 }} 像素</span>
+                <button 
+                    @click="downloadLongCombinedImage"
+                    class="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs rounded-xl transition-all shadow"
+                >
+                    下载无损长图 (PNG)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 历史生成记录 drawer -->
+    <div v-if="showHistoryDrawer" class="fixed inset-y-0 right-0 w-96 bg-white border-l border-slate-200 z-40 shadow-2xl flex flex-col overflow-hidden">
+        <div class="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
+            <h3 class="text-sm font-bold text-slate-800">历史生成记录</h3>
+            <button @click="showHistoryDrawer = false" class="text-slate-400 hover:text-slate-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+        <div class="flex-1 overflow-y-auto p-4 space-y-3">
+            <div 
+                v-for="hist in historyTasks" 
+                :key="hist.id"
+                class="p-3 bg-slate-50 rounded-xl border border-slate-200 hover:border-emerald-500/40 hover:bg-emerald-50/10 transition-colors cursor-pointer shadow-sm"
+                @click="loadHistoryTask(hist)"
+            >
+                <div class="flex justify-between items-start mb-1.5">
+                    <span class="text-xs font-bold text-slate-800 truncate max-w-[200px]">{{ hist.title }}</span>
+                    <span class="text-[9px] bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded border border-emerald-100 font-bold">{{ hist.cardsCount }}张主图</span>
+                </div>
+                <div class="flex justify-between items-center text-[9px] text-slate-500">
+                    <span>渠道：{{ hist.platform }}</span>
+                    <span>{{ hist.time }}</span>
+                </div>
+            </div>
+            
+            <div v-if="historyTasks.length === 0" class="h-64 flex flex-col items-center justify-center text-center text-slate-400">
+                <svg class="w-10 h-10 mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                </svg>
+                <span class="text-xs">暂无历史排版任务</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 批量托管异步任务队列 drawer -->
+    <div v-if="showQueueDrawer" class="fixed inset-y-0 right-0 w-96 bg-white border-l border-slate-200 z-40 shadow-2xl flex flex-col overflow-hidden">
+        <div class="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
+            <div>
+                <h3 class="text-sm font-bold text-slate-800">批量任务挂机后台</h3>
+                <p class="text-[10px] text-slate-500">异步排队，生成完成后支持邮件与系统通知</p>
+            </div>
+            <button @click="showQueueDrawer = false" class="text-slate-400 hover:text-slate-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+        <div class="flex-1 overflow-y-auto p-4 space-y-3">
+            <div 
+                v-for="task in taskQueue" 
+                :key="task.id"
+                class="p-3 bg-slate-50 rounded-xl border border-slate-200 shadow-sm"
+            >
+                <div class="flex justify-between items-center mb-1.5">
+                    <span class="text-xs font-bold text-slate-800 truncate max-w-[180px]">{{ task.title }}</span>
+                    <span :class="[
+                        'text-[8px] px-1.5 py-0.5 rounded font-bold',
+                        task.status === '进行中' ? 'bg-amber-50 text-amber-600 border border-amber-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'
+                    ]">{{ task.status }}</span>
+                </div>
+                <!-- 进度条 -->
+                <div class="bg-slate-200 rounded-full h-1 overflow-hidden mb-2">
+                    <div :class="['h-full rounded-full transition-all duration-300', task.status === '进行中' ? 'bg-amber-500' : 'bg-emerald-500']" :style="{ width: `${task.progress}%` }"></div>
+                </div>
+                <div class="flex justify-between text-[9px] text-slate-500">
+                    <span>渠道：{{ task.platform }} ({{ task.ratio }})</span>
+                    <span>进度：{{ task.progress }}%</span>
+                </div>
+            </div>
+            
+            <div v-if="taskQueue.length === 0" class="h-64 flex flex-col items-center justify-center text-center text-slate-400">
+                <svg class="w-10 h-10 mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                </svg>
+                <span class="text-xs">暂无后台批量挂机任务</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 弹窗式大图预览 Modal -->
+    <div v-if="zoomCard" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-6" @click="zoomCard = null">
+        <div class="relative max-w-3xl max-h-[90vh] bg-white p-4 rounded-2xl border border-slate-200 shadow-2xl flex flex-col" @click.stop>
+            <div class="absolute top-4 right-4 z-10">
+                <button @click="zoomCard = null" class="p-2 rounded-full bg-white hover:bg-slate-100 border border-slate-200 text-slate-600 shadow-sm">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <img :src="zoomCard.dataUrl" class="max-w-full max-h-[75vh] object-contain rounded-xl shadow-inner border border-slate-100" alt="放大主图">
+            <div class="mt-4 text-center">
+                <h4 class="text-sm font-bold text-slate-800">{{ getModuleName(zoomCard.typeId) }}</h4>
+                <p class="text-xs text-emerald-600 font-bold mt-1">策略设计：{{ getModuleStrategy(zoomCard.typeId) }}</p>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    const { createApp, ref, reactive, computed, onMounted } = Vue;
+
+    createApp({
+        setup() {
+            // 左侧导航
+            const activeNav = ref('main');
+            const mainNavs = ref([
+                { id: 'main', name: '商品原图', desc: 'AI 批量原图排版生成主图模块', icon: `<svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>` },
+ 
+                { id: 'outfit', name: '服饰穿搭', desc: '真人模特试衣与穿搭场景生成 (研发中)', icon: `<svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 21l3.586-3.586m0 0a1 1 0 011.172-.03l5.093 3.472M12 3.75l.132-.012A8.996 8.996 0 003 12c0 2.22.8 4.25 2.128 5.828l3.685-6.83a2.122 2.122 0 011.83-1.077H11.5M12 3.75a8.966 8.966 0 014.223 1.05" /></svg>` },
+               
+            ]);
+
+            // 上传图片状态
+            const uploadedImages = ref([]);
+            const mainImageIndex = ref(0);
+            const dragOver = ref(false);
+            const fileInput = ref(null);
+
+            // 商品设置
+            const settings = reactive({
+                platform: '抖音电商',
+                region: '中国',
+                language: '中文',
+                ratio: '1:1',
+                productInput: ''
+            });
+
+            // 16个核心功能模块定义 (availableModules)
+            const availableModules = ref([
+                { id: 'first-screen', name: '首屏主视觉', desc: '极简大图与大字报，第一眼传递核心卖点价值。', strategy: '大标题聚焦，高饱和度背板突显商品核心形态。' },
+                { id: 'core-selling', name: '核心卖点图', desc: '突出商品三大硬核优势，多点对照打消疑虑。', strategy: '三栏目清单排版，配图层级鲜明。' },
+                { id: 'use-scenario', name: '使用场景图', desc: '呈现真实使用状态或家居融入。', strategy: '融合淡雅环境投影，拉近用户心理距离。' },
+                { id: 'multi-angle', name: '多角度呈现图', desc: '展示侧面、背面及折叠等完整外观。', strategy: '三视图对齐，透视比例精准缩放。' },
+                { id: 'ambient-scene', name: '场景氛围图', desc: '强光影写实渲染，增强商品的高级质感。', strategy: '暖色调逆光底板，配合微小阴影质感。' },
+                { id: 'detail-zoom', name: '商品细节图', desc: '局部放大，精细展现材质和精湛工艺。', strategy: '中心放大镜切割圆圈圈，拉线批注。' },
+                { id: 'brand-story', name: '品牌故事图', desc: '传达品牌匠心，突显高档商品格调。', strategy: '英文点缀，加宽留白，典雅无衬线排版。' },
+                { id: 'specs-info', name: '尺寸/规格/容量图', desc: '直观标注物理尺寸与对比参照物。', strategy: '添加标注线与比例尺，数值一目了然。' },
+                { id: 'contrast-effect', name: '效果对比图', desc: '使用前/后、升级前/后的直观效果。', strategy: '双栏垂直切割，BEFORE / AFTER 红色徽章强对抗。' },
+                { id: 'tech-specs', name: '详细规格/参数表', desc: '将复杂工业数据整合为超清美化表格。', strategy: '圆角半透明卡片表格，结构化突出核心。' },
+                { id: 'manufacturing', name: '工艺制作图', desc: '展示精密做工、材质层级拆解。', strategy: '爆炸视图效果，精细拆解元器件架构。' },
+                { id: 'freebies', name: '配件/赠品图', desc: '明确告知用户收货拆箱的丰富组合。', strategy: '“买即送”爆款角贴，配全套礼盒全家福。' },
+                { id: 'series-show', name: '系列展示图', desc: '多配色、多SKU合辑呈现，极大提升加购。', strategy: '多色环绕渐变，卡片式并列。' },
+                { id: 'ingredients', name: '商品成分图', desc: '透明呈现成分比例或纯净配料表。', strategy: '分子网格配图，科学健康风骨。' },
+                { id: 'warranty', name: '售后保障图', desc: '官方质保、包邮无忧、金牌认证退换。', strategy: '醒目安全绿色/金黄底色徽章，构建消费信任。' },
+                { id: 'usage-tips', name: '使用建议图', desc: '温馨提示使用建议、充电与养护说明。', strategy: '简洁ICON列表，避免售后客诉纠纷。' }
+            ]);
+
+            // 默认勾选前6项
+            const selectedModules = ref(['first-screen', 'core-selling', 'use-scenario', 'multi-angle', 'detail-zoom', 'warranty']);
+
+            // 结果面板及生成状态
+            const currentTaskTitle = ref(`Task_${new Date().toISOString().slice(0,10).replace(/-/g, '')}_商品主图批量生成`);
+            const generating = ref(false);
+            const generatedCount = ref(0);
+            const genLogs = ref([]);
+            const outputCards = ref([]);
+            
+            // 批量托管队列 & 历史记录
+            const taskQueue = ref([]);
+            const historyTasks = ref([]);
+
+            // Drawers, Modals, Zoom
+            const showHistoryDrawer = ref(false);
+            const showQueueDrawer = ref(false);
+            const showLongPreviewModal = ref(false);
+            const zoomCard = ref(null);
+
+            // 预设免抠图资源 (供快速体验)
+            
+
+            const aiLoading = ref(false);
+
+            const generateSellingPointsWithAI = async () => {
+                const textInput = settings.productInput.trim();
+                if (!textInput) {
+                    alert("请在合并输入框内至少键入商品名称（如第一行），以便 AI 精准提炼卖点！");
+                    return;
+                }
+                
+                const lines = textInput.split('\n').map(l => l.trim()).filter(Boolean);
+                const queryName = lines[0];
+
+                aiLoading.value = true;
+                try {
+                    const prompt = `你是一个顶级电商爆款策划。请根据商品名称或基础信息 "${queryName}"，撰写一份完整的主图文字策略排版。
+                    要求：
+                    1. 第一行为商品简短精练的品牌与名称标题（不要带标点）。
+                    2. 接着换行，写 3 条能在主图上高亮展示的核心卖点，每条占一行（格式为：“1. [4-6字核心词] / [8-12字效果说明]”）。
+                    3. 语气极具诱惑力，符合平台: "${settings.platform}" 与地域: "${settings.region}" 的商业调性。
+                    4. 不要带任何多余的开头白、结尾语，也不要 Markdown 代码标记符号或星号。直接返回排版后的多行纯文本内容。`;
+
+                    const systemPrompt = "你是电商主图排版文案大师，只输出排版优美无格式修饰的纯多行文本。";
+                    const apiKey = ""; 
+                    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+
+                    const payload = {
+                        contents: [{ parts: [{ text: prompt }] }],
+                        systemInstruction: {
+                            parts: [{ text: systemPrompt }]
+                        }
+                    };
+
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    const result = await response.json();
+                    const aiText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                    if (aiText) {
+                        settings.productInput = aiText.trim();
+                    } else {
+                        settings.productInput = `${queryName}\n1. 旗舰级核心配置 / 全新升级首发\n2. 顶级工艺美学 / 触手可及\n3. 官方金牌质保 / 顺丰闪电发货`;
+                    }
+                } catch (err) {
+                    console.error("AI 卖点撰写失败，启用降级补全算法", err);
+                    settings.productInput = `${queryName}\n1. 旗舰级超高性能 / 全新升级首发\n2. 顶级人体工学 / 久用轻盈舒适\n3. 官方正品包邮 / 七天无理由退换`;
+                } finally {
+                    aiLoading.value = false;
+                }
+            };
+
+            const triggerFileInput = () => {
+                fileInput.value.click();
+            };
+
+            const handleFileChange = (e) => {
+                const files = Array.from(e.target.files);
+                processFiles(files);
+            };
+
+            const handleDrop = (e) => {
+                dragOver.value = false;
+                const files = Array.from(e.dataTransfer.files);
+                processFiles(files);
+            };
+
+            const processFiles = (files) => {
+                const limit = 3 - uploadedImages.value.length;
+                const toProcess = files.slice(0, limit);
+                
+                toProcess.forEach(file => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        uploadedImages.value.push(e.target.result);
+                    };
+                    reader.readAsDataURL(file);
+                });
+            };
+
+            const removeImage = (index) => {
+                uploadedImages.value.splice(index, 1);
+                if (mainImageIndex.value >= uploadedImages.value.length) {
+                    mainImageIndex.value = Math.max(0, uploadedImages.value.length - 1);
+                }
+            };
+
+            const clearImages = () => {
+                uploadedImages.value = [];
+                mainImageIndex.value = 0;
+            };
+
+            const setMainImage = (index) => {
+                mainImageIndex.value = index;
+            };
+
+            // 载入预设免抠产品素材
+            const loadPreset = (preset) => {
+                settings.productInput = `${preset.title}\n${preset.points}`;
+                
+                // 将SVG转换为Base64渲染
+                const svgString = preset.svg;
+                const base64 = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgString)));
+                uploadedImages.value = [base64];
+                mainImageIndex.value = 0;
+            };
+
+            // 生成策略说明信息
+            const getModuleName = (id) => {
+                return availableModules.value.find(m => m.id === id)?.name || id;
+            };
+
+            const getModuleStrategy = (id) => {
+                return availableModules.value.find(m => m.id === id)?.strategy || '';
+            };
+
+            const toggleModule = (id) => {
+                const idx = selectedModules.value.indexOf(id);
+                if (idx > -1) {
+                    selectedModules.value.splice(idx, 1);
+                } else {
+                    selectedModules.value.push(id);
+                }
+            };
+
+            const toggleSelectAllModules = (bool) => {
+                if (bool) {
+                    selectedModules.value = availableModules.value.map(m => m.id);
+                } else {
+                    selectedModules.value = [];
+                }
+            };
+
+            // 核心主图智能排版画布生成
+            const renderCardImage = (typeId, productImgSrc) => {
+                return new Promise((resolve) => {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    
+                    // 设置分辨率
+                    let width = 800;
+                    let height = 800;
+                    if (settings.ratio === '3:4') height = 1066;
+                    if (settings.ratio === '9:16') height = 1422;
+
+                    canvas.width = width;
+                    canvas.height = height;
+
+                    // 1. 绘制背景及渐变 (根据地区和平台定制风格 - 明亮清爽底色)
+                    let bgGrad = ctx.createLinearGradient(0, 0, width, height);
+                    if (settings.region === '欧美') {
+                        // 欧美简约风：高级大理石冷灰色
+                        bgGrad.addColorStop(0, '#f8fafc');
+                        bgGrad.addColorStop(1, '#e2e8f0');
+                    } else if (settings.region === '东南亚') {
+                        // 东南亚：热情马卡龙浅橙黄色
+                        bgGrad.addColorStop(0, '#fffbeb');
+                        bgGrad.addColorStop(1, '#ffedd5');
+                    } else {
+                        // 中国大陆高饱和高端风
+                        bgGrad.addColorStop(0, '#ffffff');
+                        bgGrad.addColorStop(1, '#f1f5f9');
+                    }
+                    ctx.fillStyle = bgGrad;
+                    ctx.fillRect(0, 0, width, height);
+
+                    // 2. 绘制微弱装饰网格背景
+                    ctx.strokeStyle = 'rgba(16, 185, 129, 0.05)';
+                    ctx.lineWidth = 1;
+                    const gridSize = 40;
+                    for (let x = 0; x < width; x += gridSize) {
+                        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke();
+                    }
+                    for (let y = 0; y < height; y += gridSize) {
+                        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke();
+                    }
+
+                    // 3. 载入核心产品图并渲染
+                    const img = new Image();
+                    img.onload = () => {
+                        let productX = width / 2;
+                        let productY = height / 2 + 50;
+                        let productW = width * 0.65;
+                        let productH = height * 0.65;
+
+                        if (typeId === 'first-screen') {
+                            // 首屏图：产品巨幅放大
+                            productW = width * 0.75;
+                            productH = height * 0.75;
+                        } else if (typeId === 'core-selling' || typeId === 'tech-specs') {
+                            // 卖点和规格图：偏左下/偏右
+                            productX = width * 0.72;
+                            productY = height * 0.62;
+                            productW = width * 0.48;
+                            productH = height * 0.48;
+                        } else if (typeId === 'detail-zoom') {
+                            // 细节局部放大：右侧
+                            productX = width * 0.35;
+                            productY = height * 0.58;
+                            productW = width * 0.55;
+                        }
+
+                        // 绘制高端轻量级软阴影
+                        ctx.shadowColor = 'rgba(15, 23, 42, 0.08)';
+                        ctx.shadowBlur = 24;
+                        ctx.shadowOffsetX = 0;
+                        ctx.shadowOffsetY = 12;
+
+                        ctx.drawImage(img, productX - productW/2, productY - productH/2, productW, productH);
+                        
+                        // 重置阴影
+                        ctx.shadowColor = 'transparent';
+                        ctx.shadowBlur = 0;
+
+                        // 4. 调用策略装饰模板绘制
+                        applyStrategyDecorations(ctx, typeId, width, height);
+
+                        resolve(canvas.toDataURL('image/png'));
+                    };
+                    img.src = productImgSrc;
+                });
+            };
+
+            // 绘制不同图种的专业排版
+            const applyStrategyDecorations = (ctx, typeId, w, h) => {
+                const isChinese = settings.language !== '英文';
+                const inputLines = settings.productInput.split('\n').map(l => l.trim()).filter(Boolean);
+                
+                const mainTitle = inputLines[0] || 'OmniAI 爆款推荐';
+                let bulletPoints = inputLines.slice(1);
+                
+                if (bulletPoints.length === 0) {
+                    bulletPoints = ["1. 突破技术瓶颈 / 首发体验", "2. 高精美学结构 / 触手可及", "3. 尊享官方售后 / 闪电发货"];
+                }
+
+                // 统一顶部排版区 (首屏、品牌图绘制 - 采用白底精致风格)
+                if (typeId === 'first-screen' || typeId === 'brand-story') {
+                    // 电商超级标题背板
+                    ctx.fillStyle = 'rgba(16, 185, 129, 0.06)';
+                    ctx.fillRect(40, 40, w - 80, 160);
+                    ctx.strokeStyle = 'rgba(16, 185, 129, 0.15)';
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(40, 40, w - 80, 160);
+
+                    // 主标题
+                    ctx.fillStyle = '#0f172a';
+                    ctx.font = 'bold 32px "Noto Sans SC"';
+                    ctx.fillText(mainTitle.slice(0, 20), 60, 95);
+
+                    // 促销气泡/小字报 (国内大促红绿，海外轻奢)
+                    if (settings.platform === '抖音电商' || settings.platform === '淘宝') {
+                        ctx.fillStyle = '#10b981';
+                        ctx.beginPath();
+                        ctx.roundRect(60, 120, 150, 32, 6);
+                        ctx.fill();
+                        ctx.fillStyle = '#ffffff';
+                        ctx.font = 'bold 16px "Noto Sans SC"';
+                        ctx.fillText("🔥 限时特惠首发", 72, 142);
+                    } else {
+                        ctx.fillStyle = '#475569';
+                        ctx.font = '15px "Plus Jakarta Sans"';
+                        ctx.fillText("NEW ARRIVAL / 2026 EDITION", 60, 140);
+                    }
+
+                    // 英文点缀
+                    ctx.fillStyle = 'rgba(16, 185, 129, 0.15)';
+                    ctx.font = 'italic bold 54px "Plus Jakarta Sans"';
+                    ctx.fillText("PREMIUM", w - 310, 150);
+                }
+
+                // A. 核心卖点排版
+                if (typeId === 'core-selling') {
+                    // 绘制左侧卖点列表
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.98)';
+                    ctx.beginPath();
+                    ctx.roundRect(40, 40, 380, h - 80, 16);
+                    ctx.fill();
+                    ctx.strokeStyle = 'rgba(16, 185, 129, 0.2)';
+                    ctx.stroke();
+
+                    // 小标题
+                    ctx.fillStyle = '#059669';
+                    ctx.font = 'bold 16px "Noto Sans SC"';
+                    ctx.fillText("✦ KEY FEATURES / 核心优势", 60, 80);
+
+                    // 循环写卖点
+                    let yOffset = 130;
+                    bulletPoints.forEach((point, idx) => {
+                        // 序列图标
+                        ctx.fillStyle = '#10b981';
+                        ctx.beginPath();
+                        ctx.arc(70, yOffset, 12, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.fillStyle = '#ffffff';
+                        ctx.font = 'bold 14px "Plus Jakarta Sans"';
+                        ctx.fillText(idx + 1, 66, yOffset + 5);
+
+                        // 卖点正文
+                        ctx.fillStyle = '#0f172a';
+                        ctx.font = 'bold 16px "Noto Sans SC"';
+                        const cleanText = point.replace(/^\d+[\.、]/, '').trim();
+                        const parts = cleanText.split('/');
+                        
+                        ctx.fillText(parts[0] || '', 95, yOffset - 5);
+                        if (parts[1]) {
+                            ctx.fillStyle = '#4b5563';
+                            ctx.font = '13px "Noto Sans SC"';
+                            ctx.fillText(parts[1], 95, yOffset + 15);
+                        }
+                        yOffset += 85;
+                    });
+
+                    // 品牌签名
+                    ctx.strokeStyle = 'rgba(0,0,0,0.06)';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath(); ctx.moveTo(60, yOffset); ctx.lineTo(380, yOffset); ctx.stroke();
+                    ctx.fillStyle = '#64748b';
+                    ctx.font = '12px "Plus Jakarta Sans"';
+                    ctx.fillText("OMNIAI DESIGNED SYSTEM", 60, yOffset + 30);
+                }
+
+                // B. 参数表展示
+                if (typeId === 'tech-specs') {
+                    // 半透明质感背景表格
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.98)';
+                    ctx.beginPath();
+                    ctx.roundRect(40, 40, 380, h - 80, 16);
+                    ctx.fill();
+                    ctx.strokeStyle = 'rgba(16, 185, 129, 0.15)';
+                    ctx.stroke();
+
+                    ctx.fillStyle = '#059669';
+                    ctx.font = 'bold 16px "Noto Sans SC"';
+                    ctx.fillText("📋 DETAILED PARAMETERS / 规格配置", 60, 80);
+
+                    const specs = [
+                        { label: '商品名称', val: mainTitle.slice(0, 10) },
+                        { label: '安全标准', val: '符合3C国际安全准则' },
+                        { label: '核心功效', val: '全速增效、降躁隔离' },
+                        { label: '质保政策', val: '1年超长保修、顺丰寄回' },
+                        { label: '包装配件', val: '主机、充电线、多尺寸套' }
+                    ];
+
+                    let rowY = 130;
+                    specs.forEach(spec => {
+                        ctx.fillStyle = 'rgba(16, 185, 129, 0.03)';
+                        ctx.fillRect(60, rowY, 340, 36);
+
+                        ctx.fillStyle = '#4b5563';
+                        ctx.font = '13px "Noto Sans SC"';
+                        ctx.fillText(spec.label, 75, rowY + 23);
+
+                        ctx.fillStyle = '#1e293b';
+                        ctx.font = 'bold 13px "Noto Sans SC"';
+                        ctx.fillText(spec.val, 190, rowY + 23);
+
+                        rowY += 50;
+                    });
+                }
+
+                // C. 售后保障图 (Trust Badges)
+                if (typeId === 'warranty') {
+                    // 全包金框
+                    ctx.strokeStyle = '#10b981';
+                    ctx.lineWidth = 4;
+                    ctx.strokeRect(20, 20, w - 40, h - 40);
+
+                    // 顶部权威头
+                    ctx.fillStyle = '#f8fafc';
+                    ctx.fillRect(w/2 - 180, 10, 360, 48);
+                    ctx.strokeStyle = '#10b981';
+                    ctx.strokeRect(w/2 - 180, 10, 360, 48);
+                    
+                    ctx.fillStyle = '#059669';
+                    ctx.font = 'bold 20px "Noto Sans SC"';
+                    ctx.textAlign = 'center';
+                    ctx.fillText("★ 官方金牌售后保障 ★", w/2, 42);
+                    ctx.textAlign = 'left';
+
+                    // 允许下方三枚大章
+                    const badges = [
+                        { t: "7天无理由退换", d: "开箱试用不满意 无损极速全额退" },
+                        { t: "全包顺丰发货", d: "全国主要城市 24小时闪电送达" },
+                        { t: "1年全保只换不修", d: "非人为硬件故障 官方极速寄换新品" }
+                    ];
+
+                    let badgeY = h * 0.58;
+                    badges.forEach((b, idx) => {
+                        ctx.fillStyle = '#ffffff';
+                        ctx.beginPath();
+                        ctx.roundRect(w/2 - 250, badgeY, 500, 70, 10);
+                        ctx.fill();
+                        ctx.strokeStyle = 'rgba(16, 185, 129, 0.25)';
+                        ctx.stroke();
+
+                        // 绿色认证对勾
+                        ctx.fillStyle = '#10b981';
+                        ctx.beginPath();
+                        ctx.arc(w/2 - 210, badgeY + 35, 16, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.fillStyle = '#ffffff';
+                        ctx.font = 'bold 16px "Noto Sans SC"';
+                        ctx.fillText("✓", w/2 - 216, badgeY + 41);
+
+                        // 文本
+                        ctx.fillStyle = '#0f172a';
+                        ctx.font = 'bold 16px "Noto Sans SC"';
+                        ctx.fillText(b.t, w/2 - 180, badgeY + 30);
+
+                        ctx.fillStyle = '#64748b';
+                        ctx.font = '12px "Noto Sans SC"';
+                        ctx.fillText(b.d, w/2 - 180, badgeY + 52);
+
+                        badgeY += 90;
+                    });
+                }
+
+                // D. 细节局部放大图
+                if (typeId === 'detail-zoom') {
+                    ctx.strokeStyle = '#10b981';
+                    ctx.lineWidth = 1.5;
+                    ctx.setLineDash([4, 4]);
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(w*0.35, h*0.5);
+                    ctx.lineTo(w*0.65, h*0.25);
+                    ctx.lineTo(w*0.8, h*0.25);
+                    ctx.stroke();
+
+                    // 细节放大镜
+                    ctx.setLineDash([]);
+                    ctx.fillStyle = '#ffffff';
+                    ctx.beginPath();
+                    ctx.arc(w*0.75, h*0.48, 80, 0, Math.PI*2);
+                    ctx.fill();
+                    ctx.strokeStyle = '#10b981';
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+
+                    // 在放大镜里画一个抽象小芯片
+                    ctx.fillStyle = '#10b981';
+                    ctx.fillRect(w*0.75 - 30, h*0.48 - 20, 60, 10);
+                    ctx.fillStyle = '#0f172a';
+                    ctx.font = 'bold 11px "Plus Jakarta Sans"';
+                    ctx.fillText("AI MICRO CHIP", w*0.75 - 40, h*0.48 + 15);
+
+                    ctx.fillStyle = '#0f172a';
+                    ctx.font = 'bold 16px "Noto Sans SC"';
+                    ctx.fillText("🔍 精细工艺微雕", w*0.58, h*0.21);
+                }
+
+                // 统一平台左上角边框角标
+                ctx.fillStyle = '#f1f5f9';
+                ctx.beginPath();
+                ctx.roundRect(w - 150, 20, 130, 28, 6);
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(16, 185, 129, 0.2)';
+                ctx.stroke();
+                
+                ctx.fillStyle = '#1e293b';
+                ctx.font = 'bold 11px "Plus Jakarta Sans"';
+                ctx.fillText(`OmniAI × ${settings.platform}`, w - 138, 38);
+            };
+
+            // 批量一键生成
+            const triggerBatchGeneration = async () => {
+                if (uploadedImages.value.length === 0) return;
+                
+                generating.value = true;
+                generatedCount.value = 0;
+                genLogs.value = ["🚀 AI 排版渲染管道初始化成功...", "🗂 读取您的平台策略与销售地区偏好..."];
+                outputCards.value = [];
+
+                const mainImg = uploadedImages.value[mainImageIndex.value];
+
+                const addLog = (text, delay) => {
+                    return new Promise(res => {
+                        setTimeout(() => {
+                            genLogs.value.push(text);
+                            res();
+                        }, delay);
+                    });
+                };
+
+                for (const modId of selectedModules.value) {
+                    await addLog(`⚡ 正在为 [${getModuleName(modId)}] 执行多层级渲染绘制...`, 250);
+                    const base64 = await renderCardImage(modId, mainImg);
+                    
+                    outputCards.value.push({
+                        id: Math.random().toString(36).substring(7),
+                        typeId: modId,
+                        dataUrl: base64,
+                        selected: true
+                    });
+                    
+                    generatedCount.value++;
+                }
+
+                await addLog("🎉 批量渲染生成任务全部完成！数据已同步至主工作区。", 200);
+                generating.value = false;
+
+                // 存入历史生成记录
+                historyTasks.value.unshift({
+                    id: Math.random().toString(36).substring(7),
+                    title: currentTaskTitle.value,
+                    platform: settings.platform,
+                    time: new Date().toLocaleTimeString(),
+                    cardsCount: outputCards.value.length,
+                    cards: JSON.parse(JSON.stringify(outputCards.value))
+                });
+            };
+
+            // 批量下载
+            const batchDownload = () => {
+                const targets = outputCards.value.filter(c => c.selected);
+                if (targets.length === 0) {
+                    alert("请先勾选需要下载的主图！");
+                    return;
+                }
+
+                targets.forEach((card, index) => {
+                    setTimeout(() => {
+                        const link = document.createElement('a');
+                        link.href = card.dataUrl;
+                        link.download = `${currentTaskTitle.value}_${getModuleName(card.typeId)}.png`;
+                        link.click();
+                    }, index * 150);
+                });
+            };
+
+            const downloadSingleImage = (card) => {
+                const link = document.createElement('a');
+                link.href = card.dataUrl;
+                link.download = `${currentTaskTitle.value}_${getModuleName(card.typeId)}.png`;
+                link.click();
+            };
+
+            // 重新单张生成 (策略迭代)
+            const regenerateSingleCard = async (card) => {
+                const mainImg = uploadedImages.value[mainImageIndex.value];
+                const newBase64 = await renderCardImage(card.typeId, mainImg);
+                card.dataUrl = newBase64;
+            };
+
+            // 拼接详情页长图算法
+            const previewLongImage = () => {
+                const targets = outputCards.value.filter(c => c.selected);
+                if (targets.length === 0) {
+                    alert("请至少勾选一张大图进行无缝拼接！");
+                    return;
+                }
+                showLongPreviewModal.value = true;
+            };
+
+            const downloadLongCombinedImage = () => {
+                const targets = outputCards.value.filter(c => c.selected);
+                if (targets.length === 0) return;
+
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+
+                const cardW = 800;
+                let cardH = 800;
+                if (settings.ratio === '3:4') cardH = 1066;
+                if (settings.ratio === '9:16') cardH = 1422;
+
+                canvas.width = cardW;
+                canvas.height = cardH * targets.length;
+
+                let loadedCount = 0;
+                targets.forEach((card, idx) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        ctx.drawImage(img, 0, idx * cardH, cardW, cardH);
+                        loadedCount++;
+                        if (loadedCount === targets.length) {
+                            const link = document.createElement('a');
+                            link.href = canvas.toDataURL('image/png');
+                            link.download = `${currentTaskTitle.value}_详情拼接长图.png`;
+                            link.click();
+                        }
+                    };
+                    img.src = card.dataUrl;
+                });
+            };
+
+            const zoomCardImage = (card) => {
+                zoomCard.value = card;
+            };
+
+            const loadHistoryTask = (hist) => {
+                currentTaskTitle.value = hist.title;
+                settings.platform = hist.platform;
+                outputCards.value = JSON.parse(JSON.stringify(hist.cards));
+                showHistoryDrawer.value = false;
+            };
+
+            const toggleCardSelection = (id) => {
+                const card = outputCards.value.find(c => c.id === id);
+                if (card) card.selected = !card.selected;
+            };
+
+            const toggleSelectAllCards = (bool) => {
+                outputCards.value.forEach(c => c.selected = bool);
+            };
+
+            const selectedCardsCount = computed(() => {
+                return outputCards.value.filter(c => c.selected).length;
+            });
+
+            const selectedCards = computed(() => {
+                return outputCards.value.filter(c => c.selected);
+            });
+
+            onMounted(() => {
+                
+            });
+
+            return {
+                activeNav,
+                mainNavs,
+                uploadedImages,
+                mainImageIndex,
+                dragOver,
+                fileInput,
+                settings,
+                availableModules,
+                selectedModules,
+                currentTaskTitle,
+                generating,
+                generatedCount,
+                genLogs,
+                outputCards,
+                taskQueue,
+                historyTasks,
+                showHistoryDrawer,
+                showQueueDrawer,
+                showLongPreviewModal,
+                zoomCard,
+                aiLoading,
+                
+                generateSellingPointsWithAI,
+                triggerFileInput,
+                handleFileChange,
+                handleDrop,
+                removeImage,
+                clearImages,
+                setMainImage,
+                loadPreset,
+                getModuleName,
+                getModuleStrategy,
+                toggleModule,
+                toggleSelectAllModules,
+                triggerBatchGeneration,
+                batchDownload,
+                downloadSingleImage,
+                regenerateSingleCard,
+                previewLongImage,
+                downloadLongCombinedImage,
+                zoomCardImage,
+                loadHistoryTask,
+                toggleCardSelection,
+                toggleSelectAllCards,
+                selectedCardsCount,
+                selectedCards
+            };
+        }
+    }).mount('#app');
+</script>
+</body>
+</html>
