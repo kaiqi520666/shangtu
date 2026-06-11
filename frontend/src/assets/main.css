@@ -1,1 +1,11 @@
-@import 'tailwindcss';
+@import "tailwindcss";
+@import "../styles/theme.css";
+.is-chosen {
+  @apply ring-2 ring-primary/20;
+}
+.is-ghost {
+  @apply opacity-40;
+}
+.is-dragging {
+  @apply shadow-xl;
+}

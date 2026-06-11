@@ -1,3 +1,4 @@
+// src/layouts/DefaultLayout.vue
 <script setup></script>
 
 <template>

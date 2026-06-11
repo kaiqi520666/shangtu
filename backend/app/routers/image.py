@@ -1,11 +1,13 @@
 import uuid
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, File, Request, UploadFile
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_user, get_db
+from app.core.image_analyzer import DashScopeConfigError, analyze_product_image
+from app.core.oss import OssConfigError, upload_image_bytes
 from app.models import ImageTask, User
 from app.schemas.response import Response, fail, success
 
@@ -17,6 +19,60 @@ CREDITS_PER_IMAGE = 1
 class GenerateRequest(BaseModel):
     prompt: str
     size: str = "720x1280"
+
+
+class AnalyzeImageRequest(BaseModel):
+    image_url: str
+    platform: str = ""
+    language: str = "中文"
+
+
+@router.post("/upload", response_model=Response)
+async def upload_image(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        content = await file.read()
+        uploaded = await upload_image_bytes(
+            user_id=current_user.id,
+            content=content,
+            content_type=file.content_type or "",
+        )
+    except (ValueError, OssConfigError) as e:
+        return fail(str(e))
+    except Exception:
+        return fail("图片上传失败")
+    finally:
+        await file.close()
+
+    return success(
+        {
+            "url": uploaded.url,
+            "object_key": uploaded.object_key,
+            "content_type": uploaded.content_type,
+            "size": uploaded.size,
+        }
+    )
+
+
+@router.post("/analyze", response_model=Response)
+async def analyze_image(
+    req: AnalyzeImageRequest,
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        content = await analyze_product_image(
+            image_url=req.image_url,
+            platform=req.platform,
+            language=req.language,
+        )
+    except (ValueError, DashScopeConfigError, RuntimeError) as e:
+        return fail(str(e))
+    except Exception:
+        return fail("图片分析失败")
+
+    return success({"content": content})
 
 
 @router.post("/generate", response_model=Response)
