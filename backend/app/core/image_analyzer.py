@@ -30,12 +30,12 @@ def get_dashscope_api_key() -> str:
     return api_key
 
 
-def build_product_prompt(platform: str, language: str) -> str:
+def build_product_prompt(platform: str) -> str:
     return f"""你是电商商品图分析助手。
 请根据图片内容，识别商品类型、外观、材质、用途、适用人群、核心卖点和可用于商品主图生成的关键信息。
 
 当前投放平台：{platform or '未指定'}
-输出语言：{language or '中文'}
+
 
 请严格按以下格式输出，不要输出 markdown，不要输出解释，不要输出多余标题。
 如果图片中无法确定某项，请基于商品外观做谨慎推测，不要编造具体品牌、认证、型号或无法从图片判断的参数。
@@ -51,7 +51,6 @@ async def analyze_product_image(
     *,
     image_url: str,
     platform: str = "",
-    language: str = "中文",
 ) -> str:
     if not image_url.startswith(("http://", "https://")):
         raise ValueError("image_url必须是可访问的HTTP地址")
@@ -69,7 +68,7 @@ async def analyze_product_image(
                     },
                     {
                         "type": "text",
-                        "text": build_product_prompt(platform, language),
+                        "text": build_product_prompt(platform),
                     },
                 ],
             }

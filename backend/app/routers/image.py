@@ -34,7 +34,6 @@ class GenerateRequest(BaseModel):
 class AnalyzeImageRequest(BaseModel):
     image_url: str
     platform: str = ""
-    language: str = "中文"
 
 
 @router.post("/upload", response_model=Response)
@@ -75,7 +74,6 @@ async def analyze_image(
         content = await analyze_product_image(
             image_url=req.image_url,
             platform=req.platform,
-            language=req.language,
         )
     except (ValueError, DashScopeConfigError, RuntimeError) as e:
         return fail(str(e))

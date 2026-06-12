@@ -1,20 +1,16 @@
-import request from './request.js'
+import request from "./request.js";
 
 export function uploadImage(file) {
-  const formData = new FormData()
-  formData.append('file', file)
-  return request.post('/image/upload', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
+  const formData = new FormData();
+  formData.append("file", file);
+  return request.post("/image/upload", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
     timeout: 60000,
-  })
+  });
 }
 
-export function analyzeImage({ image_url, platform = '', language = '中文' }) {
-  return request.post(
-    '/image/analyze',
-    { image_url, platform, language },
-    { timeout: 120000 },
-  )
+export function analyzeImage({ image_url, platform = "" }) {
+  return request.post("/image/analyze", { image_url, platform }, { timeout: 120000 });
 }
 
 export function generateImage({
@@ -28,23 +24,23 @@ export function generateImage({
   sort_order = 0,
 }) {
   return request.post(
-    '/image/generate',
+    "/image/generate",
     { prompt, image_url, ratio, resolution, job_id, type_id, title, sort_order },
     { timeout: 60000 },
-  )
+  );
 }
 
 export function getImageTask(taskId) {
-  return request.get(`/image/task/${taskId}`, { timeout: 15000 })
+  return request.get(`/image/task/${taskId}`, { timeout: 15000 });
 }
 
 export function deleteImageTask(taskId) {
-  return request.delete(`/image/task/${taskId}`, { timeout: 15000 })
+  return request.delete(`/image/task/${taskId}`, { timeout: 15000 });
 }
 
 export function getImageDownloadUrl(taskId) {
   // 返回后端代理下载的完整 URL（带 token 的请求需要用 fetch）
-  return `${request.defaults.baseURL}/image/task/${taskId}/download`
+  return `${request.defaults.baseURL}/image/task/${taskId}/download`;
 }
 
 export function regenerateImageTask(taskId, editInstruction) {
@@ -52,5 +48,5 @@ export function regenerateImageTask(taskId, editInstruction) {
     `/image/task/${taskId}/regenerate`,
     { edit_instruction: editInstruction },
     { timeout: 60000 },
-  )
+  );
 }
