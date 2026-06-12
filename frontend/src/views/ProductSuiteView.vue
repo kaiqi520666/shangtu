@@ -7,9 +7,15 @@ import GeneratorLayout from '@/components/GeneratorLayout.vue'
 import ProductSuiteSettingsPanel from '@/components/ProductSuiteSettingsPanel.vue'
 import ProductSuiteWorkspace from '@/components/ProductSuiteWorkspace.vue'
 import { useProductSuiteGenerator } from '@/composables/useProductSuiteGenerator.js'
+import { useConfirm } from '@/composables/useConfirm.js'
+import { useToast } from '@/composables/useToast.js'
+import { deleteGenerationJob } from '@/api/generation.js'
+import { Trash2 } from 'lucide-vue-next'
 
 const route = useRoute()
 const router = useRouter()
+const confirm = useConfirm()
+const toast = useToast()
 
 const suite = useProductSuiteGenerator({
   onJobCreated(jobId) {
@@ -66,6 +72,40 @@ async function handleRouteJobId(jobId) {
     }
   } else if (!jobId && suite.currentJobId.value) {
     suite.resetWorkspaceToDraft()
+  }
+}
+
+async function handleDeleteJob(job) {
+  const displayStatus = job.display_status || job.status
+  if (displayStatus === 'generating') {
+    toast.info('任务生成中，暂不能删除')
+    return
+  }
+  const ok = await confirm.open({
+    title: '删除任务',
+    message: '确定删除这个生成任务吗？已生成图片不会立即从存储中物理删除。',
+    confirmText: '删除',
+    cancelText: '取消',
+    tone: 'danger',
+  })
+  if (!ok) return
+  try {
+    const res = await deleteGenerationJob(job.job_id)
+    if (res.code !== 0) {
+      toast.error(res.message || '删除失败')
+      return
+    }
+    // 从列表中移除
+    const idx = suite.historyTasks.value.findIndex((t) => t.job_id === job.job_id)
+    if (idx > -1) suite.historyTasks.value.splice(idx, 1)
+    // 如果删的是当前查看的任务，回到空工作台
+    if (job.job_id === suite.currentJobId.value) {
+      suite.resetWorkspaceToDraft()
+      router.push('/generator/product-suite')
+    }
+    toast.success('任务已删除')
+  } catch {
+    toast.error('删除失败，请稍后重试')
   }
 }
 
@@ -148,15 +188,25 @@ watch(
         <li
           v-for="job in sortedHistory"
           :key="job.job_id"
-          class="cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs transition-all hover:border-primary/40 hover:bg-primary/5"
+          class="group cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs transition-all hover:border-primary/40 hover:bg-primary/5"
           :class="{ 'border-primary/60 bg-primary/5': job.job_id === suite.currentJobId.value }"
           @click="pickHistory(job.job_id)"
         >
           <div class="flex items-center justify-between gap-2">
             <span class="truncate font-bold text-slate-800">{{ job.title }}</span>
-            <span class="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
-              {{ getStatusLabel(job) }}
-            </span>
+            <div class="flex shrink-0 items-center gap-1.5">
+              <button
+                type="button"
+                class="rounded p-0.5 text-slate-300 opacity-0 transition-all hover:bg-rose-50 hover:text-rose-500 group-hover:opacity-100"
+                title="删除任务"
+                @click.stop="handleDeleteJob(job)"
+              >
+                <Trash2 class="h-3.5 w-3.5" />
+              </button>
+              <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                {{ getStatusLabel(job) }}
+              </span>
+            </div>
           </div>
           <div class="mt-1.5 flex items-center justify-between text-[11px] text-slate-500">
             <span>{{ formatTime(job.created_at) }}</span>

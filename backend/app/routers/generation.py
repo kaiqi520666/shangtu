@@ -114,6 +114,7 @@ async def list_jobs(
         .where(
             GenerationJob.user_id == current_user.id,
             GenerationJob.scenario == scenario,
+            GenerationJob.archived == False,  # noqa: E712
         )
         .order_by(GenerationJob.created_at.desc())
     )
@@ -174,6 +175,7 @@ async def get_job(
         select(GenerationJob).where(
             GenerationJob.id == job_id,
             GenerationJob.user_id == current_user.id,
+            GenerationJob.archived == False,  # noqa: E712
         )
     )
     job = result.scalar_one_or_none()
@@ -280,3 +282,31 @@ async def update_job(
             "updated_at": job.updated_at,
         }
     )
+
+
+@router.delete("/jobs/{job_id}", response_model=Response)
+async def delete_job(
+    job_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(GenerationJob).where(
+            GenerationJob.id == job_id,
+            GenerationJob.user_id == current_user.id,
+        )
+    )
+    job = result.scalar_one_or_none()
+    if not job:
+        return fail("任务不存在")
+
+    job.archived = True
+    job.archived_at = datetime.now()
+
+    try:
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        return fail("删除失败，请稍后重试")
+
+    return success({"job_id": job_id})

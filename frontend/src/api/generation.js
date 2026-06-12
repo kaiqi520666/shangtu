@@ -15,3 +15,7 @@ export function getGenerationJob(jobId) {
 export function updateGenerationJob(jobId, payload) {
   return request.patch(`/generation/jobs/${jobId}`, payload, { timeout: 15000 })
 }
+
+export function deleteGenerationJob(jobId) {
+  return request.delete(`/generation/jobs/${jobId}`, { timeout: 15000 })
+}
