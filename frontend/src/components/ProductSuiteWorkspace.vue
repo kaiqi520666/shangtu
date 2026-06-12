@@ -50,10 +50,6 @@ defineProps({
     type: Function,
     required: true,
   },
-  getStructureStrategy: {
-    type: Function,
-    required: true,
-  },
 })
 
 const emit = defineEmits([
@@ -160,11 +156,7 @@ const emit = defineEmits([
         </div>
         <GeneratedCardGrid
           :cards="outputCards"
-          :ratio="selectedImageLabel"
-          :platform="settings.platform"
-          :language="settings.language"
           :get-module-name="getStructureName"
-          :get-module-strategy="getStructureStrategy"
           @toggle-card="emit('toggle-card', $event)"
           @download-card="emit('download-card', $event)"
           @edit-card="emit('edit-card', $event)"

@@ -1,5 +1,5 @@
 <script setup>
-import { Check, Download, LoaderCircle, Maximize2, Pencil, TriangleAlert } from 'lucide-vue-next'
+import { Check, Download, LoaderCircle, Pencil, TriangleAlert } from 'lucide-vue-next'
 import { useToast } from '@/composables/useToast.js'
 
 defineProps({
@@ -7,23 +7,7 @@ defineProps({
     type: Array,
     required: true,
   },
-  ratio: {
-    type: String,
-    required: true,
-  },
-  platform: {
-    type: String,
-    required: true,
-  },
-  language: {
-    type: String,
-    required: true,
-  },
   getModuleName: {
-    type: Function,
-    required: true,
-  },
-  getModuleStrategy: {
     type: Function,
     required: true,
   },
@@ -87,18 +71,9 @@ function handleDownload(card) {
         >
           <Pencil class="h-3.5 w-3.5" />
         </button>
-        <button
-          v-if="card.status === undefined || (card.status === 'done' && card.dataUrl)"
-          type="button"
-          class="rounded-lg border border-slate-200 bg-white/95 p-1.5 text-slate-600 shadow transition-colors hover:bg-white hover:text-primary"
-          title="放大预览"
-          @click="emit('zoom-card', card)"
-        >
-          <Maximize2 class="h-3.5 w-3.5" />
-        </button>
       </div>
 
-      <button type="button" class="relative flex aspect-square cursor-pointer items-center justify-center overflow-hidden bg-slate-100 p-3" @click="emit('toggle-card', card.id)">
+      <button type="button" class="relative flex aspect-square cursor-pointer items-center justify-center overflow-hidden bg-slate-100 p-3" @click="card.status === 'done' && card.dataUrl ? emit('zoom-card', card) : undefined">
         <div class="absolute inset-0 bg-gradient-to-b from-transparent to-black/[0.01]"></div>
         <img v-if="card.dataUrl" :src="card.dataUrl" referrerpolicy="no-referrer" class="max-h-full max-w-full object-contain drop-shadow-md transition-transform duration-300 group-hover:scale-[1.03]" alt="AI主图" />
         <div v-else-if="isFailed(card)" class="flex flex-col items-center gap-1.5 px-4 text-center text-rose-500">
@@ -127,13 +102,7 @@ function handleDownload(card) {
 
       <div class="flex flex-1 flex-col justify-between space-y-1.5 border-t border-slate-100 bg-white p-3">
         <div>
-          <div class="flex items-center justify-between">
-            <span class="text-xs font-bold text-slate-800">{{ card.strategyTitle || getModuleName(card.typeId) }}</span>
-            <span class="text-xs font-bold text-slate-400">{{ ratio }}</span>
-          </div>
-          <p class="mt-1 text-xs font-semibold leading-relaxed text-primary">
-            策略解读：{{ card.strategyContent || getModuleStrategy(card.typeId) }}
-          </p>
+          <span class="text-xs font-bold text-slate-800">{{ card.strategyTitle || getModuleName(card.typeId) }}</span>
           <div v-if="isFailed(card)" class="mt-1.5 space-y-0.5">
             <p class="line-clamp-2 text-[11px] font-medium leading-snug text-rose-500" :title="shortFailReason(card)">
               原因：{{ shortFailReason(card) }}
@@ -141,10 +110,9 @@ function handleDownload(card) {
             <p class="text-[11px] font-medium text-emerald-600">本次失败未消耗额度</p>
           </div>
         </div>
-        <div class="flex items-center justify-between border-t border-slate-100 pt-2">
-          <span class="text-xs font-medium text-slate-400">适配：{{ platform }} / {{ language }}</span>
+        <div class="flex items-center justify-end border-t border-slate-100 pt-2">
           <button
-            v-if="card.status === undefined || (card.status === 'done' && card.dataUrl)"
+            v-if="card.status === 'done' && card.dataUrl"
             type="button"
             class="flex items-center gap-1 text-xs font-bold text-primary hover:text-secondary"
             @click="handleDownload(card)"
