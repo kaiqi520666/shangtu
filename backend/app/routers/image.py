@@ -191,15 +191,17 @@ async def get_task(
     if redis_pool is not None:
         try:
             live_status = await redis_pool.get(f"task:{task_id}:status")
+            live_status_str: str | None = None
             if live_status:
                 live_status_str = live_status.decode() if isinstance(live_status, bytes) else live_status
                 # 防止 Redis 残留的旧 done 覆盖 DB 的 pending/processing
-                # DB 为 pending/processing 时，只接受 Redis 的 processing/failed/timeout
                 if task.status in ("pending", "processing"):
                     if live_status_str != "done":
                         status = live_status_str
+                    # live_status_str == "done" 时，下面会尝试取 Redis result 验证
                 else:
                     status = live_status_str
+
             live_error = await redis_pool.get(f"task:{task_id}:error")
             if live_error:
                 error_message = live_error.decode() if isinstance(live_error, bytes) else live_error
@@ -210,15 +212,36 @@ async def get_task(
                     progress = max(0, min(100, int(raw)))
                 except (TypeError, ValueError):
                     pass
-            if not result_url:
-                live_result = await redis_pool.get(f"task:{task_id}:result")
+
+            # 读取 Redis result —— 无论 DB result_url 是否有值都要尝试
+            # 重新生成场景下 DB result_url 是旧图，需要用 Redis 的新 result 覆盖
+            live_result = await redis_pool.get(f"task:{task_id}:result")
+            if live_result:
+                raw = live_result.decode() if isinstance(live_result, bytes) else live_result
+                try:
+                    parsed = json.loads(raw)
+                    redis_result_url = parsed.get("url") or None
+                    if redis_result_url:
+                        result_url = redis_result_url
+                except (TypeError, ValueError):
+                    pass
+
+            # 如果 Redis 报告 done 且 DB 还是 pending/processing，需要验证有新 result
+            if live_status_str == "done" and task.status in ("pending", "processing"):
+                # 只有拿到了本轮新 result 才认可 done
                 if live_result:
-                    raw = live_result.decode() if isinstance(live_result, bytes) else live_result
                     try:
-                        parsed = json.loads(raw)
-                        result_url = parsed.get("url") or None
+                        parsed = json.loads(
+                            live_result.decode() if isinstance(live_result, bytes) else live_result
+                        )
+                        if parsed.get("url"):
+                            status = "done"
+                        else:
+                            status = "processing"
                     except (TypeError, ValueError):
-                        pass
+                        status = "processing"
+                else:
+                    status = "processing"
         except Exception:
             pass
 

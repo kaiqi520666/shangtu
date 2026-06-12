@@ -513,13 +513,20 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
       const resultUrl = data.result_url || ''
 
       if (status === 'done' && resultUrl) {
-        card.status = 'done'
-        card.resultUrl = resultUrl
-        card.dataUrl = resultUrl
-        generatedCount.value += 1
-        genLogs.value.push(`[${card.strategyTitle}] 已完成`)
-        genLogs.value.push(`已完成 ${generatedCount.value}/${jobTotal.value}`)
-        stopPollingCard(card.id)
+        // 防御：重新生成场景下，如果返回的 resultUrl 跟旧图一样，说明后端还没拿到新图
+        if (card.previousResultUrl && resultUrl === card.previousResultUrl) {
+          // 继续轮询，不停止
+          card.status = 'processing'
+        } else {
+          card.status = 'done'
+          card.resultUrl = resultUrl
+          card.dataUrl = resultUrl
+          card.previousResultUrl = ''
+          generatedCount.value += 1
+          genLogs.value.push(`[${card.strategyTitle}] 已完成`)
+          genLogs.value.push(`已完成 ${generatedCount.value}/${jobTotal.value}`)
+          stopPollingCard(card.id)
+        }
       } else if (status === 'failed' || status === 'timeout') {
         card.status = status
         card.errorMessage = data.error_message || (status === 'timeout' ? '生成超时' : '生成失败')

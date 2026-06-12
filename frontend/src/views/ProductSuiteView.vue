@@ -153,6 +153,7 @@ async function handleRegenerate() {
     // 更新 card 状态 —— 先找到 outputCards 中的原始对象确保响应式
     const target = suite.outputCards.value.find((c) => c.taskId === card.taskId)
     if (target) {
+      target.previousResultUrl = target.resultUrl || target.dataUrl || ''
       target.status = 'processing'
       target.errorMessage = ''
       target.editInstruction = instruction
