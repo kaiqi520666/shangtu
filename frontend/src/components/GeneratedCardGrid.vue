@@ -112,17 +112,15 @@ function handleDownload(card) {
         </div>
       </button>
 
-      <div class="flex flex-1 flex-col justify-between space-y-1.5 border-t border-slate-100 bg-white p-3">
-        <div>
-          <span class="text-xs font-medium text-slate-500">{{ platform }} {{ language }} {{ imageLabel }}</span>
-          <div v-if="isFailed(card)" class="mt-1.5 space-y-0.5">
-            <p class="line-clamp-2 text-[11px] font-medium leading-snug text-rose-500" :title="shortFailReason(card)">
-              原因：{{ shortFailReason(card) }}
-            </p>
-            <p class="text-[11px] font-medium text-emerald-600">本次失败未消耗额度</p>
-          </div>
+      <div class="flex flex-1 flex-col justify-between border-t border-slate-100 bg-white p-3">
+        <div v-if="isFailed(card)" class="mb-1.5 space-y-0.5">
+          <p class="line-clamp-2 text-[11px] font-medium leading-snug text-rose-500" :title="shortFailReason(card)">
+            原因：{{ shortFailReason(card) }}
+          </p>
+          <p class="text-[11px] font-medium text-emerald-600">本次失败未消耗额度</p>
         </div>
-        <div class="flex items-center justify-end border-t border-slate-100 pt-2">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-medium text-slate-500">{{ platform }} {{ language }} {{ imageLabel }}</span>
           <button
             v-if="card.status === 'done' && card.dataUrl"
             type="button"
