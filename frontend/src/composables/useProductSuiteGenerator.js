@@ -14,6 +14,15 @@ const POLL_INTERVAL_MS = 5000
 const TERMINAL_STATUSES = new Set(['done', 'failed', 'timeout'])
 const TITLE_DEBOUNCE_MS = 600
 
+function preloadImage(url) {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = resolve
+    img.onerror = reject
+    img.src = url
+  })
+}
+
 export function useProductSuiteGenerator({ onJobCreated } = {}) {
   const toast = useToast()
   const uploadedImages = ref([])
@@ -518,23 +527,27 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
           // 继续轮询，不停止
           card.status = 'processing'
         } else {
-          card.status = 'done'
+          // 先停轮询，避免重复处理
+          stopPollingCard(card.id)
+          // 保持遮罩：预加载新图完成后再切换状态
+          try {
+            await preloadImage(resultUrl)
+          } catch {
+            // 预加载失败也继续，浏览器会用 img src 正常请求
+          }
           card.resultUrl = resultUrl
           card.dataUrl = resultUrl
           card.previousResultUrl = ''
+          card.status = 'done'
           generatedCount.value += 1
           genLogs.value.push(`[${card.strategyTitle}] 已完成`)
           genLogs.value.push(`已完成 ${generatedCount.value}/${jobTotal.value}`)
-          stopPollingCard(card.id)
-          // 强制触发 ref 更新，确保 prop 链重新渲染新图
-          outputCards.value = [...outputCards.value]
         }
       } else if (status === 'failed' || status === 'timeout') {
         card.status = status
         card.errorMessage = data.error_message || (status === 'timeout' ? '生成超时' : '生成失败')
         genLogs.value.push(`[${card.strategyTitle}] ${status === 'timeout' ? '超时' : '失败'}：${card.errorMessage}`)
         stopPollingCard(card.id)
-        outputCards.value = [...outputCards.value]
       } else {
         // 包含两种情况：1) processing；2) done 但 result_url 仍未落库（worker 写入竞态/降级）
         card.status = status === 'done' ? 'processing' : status
