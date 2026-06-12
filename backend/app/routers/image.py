@@ -192,7 +192,14 @@ async def get_task(
         try:
             live_status = await redis_pool.get(f"task:{task_id}:status")
             if live_status:
-                status = live_status.decode() if isinstance(live_status, bytes) else live_status
+                live_status_str = live_status.decode() if isinstance(live_status, bytes) else live_status
+                # 防止 Redis 残留的旧 done 覆盖 DB 的 pending/processing
+                # DB 为 pending/processing 时，只接受 Redis 的 processing/failed/timeout
+                if task.status in ("pending", "processing"):
+                    if live_status_str != "done":
+                        status = live_status_str
+                else:
+                    status = live_status_str
             live_error = await redis_pool.get(f"task:{task_id}:error")
             if live_error:
                 error_message = live_error.decode() if isinstance(live_error, bytes) else live_error
@@ -338,10 +345,17 @@ async def regenerate_task(
         await db.rollback()
         return fail("重新生成失败，请稍后重试")
 
+    # 重置 Redis 运行态，避免前端轮询读到上一轮的 done/result
     # 入队 worker
     # TODO: 后续用 generation_attempts 做严格幂等退款
     try:
-        await request.app.state.redis_pool.enqueue_job(
+        redis = request.app.state.redis_pool
+        await redis.delete(f"task:{task_id}:result")
+        await redis.delete(f"task:{task_id}:error")
+        await redis.set(f"task:{task_id}:status", "pending", ex=7200)
+        await redis.set(f"task:{task_id}:progress", "0", ex=7200)
+
+        await redis.enqueue_job(
             "generate_image",
             task_id,
             new_prompt,

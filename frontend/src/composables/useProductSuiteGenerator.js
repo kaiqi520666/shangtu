@@ -481,6 +481,8 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
 
   function startPollingCard(card) {
     if (!card.taskId) return
+    // 避免重复 timer（重新生成场景）
+    stopPollingCard(card.id)
     const timer = window.setInterval(() => {
       pollCardOnce(card).catch(() => {})
     }, POLL_INTERVAL_MS)
