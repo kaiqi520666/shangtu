@@ -137,24 +137,34 @@ async function handleRegenerate() {
   }
   const card = editCard.value
   if (!card) return
+  if (!card.taskId) {
+    toast.error('该图片缺少任务 ID，无法重新生成')
+    return
+  }
 
   editSubmitting.value = true
   try {
     const res = await regenerateImageTask(card.taskId, instruction)
-    if (res.code !== 0) {
-      toast.error(res.message || '重新生成失败')
+    if (!res || res.code !== 0) {
+      toast.error((res && res.message) || '重新生成失败')
       editSubmitting.value = false
       return
     }
-    // 更新 card 状态
-    card.status = 'processing'
-    card.errorMessage = ''
-    card.editInstruction = instruction
-    // 保留旧图继续展示
+    // 更新 card 状态 —— 先找到 outputCards 中的原始对象确保响应式
+    const target = suite.outputCards.value.find((c) => c.taskId === card.taskId)
+    if (target) {
+      target.status = 'processing'
+      target.errorMessage = ''
+      target.editInstruction = instruction
+    }
     closeEditModal()
-    // 开始轮询该 card
-    suite.startPollingCard(card)
-  } catch {
+    toast.success('已提交重新生成，请稍候...')
+    // 开始轮询
+    if (target) {
+      suite.startPollingCard(target)
+    }
+  } catch (err) {
+    console.error('[regenerate]', err)
     toast.error('重新生成失败，请稍后重试')
     editSubmitting.value = false
   }
