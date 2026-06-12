@@ -96,7 +96,7 @@ async def list_assets(
             "type_id": row.type_id or "",
             "scenario": row.scenario or "",
             "job_title": row.job_title or "",
-            "created_at": row.created_at.isoformat() if row.created_at else "",
+            "created_at": (row.created_at.isoformat() + "Z") if row.created_at else "",
         }
         for row in rows
     ]

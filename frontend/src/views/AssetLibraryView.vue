@@ -201,12 +201,12 @@ onMounted(() => {
     </div>
 
     <!-- 大图弹窗 -->
-    <AppModal :open="!!zoomCard" @close="zoomCard = null">
-      <div v-if="zoomCard" class="flex max-h-[85vh] max-w-[85vw] items-center justify-center">
+    <AppModal :open="!!zoomCard" panel-class="max-w-[90vw] max-h-[90vh] w-auto" @close="zoomCard = null">
+      <div v-if="zoomCard" class="flex items-center justify-center p-2">
         <img
           :src="zoomCard.dataUrl"
           referrerpolicy="no-referrer"
-          class="max-h-[85vh] max-w-[85vw] object-contain"
+          class="max-h-[85vh] max-w-full object-contain"
           alt="大图预览"
         />
       </div>
