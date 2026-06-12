@@ -1,4 +1,5 @@
 <script setup>
+import GlobalConfirm from '@/components/GlobalConfirm.vue'
 import GlobalToast from '@/components/GlobalToast.vue'
 import DefaultLayout from '@/layouts/DefaultLayout.vue'
 </script>
@@ -7,5 +8,6 @@ import DefaultLayout from '@/layouts/DefaultLayout.vue'
   <DefaultLayout>
     <RouterView />
     <GlobalToast />
+    <GlobalConfirm />
   </DefaultLayout>
 </template>
