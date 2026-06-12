@@ -1,7 +1,7 @@
 import { computed, reactive, ref } from "vue";
 import { availableModules, ratioOptions, resolutionMap, resolveQuality } from "@/constants/generator.js";
 import { useToast } from "@/composables/useToast.js";
-import { analyzeImage } from "@/api/image.js";
+import { analyzeImage, generateProductImageStrategy } from "@/api/image.js";
 
 const THEME_COLORS = {
   primary: "#10b981",
@@ -154,6 +154,16 @@ export function useGenerator() {
       return;
     }
 
+    const mainImg = uploadedImages.value[mainImageIndex.value];
+    if (!mainImg || !mainImg.url) {
+      toast.info("主图还未上传完成，请稍候再试");
+      return;
+    }
+    if (mainImg.uploading) {
+      toast.info("主图还在上传中，请稍候");
+      return;
+    }
+
     if (selectedModules.value.length === 0) {
       toast.info("请至少选择一个生成图种");
       return;
@@ -165,30 +175,52 @@ export function useGenerator() {
     outputCards.value = [];
     generatedCount.value = 0;
 
-    await wait(800);
+    try {
+      const result = await generateProductImageStrategy({
+        image_url: mainImg.url,
+        platform: settings.platform,
+        language: settings.language,
+        product_input: settings.productInput,
+        module_ids: selectedModules.value,
+      });
 
-    const productName = getProductNameFromInput(settings.productInput);
-    const moduleMap = new Map(availableModules.map((module) => [module.id, module]));
+      if (result.code !== 0) {
+        toast.error(result.message || "模块策略生成失败，请稍后重试");
+        workflowStep.value = "config";
+        return;
+      }
 
-    // TODO: replace with API
-    moduleContents.value = selectedModules.value
-      .map((moduleId, index) => {
-        const module = moduleMap.get(moduleId);
-        if (!module) return null;
+      const modules = Array.isArray(result.data?.modules) ? result.data.modules : [];
+      if (modules.length === 0) {
+        toast.error("AI 未返回有效模块策略");
+        workflowStep.value = "config";
+        return;
+      }
 
+      moduleContents.value = modules.map((module, index) => {
+        const fallback = availableModules.find((item) => item.id === module.id);
         return {
-          id: module.id,
-          moduleName: module.name,
-          title: buildModuleTitle(module, productName),
-          content: buildModuleContent(module, index),
-          strategy: module.strategy,
+          id: module.id || fallback?.id || `module-${index + 1}`,
+          moduleName: module.moduleName || fallback?.name || `模块 ${index + 1}`,
+          title: module.title || `${fallback?.name || "详情图"}策略`,
+          content: module.content || "",
+          strategy: module.strategy || fallback?.strategy || "",
         };
-      })
-      .filter(Boolean);
-
-    strategyBrief.value = `${settings.platform} / ${settings.language} / ${selectedImageLabel.value}，已为 ${moduleContents.value.length} 个图种生成可编辑模块内容。`;
-    workflowStep.value = "strategy-review";
-    toast.success("模块策略已生成，可编辑后继续出图");
+      });
+      strategyBrief.value =
+        result.data?.brief ||
+        `${settings.platform} / ${settings.language} / ${selectedImageLabel.value}，已为 ${moduleContents.value.length} 个图种生成可编辑模块内容。`;
+      workflowStep.value = "strategy-review";
+      toast.success("模块策略已生成，可编辑后继续出图");
+    } catch (error) {
+      const status = error.response?.status;
+      if (status === 401) {
+        toast.error("登录已过期，请重新登录");
+      } else {
+        toast.error(error.response?.data?.message || "模块策略生成失败，请稍后重试");
+      }
+      workflowStep.value = "config";
+    }
   }
 
   async function confirmStrategyAndGenerate() {
@@ -752,83 +784,11 @@ function makeCardId() {
   return `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function getProductNameFromInput(input) {
-  return (
-    input
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean)[0] || "当前商品"
-  );
-}
-
 function parseStrategyLines(content) {
   return content
     .split("\n")
     .map((line) => line.trim())
     .filter(Boolean);
-}
-
-function buildModuleTitle(module, productName) {
-  const titleMap = {
-    "first-screen": `${productName} 爆款首屏主视觉`,
-    "core-selling": `${productName} 核心卖点提炼`,
-    "use-scenario": `${productName} 高转化使用场景`,
-    "multi-angle": `${productName} 多角度细节呈现`,
-    "ambient-scene": `${productName} 场景氛围大片`,
-    "detail-zoom": `${productName} 关键细节放大`,
-    "brand-story": `${productName} 品牌价值表达`,
-    "specs-info": `${productName} 尺寸规格说明`,
-    "contrast-effect": `${productName} 效果对比表达`,
-    "tech-specs": `${productName} 参数表视觉化`,
-    manufacturing: `${productName} 工艺结构拆解`,
-    freebies: `${productName} 配件赠品展示`,
-    "series-show": `${productName} 系列 SKU 展示`,
-    ingredients: `${productName} 成分信息展示`,
-    warranty: `${productName} 售后保障承诺`,
-    "usage-tips": `${productName} 使用建议说明`,
-  };
-
-  return titleMap[module.id] || `${productName} ${module.name}`;
-}
-
-function buildModuleContent(module, index) {
-  const baseContents = [
-    `模块目标：${module.desc}`,
-    `排版策略：${module.strategy}`,
-    `视觉重点：突出商品主体，减少无效装饰，保持电商平台可读性。`,
-  ];
-
-  const directionMap = {
-    "first-screen": [
-      "主标题：首屏 3 秒内传达核心价值",
-      "副标题：强化新品、高端、官方背书",
-      "画面层级：商品居中放大，品牌信息轻量点缀",
-    ],
-    "core-selling": [
-      "卖点 1：核心性能升级",
-      "卖点 2：材质与工艺优势",
-      "卖点 3：服务保障降低决策成本",
-    ],
-    "use-scenario": [
-      "场景：真实使用环境",
-      "情绪：干净、可信、有生活感",
-      "信息：保留一个强卖点即可",
-    ],
-    "multi-angle": [
-      "视角：正面、侧面、细节局部",
-      "对齐：统一比例与基线",
-      "标注：只保留关键结构名称",
-    ],
-    "detail-zoom": [
-      "细节：局部材质、接口、工艺纹理",
-      "标注：拉线说明关键优势",
-      "氛围：保持精密感与可信度",
-    ],
-    warranty: ["信任点：退换、发货、质保", "表达：徽章式信息块", "语气：官方、明确、降低售后疑虑"],
-  };
-
-  const lines = directionMap[module.id] || baseContents;
-  return [`模块序号：${index + 1}`, ...lines].join("\n");
 }
 
 function getProgressWidthClass(progress) {

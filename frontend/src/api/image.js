@@ -13,6 +13,20 @@ export function analyzeImage({ image_url, platform = "" }) {
   return request.post("/image/analyze", { image_url, platform }, { timeout: 120000 });
 }
 
+export function generateProductImageStrategy({
+  image_url,
+  platform = "",
+  language = "中文",
+  product_input,
+  module_ids,
+}) {
+  return request.post(
+    "/image/product-image/strategy",
+    { image_url, platform, language, product_input, module_ids },
+    { timeout: 120000 },
+  );
+}
+
 export function generateImage({
   prompt,
   image_url = null,

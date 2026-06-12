@@ -9,7 +9,11 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_user, get_db
-from app.core.image_analyzer import DashScopeConfigError, analyze_product_image
+from app.core.image_analyzer import (
+    DashScopeConfigError,
+    analyze_product_image,
+    generate_product_image_strategy,
+)
 from app.core.oss import OssConfigError, upload_image_bytes
 from app.core.time import to_utc_iso, utc_now
 from app.models import GenerationJob, ImageTask, User
@@ -34,6 +38,14 @@ class GenerateRequest(BaseModel):
 class AnalyzeImageRequest(BaseModel):
     image_url: str
     platform: str = ""
+
+
+class ProductImageStrategyRequest(BaseModel):
+    image_url: str
+    platform: str = ""
+    language: str = "中文"
+    product_input: str
+    module_ids: list[str]
 
 
 @router.post("/upload", response_model=Response)
@@ -81,6 +93,27 @@ async def analyze_image(
         return fail("图片分析失败")
 
     return success({"content": content})
+
+
+@router.post("/product-image/strategy", response_model=Response)
+async def product_image_strategy(
+    req: ProductImageStrategyRequest,
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        strategy = await generate_product_image_strategy(
+            image_url=req.image_url,
+            platform=req.platform,
+            language=req.language,
+            product_input=req.product_input,
+            module_ids=req.module_ids,
+        )
+    except (ValueError, DashScopeConfigError, RuntimeError) as e:
+        return fail(str(e))
+    except Exception:
+        return fail("详情页策略生成失败")
+
+    return success(strategy)
 
 
 @router.post("/generate", response_model=Response)
