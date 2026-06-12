@@ -1,5 +1,5 @@
 <script setup>
-import { Check, Download, LoaderCircle, Pencil, TriangleAlert } from 'lucide-vue-next'
+import { Check, Download, LoaderCircle, Pencil, Trash2, TriangleAlert } from 'lucide-vue-next'
 import { useToast } from '@/composables/useToast.js'
 
 defineProps({
@@ -25,7 +25,7 @@ defineProps({
   },
 })
 
-const emit = defineEmits(['toggle-card', 'download-card', 'edit-card', 'zoom-card'])
+const emit = defineEmits(['toggle-card', 'download-card', 'edit-card', 'zoom-card', 'delete-card'])
 
 const toast = useToast()
 
@@ -82,6 +82,15 @@ function handleDownload(card) {
           @click="emit('edit-card', card)"
         >
           <Pencil class="h-3.5 w-3.5" />
+        </button>
+        <button
+          v-if="card.status !== 'pending' && card.status !== 'processing'"
+          type="button"
+          class="rounded-lg border border-slate-200 bg-white/95 p-1.5 text-slate-600 shadow transition-colors hover:bg-white hover:text-rose-500"
+          title="删除图片"
+          @click="emit('delete-card', card)"
+        >
+          <Trash2 class="h-3.5 w-3.5" />
         </button>
       </div>
 

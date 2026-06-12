@@ -60,6 +60,7 @@ const emit = defineEmits([
   'download-card',
   'edit-card',
   'zoom-card',
+  'delete-card',
   'create-new-task',
   'open-history',
 ])
@@ -164,6 +165,7 @@ const emit = defineEmits([
           @download-card="emit('download-card', $event)"
           @edit-card="emit('edit-card', $event)"
           @zoom-card="emit('zoom-card', $event)"
+          @delete-card="emit('delete-card', $event)"
         />
       </div>
 

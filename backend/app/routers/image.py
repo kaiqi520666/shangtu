@@ -265,7 +265,48 @@ async def get_task(
     )
 
 
-@router.get("/tasks", response_model=Response)
+@router.delete("/task/{task_id}", response_model=Response)
+async def delete_task(
+    task_id: str,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(ImageTask).where(
+            ImageTask.id == task_id,
+            ImageTask.user_id == current_user.id,
+        )
+    )
+    task = result.scalar_one_or_none()
+    if not task:
+        return fail("任务不存在")
+
+    # 如果任务正在生成中，不允许删除
+    if task.status in ("pending", "processing"):
+        return fail("任务正在生成中，无法删除")
+
+    await db.delete(task)
+    try:
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        return fail("删除失败，请稍后重试")
+
+    # 清理 Redis 中的运行态数据
+    redis_pool = getattr(request.app.state, "redis_pool", None)
+    if redis_pool is not None:
+        try:
+            await redis_pool.delete(
+                f"task:{task_id}:status",
+                f"task:{task_id}:result",
+                f"task:{task_id}:error",
+                f"task:{task_id}:progress",
+            )
+        except Exception:
+            pass
+
+    return success(None, message="删除成功")
 async def get_tasks(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),

@@ -198,6 +198,30 @@ async function handleDeleteCard() {
   }
 }
 
+async function handleDeleteCardDirect(card) {
+  if (!card) return
+  const ok = await confirm.open({
+    title: '删除图片',
+    message: '确定删除这张图片吗？',
+    confirmText: '删除',
+    cancelText: '取消',
+    tone: 'danger',
+  })
+  if (!ok) return
+  try {
+    const res = await deleteImageTask(card.taskId)
+    if (res.code !== 0) {
+      toast.error(res.message || '删除失败')
+      return
+    }
+    const idx = suite.outputCards.value.findIndex((c) => c.id === card.id)
+    if (idx > -1) suite.outputCards.value.splice(idx, 1)
+    toast.success('图片已删除')
+  } catch {
+    toast.error('删除失败，请稍后重试')
+  }
+}
+
 onMounted(() => {
   const jobId = route.params.jobId
   if (jobId) {
@@ -255,6 +279,7 @@ watch(
       @download-card="suite.downloadSingleImage"
       @edit-card="openEditModal"
       @zoom-card="(card) => { suite.zoomCard.value = card }"
+      @delete-card="handleDeleteCardDirect"
       @create-new-task="handleCreateNewTask"
       @open-history="openHistory"
     />
