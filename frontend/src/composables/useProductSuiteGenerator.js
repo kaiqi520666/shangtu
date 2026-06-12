@@ -1,9 +1,10 @@
 import { computed, onBeforeUnmount, reactive, ref } from "vue";
-import JSZip from "jszip";
 import { ratioOptions, resolutionMap, resolveQuality } from "@/constants/generator.js";
 import { suiteStructureDefaults } from "@/constants/productSuite.js";
 import { useToast } from "@/composables/useToast.js";
-import { analyzeImage, generateImage, getImageDownloadUrl, getImageTask } from "@/api/image.js";
+import { useGenerationCards } from "@/composables/useGenerationCards.js";
+import { useCardActions } from "@/composables/useCardActions.js";
+import { analyzeImage, generateImage } from "@/api/image.js";
 import {
   createGenerationJob,
   getGenerationJob,
@@ -11,49 +12,69 @@ import {
   updateGenerationJob,
 } from "@/api/generation.js";
 
-const POLL_INTERVAL_MS = 5000;
-const TERMINAL_STATUSES = new Set(["done", "failed", "timeout"]);
 const TITLE_DEBOUNCE_MS = 600;
-
-function preloadImage(url) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = resolve;
-    img.onerror = reject;
-    img.src = url;
-  });
-}
-
-function getToken() {
-  try {
-    const raw = window.localStorage.getItem("nodepass_auth_user");
-    return raw ? JSON.parse(raw)?.token : "";
-  } catch {
-    return "";
-  }
-}
 
 export function useProductSuiteGenerator({ onJobCreated } = {}) {
   const toast = useToast();
+
+  // --- 通用卡片状态 + 轮询引擎 ---
+  const cards = useGenerationCards({
+    getLogPrefix: (card) => card.strategyTitle || card.typeId || "",
+    onBatchFinished({ total, failed }) {
+      genLogs.value.push("全部商品套图任务已结束");
+      if (failed === 0) {
+        toast.success("商品套图已全部生成");
+      } else if (failed === total) {
+        toast.error("套图生成失败，请稍后重试");
+      } else {
+        toast.info(`部分套图生成失败（${failed} 张）`);
+      }
+    },
+  });
+
+  const {
+    outputCards,
+    genLogs,
+    generating,
+    generatedCount,
+    jobTotal,
+    activeBatchRunId,
+    startPollingCard,
+    clearAllPollTimers,
+    maybeFinishGenerating,
+    makeId,
+    TERMINAL_STATUSES,
+  } = cards;
+
+  // --- 通用卡片操作：选择 / 下载 ---
+  const currentJobId = ref("");
+  const currentTaskTitle = ref("");
+
+  const actions = useCardActions({
+    outputCards,
+    currentTaskTitle,
+    getCardName: (card) => card.strategyTitle || getStructureName(card.typeId),
+    toast,
+  });
+
+  const {
+    zoomCard,
+    selectedCards,
+    selectedCardsCount,
+    toggleCardSelection,
+    toggleSelectAllCards,
+    batchDownload,
+    downloadSingleImage,
+  } = actions;
+
+  // --- 场景特有状态 ---
   const uploadedImages = ref([]);
   const mainImageIndex = ref(0);
   const aiLoading = ref(false);
-  const generating = ref(false);
-  const generatedCount = ref(0);
-  const jobTotal = ref(0);
-  const genLogs = ref([]);
-  const outputCards = ref([]);
-  const zoomCard = ref(null);
-  const currentJobId = ref("");
-  const currentTaskTitle = ref("");
   const historyTasks = ref([]);
   const showHistoryDrawer = ref(false);
   const historyLoading = ref(false);
   const jobLoading = ref(false);
-  const activeBatchRunId = ref("");
-
-  const pollTimers = new Map();
-  const pollInFlight = new Set();
 
   const settings = reactive({
     platform: "亚马逊",
@@ -71,6 +92,7 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
     })),
   );
 
+  // --- 计算属性 ---
   const totalCount = computed(() =>
     suiteStructure.value.reduce((sum, item) => {
       if (!item.enabled) return sum;
@@ -83,8 +105,6 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
   const canGenerate = computed(
     () => hasGenerationSource.value && totalCount.value > 0 && !generating.value,
   );
-  const selectedCards = computed(() => outputCards.value.filter((card) => card.selected));
-  const selectedCardsCount = computed(() => selectedCards.value.length);
   const selectedRatioOption = computed(
     () => ratioOptions.find((option) => option.value === settings.ratio) || ratioOptions[0],
   );
@@ -93,13 +113,14 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
     return `${settings.quality} / ${selectedRatioOption.value.label} / ${width}x${height}`;
   });
 
+  // --- 任务标题（debounce 保存） ---
   let titleDebounceTimer = null;
 
   function updateCurrentJobTitle(title) {
     const trimmed = (title || "").trim();
-    currentTaskTitle.value = title; // 保留用户输入（含未 trim 的空格）
+    currentTaskTitle.value = title;
     if (!currentJobId.value) return;
-    if (!trimmed) return; // 空标题不提交
+    if (!trimmed) return;
 
     if (titleDebounceTimer) {
       clearTimeout(titleDebounceTimer);
@@ -115,6 +136,8 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
       }
     }, TITLE_DEBOUNCE_MS);
   }
+
+  // --- Job 生命周期 ---
 
   async function ensureCurrentJob() {
     if (currentJobId.value) return currentJobId.value;
@@ -292,6 +315,8 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
     }
   }
 
+  // --- AI 卖点分析 ---
+
   async function generateSellingPointsWithAI() {
     const mainImg = uploadedImages.value[mainImageIndex.value];
     if (!mainImg || !mainImg.url) {
@@ -333,6 +358,8 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
       aiLoading.value = false;
     }
   }
+
+  // --- 生成套图 ---
 
   async function generateSuiteImages() {
     if (uploadedImages.value.length === 0) {
@@ -434,7 +461,7 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
       createdCards.push({ card, item });
     });
 
-    // 新批次插到前面，让最新生成更醒目；旧 cards 保留
+    // 新批次插到前面
     outputCards.value = [...createdCards.map((c) => c.card), ...outputCards.value];
 
     let successfullyEnqueued = 0;
@@ -484,6 +511,8 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
     }
   }
 
+  // --- 套图特有辅助 ---
+
   function buildPromptForItem(item) {
     const lines = [
       "【参考图】必须以用户上传的商品图为商品主体，保持商品款式、颜色、材质、结构和外观完全一致。",
@@ -497,119 +526,6 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
       "【强约束】禁止虚构品牌 Logo、认证标识、价格、销量、参数等无法从参考图与上述卖点确认的信息；如需添加文字必须使用上述指定语言，文字简洁清晰，适合电商平台展示。",
     ];
     return lines.filter(Boolean).join("\n");
-  }
-
-  function startPollingCard(card) {
-    if (!card.taskId) return;
-    // 避免重复 timer（重新生成场景）
-    stopPollingCard(card.id);
-    const timer = window.setInterval(() => {
-      pollCardOnce(card).catch(() => {});
-    }, POLL_INTERVAL_MS);
-    pollTimers.set(card.id, timer);
-    pollCardOnce(card).catch(() => {});
-  }
-
-  async function pollCardOnce(card) {
-    if (!card.taskId) return;
-    if (TERMINAL_STATUSES.has(card.status)) {
-      stopPollingCard(card.id);
-      return;
-    }
-    if (pollInFlight.has(card.id)) return;
-    pollInFlight.add(card.id);
-    try {
-      const result = await getImageTask(card.taskId);
-      if (result.code !== 0) {
-        return;
-      }
-      // 处理本次响应前再校验一次终态，避免并发响应叠加导致 generatedCount 重复 +1
-      if (TERMINAL_STATUSES.has(card.status)) {
-        stopPollingCard(card.id);
-        return;
-      }
-      const data = result.data || {};
-      const status = data.status || "processing";
-      const resultUrl = data.result_url || "";
-
-      if (status === "done" && resultUrl) {
-        // 防御：重新生成场景下，如果返回的 resultUrl 跟旧图一样，说明后端还没拿到新图
-        if (card.previousResultUrl && resultUrl === card.previousResultUrl) {
-          // 继续轮询，不停止
-          card.status = "processing";
-        } else {
-          // 先停轮询，避免重复处理
-          stopPollingCard(card.id);
-          // 保持遮罩：预加载新图完成后再切换状态
-          try {
-            await preloadImage(resultUrl);
-          } catch {
-            // 预加载失败也继续，浏览器会用 img src 正常请求
-          }
-          card.resultUrl = resultUrl;
-          card.dataUrl = resultUrl;
-          card.previousResultUrl = "";
-          card.status = "done";
-          generatedCount.value += 1;
-          genLogs.value.push(`[${card.strategyTitle}] 已完成`);
-          genLogs.value.push(`已完成 ${generatedCount.value}/${jobTotal.value}`);
-        }
-      } else if (status === "failed" || status === "timeout") {
-        card.status = status;
-        card.errorMessage = data.error_message || (status === "timeout" ? "生成超时" : "生成失败");
-        genLogs.value.push(
-          `[${card.strategyTitle}] ${status === "timeout" ? "超时" : "失败"}：${card.errorMessage}`,
-        );
-        stopPollingCard(card.id);
-      } else {
-        // 包含两种情况：1) processing；2) done 但 result_url 仍未落库（worker 写入竞态/降级）
-        card.status = status === "done" ? "processing" : status;
-      }
-
-      maybeFinishGenerating();
-    } catch {
-      // 单次轮询异常不停止该任务，等下一次 tick；网络抖动等场景靠后端最终态收敛
-    } finally {
-      pollInFlight.delete(card.id);
-    }
-  }
-
-  function stopPollingCard(cardId) {
-    const timer = pollTimers.get(cardId);
-    if (timer) {
-      window.clearInterval(timer);
-      pollTimers.delete(cardId);
-    }
-  }
-
-  function clearAllPollTimers() {
-    for (const timer of pollTimers.values()) {
-      window.clearInterval(timer);
-    }
-    pollTimers.clear();
-    pollInFlight.clear();
-  }
-
-  function maybeFinishGenerating() {
-    if (!generating.value) return;
-    const batchId = activeBatchRunId.value;
-    const batchCards = batchId
-      ? outputCards.value.filter((card) => card.batchRunId === batchId)
-      : outputCards.value;
-    if (batchCards.length === 0) return;
-    const allTerminal = batchCards.every((card) => TERMINAL_STATUSES.has(card.status));
-    if (allTerminal) {
-      generating.value = false;
-      genLogs.value.push("全部商品套图任务已结束");
-      const failedCount = batchCards.filter((card) => card.status !== "done").length;
-      if (failedCount === 0) {
-        toast.success("商品套图已全部生成");
-      } else if (failedCount === batchCards.length) {
-        toast.error("套图生成失败，请稍后重试");
-      } else {
-        toast.info(`部分套图生成失败（${failedCount} 张）`);
-      }
-    }
   }
 
   function buildSuiteQueue() {
@@ -645,107 +561,11 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
     return suiteStructureDefaults.find((item) => item.id === id)?.description || "商品套图生成";
   }
 
-  function toggleCardSelection(id) {
-    const card = outputCards.value.find((item) => item.id === id);
-    if (card) card.selected = !card.selected;
-  }
-
-  function toggleSelectAllCards(value) {
-    outputCards.value.forEach((card) => {
-      card.selected = value;
-    });
-  }
-
-  function batchDownload() {
-    const downloadable = selectedCards.value.filter(
-      (card) => card.status === "done" && card.dataUrl,
-    );
-    if (downloadable.length === 0) {
-      toast.info("请先勾选已生成完成的套图");
-      return;
-    }
-
-    if (downloadable.length === 1) {
-      downloadSingleImage(downloadable[0]);
-      return;
-    }
-
-    // 多张打 zip 包下载
-    downloadAsZip(downloadable);
-  }
-
-  async function downloadAsZip(cards) {
-    toast.info(`正在打包 ${cards.length} 张图片...`);
-    const zip = new JSZip();
-    const token = getToken();
-
-    const results = await Promise.allSettled(
-      cards.map(async (card, index) => {
-        const url = getImageDownloadUrl(card.taskId);
-        const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const blob = await res.blob();
-        const ext = blob.type === "image/jpeg" ? "jpg" : "png";
-        const name = `${card.strategyTitle || getStructureName(card.typeId)}_${index + 1}.${ext}`;
-        zip.file(name, blob);
-      }),
-    );
-
-    const succeeded = results.filter((r) => r.status === "fulfilled").length;
-    if (succeeded === 0) {
-      toast.error("图片下载失败，请稍后重试");
-      return;
-    }
-
-    try {
-      const content = await zip.generateAsync({ type: "blob" });
-      const url = URL.createObjectURL(content);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `${currentTaskTitle.value || "商品套图"}.zip`;
-      link.click();
-      URL.revokeObjectURL(url);
-      if (succeeded < cards.length) {
-        toast.info(`已打包 ${succeeded}/${cards.length} 张，部分图片下载失败`);
-      } else {
-        toast.success("打包下载完成");
-      }
-    } catch {
-      toast.error("打包失败，请稍后重试");
-    }
-  }
-
-  async function downloadSingleImage(card) {
-    if (!card.dataUrl) {
-      toast.info("该套图还未生成完成");
-      return;
-    }
-    try {
-      const url = getImageDownloadUrl(card.taskId);
-      const token = getToken();
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const blob = await res.blob();
-      const ext = blob.type === "image/jpeg" ? "jpg" : "png";
-      const blobUrl = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = blobUrl;
-      link.download = `${currentTaskTitle.value}_${card.strategyTitle || getStructureName(card.typeId)}.${ext}`;
-      link.click();
-      URL.revokeObjectURL(blobUrl);
-    } catch {
-      // fallback 到直接打开
-      const link = document.createElement("a");
-      link.href = card.dataUrl;
-      link.target = "_blank";
-      link.rel = "noopener";
-      link.click();
-    }
-  }
-
   function regenerateSingleCard(_card) {
     toast.info("请点击编辑图片按钮进行重新生成");
   }
+
+  // --- 生命周期 ---
 
   onBeforeUnmount(() => {
     clearAllPollTimers();
@@ -754,6 +574,8 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
       titleDebounceTimer = null;
     }
   });
+
+  // --- 对外接口（保持与原版一致）---
 
   return {
     uploadedImages,
@@ -796,8 +618,4 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
     regenerateSingleCard,
     startPollingCard,
   };
-}
-
-function makeId() {
-  return `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
