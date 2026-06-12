@@ -349,6 +349,7 @@ VITE_API_BASE_URL=
 
 ## 编码和编辑约定
 
+- 除非用户明确打出“执行”两个字，否则只讨论和分析，不要修改代码、配置、文档或运行会改变项目状态的命令。
 - Windows 环境读取文件用：
   `Get-Content <path> -Encoding UTF8`
 - 不要用 `cat` / `type` 读中文文件，容易乱码。
