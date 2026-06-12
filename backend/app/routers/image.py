@@ -104,7 +104,7 @@ async def create_task(
         job = job_result.scalar_one_or_none()
         if not job:
             return fail("任务不存在")
-        if job.scenario != "product_suite":
+        if job.scenario not in {"product_suite", "product_image"}:
             return fail("任务类型不匹配")
 
     task_id = str(uuid.uuid4())
