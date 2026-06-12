@@ -2,7 +2,9 @@ import json
 import uuid
 from datetime import datetime
 
+import httpx
 from fastapi import APIRouter, Depends, File, Request, UploadFile
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -265,13 +267,13 @@ async def get_task(
     )
 
 
-@router.delete("/task/{task_id}", response_model=Response)
-async def delete_task(
+@router.get("/task/{task_id}/download")
+async def download_task_image(
     task_id: str,
-    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    """代理下载图片，绕过浏览器跨域限制。"""
     result = await db.execute(
         select(ImageTask).where(
             ImageTask.id == task_id,
@@ -279,34 +281,37 @@ async def delete_task(
         )
     )
     task = result.scalar_one_or_none()
-    if not task:
-        return fail("任务不存在")
+    if not task or not task.result_url:
+        return fail("图片不存在或尚未生成完成")
 
-    # 如果任务正在生成中，不允许删除
-    if task.status in ("pending", "processing"):
-        return fail("任务正在生成中，无法删除")
+    async def stream():
+        async with httpx.AsyncClient(timeout=30) as client:
+            async with client.stream("GET", task.result_url) as resp:
+                resp.raise_for_status()
+                async for chunk in resp.aiter_bytes(chunk_size=65536):
+                    yield chunk
 
-    await db.delete(task)
-    try:
-        await db.commit()
-    except Exception:
-        await db.rollback()
-        return fail("删除失败，请稍后重试")
+    # 猜测 content type
+    url_lower = task.result_url.lower()
+    if url_lower.endswith(".jpg") or url_lower.endswith(".jpeg"):
+        media_type = "image/jpeg"
+        ext = "jpg"
+    elif url_lower.endswith(".webp"):
+        media_type = "image/webp"
+        ext = "webp"
+    else:
+        media_type = "image/png"
+        ext = "png"
 
-    # 清理 Redis 中的运行态数据
-    redis_pool = getattr(request.app.state, "redis_pool", None)
-    if redis_pool is not None:
-        try:
-            await redis_pool.delete(
-                f"task:{task_id}:status",
-                f"task:{task_id}:result",
-                f"task:{task_id}:error",
-                f"task:{task_id}:progress",
-            )
-        except Exception:
-            pass
+    filename = f"{task_id}.{ext}"
+    return StreamingResponse(
+        stream(),
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
-    return success(None, message="删除成功")
+
+@router.get("/tasks", response_model=Response)
 async def get_tasks(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),

@@ -3,7 +3,7 @@ import JSZip from 'jszip'
 import { ratioOptions, resolutionMap, resolveQuality } from '@/constants/generator.js'
 import { suiteStructureDefaults } from '@/constants/productSuite.js'
 import { useToast } from '@/composables/useToast.js'
-import { analyzeImage, generateImage, getImageTask } from '@/api/image.js'
+import { analyzeImage, generateImage, getImageDownloadUrl, getImageTask } from '@/api/image.js'
 import {
   createGenerationJob,
   getGenerationJob,
@@ -22,6 +22,15 @@ function preloadImage(url) {
     img.onerror = reject
     img.src = url
   })
+}
+
+function getToken() {
+  try {
+    const raw = window.localStorage.getItem('nodepass_auth_user')
+    return raw ? JSON.parse(raw)?.token : ''
+  } catch {
+    return ''
+  }
 }
 
 export function useProductSuiteGenerator({ onJobCreated } = {}) {
@@ -663,10 +672,12 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
   async function downloadAsZip(cards) {
     toast.info(`正在打包 ${cards.length} 张图片...`)
     const zip = new JSZip()
+    const token = getToken()
 
     const results = await Promise.allSettled(
       cards.map(async (card, index) => {
-        const res = await fetch(card.dataUrl)
+        const url = getImageDownloadUrl(card.taskId)
+        const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         const blob = await res.blob()
         const ext = blob.type === 'image/jpeg' ? 'jpg' : 'png'
@@ -705,18 +716,20 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
       return
     }
     try {
-      const res = await fetch(card.dataUrl)
+      const url = getImageDownloadUrl(card.taskId)
+      const token = getToken()
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const blob = await res.blob()
       const ext = blob.type === 'image/jpeg' ? 'jpg' : 'png'
-      const url = URL.createObjectURL(blob)
+      const blobUrl = URL.createObjectURL(blob)
       const link = document.createElement('a')
-      link.href = url
+      link.href = blobUrl
       link.download = `${currentTaskTitle.value}_${card.strategyTitle || getStructureName(card.typeId)}.${ext}`
       link.click()
-      URL.revokeObjectURL(url)
+      URL.revokeObjectURL(blobUrl)
     } catch {
-      // fetch 失败时 fallback 到直接打开
+      // fallback 到直接打开
       const link = document.createElement('a')
       link.href = card.dataUrl
       link.target = '_blank'

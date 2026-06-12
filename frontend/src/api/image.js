@@ -42,6 +42,11 @@ export function deleteImageTask(taskId) {
   return request.delete(`/image/task/${taskId}`, { timeout: 15000 })
 }
 
+export function getImageDownloadUrl(taskId) {
+  // 返回后端代理下载的完整 URL（带 token 的请求需要用 fetch）
+  return `${request.defaults.baseURL}/image/task/${taskId}/download`
+}
+
 export function regenerateImageTask(taskId, editInstruction) {
   return request.post(
     `/image/task/${taskId}/regenerate`,
