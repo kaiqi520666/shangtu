@@ -157,6 +157,8 @@ async function handleRegenerate() {
       target.errorMessage = ''
       target.editInstruction = instruction
     }
+    // 强制触发 ref 更新，让 prop 链路重新渲染
+    suite.outputCards.value = [...suite.outputCards.value]
     closeEditModal()
     toast.success('已提交重新生成，请稍候...')
     // 开始轮询
