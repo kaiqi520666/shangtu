@@ -19,6 +19,24 @@ SCENARIO_TITLE_PREFIX = {"product_suite": "商品套图"}
 
 TERMINAL_DONE = "done"
 TERMINAL_FAILED = {"failed", "timeout"}
+PROCESSING_STATUSES = {"pending", "processing"}
+
+
+def _compute_display_status(job_status: str, total: int, completed: int, failed: int) -> str:
+    """根据子任务聚合统计推断展示状态。"""
+    if total == 0:
+        return "draft"
+    # 还有进行中的子任务
+    pending_or_processing = total - completed - failed
+    if pending_or_processing > 0:
+        return "generating"
+    if completed == total:
+        return "done"
+    if failed == total:
+        return "failed"
+    if failed > 0 and completed > 0:
+        return "partial_failed"
+    return job_status
 
 
 class CreateJobRequest(BaseModel):
@@ -129,6 +147,12 @@ async def list_jobs(
             "scenario": job.scenario,
             "title": job.title,
             "status": job.status,
+            "display_status": _compute_display_status(
+                job.status,
+                stats[job.id]["total"],
+                stats[job.id]["completed"],
+                stats[job.id]["failed"],
+            ),
             "created_at": job.created_at,
             "updated_at": job.updated_at,
             "total": stats[job.id]["total"],
@@ -179,12 +203,19 @@ async def get_job(
         for task in tasks_result.scalars().all()
     ]
 
+    total = len(items)
+    completed = sum(1 for t in items if t["status"] == TERMINAL_DONE)
+    failed = sum(1 for t in items if t["status"] in TERMINAL_FAILED)
+
     return success(
         {
             "job_id": job.id,
             "scenario": job.scenario,
             "title": job.title,
             "status": job.status,
+            "display_status": _compute_display_status(
+                job.status, total, completed, failed
+            ),
             "settings": _parse_json(job.settings_json),
             "source_images": _parse_json(job.source_images_json),
             "input_text": job.input_text,

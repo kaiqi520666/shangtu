@@ -23,6 +23,12 @@ const STATUS_LABEL = {
   done: '已完成',
   partial_failed: '部分失败',
   failed: '失败',
+  timeout: '超时',
+}
+
+function getStatusLabel(job) {
+  const key = job.display_status || job.status || 'draft'
+  return STATUS_LABEL[key] || key
 }
 
 function formatTime(value) {
@@ -114,7 +120,7 @@ watch(
       :selected-image-label="suite.selectedImageLabel.value"
       :get-structure-name="suite.getStructureName"
       :get-structure-strategy="suite.getStructureStrategy"
-      @update:current-task-title="suite.currentTaskTitle.value = $event"
+      @update:current-task-title="suite.updateCurrentJobTitle"
       @select-all-cards="suite.toggleSelectAllCards"
       @batch-download="suite.batchDownload"
       @toggle-card="suite.toggleCardSelection"
@@ -149,7 +155,7 @@ watch(
           <div class="flex items-center justify-between gap-2">
             <span class="truncate font-bold text-slate-800">{{ job.title }}</span>
             <span class="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
-              {{ STATUS_LABEL[job.status] || job.status }}
+              {{ getStatusLabel(job) }}
             </span>
           </div>
           <div class="mt-1.5 flex items-center justify-between text-[11px] text-slate-500">

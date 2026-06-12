@@ -12,6 +12,7 @@ import {
 
 const POLL_INTERVAL_MS = 5000
 const TERMINAL_STATUSES = new Set(['done', 'failed', 'timeout'])
+const TITLE_DEBOUNCE_MS = 600
 
 export function useProductSuiteGenerator({ onJobCreated } = {}) {
   const toast = useToast()
@@ -70,6 +71,29 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
     const { width, height } = getCardSize()
     return `${settings.quality} / ${selectedRatioOption.value.label} / ${width}x${height}`
   })
+
+  let titleDebounceTimer = null
+
+  function updateCurrentJobTitle(title) {
+    const trimmed = (title || '').trim()
+    currentTaskTitle.value = title // 保留用户输入（含未 trim 的空格）
+    if (!currentJobId.value) return
+    if (!trimmed) return // 空标题不提交
+
+    if (titleDebounceTimer) {
+      clearTimeout(titleDebounceTimer)
+    }
+    titleDebounceTimer = setTimeout(async () => {
+      try {
+        const res = await updateGenerationJob(currentJobId.value, { title: trimmed })
+        if (res.code !== 0) {
+          toast.error('任务标题保存失败')
+        }
+      } catch {
+        toast.error('任务标题保存失败')
+      }
+    }, TITLE_DEBOUNCE_MS)
+  }
 
   async function ensureCurrentJob() {
     if (currentJobId.value) return currentJobId.value
@@ -627,6 +651,10 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
 
   onBeforeUnmount(() => {
     clearAllPollTimers()
+    if (titleDebounceTimer) {
+      clearTimeout(titleDebounceTimer)
+      titleDebounceTimer = null
+    }
   })
 
   return {
@@ -657,6 +685,7 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
     generateSuiteImages,
     createNewTask,
     resetWorkspaceToDraft,
+    updateCurrentJobTitle,
     loadHistoryTasks,
     loadGenerationJob,
     showNotice: toast.info,
