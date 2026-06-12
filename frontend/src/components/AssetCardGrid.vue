@@ -76,8 +76,8 @@ function formatDate(isoStr) {
 
       <!-- 底部信息 -->
       <div class="flex items-center justify-between border-t border-slate-100 bg-white p-3">
-        <span class="truncate text-xs font-medium text-slate-500" :title="card.title || formatDate(card.createdAt)">
-          {{ card.title || formatDate(card.createdAt) }}
+        <span class="truncate text-xs font-medium text-slate-500">
+          {{ formatDate(card.createdAt) }}
         </span>
         <button
           type="button"
