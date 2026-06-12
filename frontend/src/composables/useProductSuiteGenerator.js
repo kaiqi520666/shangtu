@@ -13,7 +13,7 @@ import {
 const POLL_INTERVAL_MS = 5000
 const TERMINAL_STATUSES = new Set(['done', 'failed', 'timeout'])
 
-export function useProductSuiteGenerator() {
+export function useProductSuiteGenerator({ onJobCreated } = {}) {
   const toast = useToast()
   const uploadedImages = ref([])
   const mainImageIndex = ref(0)
@@ -81,6 +81,7 @@ export function useProductSuiteGenerator() {
       }
       currentJobId.value = result.data.job_id
       currentTaskTitle.value = result.data.title
+      onJobCreated?.(currentJobId.value)
       return currentJobId.value
     } catch (error) {
       const status = error.response?.status
@@ -96,39 +97,30 @@ export function useProductSuiteGenerator() {
   async function createNewTask() {
     if (generating.value) {
       toast.info('当前任务正在生成中，请稍后再新建任务')
-      return
+      return false
     }
-    try {
-      const result = await createGenerationJob('product_suite')
-      if (result.code !== 0) {
-        toast.error(result.message || '创建任务失败')
-        return
-      }
-      clearAllPollTimers()
-      uploadedImages.value = []
-      mainImageIndex.value = 0
-      settings.productInput = ''
-      outputCards.value = []
-      genLogs.value = []
-      generatedCount.value = 0
-      jobTotal.value = 0
-      activeBatchRunId.value = ''
-      suiteStructure.value = suiteStructureDefaults.map((item) => ({
-        ...item,
-        enabled: true,
-        count: item.defaultCount,
-      }))
-      currentJobId.value = result.data.job_id
-      currentTaskTitle.value = result.data.title
-      toast.success('已新建商品套图任务')
-    } catch (error) {
-      const status = error.response?.status
-      if (status === 401) {
-        toast.error('登录已过期，请重新登录')
-      } else {
-        toast.error(error.response?.data?.message || '创建任务失败')
-      }
-    }
+    clearAllPollTimers()
+    resetWorkspaceToDraft()
+    return true
+  }
+
+  function resetWorkspaceToDraft() {
+    clearAllPollTimers()
+    uploadedImages.value = []
+    mainImageIndex.value = 0
+    settings.productInput = ''
+    outputCards.value = []
+    genLogs.value = []
+    generatedCount.value = 0
+    jobTotal.value = 0
+    activeBatchRunId.value = ''
+    currentJobId.value = ''
+    currentTaskTitle.value = ''
+    suiteStructure.value = suiteStructureDefaults.map((item) => ({
+      ...item,
+      enabled: true,
+      count: item.defaultCount,
+    }))
   }
 
   async function loadHistoryTasks() {
@@ -155,17 +147,17 @@ export function useProductSuiteGenerator() {
   }
 
   async function loadGenerationJob(jobId) {
-    if (!jobId) return
+    if (!jobId) return false
     if (generating.value) {
       toast.info('当前任务正在生成中，请稍后再切换任务')
-      return
+      return false
     }
     jobLoading.value = true
     try {
       const result = await getGenerationJob(jobId)
       if (result.code !== 0) {
-        toast.error(result.message || '加载任务失败')
-        return
+        toast.error(result.message || '任务不存在或无权限访问')
+        return false
       }
       const data = result.data || {}
       clearAllPollTimers()
@@ -241,13 +233,15 @@ export function useProductSuiteGenerator() {
       } else {
         generating.value = false
       }
+      return true
     } catch (error) {
       const status = error.response?.status
       if (status === 401) {
         toast.error('登录已过期，请重新登录')
       } else {
-        toast.error(error.response?.data?.message || '加载任务失败')
+        toast.error(error.response?.data?.message || '任务不存在或无权限访问')
       }
+      return false
     } finally {
       jobLoading.value = false
     }
@@ -662,6 +656,7 @@ export function useProductSuiteGenerator() {
     generateSellingPointsWithAI,
     generateSuiteImages,
     createNewTask,
+    resetWorkspaceToDraft,
     loadHistoryTasks,
     loadGenerationJob,
     showNotice: toast.info,

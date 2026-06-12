@@ -1,5 +1,6 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import AppDrawer from '@/components/AppDrawer.vue'
 import AppModal from '@/components/AppModal.vue'
 import GeneratorLayout from '@/components/GeneratorLayout.vue'
@@ -7,7 +8,14 @@ import ProductSuiteSettingsPanel from '@/components/ProductSuiteSettingsPanel.vu
 import ProductSuiteWorkspace from '@/components/ProductSuiteWorkspace.vue'
 import { useProductSuiteGenerator } from '@/composables/useProductSuiteGenerator.js'
 
-const suite = useProductSuiteGenerator()
+const route = useRoute()
+const router = useRouter()
+
+const suite = useProductSuiteGenerator({
+  onJobCreated(jobId) {
+    router.replace(`/generator/product-suite/${jobId}`)
+  },
+})
 
 const STATUS_LABEL = {
   draft: '草稿',
@@ -32,10 +40,42 @@ async function openHistory() {
   await suite.loadHistoryTasks()
 }
 
-async function pickHistory(jobId) {
+function pickHistory(jobId) {
   suite.showHistoryDrawer.value = false
-  await suite.loadGenerationJob(jobId)
+  router.push(`/generator/product-suite/${jobId}`)
 }
+
+async function handleCreateNewTask() {
+  const ok = await suite.createNewTask()
+  if (ok) {
+    router.push('/generator/product-suite')
+  }
+}
+
+async function handleRouteJobId(jobId) {
+  if (jobId && jobId !== suite.currentJobId.value) {
+    const ok = await suite.loadGenerationJob(jobId)
+    if (!ok) {
+      router.replace('/generator/product-suite')
+    }
+  } else if (!jobId && suite.currentJobId.value) {
+    suite.resetWorkspaceToDraft()
+  }
+}
+
+onMounted(() => {
+  const jobId = route.params.jobId
+  if (jobId) {
+    handleRouteJobId(jobId)
+  }
+})
+
+watch(
+  () => route.params.jobId,
+  (newJobId) => {
+    handleRouteJobId(newJobId)
+  },
+)
 </script>
 
 <template>
@@ -81,7 +121,7 @@ async function pickHistory(jobId) {
       @download-card="suite.downloadSingleImage"
       @regenerate-card="suite.regenerateSingleCard"
       @zoom-card="(card) => { if (card.status === 'done' && card.dataUrl) suite.zoomCard.value = card }"
-      @create-new-task="suite.createNewTask"
+      @create-new-task="handleCreateNewTask"
       @open-history="openHistory"
     />
 

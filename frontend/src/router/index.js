@@ -25,7 +25,7 @@ const router = createRouter({
       redirect: "/generator/product-suite",
     },
     {
-      path: "/generator/product-suite",
+      path: "/generator/product-suite/:jobId?",
       name: "product-suite",
       component: () => import("../views/ProductSuiteView.vue"),
     },
