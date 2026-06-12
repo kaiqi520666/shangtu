@@ -37,6 +37,10 @@ function isFailed(card) {
   return card.status === 'failed' || card.status === 'timeout'
 }
 
+function isRegenerating(card) {
+  return (card.status === 'processing' || card.status === 'pending') && card.dataUrl
+}
+
 function shortFailReason(card) {
   if (card.errorMessage) return card.errorMessage
   return card.status === 'timeout' ? '生成超时，请稍后重试' : '生成失败，请稍后重试'
@@ -113,6 +117,11 @@ function handleDownload(card) {
           <span class="text-xs font-semibold text-slate-500">
             {{ card.status === 'processing' ? '生成中...' : '排队中...' }}
           </span>
+        </div>
+        <!-- 重新生成遮罩：有旧图 + 正在生成 -->
+        <div v-if="isRegenerating(card)" class="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-white/70 backdrop-blur-[2px]">
+          <LoaderCircle class="h-7 w-7 animate-spin text-primary" />
+          <span class="text-xs font-semibold text-slate-600">重新生成中...</span>
         </div>
       </button>
 
