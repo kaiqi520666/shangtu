@@ -39,10 +39,11 @@ export function useOutfitGenerator() {
   const selectedImageLabel = computed(() => `${ratio.value} / Mock`)
   const previewSlides = computed(() => {
     const uploadedImage = garmentImages.value[mainGarmentIndex.value]
-    if (!uploadedImage) return outfitPreviewSlides
+    const src = getImageSrc(uploadedImage)
+    if (!src) return outfitPreviewSlides
     return outfitPreviewSlides.map((slide) => ({
       ...slide,
-      sourceImage: uploadedImage,
+      sourceImage: src,
     }))
   })
 
@@ -201,4 +202,10 @@ function wait(ms) {
 
 function makeId() {
   return `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+}
+
+function getImageSrc(image) {
+  if (!image) return ''
+  if (typeof image === 'string') return image
+  return image.previewUrl || image.url || ''
 }

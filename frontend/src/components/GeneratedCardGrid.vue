@@ -1,5 +1,5 @@
 <script setup>
-import { Check, Download, Maximize2, RefreshCw } from 'lucide-vue-next'
+import { Check, Download, LoaderCircle, Maximize2, RefreshCw, TriangleAlert } from 'lucide-vue-next'
 
 defineProps({
   cards: {
@@ -63,6 +63,7 @@ const emit = defineEmits(['toggle-card', 'download-card', 'regenerate-card', 'zo
           <RefreshCw class="h-3.5 w-3.5" />
         </button>
         <button
+          v-if="card.status === undefined || (card.status === 'done' && card.dataUrl)"
           type="button"
           class="rounded-lg border border-slate-200 bg-white/95 p-1.5 text-slate-600 shadow transition-colors hover:bg-white hover:text-primary"
           title="放大预览"
@@ -74,7 +75,17 @@ const emit = defineEmits(['toggle-card', 'download-card', 'regenerate-card', 'zo
 
       <button type="button" class="relative flex aspect-square cursor-pointer items-center justify-center overflow-hidden bg-slate-100 p-3" @click="emit('toggle-card', card.id)">
         <div class="absolute inset-0 bg-gradient-to-b from-transparent to-black/[0.01]"></div>
-        <img :src="card.dataUrl" class="max-h-full max-w-full object-contain drop-shadow-md transition-transform duration-300 group-hover:scale-[1.03]" alt="AI主图" />
+        <img v-if="card.dataUrl" :src="card.dataUrl" referrerpolicy="no-referrer" class="max-h-full max-w-full object-contain drop-shadow-md transition-transform duration-300 group-hover:scale-[1.03]" alt="AI主图" />
+        <div v-else-if="card.status === 'failed' || card.status === 'timeout'" class="flex flex-col items-center gap-2 px-4 text-center text-rose-500">
+          <TriangleAlert class="h-7 w-7" />
+          <span class="text-xs font-semibold">{{ card.errorMessage || (card.status === 'timeout' ? '生成超时' : '生成失败') }}</span>
+        </div>
+        <div v-else class="flex flex-col items-center gap-2 text-primary">
+          <LoaderCircle class="h-7 w-7 animate-spin" />
+          <span class="text-xs font-semibold text-slate-500">
+            {{ card.status === 'processing' ? '生成中...' : '排队中...' }}
+          </span>
+        </div>
       </button>
 
       <div class="flex flex-1 flex-col justify-between space-y-1.5 border-t border-slate-100 bg-white p-3">
@@ -89,10 +100,24 @@ const emit = defineEmits(['toggle-card', 'download-card', 'regenerate-card', 'zo
         </div>
         <div class="flex items-center justify-between border-t border-slate-100 pt-2">
           <span class="text-xs font-medium text-slate-400">适配：{{ platform }} / {{ language }}</span>
-          <button type="button" class="flex items-center gap-1 text-xs font-bold text-primary hover:text-secondary" @click="emit('download-card', card)">
+          <button
+            v-if="card.status === undefined || (card.status === 'done' && card.dataUrl)"
+            type="button"
+            class="flex items-center gap-1 text-xs font-bold text-primary hover:text-secondary"
+            @click="emit('download-card', card)"
+          >
             下载单张
             <Download class="h-3 w-3" />
           </button>
+          <span
+            v-else-if="card.status === 'failed' || card.status === 'timeout'"
+            class="text-xs font-semibold text-rose-500"
+          >
+            {{ card.errorMessage || (card.status === 'timeout' ? '生成超时' : '生成失败') }}
+          </span>
+          <span v-else class="text-xs font-medium text-slate-400">
+            {{ card.status === 'processing' ? '生成中...' : '排队中...' }}
+          </span>
         </div>
       </div>
     </article>

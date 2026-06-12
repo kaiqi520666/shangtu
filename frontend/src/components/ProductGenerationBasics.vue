@@ -1,8 +1,15 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { HelpCircle, LoaderCircle, Sparkles, X } from 'lucide-vue-next'
 import AppSelect from '@/components/AppSelect.vue'
-import { languageOptions, platformOptions, qualityOptions, ratioOptions } from '@/constants/generator.js'
+import {
+  isQualitySupported,
+  languageOptions,
+  platformOptions,
+  qualityOptions,
+  ratioOptions,
+  resolveQuality,
+} from '@/constants/generator.js'
 
 const props = defineProps({
   settings: {
@@ -30,6 +37,18 @@ const aiDraft = ref('')
 
 const hasAiDraft = computed(() => aiDraft.value.trim().length > 0)
 
+const isQualityEnabled = (quality) => isQualitySupported(props.settings.ratio, quality)
+
+watch(
+  () => props.settings.ratio,
+  (ratio) => {
+    const next = resolveQuality(ratio, props.settings.quality)
+    if (next && next !== props.settings.quality) {
+      updateSetting('quality', next)
+    }
+  },
+)
+
 async function handleAiWrite() {
   const draft = await props.generateSellingPoints()
   if (!draft) return
@@ -41,6 +60,11 @@ function confirmAiDraft() {
   if (!hasAiDraft.value) return
   updateSetting('productInput', aiDraft.value)
   showAiPopover.value = false
+}
+
+function selectQuality(quality) {
+  if (!isQualityEnabled(quality)) return
+  updateSetting('quality', quality)
 }
 
 function updateSetting(key, value) {
@@ -88,20 +112,29 @@ function updateSetting(key, value) {
           v-for="quality in qualityOptions"
           :key="quality.value"
           type="button"
+          :disabled="!isQualityEnabled(quality.value)"
           class="rounded-lg border px-3 py-2 text-center transition-all"
           :class="
-            settings.quality === quality.value
-              ? 'border-primary bg-primary/10 text-primary shadow-sm'
-              : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50'
+            !isQualityEnabled(quality.value)
+              ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-300'
+              : settings.quality === quality.value
+                ? 'border-primary bg-primary/10 text-primary shadow-sm'
+                : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50'
           "
-          @click="updateSetting('quality', quality.value)"
+          @click="selectQuality(quality.value)"
         >
           <span class="block text-sm font-bold leading-tight">{{ quality.title }}</span>
           <span
             class="mt-0.5 block text-xs leading-tight"
-            :class="settings.quality === quality.value ? 'text-primary' : 'text-slate-400'"
+            :class="
+              !isQualityEnabled(quality.value)
+                ? 'text-slate-300'
+                : settings.quality === quality.value
+                  ? 'text-primary'
+                  : 'text-slate-400'
+            "
           >
-            {{ quality.subtitle }}
+            {{ isQualityEnabled(quality.value) ? quality.subtitle : '不支持' }}
           </span>
         </button>
       </div>

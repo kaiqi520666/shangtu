@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref } from 'vue'
-import { CheckCircle2, ImagePlus, Trash2, X } from 'lucide-vue-next'
+import { CheckCircle2, ImagePlus, LoaderCircle, Trash2, X } from 'lucide-vue-next'
+import { uploadImage } from '@/api/image.js'
 
 const props = defineProps({
   images: {
@@ -61,31 +62,81 @@ function handleDrop(event) {
   processFiles(Array.from(event.dataTransfer.files || []))
 }
 
-function processFiles(files) {
+function readPreview(file) {
+  return new Promise((resolve) => {
+    const reader = new FileReader()
+    reader.onload = (e) => resolve(e.target.result)
+    reader.readAsDataURL(file)
+  })
+}
+
+async function processFiles(files) {
   const imageFiles = files.filter((file) => file.type.startsWith('image/'))
   const limit = props.maxCount - props.images.length
-  const toProcess = imageFiles.slice(0, limit)
 
   if (limit <= 0) {
     emit('notify', props.limitMessage)
     return
   }
 
+  const toProcess = imageFiles.slice(0, limit)
   if (imageFiles.length > toProcess.length) {
     emit('notify', `已达到 ${props.maxCount} 张上限，多余图片未添加`)
   }
 
-  Promise.all(
-    toProcess.map((file) => {
-      return new Promise((resolve) => {
-        const reader = new FileReader()
-        reader.onload = (readerEvent) => resolve(readerEvent.target.result)
-        reader.readAsDataURL(file)
-      })
+  // 先并行生成本地预览，立刻塞入占位项
+  const previews = await Promise.all(toProcess.map((file) => readPreview(file)))
+
+  const placeholders = toProcess.map((file, index) => ({
+    id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${index}`,
+    previewUrl: previews[index],
+    url: '',
+    objectKey: '',
+    contentType: file.type,
+    size: file.size,
+    uploading: true,
+    error: '',
+  }))
+
+  emit('update:images', [...props.images, ...placeholders])
+
+  // 逐一上传，回填 OSS 信息
+  await Promise.all(
+    toProcess.map(async (file, index) => {
+      const localId = placeholders[index].id
+      try {
+        const result = await uploadImage(file)
+        if (result.code !== 0) {
+          patchImage(localId, { uploading: false, error: result.message || '图片上传失败' })
+          emit('notify', result.message || '图片上传失败')
+          return
+        }
+        patchImage(localId, {
+          uploading: false,
+          error: '',
+          url: result.data.url,
+          objectKey: result.data.object_key,
+          contentType: result.data.content_type,
+          size: result.data.size,
+        })
+      } catch (error) {
+        const status = error.response?.status
+        if (status === 401) {
+          emit('notify', '登录已过期，请重新登录')
+        } else {
+          emit('notify', error.response?.data?.message || '图片上传失败')
+        }
+        patchImage(localId, { uploading: false, error: '图片上传失败' })
+      }
     }),
-  ).then((imageUrls) => {
-    emit('update:images', [...props.images, ...imageUrls])
-  })
+  )
+}
+
+function patchImage(localId, patch) {
+  const next = props.images.map((item) =>
+    item && item.id === localId ? { ...item, ...patch } : item,
+  )
+  emit('update:images', next)
 }
 
 function removeImage(index) {
@@ -102,6 +153,12 @@ function removeImage(index) {
 function clearImages() {
   emit('update:images', [])
   emit('update:mainIndex', 0)
+}
+
+function getPreview(img) {
+  if (!img) return ''
+  if (typeof img === 'string') return img
+  return img.previewUrl || img.url || ''
 }
 </script>
 
@@ -121,10 +178,19 @@ function clearImages() {
     <div class="grid grid-cols-3 gap-3">
       <div
         v-for="(img, index) in images"
-        :key="`${img}-${index}`"
+        :key="img?.id || `${getPreview(img)}-${index}`"
         class="group relative flex aspect-square items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50 p-1 shadow-inner"
       >
-        <img :src="img" class="max-h-full max-w-full rounded-lg object-contain transition-transform duration-300 group-hover:scale-105" :alt="altText" />
+        <img :src="getPreview(img)" class="max-h-full max-w-full rounded-lg object-contain transition-transform duration-300 group-hover:scale-105" :alt="altText" />
+
+        <div v-if="img?.uploading" class="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-white/70 text-xs font-semibold text-primary">
+          <LoaderCircle class="h-5 w-5 animate-spin" />
+          <span>上传中...</span>
+        </div>
+        <div v-else-if="img?.error" class="absolute inset-x-0 bottom-0 bg-rose-500/85 px-2 py-1 text-center text-xs text-white">
+          {{ img.error }}
+        </div>
+
         <div class="absolute inset-0 flex items-center justify-center gap-1.5 bg-slate-900/60 opacity-0 transition-opacity group-hover:opacity-100">
           <button
             type="button"

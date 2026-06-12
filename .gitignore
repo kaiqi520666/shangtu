@@ -15,3 +15,9 @@ Thumbs.db
 **/__pycache__/
 *.pyc
 *.pyo
+
+# 比赛/交付材料（产物体积大，不入库）
+deliverables/
+
+# Office 临时锁文件
+~$*

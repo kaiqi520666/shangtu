@@ -32,17 +32,19 @@ export const languageOptions = [
 ]
 
 export const ratioOptions = [
-  { value: '2:3', label: '2:3', description: '竖图' },
-  { value: '3:4', label: '3:4', description: '竖图' },
   { value: '1:1', label: '1:1', description: '正方形' },
+  { value: '3:2', label: '3:2', description: '横图' },
+  { value: '2:3', label: '2:3', description: '竖图' },
+  { value: '4:3', label: '4:3', description: '横图' },
+  { value: '3:4', label: '3:4', description: '竖图' },
+  { value: '5:4', label: '5:4', description: '横图' },
+  { value: '4:5', label: '4:5', description: '竖图' },
   { value: '16:9', label: '16:9', description: '横图' },
   { value: '9:16', label: '9:16', description: '竖图' },
-  { value: '4:3', label: '4:3', description: '横图' },
-  { value: '3:2', label: '3:2', description: '横图' },
-  { value: '4:5', label: '4:5', description: '竖图' },
-  { value: '5:4', label: '5:4', description: '横图' },
+  { value: '2:1', label: '2:1', description: '横幅' },
+  { value: '1:2', label: '1:2', description: '长竖图' },
   { value: '21:9', label: '21:9', description: '横图' },
-  { value: '40:17', label: '40:17', description: '横幅' },
+  { value: '9:21', label: '9:21', description: '长竖图' },
 ]
 
 export const qualityOptions = [
@@ -73,45 +75,81 @@ export const productDetailPreviewSlides = [
 ]
 
 export const resolutionMap = {
-  '1K': {
-    '1:1': [1280, 1280],
-    '2:3': [848, 1280],
-    '3:2': [1280, 848],
-    '3:4': [960, 1280],
-    '4:3': [1280, 960],
-    '4:5': [1024, 1280],
-    '5:4': [1280, 1024],
-    '9:16': [720, 1280],
-    '16:9': [1280, 720],
-    '21:9': [1280, 544],
-    '40:17': [1280, 544],
+  '1:1': {
+    '1K': [1024, 1024],
+    '2K': [2048, 2048],
   },
-  '2K': {
-    '1:1': [2048, 2048],
-    '2:3': [1360, 2048],
-    '3:2': [2048, 1360],
-    '3:4': [1536, 2048],
-    '4:3': [2048, 1536],
-    '4:5': [1632, 2048],
-    '5:4': [2048, 1632],
-    '9:16': [1152, 2048],
-    '16:9': [2048, 1152],
-    '21:9': [2048, 864],
-    '40:17': [2048, 864],
+  '3:2': {
+    '1K': [1536, 1024],
+    '2K': [2048, 1360],
   },
-  '4K': {
-    '1:1': [2880, 2880],
-    '2:3': [2336, 3520],
-    '3:2': [3520, 2336],
-    '3:4': [2480, 3312],
-    '4:3': [3312, 2480],
-    '4:5': [2560, 3216],
-    '5:4': [3216, 2560],
-    '9:16': [2160, 3840],
-    '16:9': [3840, 2160],
-    '21:9': [3840, 1632],
-    '40:17': [3840, 1632],
+  '2:3': {
+    '1K': [1024, 1536],
+    '2K': [1360, 2048],
   },
+  '4:3': {
+    '1K': [1024, 768],
+    '2K': [2048, 1536],
+  },
+  '3:4': {
+    '1K': [768, 1024],
+    '2K': [1536, 2048],
+  },
+  '5:4': {
+    '1K': [1280, 1024],
+    '2K': [2560, 2048],
+  },
+  '4:5': {
+    '1K': [1024, 1280],
+    '2K': [2048, 2560],
+  },
+  '16:9': {
+    '1K': [1536, 864],
+    '2K': [2048, 1152],
+    '4K': [3840, 2160],
+  },
+  '9:16': {
+    '1K': [864, 1536],
+    '2K': [1152, 2048],
+    '4K': [2160, 3840],
+  },
+  '2:1': {
+    '1K': [2048, 1024],
+    '2K': [2688, 1344],
+    '4K': [3840, 1920],
+  },
+  '1:2': {
+    '1K': [1024, 2048],
+    '2K': [1344, 2688],
+    '4K': [1920, 3840],
+  },
+  '21:9': {
+    '1K': [2016, 864],
+    '2K': [2688, 1152],
+    '4K': [3840, 1648],
+  },
+  '9:21': {
+    '1K': [864, 2016],
+    '2K': [1152, 2688],
+    '4K': [1648, 3840],
+  },
+}
+
+export function getSupportedQualities(ratio) {
+  return Object.keys(resolutionMap[ratio] || {})
+}
+
+export function isQualitySupported(ratio, quality) {
+  return Boolean(resolutionMap[ratio]?.[quality])
+}
+
+export function resolveQuality(ratio, requestedQuality) {
+  if (isQualitySupported(ratio, requestedQuality)) return requestedQuality
+  const supported = getSupportedQualities(ratio)
+  if (supported.length === 0) return null
+  if (supported.includes('2K')) return '2K'
+  if (supported.includes('1K')) return '1K'
+  return supported[0]
 }
 
 export const availableModules = [

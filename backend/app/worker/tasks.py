@@ -1,85 +1,433 @@
+import asyncio
 import json
 import os
-import re
+import time
 import traceback
+from typing import Any
 
 import httpx
 from dotenv import load_dotenv
-from sqlalchemy import update
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+from app.core.oss import ALLOWED_IMAGE_TYPES, upload_image_bytes
 
 load_dotenv()
 
-APIYI_KEY = os.getenv("APIYI_KEY")
-os.environ.pop("HTTP_PROXY", None)
-os.environ.pop("HTTPS_PROXY", None)
-os.environ.pop("http_proxy", None)
-os.environ.pop("https_proxy", None)
+TOAPIS_BASE_URL = (os.getenv("TOAPIS_URL") or "https://toapis.com").rstrip("/")
+TOAPIS_KEY = os.getenv("TOAPIS_KEY")
+
+# 主动剥离代理环境变量，防止 Windows 走代理失败
+for _proxy_key in ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"):
+    os.environ.pop(_proxy_key, None)
+
+PRODUCT_IMAGE_SYSTEM_PROMPT = (
+    "你是专业电商商品图生成助手。必须以用户提供的参考商品图为主体，"
+    "保持商品的款式、颜色、材质、结构和核心外观一致；"
+    "只允许根据用户要求调整背景、构图、光影、场景和信息排版。"
+    "不要虚构品牌 Logo、认证、参数、价格、销量或无法从图片与用户文字确认的信息。"
+    "若需要添加文字，必须使用用户指定语言，文字简洁清晰，适合电商平台展示。"
+)
+
+DEFAULT_GENERATED_CONTENT_TYPE = "image/png"
+
+POLL_INTERVAL_SECONDS = 5
+MAX_WAIT_SECONDS = 20 * 60
+
+# ToAPIS 支持的 (ratio, resolution) → 像素尺寸；与前端 frontend/src/constants/generator.js#resolutionMap 完全对齐
+TOAPIS_SIZE_TABLE: dict[str, dict[str, tuple[int, int]]] = {
+    "1:1": {"1K": (1024, 1024), "2K": (2048, 2048)},
+    "3:2": {"1K": (1536, 1024), "2K": (2048, 1360)},
+    "2:3": {"1K": (1024, 1536), "2K": (1360, 2048)},
+    "4:3": {"1K": (1024, 768), "2K": (2048, 1536)},
+    "3:4": {"1K": (768, 1024), "2K": (1536, 2048)},
+    "5:4": {"1K": (1280, 1024), "2K": (2560, 2048)},
+    "4:5": {"1K": (1024, 1280), "2K": (2048, 2560)},
+    "16:9": {"1K": (1536, 864), "2K": (2048, 1152), "4K": (3840, 2160)},
+    "9:16": {"1K": (864, 1536), "2K": (1152, 2048), "4K": (2160, 3840)},
+    "2:1": {"1K": (2048, 1024), "2K": (2688, 1344), "4K": (3840, 1920)},
+    "1:2": {"1K": (1024, 2048), "2K": (1344, 2688), "4K": (1920, 3840)},
+    "21:9": {"1K": (2016, 864), "2K": (2688, 1152), "4K": (3840, 1648)},
+    "9:21": {"1K": (864, 2016), "2K": (1152, 2688), "4K": (1648, 3840)},
+}
+
+TOAPIS_STATUS_DONE = {"completed", "succeeded", "success"}
+TOAPIS_STATUS_FAILED = {"failed", "error", "cancelled", "canceled"}
 
 engine = create_async_engine(os.getenv("DATABASE_URL"))
 SessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
 
-async def update_task_in_db(task_id: str, status: str, result_url: str | None = None):
+async def update_task_in_db(
+    task_id: str,
+    *,
+    status: str | None = None,
+    result_url: str | None = None,
+    error_message: str | None = None,
+    progress: int | None = None,
+    provider_task_id: str | None = None,
+) -> None:
     from app.models import ImageTask
+
+    values: dict[str, Any] = {}
+    if status is not None:
+        values["status"] = status
+    if result_url is not None:
+        values["result_url"] = result_url
+    if error_message is not None:
+        values["error_message"] = error_message
+    if progress is not None:
+        values["progress"] = max(0, min(100, int(progress)))
+    if provider_task_id is not None:
+        values["provider_task_id"] = provider_task_id
+
+    if not values:
+        return
 
     async with SessionLocal() as session:
         await session.execute(
             update(ImageTask)
             .where(ImageTask.id == task_id)
-            .values(status=status, result_url=result_url)
+            .values(**values)
         )
         await session.commit()
 
 
-async def generate_image(ctx, task_id: str, prompt: str, size: str = "720x1280"):
+async def fetch_task_user_id(task_id: str) -> int | None:
+    from app.models import ImageTask
+
+    async with SessionLocal() as session:
+        result = await session.execute(
+            select(ImageTask.user_id).where(ImageTask.id == task_id)
+        )
+        return result.scalar_one_or_none()
+
+
+def validate_size(ratio: str, resolution: str) -> str | None:
+    """校验 (ratio, resolution) 是否被 ToAPIS 支持，不支持时返回中文错误说明，否则返回 None。"""
+    if ratio not in TOAPIS_SIZE_TABLE:
+        return f"不支持的图片比例：{ratio}"
+    if resolution not in TOAPIS_SIZE_TABLE[ratio]:
+        supported = "/".join(TOAPIS_SIZE_TABLE[ratio].keys())
+        return f"当前比例 {ratio} 不支持 {resolution}，请选择 {supported}"
+    return None
+
+
+def normalize_content_type(raw: str | None) -> str:
+    if not raw:
+        return DEFAULT_GENERATED_CONTENT_TYPE
+    main = raw.split(";", 1)[0].strip().lower()
+    if main == "image/jpg":
+        main = "image/jpeg"
+    if main in ALLOWED_IMAGE_TYPES:
+        return main
+    return DEFAULT_GENERATED_CONTENT_TYPE
+
+
+def build_create_payload(
+    *,
+    prompt: str,
+    ratio: str,
+    resolution: str,
+    image_url: str | None,
+) -> dict:
+    full_prompt = (
+        f"{PRODUCT_IMAGE_SYSTEM_PROMPT}\n\n{prompt}" if image_url else prompt
+    )
+    payload: dict[str, Any] = {
+        "model": "gpt-image-2",
+        "prompt": full_prompt,
+        "n": 1,
+        "size": ratio,
+        "resolution": resolution,
+        "response_format": "url",
+    }
+    if image_url:
+        payload["image_urls"] = [image_url]
+    return payload
+
+
+def extract_provider_task_id(create_response: dict) -> str | None:
+    for key in ("id", "task_id", "request_id"):
+        value = create_response.get(key)
+        if isinstance(value, str) and value:
+            return value
+    data = create_response.get("data")
+    if isinstance(data, dict):
+        for key in ("id", "task_id"):
+            value = data.get(key)
+            if isinstance(value, str) and value:
+                return value
+    return None
+
+
+def extract_provider_status(poll_response: dict) -> str | None:
+    status = poll_response.get("status")
+    if isinstance(status, str) and status:
+        return status.lower()
+    data = poll_response.get("data")
+    if isinstance(data, dict):
+        nested = data.get("status")
+        if isinstance(nested, str) and nested:
+            return nested.lower()
+    return None
+
+
+def extract_provider_progress(poll_response: dict) -> int | None:
+    progress = poll_response.get("progress")
+    if progress is None:
+        data = poll_response.get("data")
+        if isinstance(data, dict):
+            progress = data.get("progress")
+    if progress is None:
+        return None
+    try:
+        return max(0, min(100, int(progress)))
+    except (TypeError, ValueError):
+        return None
+
+
+def extract_provider_error(poll_response: dict) -> str | None:
+    err = poll_response.get("error") or poll_response.get("error_message")
+    if isinstance(err, dict):
+        err = err.get("message") or err.get("detail")
+    if isinstance(err, str) and err:
+        return err
+    data = poll_response.get("data")
+    if isinstance(data, dict):
+        nested = data.get("error") or data.get("error_message")
+        if isinstance(nested, dict):
+            nested = nested.get("message") or nested.get("detail")
+        if isinstance(nested, str) and nested:
+            return nested
+    return None
+
+
+def extract_result_url(poll_response: dict) -> str | None:
+    # 候选位置：顶层 data / 顶层 result / data.data / data.result（覆盖 ToAPIS 的多种返回形态）
+    candidates: list[Any] = [
+        poll_response.get("data"),
+        poll_response.get("result"),
+    ]
+    data = poll_response.get("data")
+    if isinstance(data, dict):
+        candidates.append(data.get("data"))
+        candidates.append(data.get("result"))
+
+    for node in candidates:
+        if isinstance(node, list) and node:
+            first = node[0] or {}
+            url = first.get("url") if isinstance(first, dict) else None
+            if isinstance(url, str) and url:
+                return url
+        if isinstance(node, dict):
+            url = node.get("url")
+            if isinstance(url, str) and url:
+                return url
+            inner = node.get("data")
+            if isinstance(inner, list) and inner:
+                first = inner[0] or {}
+                url = first.get("url") if isinstance(first, dict) else None
+                if isinstance(url, str) and url:
+                    return url
+    return None
+
+
+async def materialize_to_oss(
+    *,
+    user_id: int,
+    url: str,
+    client: httpx.AsyncClient,
+):
+    download = await client.get(url)
+    download.raise_for_status()
+    content_bytes = download.content
+    content_type = normalize_content_type(download.headers.get("content-type"))
+
+    return await upload_image_bytes(
+        user_id=user_id,
+        content=content_bytes,
+        content_type=content_type,
+        source="generated",
+    )
+
+
+async def _set_progress(redis, task_id: str, value: int) -> None:
+    await redis.set(
+        f"task:{task_id}:progress", str(max(0, min(100, value))), ex=7200
+    )
+
+
+async def _mark_failed(redis, task_id: str, message: str) -> None:
+    await update_task_in_db(task_id, status="failed", error_message=message)
+    await redis.set(f"task:{task_id}:error", message, ex=3600)
+    await redis.set(f"task:{task_id}:status", "failed", ex=3600)
+
+
+async def _mark_timeout(redis, task_id: str, message: str) -> None:
+    await update_task_in_db(task_id, status="timeout", error_message=message)
+    await redis.set(f"task:{task_id}:error", message, ex=3600)
+    await redis.set(f"task:{task_id}:status", "timeout", ex=3600)
+
+
+async def generate_image(
+    ctx,
+    task_id: str,
+    prompt: str,
+    ratio: str = "1:1",
+    resolution: str = "1K",
+    image_url: str | None = None,
+):
     redis = ctx["redis"]
 
     try:
         await redis.set(f"task:{task_id}:status", "processing", ex=7200)
+        await _set_progress(redis, task_id, 0)
+        await update_task_in_db(task_id, status="processing", progress=0)
+
+        if not TOAPIS_KEY:
+            await _mark_failed(redis, task_id, "TOAPIS_KEY 未配置，无法调用生图服务")
+            return
+
+        user_id = await fetch_task_user_id(task_id)
+        if not user_id:
+            await _mark_failed(redis, task_id, "任务不存在或已删除")
+            return
+
+        validation_error = validate_size(ratio, resolution)
+        if validation_error:
+            await _mark_failed(redis, task_id, validation_error)
+            return
+
+        create_payload = build_create_payload(
+            prompt=prompt,
+            ratio=ratio,
+            resolution=resolution,
+            image_url=image_url,
+        )
+
         transport = httpx.AsyncHTTPTransport(proxy=None)
+        async with httpx.AsyncClient(timeout=60, transport=transport) as client:
+            try:
+                create_resp = await client.post(
+                    f"{TOAPIS_BASE_URL}/v1/images/generations",
+                    headers={
+                        "Authorization": f"Bearer {TOAPIS_KEY}",
+                        "Content-Type": "application/json",
+                    },
+                    json=create_payload,
+                )
+                create_resp.raise_for_status()
+                create_result = create_resp.json()
+            except httpx.HTTPError as e:
+                await _mark_failed(redis, task_id, f"创建 ToAPIS 任务失败: {e}")
+                return
+            except ValueError as e:
+                await _mark_failed(redis, task_id, f"ToAPIS 创建响应解析失败: {e}")
+                return
 
-        async with httpx.AsyncClient(timeout=310, transport=transport) as client:
-            resp = await client.post(
-                "https://api.apiyi.com/v1/chat/completions",
-                headers={"Authorization": f"Bearer {APIYI_KEY}"},
-                json={
-                    "model": "gpt-image-2-vip",
-                    "size": size,
-                    "messages": [{"role": "user", "content": prompt}],
-                },
+            print(f"toapis 创建响应: {create_result}")
+
+            provider_task_id = extract_provider_task_id(create_result)
+            if not provider_task_id:
+                err = (
+                    extract_provider_error(create_result)
+                    or "ToAPIS 未返回 task id"
+                )
+                await _mark_failed(redis, task_id, err)
+                return
+
+            await update_task_in_db(task_id, provider_task_id=provider_task_id)
+
+            poll_url = (
+                f"{TOAPIS_BASE_URL}/v1/images/generations/{provider_task_id}"
             )
-            result = resp.json()
-            print(f"apiyi 原始响应: {result}")
+            deadline = time.monotonic() + MAX_WAIT_SECONDS
+            final_status: str | None = None
+            final_url: str | None = None
+            final_error: str | None = None
 
-        if "data" in result:
-            url = result["data"][0].get("url") or result["data"][0].get("b64_json")
-        elif "choices" in result:
-            content = result["choices"][0]["message"]["content"]
-            match = re.search(r"!\[image\]\((https?://[^\)]+)\)", content)
-            url = match.group(1) if match else None
-        else:
-            url = None
+            while time.monotonic() < deadline:
+                await asyncio.sleep(POLL_INTERVAL_SECONDS)
+                try:
+                    poll_resp = await client.get(
+                        poll_url,
+                        headers={"Authorization": f"Bearer {TOAPIS_KEY}"},
+                    )
+                    poll_resp.raise_for_status()
+                    poll_result = poll_resp.json()
+                except httpx.HTTPError as e:
+                    print(f"轮询 ToAPIS 异常: {e}")
+                    continue
+                except ValueError as e:
+                    print(f"ToAPIS 轮询响应解析失败: {e}")
+                    continue
 
-        if url:
-            await redis.set(
-                f"task:{task_id}:result",
-                json.dumps({"url": url}),
-                ex=86400,
-            )
-            await redis.set(f"task:{task_id}:status", "done", ex=86400)
-            await update_task_in_db(task_id, "done", url)
-        else:
-            await redis.set(f"task:{task_id}:status", "failed", ex=3600)
-            await redis.set(f"task:{task_id}:error", "无法提取图片URL", ex=3600)
-            await update_task_in_db(task_id, "failed")
+                provider_status = extract_provider_status(poll_result)
+                provider_progress = extract_provider_progress(poll_result)
+
+                if provider_progress is not None:
+                    await _set_progress(redis, task_id, provider_progress)
+                    await update_task_in_db(task_id, progress=provider_progress)
+
+                if provider_status in TOAPIS_STATUS_DONE:
+                    final_url = extract_result_url(poll_result)
+                    if final_url:
+                        final_status = "done"
+                    else:
+                        final_status = "failed"
+                        final_error = "ToAPIS 已完成但未返回结果图 URL"
+                    break
+
+                if provider_status in TOAPIS_STATUS_FAILED:
+                    final_status = "failed"
+                    final_error = (
+                        extract_provider_error(poll_result) or "ToAPIS 任务失败"
+                    )
+                    break
+                # queued / in_progress / 未知状态：继续轮询
+            else:
+                await _mark_timeout(redis, task_id, "等待 ToAPIS 任务超时")
+                return
+
+            if final_status == "failed" or not final_url:
+                await _mark_failed(
+                    redis, task_id, final_error or "ToAPIS 任务失败"
+                )
+                return
+
+            try:
+                uploaded = await materialize_to_oss(
+                    user_id=user_id,
+                    url=final_url,
+                    client=client,
+                )
+            except httpx.HTTPError as e:
+                await _mark_failed(redis, task_id, f"下载生成图失败: {e}")
+                return
+            except Exception as e:
+                traceback.print_exc()
+                await _mark_failed(redis, task_id, f"OSS 上传失败: {e}")
+                return
+
+        # 先 DB 后 Redis：避免 status=done 但 result_url=null 竞态
+        await update_task_in_db(
+            task_id,
+            status="done",
+            result_url=uploaded.url,
+            progress=100,
+        )
+        await redis.set(
+            f"task:{task_id}:result",
+            json.dumps({"url": uploaded.url}),
+            ex=86400,
+        )
+        await _set_progress(redis, task_id, 100)
+        await redis.set(f"task:{task_id}:status", "done", ex=86400)
 
     except httpx.TimeoutException:
-        await redis.set(f"task:{task_id}:status", "timeout", ex=3600)
-        await update_task_in_db(task_id, "timeout")
+        await _mark_timeout(redis, task_id, "请求 ToAPIS 超时")
     except Exception as e:
         print(f"任务失败详细错误: {e}")
         traceback.print_exc()
-        await redis.set(f"task:{task_id}:status", "failed", ex=3600)
-        await redis.set(f"task:{task_id}:error", str(e), ex=3600)
-        await update_task_in_db(task_id, "failed")
+        await _mark_failed(redis, task_id, str(e))

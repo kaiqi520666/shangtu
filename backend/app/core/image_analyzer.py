@@ -58,6 +58,7 @@ async def analyze_product_image(
 
     payload = {
         "model": DASHSCOPE_MODEL,
+        "enable_thinking": False,
         "messages": [
             {
                 "role": "user",

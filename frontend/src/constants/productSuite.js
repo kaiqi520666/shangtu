@@ -33,7 +33,7 @@ export const productSuitePreviewSlides = [
   {
     caption: '围绕同一商品自动生成白底、场景、卖点和细节套图，适合多平台批量上架。',
     sourceImage:
-      'https://images.unsplash.com/photo-1585386959984-a41552231658?auto=format&fit=crop&w=360&q=80',
+      'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?auto=format&fit=crop&w=360&q=80',
     resultImages: [
       'https://images.unsplash.com/photo-1586495777744-4413f21062fa?auto=format&fit=crop&w=420&q=80',
       'https://images.unsplash.com/photo-1596462502278-27bfdc403348?auto=format&fit=crop&w=420&q=80',

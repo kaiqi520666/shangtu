@@ -1,5 +1,5 @@
 import { computed, reactive, ref } from "vue";
-import { availableModules, ratioOptions, resolutionMap } from "@/constants/generator.js";
+import { availableModules, ratioOptions, resolutionMap, resolveQuality } from "@/constants/generator.js";
 import { useToast } from "@/composables/useToast.js";
 
 const THEME_COLORS = {
@@ -116,8 +116,15 @@ export function useGenerator() {
   }
 
   function getCardSize() {
-    const [width, height] =
-      resolutionMap[settings.quality]?.[settings.ratio] || resolutionMap["1K"]["1:1"];
+    const effectiveQuality = resolveQuality(settings.ratio, settings.quality) || settings.quality;
+    const dims = resolutionMap[settings.ratio]?.[effectiveQuality];
+    if (!dims) {
+      throw new Error(`不支持的尺寸组合：${settings.ratio} / ${settings.quality}`);
+    }
+    if (effectiveQuality !== settings.quality) {
+      settings.quality = effectiveQuality;
+    }
+    const [width, height] = dims;
     return { width, height };
   }
 
@@ -205,7 +212,7 @@ export function useGenerator() {
     for (const moduleItem of moduleQueue) {
       await wait(180);
       genLogs.value.push(`正在为 [${moduleItem.moduleName}] 执行多层级渲染绘制...`);
-      const base64 = await renderCardImage(moduleItem.id, mainImg, moduleItem);
+      const base64 = await renderCardImage(moduleItem.id, getImageSrc(mainImg), moduleItem);
       outputCards.value.push({
         id: makeCardId(),
         typeId: moduleItem.id,
@@ -575,7 +582,7 @@ export function useGenerator() {
     const mainImg = uploadedImages.value[mainImageIndex.value];
     card.dataUrl = await renderCardImage(
       card.typeId,
-      mainImg,
+      getImageSrc(mainImg),
       findModuleContent(card.typeId, card),
     );
     toast.success(`${getModuleName(card.typeId)} 已重新生成`);
@@ -814,4 +821,10 @@ function getProgressWidthClass(progress) {
   if (progress >= 25) return "w-1/4";
   if (progress > 0) return "w-1/12";
   return "w-0";
+}
+
+function getImageSrc(image) {
+  if (!image) return "";
+  if (typeof image === "string") return image;
+  return image.previewUrl || image.url || "";
 }

@@ -13,5 +13,5 @@ class WorkerSettings:
     redis_settings = RedisSettings.from_dsn(
         os.getenv("REDIS_URL", "redis://localhost:6379")
     )
-    job_timeout = 330
+    job_timeout = 1500
     max_jobs = 5
