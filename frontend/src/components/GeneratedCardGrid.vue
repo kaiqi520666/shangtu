@@ -1,5 +1,5 @@
 <script setup>
-import { Check, Download, LoaderCircle, Maximize2, RefreshCw, TriangleAlert } from 'lucide-vue-next'
+import { Check, Download, LoaderCircle, Maximize2, Pencil, TriangleAlert } from 'lucide-vue-next'
 import { useToast } from '@/composables/useToast.js'
 
 defineProps({
@@ -29,7 +29,7 @@ defineProps({
   },
 })
 
-const emit = defineEmits(['toggle-card', 'download-card', 'regenerate-card', 'zoom-card'])
+const emit = defineEmits(['toggle-card', 'download-card', 'edit-card', 'zoom-card'])
 
 const toast = useToast()
 
@@ -75,12 +75,13 @@ function handleDownload(card) {
 
       <div class="absolute right-2.5 top-2.5 z-10 flex gap-1.5 opacity-0 transition-opacity group-hover:opacity-100">
         <button
+          v-if="card.status === 'done' && card.dataUrl"
           type="button"
           class="rounded-lg border border-slate-200 bg-white/95 p-1.5 text-slate-600 shadow transition-colors hover:bg-white hover:text-primary"
-          title="重算该策略图"
-          @click="emit('regenerate-card', card)"
+          title="编辑图片"
+          @click="emit('edit-card', card)"
         >
-          <RefreshCw class="h-3.5 w-3.5" />
+          <Pencil class="h-3.5 w-3.5" />
         </button>
         <button
           v-if="card.status === undefined || (card.status === 'done' && card.dataUrl)"

@@ -24,4 +24,7 @@ class ImageTask(Base):
     provider: Mapped[str] = mapped_column(String(32), default="toapis")
     provider_task_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     credit_refunded: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    edit_instruction: Mapped[str | None] = mapped_column(Text, nullable=True)
+    archived: Mapped[bool] = mapped_column(Boolean, default=False)
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())

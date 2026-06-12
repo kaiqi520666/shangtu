@@ -187,6 +187,7 @@ async def get_job(
         .where(
             ImageTask.job_id == job_id,
             ImageTask.user_id == current_user.id,
+            ImageTask.archived == False,  # noqa: E712
         )
         .order_by(ImageTask.sort_order.asc(), ImageTask.created_at.asc())
     )
@@ -201,6 +202,8 @@ async def get_job(
             "result_url": task.result_url,
             "error_message": task.error_message,
             "credit_refunded": bool(task.credit_refunded),
+            "prompt": task.prompt,
+            "edit_instruction": task.edit_instruction,
         }
         for task in tasks_result.scalars().all()
     ]

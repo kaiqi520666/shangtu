@@ -62,7 +62,7 @@ const emit = defineEmits([
   'batch-download',
   'toggle-card',
   'download-card',
-  'regenerate-card',
+  'edit-card',
   'zoom-card',
   'create-new-task',
   'open-history',
@@ -167,7 +167,7 @@ const emit = defineEmits([
           :get-module-strategy="getStructureStrategy"
           @toggle-card="emit('toggle-card', $event)"
           @download-card="emit('download-card', $event)"
-          @regenerate-card="emit('regenerate-card', $event)"
+          @edit-card="emit('edit-card', $event)"
           @zoom-card="emit('zoom-card', $event)"
         />
       </div>

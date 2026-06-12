@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppDrawer from '@/components/AppDrawer.vue'
 import AppModal from '@/components/AppModal.vue'
@@ -10,6 +10,7 @@ import { useProductSuiteGenerator } from '@/composables/useProductSuiteGenerator
 import { useConfirm } from '@/composables/useConfirm.js'
 import { useToast } from '@/composables/useToast.js'
 import { deleteGenerationJob } from '@/api/generation.js'
+import { deleteImageTask, regenerateImageTask } from '@/api/image.js'
 import { Trash2 } from 'lucide-vue-next'
 
 const route = useRoute()
@@ -22,6 +23,12 @@ const suite = useProductSuiteGenerator({
     router.replace(`/generator/product-suite/${jobId}`)
   },
 })
+
+// 编辑弹窗状态
+const editModalOpen = ref(false)
+const editCard = ref(null)
+const editInstruction = ref('')
+const editSubmitting = ref(false)
 
 const STATUS_LABEL = {
   draft: '草稿',
@@ -95,15 +102,86 @@ async function handleDeleteJob(job) {
       toast.error(res.message || '删除失败')
       return
     }
-    // 从列表中移除
     const idx = suite.historyTasks.value.findIndex((t) => t.job_id === job.job_id)
     if (idx > -1) suite.historyTasks.value.splice(idx, 1)
-    // 如果删的是当前查看的任务，回到空工作台
     if (job.job_id === suite.currentJobId.value) {
       suite.resetWorkspaceToDraft()
       router.push('/generator/product-suite')
     }
     toast.success('任务已删除')
+  } catch {
+    toast.error('删除失败，请稍后重试')
+  }
+}
+
+// --- 编辑弹窗 ---
+function openEditModal(card) {
+  if (card.status !== 'done' || !card.dataUrl) return
+  editCard.value = card
+  editInstruction.value = ''
+  editModalOpen.value = true
+}
+
+function closeEditModal() {
+  editModalOpen.value = false
+  editCard.value = null
+  editInstruction.value = ''
+  editSubmitting.value = false
+}
+
+async function handleRegenerate() {
+  const instruction = editInstruction.value.trim()
+  if (!instruction) {
+    toast.info('请输入修改要求')
+    return
+  }
+  const card = editCard.value
+  if (!card) return
+
+  editSubmitting.value = true
+  try {
+    const res = await regenerateImageTask(card.taskId, instruction)
+    if (res.code !== 0) {
+      toast.error(res.message || '重新生成失败')
+      editSubmitting.value = false
+      return
+    }
+    // 更新 card 状态
+    card.status = 'processing'
+    card.errorMessage = ''
+    card.editInstruction = instruction
+    // 保留旧图继续展示
+    closeEditModal()
+    // 开始轮询该 card
+    suite.startPollingCard(card)
+  } catch {
+    toast.error('重新生成失败，请稍后重试')
+    editSubmitting.value = false
+  }
+}
+
+async function handleDeleteCard() {
+  const card = editCard.value
+  if (!card) return
+  const ok = await confirm.open({
+    title: '删除图片',
+    message: '确定删除这张图片吗？图片不会立即从存储中物理删除。',
+    confirmText: '删除',
+    cancelText: '取消',
+    tone: 'danger',
+  })
+  if (!ok) return
+  try {
+    const res = await deleteImageTask(card.taskId)
+    if (res.code !== 0) {
+      toast.error(res.message || '删除失败')
+      return
+    }
+    // 从 outputCards 中移除
+    const idx = suite.outputCards.value.findIndex((c) => c.id === card.id)
+    if (idx > -1) suite.outputCards.value.splice(idx, 1)
+    closeEditModal()
+    toast.success('图片已删除')
   } catch {
     toast.error('删除失败，请稍后重试')
   }
@@ -165,7 +243,7 @@ watch(
       @batch-download="suite.batchDownload"
       @toggle-card="suite.toggleCardSelection"
       @download-card="suite.downloadSingleImage"
-      @regenerate-card="suite.regenerateSingleCard"
+      @edit-card="openEditModal"
       @zoom-card="(card) => { if (card.status === 'done' && card.dataUrl) suite.zoomCard.value = card }"
       @create-new-task="handleCreateNewTask"
       @open-history="openHistory"
@@ -228,6 +306,59 @@ watch(
     >
       <div v-if="suite.zoomCard.value" class="bg-slate-100 p-6">
         <img :src="suite.zoomCard.value.dataUrl" class="mx-auto max-h-[75vh] rounded-xl object-contain shadow-lg" alt="商品套图预览" />
+      </div>
+    </AppModal>
+
+    <AppModal
+      :open="editModalOpen"
+      title="编辑图片"
+      panel-class="w-full max-w-lg"
+      @close="closeEditModal"
+    >
+      <div v-if="editCard" class="space-y-4 p-5">
+        <div class="overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+          <img :src="editCard.dataUrl" class="mx-auto max-h-56 object-contain" referrerpolicy="no-referrer" alt="当前图片" />
+        </div>
+        <div class="flex items-center gap-2 text-xs text-slate-600">
+          <span class="rounded-full bg-slate-100 px-2 py-0.5 font-semibold">{{ suite.getStructureName(editCard.typeId) }}</span>
+          <span class="text-slate-400">{{ editCard.strategyTitle }}</span>
+        </div>
+        <div>
+          <label class="mb-1.5 block text-xs font-semibold text-slate-700">修改要求</label>
+          <textarea
+            v-model="editInstruction"
+            rows="3"
+            class="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30"
+            placeholder="例如：背景换成浅色办公室，商品放大 20%，减少文字信息"
+          />
+        </div>
+        <div class="flex items-center justify-between border-t border-slate-100 pt-4">
+          <button
+            type="button"
+            class="flex items-center gap-1 text-xs font-semibold text-rose-500 hover:text-rose-600"
+            @click="handleDeleteCard"
+          >
+            <Trash2 class="h-3.5 w-3.5" />
+            删除图片
+          </button>
+          <div class="flex items-center gap-2">
+            <button
+              type="button"
+              class="rounded-lg border border-slate-200 px-3.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+              @click="closeEditModal"
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              class="rounded-lg bg-primary px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50"
+              :disabled="editSubmitting || !editInstruction.trim()"
+              @click="handleRegenerate"
+            >
+              {{ editSubmitting ? '提交中...' : '重新生成' }}
+            </button>
+          </div>
+        </div>
       </div>
     </AppModal>
   </GeneratorLayout>

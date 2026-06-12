@@ -37,3 +37,15 @@ export function generateImage({
 export function getImageTask(taskId) {
   return request.get(`/image/task/${taskId}`, { timeout: 15000 })
 }
+
+export function deleteImageTask(taskId) {
+  return request.delete(`/image/task/${taskId}`, { timeout: 15000 })
+}
+
+export function regenerateImageTask(taskId, editInstruction) {
+  return request.post(
+    `/image/task/${taskId}/regenerate`,
+    { edit_instruction: editInstruction },
+    { timeout: 60000 },
+  )
+}

@@ -646,7 +646,7 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
   }
 
   function regenerateSingleCard(_card) {
-    toast.info('单张重算暂未支持，可调整参数后重新生成全部套图')
+    toast.info('请点击编辑图片按钮进行重新生成')
   }
 
   onBeforeUnmount(() => {
@@ -696,6 +696,7 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
     batchDownload,
     downloadSingleImage,
     regenerateSingleCard,
+    startPollingCard,
   }
 }
 

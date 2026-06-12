@@ -1,5 +1,6 @@
 import json
 import uuid
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, File, Request, UploadFile
 from pydantic import BaseModel
@@ -245,3 +246,121 @@ async def get_tasks(
         .order_by(ImageTask.created_at.desc())
     )
     return success(result.scalars().all())
+
+
+@router.delete("/task/{task_id}", response_model=Response)
+async def delete_task(
+    task_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """软删除单张图片（仅标记 archived，不物理删除 OSS 文件）。"""
+    result = await db.execute(
+        select(ImageTask).where(
+            ImageTask.id == task_id,
+            ImageTask.user_id == current_user.id,
+        )
+    )
+    task = result.scalar_one_or_none()
+    if not task:
+        return fail("图片不存在")
+
+    task.archived = True
+    task.archived_at = datetime.now()
+    try:
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        return fail("删除失败，请稍后重试")
+
+    return success({"task_id": task_id})
+
+
+class RegenerateRequest(BaseModel):
+    edit_instruction: str
+
+
+@router.post("/task/{task_id}/regenerate", response_model=Response)
+async def regenerate_task(
+    task_id: str,
+    req: RegenerateRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """基于已有图片重新生成。复用同一个 task_id，覆盖结果。"""
+    edit_instruction = req.edit_instruction.strip()
+    if not edit_instruction:
+        return fail("请输入修改要求")
+
+    result = await db.execute(
+        select(ImageTask).where(
+            ImageTask.id == task_id,
+            ImageTask.user_id == current_user.id,
+        )
+    )
+    task = result.scalar_one_or_none()
+    if not task:
+        return fail("图片不存在")
+    if task.archived:
+        return fail("图片已被删除")
+    if not task.result_url:
+        return fail("该图片尚未生成完成，无法重新生成")
+
+    if current_user.credits < CREDITS_PER_IMAGE:
+        return fail("积分不足")
+
+    # 解析原 size -> ratio/resolution
+    parts = task.size.split("/") if task.size else ["1:1", "1K"]
+    ratio = parts[0] if len(parts) > 0 else "1:1"
+    resolution = parts[1] if len(parts) > 1 else "1K"
+
+    # 保留旧 result_url 供前端继续展示
+    old_result_url = task.result_url
+
+    # 构造新 prompt
+    new_prompt = task.prompt + "\n\n【用户修改要求】" + edit_instruction
+
+    # 扣积分 + 更新 task 同一事务
+    current_user.credits -= CREDITS_PER_IMAGE
+    task.status = "pending"
+    task.error_message = None
+    task.progress = 0
+    task.edit_instruction = edit_instruction
+    task.prompt = new_prompt
+    # 保留 result_url 不清空，前端继续显示旧图
+    task.credit_refunded = False
+    task.provider_task_id = None
+
+    try:
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        return fail("重新生成失败，请稍后重试")
+
+    # 入队 worker
+    # TODO: 后续用 generation_attempts 做严格幂等退款
+    try:
+        await request.app.state.redis_pool.enqueue_job(
+            "generate_image",
+            task_id,
+            new_prompt,
+            ratio,
+            resolution,
+            old_result_url,  # 使用当前已生成图作为参考图
+        )
+    except Exception:
+        # 入队失败：退积分 + 标记 failed
+        try:
+            current_user.credits += CREDITS_PER_IMAGE
+            task.status = "failed"
+            task.error_message = "任务入队失败"
+            task.credit_refunded = True
+            # 恢复旧 result_url 确保前端仍可展示
+            task.result_url = old_result_url
+            await db.commit()
+        except Exception:
+            await db.rollback()
+        return fail("任务入队失败，请稍后重试")
+
+    return success({"task_id": task_id})
