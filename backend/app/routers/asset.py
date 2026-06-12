@@ -4,6 +4,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_user, get_db
+from app.core.time import to_utc_iso
 from app.models import GenerationJob, ImageTask, User
 from app.schemas.response import Response, fail, success
 
@@ -96,7 +97,7 @@ async def list_assets(
             "type_id": row.type_id or "",
             "scenario": row.scenario or "",
             "job_title": row.job_title or "",
-            "created_at": (row.created_at.isoformat() + "Z") if row.created_at else "",
+            "created_at": to_utc_iso(row.created_at),
         }
         for row in rows
     ]

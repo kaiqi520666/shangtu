@@ -1,6 +1,5 @@
 import json
 import uuid
-from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query
@@ -9,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_user, get_db
+from app.core.time import to_utc_iso, utc_now
 from app.models import GenerationJob, ImageTask, User
 from app.schemas.response import Response, fail, success
 
@@ -62,7 +62,7 @@ def _parse_json(raw: str | None):
 
 def _default_title(scenario: str) -> str:
     prefix = SCENARIO_TITLE_PREFIX.get(scenario, scenario)
-    return f"{prefix}_{datetime.now():%Y%m%d_%H%M%S}"
+    return f"{prefix}_{utc_now():%Y%m%d_%H%M%S}"
 
 
 @router.post("/jobs", response_model=Response)
@@ -95,7 +95,7 @@ async def create_job(
             "scenario": job.scenario,
             "title": job.title,
             "status": job.status,
-            "created_at": job.created_at,
+            "created_at": to_utc_iso(job.created_at),
         }
     )
 
@@ -154,8 +154,8 @@ async def list_jobs(
                 stats[job.id]["completed"],
                 stats[job.id]["failed"],
             ),
-            "created_at": job.created_at,
-            "updated_at": job.updated_at,
+            "created_at": to_utc_iso(job.created_at),
+            "updated_at": to_utc_iso(job.updated_at),
             "total": stats[job.id]["total"],
             "completed": stats[job.id]["completed"],
             "failed": stats[job.id]["failed"],
@@ -226,8 +226,8 @@ async def get_job(
             "input_text": job.input_text,
             "structure": _parse_json(job.structure_json),
             "items": items,
-            "created_at": job.created_at,
-            "updated_at": job.updated_at,
+            "created_at": to_utc_iso(job.created_at),
+            "updated_at": to_utc_iso(job.updated_at),
         }
     )
 
@@ -267,7 +267,7 @@ async def update_job(
     if req.structure is not None:
         job.structure_json = _dump_json(req.structure)
 
-    job.updated_at = datetime.now()
+    job.updated_at = utc_now()
 
     try:
         await db.commit()
@@ -282,7 +282,7 @@ async def update_job(
             "scenario": job.scenario,
             "title": job.title,
             "status": job.status,
-            "updated_at": job.updated_at,
+            "updated_at": to_utc_iso(job.updated_at),
         }
     )
 
@@ -304,7 +304,7 @@ async def delete_job(
         return fail("任务不存在")
 
     job.archived = True
-    job.archived_at = datetime.now()
+    job.archived_at = utc_now()
 
     try:
         await db.commit()

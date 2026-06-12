@@ -1,6 +1,5 @@
 import json
 import uuid
-from datetime import datetime
 
 import httpx
 from fastapi import APIRouter, Depends, File, Request, UploadFile
@@ -12,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.deps import get_current_user, get_db
 from app.core.image_analyzer import DashScopeConfigError, analyze_product_image
 from app.core.oss import OssConfigError, upload_image_bytes
+from app.core.time import to_utc_iso, utc_now
 from app.models import GenerationJob, ImageTask, User
 from app.schemas.response import Response, fail, success
 
@@ -258,7 +258,7 @@ async def get_task(
             "status": status,
             "result_url": result_url,
             "prompt": task.prompt,
-            "created_at": task.created_at,
+            "created_at": to_utc_iso(task.created_at),
             "error_message": error_message,
             "progress": progress,
         }
@@ -340,7 +340,7 @@ async def delete_task(
         return fail("图片不存在")
 
     task.archived = True
-    task.archived_at = datetime.now()
+    task.archived_at = utc_now()
     try:
         await db.commit()
     except Exception:

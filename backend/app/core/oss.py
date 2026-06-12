@@ -2,10 +2,11 @@ import asyncio
 import os
 import uuid
 from dataclasses import dataclass
-from datetime import datetime
 
 import oss2
 from dotenv import load_dotenv
+
+from app.core.time import utc_now
 
 load_dotenv()
 
@@ -46,7 +47,7 @@ def get_oss_config() -> dict[str, str]:
 
 def build_image_object_key(user_id: int, content_type: str, source: str = "uploads") -> str:
     extension = ALLOWED_IMAGE_TYPES[content_type]
-    now = datetime.utcnow()
+    now = utc_now()
     return f"{source}/{user_id}/{now:%Y/%m}/{uuid.uuid4().hex}.{extension}"
 
 
