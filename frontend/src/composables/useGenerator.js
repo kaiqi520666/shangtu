@@ -1,6 +1,7 @@
 import { computed, reactive, ref } from "vue";
 import { availableModules, ratioOptions, resolutionMap, resolveQuality } from "@/constants/generator.js";
 import { useToast } from "@/composables/useToast.js";
+import { analyzeImage } from "@/api/image.js";
 
 const THEME_COLORS = {
   primary: "#10b981",
@@ -85,26 +86,45 @@ export function useGenerator() {
   });
 
   async function generateSellingPointsWithAI() {
-    const textInput = settings.productInput.trim();
-    if (!textInput && uploadedImages.value.length === 0) {
-      toast.info("请先上传产品图或输入商品名称，AI 才能帮写卖点");
+    const mainImg = uploadedImages.value[mainImageIndex.value];
+    if (!mainImg || !mainImg.url) {
+      toast.info("请先上传商品图，等待图片上传完成后再让 AI 帮写");
+      return "";
+    }
+
+    if (mainImg.uploading) {
+      toast.info("主图还在上传中，请稍候");
       return "";
     }
 
     aiLoading.value = true;
-    await wait(450);
-    // TODO: replace with API
-    const queryName =
-      textInput
-        .split("\n")
-        .map((line) => line.trim())
-        .filter(Boolean)[0] || "上传商品图";
+    try {
+      const result = await analyzeImage({
+        image_url: mainImg.url,
+        platform: settings.platform,
+      });
+      if (result.code !== 0) {
+        toast.error(result.message || "AI 分析失败，请稍后重试");
+        return "";
+      }
 
-    aiLoading.value = false;
-    return `${queryName}
-1. 旗舰级核心配置 / 全新升级首发
-2. 顶级工艺美学 / 触手可及
-3. 官方金牌质保 / 顺丰闪电发货`;
+      const content = result.data?.content?.trim();
+      if (!content) {
+        toast.error("AI 未返回有效内容");
+        return "";
+      }
+      return content;
+    } catch (error) {
+      const status = error.response?.status;
+      if (status === 401) {
+        toast.error("登录已过期，请重新登录");
+      } else {
+        toast.error(error.response?.data?.message || "AI 分析失败，请稍后重试");
+      }
+      return "";
+    } finally {
+      aiLoading.value = false;
+    }
   }
 
   function getModuleName(id) {
