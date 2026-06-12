@@ -1,8 +1,8 @@
 <script setup>
 import { LoaderCircle, WandSparkles } from 'lucide-vue-next'
-import GeneratorActionFooter from '@/components/GeneratorActionFooter.vue'
-import GeneratorSidePanelShell from '@/components/GeneratorSidePanelShell.vue'
-import OutfitPoseCard from '@/components/OutfitPoseCard.vue'
+import GeneratorActionFooter from '@/components/generation/GeneratorActionFooter.vue'
+import GeneratorSidePanelShell from '@/components/generation/GeneratorSidePanelShell.vue'
+import OutfitPoseCard from '@/components/outfit/OutfitPoseCard.vue'
 
 defineProps({
   loading: {

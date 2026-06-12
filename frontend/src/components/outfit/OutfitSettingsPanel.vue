@@ -1,11 +1,11 @@
 <script setup>
 import { computed } from 'vue'
 import { LoaderCircle, RectangleVertical, Smartphone, Square, WandSparkles } from 'lucide-vue-next'
-import GeneratorActionFooter from '@/components/GeneratorActionFooter.vue'
-import GeneratorSidePanelShell from '@/components/GeneratorSidePanelShell.vue'
-import ImageUploader from '@/components/ImageUploader.vue'
-import ModelSelector from '@/components/ModelSelector.vue'
-import ScenePresetSelector from '@/components/ScenePresetSelector.vue'
+import GeneratorActionFooter from '@/components/generation/GeneratorActionFooter.vue'
+import GeneratorSidePanelShell from '@/components/generation/GeneratorSidePanelShell.vue'
+import ImageUploader from '@/components/generation/ImageUploader.vue'
+import ModelSelector from '@/components/outfit/ModelSelector.vue'
+import ScenePresetSelector from '@/components/outfit/ScenePresetSelector.vue'
 import { modelLibrary, outfitRatioOptions, scenePresets } from '@/constants/outfit.js'
 
 const props = defineProps({

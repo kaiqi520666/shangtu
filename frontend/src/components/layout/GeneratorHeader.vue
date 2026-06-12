@@ -1,5 +1,5 @@
 <script setup>
-import UserMenu from '@/components/UserMenu.vue'
+import UserMenu from '@/components/layout/UserMenu.vue'
 </script>
 
 <template>

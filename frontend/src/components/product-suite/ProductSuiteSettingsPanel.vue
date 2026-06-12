@@ -1,11 +1,11 @@
 <script setup>
 import { computed } from 'vue'
 import { LoaderCircle, PackageCheck } from 'lucide-vue-next'
-import GeneratorActionFooter from '@/components/GeneratorActionFooter.vue'
-import GeneratorSidePanelShell from '@/components/GeneratorSidePanelShell.vue'
-import ImageUploader from '@/components/ImageUploader.vue'
-import ProductGenerationBasics from '@/components/ProductGenerationBasics.vue'
-import SuiteStructureConfigurator from '@/components/SuiteStructureConfigurator.vue'
+import GeneratorActionFooter from '@/components/generation/GeneratorActionFooter.vue'
+import GeneratorSidePanelShell from '@/components/generation/GeneratorSidePanelShell.vue'
+import ImageUploader from '@/components/generation/ImageUploader.vue'
+import ProductGenerationBasics from '@/components/generation/ProductGenerationBasics.vue'
+import SuiteStructureConfigurator from '@/components/product-suite/SuiteStructureConfigurator.vue'
 
 const props = defineProps({
   settings: {

@@ -1,9 +1,9 @@
 <script setup>
 import { onMounted } from 'vue'
 import { Download, ImageOff, LoaderCircle, Trash2 } from 'lucide-vue-next'
-import AppModal from '@/components/AppModal.vue'
-import AssetCardGrid from '@/components/AssetCardGrid.vue'
-import GeneratorLayout from '@/components/GeneratorLayout.vue'
+import AppModal from '@/components/ui/AppModal.vue'
+import AssetCardGrid from '@/components/assets/AssetCardGrid.vue'
+import GeneratorLayout from '@/components/layout/GeneratorLayout.vue'
 import { useAssetLibrary } from '@/composables/useAssetLibrary.js'
 import { useConfirm } from '@/composables/useConfirm.js'
 

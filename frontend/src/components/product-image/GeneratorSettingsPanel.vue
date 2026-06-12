@@ -1,11 +1,11 @@
 <script setup>
 import { computed } from "vue";
 import { LoaderCircle, WandSparkles } from "lucide-vue-next";
-import GeneratorActionFooter from "@/components/GeneratorActionFooter.vue";
-import GeneratorSidePanelShell from "@/components/GeneratorSidePanelShell.vue";
-import ImageUploader from "@/components/ImageUploader.vue";
-import ModuleSelector from "@/components/ModuleSelector.vue";
-import ProductGenerationBasics from "@/components/ProductGenerationBasics.vue";
+import GeneratorActionFooter from "@/components/generation/GeneratorActionFooter.vue";
+import GeneratorSidePanelShell from "@/components/generation/GeneratorSidePanelShell.vue";
+import ImageUploader from "@/components/generation/ImageUploader.vue";
+import ModuleSelector from "@/components/product-image/ModuleSelector.vue";
+import ProductGenerationBasics from "@/components/generation/ProductGenerationBasics.vue";
 import { availableModules } from "@/constants/generator.js";
 
 const props = defineProps({

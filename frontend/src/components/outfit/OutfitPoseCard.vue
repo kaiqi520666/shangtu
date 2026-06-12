@@ -1,6 +1,6 @@
 <script setup>
 import { Check } from 'lucide-vue-next'
-import AppSelect from '@/components/AppSelect.vue'
+import AppSelect from '@/components/ui/AppSelect.vue'
 import { outfitAngleOptions, outfitFrameOptions } from '@/constants/outfit.js'
 
 defineProps({

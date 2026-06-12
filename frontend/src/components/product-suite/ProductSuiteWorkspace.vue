@@ -1,8 +1,8 @@
 <script setup>
 import { Clock3, Download, PackageCheck, Plus, RefreshCw } from 'lucide-vue-next'
-import GeneratedCardGrid from '@/components/GeneratedCardGrid.vue'
-import GeneratorPreviewShowcase from '@/components/GeneratorPreviewShowcase.vue'
-import GeneratorWorkspaceShell from '@/components/GeneratorWorkspaceShell.vue'
+import GeneratedCardGrid from '@/components/generation/GeneratedCardGrid.vue'
+import GeneratorPreviewShowcase from '@/components/generation/GeneratorPreviewShowcase.vue'
+import GeneratorWorkspaceShell from '@/components/generation/GeneratorWorkspaceShell.vue'
 import { productSuitePreviewSlides } from '@/constants/productSuite.js'
 
 defineProps({

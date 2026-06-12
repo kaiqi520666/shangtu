@@ -1,6 +1,6 @@
 <script setup>
-import GeneratorHeader from '@/components/GeneratorHeader.vue'
-import GeneratorSidebar from '@/components/GeneratorSidebar.vue'
+import GeneratorHeader from '@/components/layout/GeneratorHeader.vue'
+import GeneratorSidebar from '@/components/layout/GeneratorSidebar.vue'
 </script>
 
 <template>

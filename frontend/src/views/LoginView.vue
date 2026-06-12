@@ -2,7 +2,7 @@
 import { onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { login } from '@/api/auth.js'
-import AuthForm from '@/components/AuthForm.vue'
+import AuthForm from '@/components/auth/AuthForm.vue'
 import { useAuth } from '@/composables/useAuth.js'
 import { useToast } from '@/composables/useToast.js'
 

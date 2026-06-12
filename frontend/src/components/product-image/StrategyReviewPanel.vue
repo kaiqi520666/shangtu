@@ -2,7 +2,7 @@
 import { computed, ref, watch } from "vue";
 import { ArrowLeft, CheckCircle2, LoaderCircle, Sparkles, WandSparkles } from "lucide-vue-next";
 import draggable from "vuedraggable";
-import StrategyModuleCard from "@/components/StrategyModuleCard.vue";
+import StrategyModuleCard from "@/components/product-image/StrategyModuleCard.vue";
 
 const props = defineProps({
   loading: {

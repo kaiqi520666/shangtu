@@ -1,7 +1,7 @@
 <script setup>
 import { useRouter } from "vue-router";
 import { register } from "@/api/auth.js";
-import AuthForm from "@/components/AuthForm.vue";
+import AuthForm from "@/components/auth/AuthForm.vue";
 import { useAuth } from "@/composables/useAuth.js";
 import { useToast } from "@/composables/useToast.js";
 

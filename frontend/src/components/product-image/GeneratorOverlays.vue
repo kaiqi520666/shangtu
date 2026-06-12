@@ -1,7 +1,7 @@
 <script setup>
 import { Archive, Lock } from 'lucide-vue-next'
-import AppDrawer from '@/components/AppDrawer.vue'
-import AppModal from '@/components/AppModal.vue'
+import AppDrawer from '@/components/ui/AppDrawer.vue'
+import AppModal from '@/components/ui/AppModal.vue'
 
 defineProps({
   showLongPreviewModal: {

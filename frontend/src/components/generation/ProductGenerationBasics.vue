@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { HelpCircle, LoaderCircle, Sparkles, X } from 'lucide-vue-next'
-import AppSelect from '@/components/AppSelect.vue'
+import AppSelect from '@/components/ui/AppSelect.vue'
 import {
   isQualitySupported,
   languageOptions,

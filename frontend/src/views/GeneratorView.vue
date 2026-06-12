@@ -1,9 +1,9 @@
 <script setup>
-import GeneratorLayout from '@/components/GeneratorLayout.vue'
-import GeneratorOverlays from '@/components/GeneratorOverlays.vue'
-import GeneratorSettingsPanel from '@/components/GeneratorSettingsPanel.vue'
-import GeneratorWorkspace from '@/components/GeneratorWorkspace.vue'
-import StrategyReviewPanel from '@/components/StrategyReviewPanel.vue'
+import GeneratorLayout from '@/components/layout/GeneratorLayout.vue'
+import GeneratorOverlays from '@/components/product-image/GeneratorOverlays.vue'
+import GeneratorSettingsPanel from '@/components/product-image/GeneratorSettingsPanel.vue'
+import GeneratorWorkspace from '@/components/product-image/GeneratorWorkspace.vue'
+import StrategyReviewPanel from '@/components/product-image/StrategyReviewPanel.vue'
 import { useGenerator } from '@/composables/useGenerator.js'
 
 const generator = useGenerator()

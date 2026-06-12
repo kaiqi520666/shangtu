@@ -1,6 +1,6 @@
 <script setup>
-import GlobalConfirm from '@/components/GlobalConfirm.vue'
-import GlobalToast from '@/components/GlobalToast.vue'
+import GlobalConfirm from '@/components/ui/GlobalConfirm.vue'
+import GlobalToast from '@/components/ui/GlobalToast.vue'
 import DefaultLayout from '@/layouts/DefaultLayout.vue'
 </script>
 

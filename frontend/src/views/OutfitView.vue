@@ -1,9 +1,9 @@
 <script setup>
-import AppModal from '@/components/AppModal.vue'
-import GeneratorLayout from '@/components/GeneratorLayout.vue'
-import OutfitSceneReviewPanel from '@/components/OutfitSceneReviewPanel.vue'
-import OutfitSettingsPanel from '@/components/OutfitSettingsPanel.vue'
-import OutfitWorkspace from '@/components/OutfitWorkspace.vue'
+import AppModal from '@/components/ui/AppModal.vue'
+import GeneratorLayout from '@/components/layout/GeneratorLayout.vue'
+import OutfitSceneReviewPanel from '@/components/outfit/OutfitSceneReviewPanel.vue'
+import OutfitSettingsPanel from '@/components/outfit/OutfitSettingsPanel.vue'
+import OutfitWorkspace from '@/components/outfit/OutfitWorkspace.vue'
 import { useOutfitGenerator } from '@/composables/useOutfitGenerator.js'
 
 const outfit = useOutfitGenerator()
