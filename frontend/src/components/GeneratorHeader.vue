@@ -1,22 +1,12 @@
 <script setup>
-import { Boxes, Clock3, Layers } from 'lucide-vue-next'
 import UserMenu from '@/components/UserMenu.vue'
-
-defineProps({
-  taskCount: {
-    type: Number,
-    default: 0,
-  },
-})
-
-const emit = defineEmits(['open-queue', 'open-history'])
 </script>
 
 <template>
   <header class="z-30 flex h-16 items-center justify-between border-b border-slate-200 bg-white/90 px-6 shadow-sm backdrop-blur-md">
     <div class="flex items-center gap-3">
-      <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-tr from-primary to-secondary text-white shadow-lg shadow-primary/10">
-        <Layers class="h-5 w-5 stroke-[2.5]" />
+      <div class="flex h-10 w-10 items-center justify-center rounded-xl border border-primary/10 bg-white shadow-sm">
+        <img src="/logo.png" class="h-8 w-8 object-contain" alt="NodePass AI Logo" />
       </div>
       <div>
         <h1 class="flex items-center gap-2 text-base font-bold text-slate-800">
@@ -33,17 +23,6 @@ const emit = defineEmits(['open-queue', 'open-history'])
         <span class="text-xs text-slate-500">额度剩余</span>
         <span class="text-xs font-bold text-primary">1,280 点</span>
       </div>
-      <button type="button" class="relative flex items-center gap-1.5 py-1 text-xs font-medium text-slate-600 transition-colors hover:text-primary" @click="emit('open-queue')">
-        <Boxes class="h-4 w-4" />
-        批量托管
-        <span v-if="taskCount > 0" class="absolute -right-2 -top-1 flex h-4 w-4 animate-bounce items-center justify-center rounded-full bg-primary text-xs font-bold text-white">
-          {{ taskCount }}
-        </span>
-      </button>
-      <button type="button" class="flex items-center gap-1.5 text-xs font-medium text-slate-600 transition-colors hover:text-primary" @click="emit('open-history')">
-        <Clock3 class="h-4 w-4" />
-        生成记录
-      </button>
       <div class="h-6 w-px bg-slate-200"></div>
       <UserMenu />
     </div>

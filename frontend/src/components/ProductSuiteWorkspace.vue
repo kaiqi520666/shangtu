@@ -1,5 +1,5 @@
 <script setup>
-import { Download, PackageCheck, RefreshCw } from 'lucide-vue-next'
+import { Clock3, Download, PackageCheck, Plus, RefreshCw } from 'lucide-vue-next'
 import GeneratedCardGrid from '@/components/GeneratedCardGrid.vue'
 import GeneratorPreviewShowcase from '@/components/GeneratorPreviewShowcase.vue'
 import GeneratorWorkspaceShell from '@/components/GeneratorWorkspaceShell.vue'
@@ -27,6 +27,10 @@ defineProps({
     default: 0,
   },
   totalCount: {
+    type: Number,
+    default: 0,
+  },
+  jobTotal: {
     type: Number,
     default: 0,
   },
@@ -60,6 +64,8 @@ const emit = defineEmits([
   'download-card',
   'regenerate-card',
   'zoom-card',
+  'create-new-task',
+  'open-history',
 ])
 </script>
 
@@ -77,23 +83,43 @@ const emit = defineEmits([
           />
         </div>
 
-        <div v-if="outputCards.length > 0" class="flex items-center gap-4">
-          <div class="flex items-center gap-2">
-            <button type="button" class="text-xs font-semibold text-slate-500 hover:text-primary" @click="emit('select-all-cards', true)">全选</button>
-            <span class="text-xs text-slate-300">/</span>
-            <button type="button" class="text-xs font-semibold text-slate-500 hover:text-slate-700" @click="emit('select-all-cards', false)">全不选</button>
-          </div>
-          <div class="h-4 w-px bg-slate-200"></div>
-          <button type="button" class="flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-1.5 text-xs font-bold text-white shadow-md transition-all hover:bg-secondary" @click="emit('batch-download')">
-            <Download class="h-3.5 w-3.5 stroke-[2.5]" />
-            批量下载 ({{ selectedCardsCount }}张)
+        <div class="flex items-center gap-3">
+          <button
+            type="button"
+            class="flex items-center gap-1.5 rounded-lg border border-primary/30 bg-white px-3 py-1.5 text-xs font-semibold text-primary transition-all hover:bg-primary/5"
+            :disabled="generating"
+            :class="{ 'cursor-not-allowed opacity-50': generating }"
+            @click="emit('create-new-task')"
+          >
+            <Plus class="h-3.5 w-3.5 stroke-[2.5]" />
+            新建任务
           </button>
+          <button
+            type="button"
+            class="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition-all hover:border-primary/40 hover:text-primary"
+            @click="emit('open-history')"
+          >
+            <Clock3 class="h-3.5 w-3.5" />
+            生成记录
+          </button>
+          <template v-if="outputCards.length > 0">
+            <div class="h-4 w-px bg-slate-200"></div>
+            <div class="flex items-center gap-2">
+              <button type="button" class="text-xs font-semibold text-slate-500 hover:text-primary" @click="emit('select-all-cards', true)">全选</button>
+              <span class="text-xs text-slate-300">/</span>
+              <button type="button" class="text-xs font-semibold text-slate-500 hover:text-slate-700" @click="emit('select-all-cards', false)">全不选</button>
+            </div>
+            <button type="button" class="flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-1.5 text-xs font-bold text-white shadow-md transition-all hover:bg-secondary" @click="emit('batch-download')">
+              <Download class="h-3.5 w-3.5 stroke-[2.5]" />
+              批量下载 ({{ selectedCardsCount }}张)
+            </button>
+          </template>
         </div>
       </div>
     </template>
 
     <template #default>
-      <div v-if="generating" class="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white/95 p-8">
+      <div v-if="generating && outputCards.length === 0" class="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white/95 p-8">
         <div class="w-full max-w-md space-y-6 text-center">
           <div class="relative mx-auto flex h-24 w-24 items-center justify-center">
             <div class="absolute inset-0 animate-ping rounded-full bg-primary/10"></div>
@@ -113,7 +139,7 @@ const emit = defineEmits([
               <span>{{ log }}</span>
             </div>
           </div>
-          <p class="text-xs font-bold text-slate-400">已生成 {{ generatedCount }} / {{ totalCount }}</p>
+          <p class="text-xs font-bold text-slate-400">正在创建任务 ...</p>
         </div>
       </div>
 
@@ -124,19 +150,27 @@ const emit = defineEmits([
         :slides="productSuitePreviewSlides"
       />
 
-      <GeneratedCardGrid
-        v-else-if="!generating"
-        :cards="outputCards"
-        :ratio="selectedImageLabel"
-        :platform="settings.platform"
-        :language="settings.language"
-        :get-module-name="getStructureName"
-        :get-module-strategy="getStructureStrategy"
-        @toggle-card="emit('toggle-card', $event)"
-        @download-card="emit('download-card', $event)"
-        @regenerate-card="emit('regenerate-card', $event)"
-        @zoom-card="emit('zoom-card', $event)"
-      />
+      <div v-else-if="outputCards.length > 0" class="space-y-4">
+        <div v-if="generating" class="flex items-center justify-between rounded-xl border border-primary/20 bg-primary/5 px-4 py-2 text-xs">
+          <div class="flex items-center gap-2 text-slate-700">
+            <RefreshCw class="h-3.5 w-3.5 animate-spin text-primary" />
+            <span>正在生成商品套图，已完成 <span class="font-bold text-primary">{{ generatedCount }} / {{ jobTotal || totalCount }}</span></span>
+          </div>
+          <span class="font-mono text-slate-400">每 5 秒轮询任务状态</span>
+        </div>
+        <GeneratedCardGrid
+          :cards="outputCards"
+          :ratio="selectedImageLabel"
+          :platform="settings.platform"
+          :language="settings.language"
+          :get-module-name="getStructureName"
+          :get-module-strategy="getStructureStrategy"
+          @toggle-card="emit('toggle-card', $event)"
+          @download-card="emit('download-card', $event)"
+          @regenerate-card="emit('regenerate-card', $event)"
+          @zoom-card="emit('zoom-card', $event)"
+        />
+      </div>
 
       <div v-if="outputCards.length === 0 && !generating && productSuitePreviewSlides.length === 0" class="flex h-full items-center justify-center text-slate-300">
         <PackageCheck class="h-8 w-8" />

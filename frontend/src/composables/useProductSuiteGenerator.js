@@ -1,17 +1,16 @@
-import { computed, reactive, ref } from 'vue'
-import { ratioOptions, resolutionMap } from '@/constants/generator.js'
+import { computed, onBeforeUnmount, reactive, ref } from 'vue'
+import { ratioOptions, resolutionMap, resolveQuality } from '@/constants/generator.js'
 import { suiteStructureDefaults } from '@/constants/productSuite.js'
 import { useToast } from '@/composables/useToast.js'
+import { analyzeImage, generateImage, getImageTask } from '@/api/image.js'
+import {
+  createGenerationJob,
+  getGenerationJob,
+  listGenerationJobs,
+} from '@/api/generation.js'
 
-const THEME_COLORS = {
-  primary: '#10b981',
-  primaryDark: '#059669',
-  secondary: '#14b8a6',
-  slate900: '#0f172a',
-  slate700: '#334155',
-  slate500: '#64748b',
-  slate100: '#f1f5f9',
-}
+const POLL_INTERVAL_MS = 5000
+const TERMINAL_STATUSES = new Set(['done', 'failed', 'timeout'])
 
 export function useProductSuiteGenerator() {
   const toast = useToast()
@@ -20,10 +19,20 @@ export function useProductSuiteGenerator() {
   const aiLoading = ref(false)
   const generating = ref(false)
   const generatedCount = ref(0)
+  const jobTotal = ref(0)
   const genLogs = ref([])
   const outputCards = ref([])
   const zoomCard = ref(null)
-  const currentTaskTitle = ref(`Suite_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}_商品套图`)
+  const currentJobId = ref('')
+  const currentTaskTitle = ref('')
+  const historyTasks = ref([])
+  const showHistoryDrawer = ref(false)
+  const historyLoading = ref(false)
+  const jobLoading = ref(false)
+  const activeBatchRunId = ref('')
+
+  const pollTimers = new Map()
+  const pollInFlight = new Set()
 
   const settings = reactive({
     platform: '亚马逊',
@@ -33,7 +42,6 @@ export function useProductSuiteGenerator() {
     productInput: '',
   })
 
-  // TODO: replace with API
   const suiteStructure = ref(
     suiteStructureDefaults.map((item) => ({
       ...item,
@@ -62,32 +70,233 @@ export function useProductSuiteGenerator() {
     return `${settings.quality} / ${selectedRatioOption.value.label} / ${width}x${height}`
   })
 
+  async function ensureCurrentJob() {
+    if (currentJobId.value) return currentJobId.value
+    try {
+      const result = await createGenerationJob('product_suite')
+      if (result.code !== 0) {
+        toast.error(result.message || '创建任务失败')
+        return ''
+      }
+      currentJobId.value = result.data.job_id
+      currentTaskTitle.value = result.data.title
+      return currentJobId.value
+    } catch (error) {
+      const status = error.response?.status
+      if (status === 401) {
+        toast.error('登录已过期，请重新登录')
+      } else {
+        toast.error(error.response?.data?.message || '创建任务失败')
+      }
+      return ''
+    }
+  }
+
+  async function createNewTask() {
+    if (generating.value) {
+      toast.info('当前任务正在生成中，请稍后再新建任务')
+      return
+    }
+    try {
+      const result = await createGenerationJob('product_suite')
+      if (result.code !== 0) {
+        toast.error(result.message || '创建任务失败')
+        return
+      }
+      clearAllPollTimers()
+      uploadedImages.value = []
+      mainImageIndex.value = 0
+      settings.productInput = ''
+      outputCards.value = []
+      genLogs.value = []
+      generatedCount.value = 0
+      jobTotal.value = 0
+      activeBatchRunId.value = ''
+      suiteStructure.value = suiteStructureDefaults.map((item) => ({
+        ...item,
+        enabled: true,
+        count: item.defaultCount,
+      }))
+      currentJobId.value = result.data.job_id
+      currentTaskTitle.value = result.data.title
+      toast.success('已新建商品套图任务')
+    } catch (error) {
+      const status = error.response?.status
+      if (status === 401) {
+        toast.error('登录已过期，请重新登录')
+      } else {
+        toast.error(error.response?.data?.message || '创建任务失败')
+      }
+    }
+  }
+
+  async function loadHistoryTasks() {
+    historyLoading.value = true
+    try {
+      const result = await listGenerationJobs('product_suite')
+      if (result.code !== 0) {
+        toast.error(result.message || '加载历史任务失败')
+        historyTasks.value = []
+        return
+      }
+      historyTasks.value = result.data || []
+    } catch (error) {
+      const status = error.response?.status
+      if (status === 401) {
+        toast.error('登录已过期，请重新登录')
+      } else {
+        toast.error(error.response?.data?.message || '加载历史任务失败')
+      }
+      historyTasks.value = []
+    } finally {
+      historyLoading.value = false
+    }
+  }
+
+  async function loadGenerationJob(jobId) {
+    if (!jobId) return
+    if (generating.value) {
+      toast.info('当前任务正在生成中，请稍后再切换任务')
+      return
+    }
+    jobLoading.value = true
+    try {
+      const result = await getGenerationJob(jobId)
+      if (result.code !== 0) {
+        toast.error(result.message || '加载任务失败')
+        return
+      }
+      const data = result.data || {}
+      clearAllPollTimers()
+      currentJobId.value = data.job_id
+      currentTaskTitle.value = data.title || ''
+      if (data.settings && typeof data.settings === 'object') {
+        Object.assign(settings, data.settings)
+      }
+      if (Array.isArray(data.source_images)) {
+        uploadedImages.value = data.source_images
+        mainImageIndex.value = 0
+      } else {
+        uploadedImages.value = []
+        mainImageIndex.value = 0
+      }
+      settings.productInput = data.input_text || ''
+      if (Array.isArray(data.structure) && data.structure.length > 0) {
+        suiteStructure.value = data.structure
+      } else {
+        suiteStructure.value = suiteStructureDefaults.map((item) => ({
+          ...item,
+          enabled: true,
+          count: item.defaultCount,
+        }))
+      }
+
+      const items = Array.isArray(data.items) ? data.items : []
+      const restoredCards = items.map((item) =>
+        reactive({
+          id: item.task_id,
+          taskId: item.task_id,
+          typeId: item.type_id || '',
+          dataUrl: item.result_url || '',
+          resultUrl: item.result_url || '',
+          selected: true,
+          status: item.status || 'pending',
+          strategyTitle: item.title || getStructureName(item.type_id),
+          strategyContent: getStructureStrategy(item.type_id),
+          errorMessage: item.error_message || '',
+          sortOrder: item.sort_order || 0,
+          batchRunId: '',
+        }),
+      )
+      outputCards.value = restoredCards
+
+      const pendingCards = restoredCards.filter((card) => !TERMINAL_STATUSES.has(card.status))
+      const doneCount = restoredCards.filter((card) => card.status === 'done').length
+      generatedCount.value = doneCount
+      jobTotal.value = restoredCards.length
+      genLogs.value = restoredCards.length
+        ? [`已恢复任务「${currentTaskTitle.value}」，共 ${restoredCards.length} 张`]
+        : []
+
+      if (pendingCards.length > 0) {
+        generating.value = true
+        const resumeBatchId = makeId()
+        activeBatchRunId.value = resumeBatchId
+        pendingCards.forEach((card) => {
+          card.batchRunId = resumeBatchId
+          startPollingCard(card)
+        })
+      } else {
+        generating.value = false
+      }
+    } catch (error) {
+      const status = error.response?.status
+      if (status === 401) {
+        toast.error('登录已过期，请重新登录')
+      } else {
+        toast.error(error.response?.data?.message || '加载任务失败')
+      }
+    } finally {
+      jobLoading.value = false
+    }
+  }
+
   async function generateSellingPointsWithAI() {
-    const textInput = settings.productInput.trim()
-    if (!textInput && uploadedImages.value.length === 0) {
-      toast.info('请先上传商品图或输入商品名称，AI 才能帮写卖点')
+    const mainImg = uploadedImages.value[mainImageIndex.value]
+    if (!mainImg || !mainImg.url) {
+      toast.info('请先上传商品图，等待图片上传完成后再让 AI 帮写')
+      return ''
+    }
+
+    if (mainImg.uploading) {
+      toast.info('主图还在上传中，请稍候')
       return ''
     }
 
     aiLoading.value = true
-    await wait(450)
-    // TODO: replace with API
-    const queryName =
-      textInput
-        .split('\n')
-        .map((line) => line.trim())
-        .filter(Boolean)[0] || '上传商品图'
+    try {
+      const result = await analyzeImage({
+        image_url: mainImg.url,
+        platform: settings.platform,
+        language: settings.language,
+      })
+      if (result.code !== 0) {
+        toast.error(result.message || 'AI 分析失败，请稍后重试')
+        return ''
+      }
 
-    aiLoading.value = false
-    return `${queryName}
-1. 清晰展示商品主体，适配平台首图规范
-2. 提炼核心卖点，统一套图视觉风格
-3. 兼顾场景、细节与信任背书，提高转化效率`
+      const content = result.data?.content?.trim()
+      if (!content) {
+        toast.error('AI 未返回有效内容')
+        return ''
+      }
+      return content
+    } catch (error) {
+      const status = error.response?.status
+      if (status === 401) {
+        toast.error('登录已过期，请重新登录')
+      } else {
+        toast.error(error.response?.data?.message || 'AI 分析失败，请稍后重试')
+      }
+      return ''
+    } finally {
+      aiLoading.value = false
+    }
   }
 
   async function generateSuiteImages() {
     if (uploadedImages.value.length === 0) {
       toast.info('请先上传商品图片')
+      return
+    }
+
+    const mainImg = uploadedImages.value[mainImageIndex.value]
+    if (!mainImg || !mainImg.url) {
+      toast.info('主图还未上传完成，请稍候再试')
+      return
+    }
+    if (mainImg.uploading) {
+      toast.info('主图还在上传中，请稍候')
       return
     }
 
@@ -102,30 +311,201 @@ export function useProductSuiteGenerator() {
       return
     }
 
+    const jobId = await ensureCurrentJob()
+    if (!jobId) return
+
     generating.value = true
     generatedCount.value = 0
-    genLogs.value = ['商品套图生成任务初始化...', '读取商品图片、平台规范与套图结构...']
-    outputCards.value = []
-
-    const mainImg = uploadedImages.value[mainImageIndex.value]
-    for (const item of queue) {
-      await wait(180)
-      genLogs.value.push(`正在生成 [${item.name}] 第 ${item.index} 张视觉图...`)
-      const dataUrl = await renderSuiteImage(item, mainImg)
-      outputCards.value.push({
-        id: makeId(),
-        typeId: item.id,
-        dataUrl,
-        selected: true,
-        strategyTitle: `${item.name} ${item.index}`,
-        strategyContent: item.description,
-      })
-      generatedCount.value += 1
+    jobTotal.value = queue.length
+    const baseSortOrder = outputCards.value.length
+    const batchRunId = makeId()
+    activeBatchRunId.value = batchRunId
+    if (genLogs.value.length === 0) {
+      genLogs.value.push('商品套图生成任务初始化...', '读取商品图片、平台规范与套图结构...')
+    } else {
+      genLogs.value.push(`新一批套图开始生成，共 ${queue.length} 张`)
     }
 
-    genLogs.value.push('商品套图已生成完成，可继续预览、下载或重算单张。')
-    generating.value = false
-    toast.success('商品套图已生成')
+    const imageUrl = mainImg.url
+
+    const createdCards = []
+
+    queue.forEach((item, index) => {
+      const card = reactive({
+        id: makeId(),
+        taskId: '',
+        typeId: item.id,
+        dataUrl: '',
+        resultUrl: '',
+        selected: true,
+        status: 'pending',
+        strategyTitle: `${item.name} ${item.index}`,
+        strategyContent: item.description,
+        errorMessage: '',
+        sortOrder: baseSortOrder + index,
+        batchRunId,
+      })
+      createdCards.push({ card, item })
+    })
+
+    // 新批次插到前面，让最新生成更醒目；旧 cards 保留
+    outputCards.value = [...createdCards.map((c) => c.card), ...outputCards.value]
+
+    let successfullyEnqueued = 0
+    for (const { card, item } of createdCards) {
+      const prompt = buildPromptForItem(item)
+      try {
+        const result = await generateImage({
+          prompt,
+          image_url: imageUrl,
+          ratio: settings.ratio,
+          resolution: settings.quality,
+          job_id: jobId,
+          type_id: item.id,
+          title: card.strategyTitle,
+          sort_order: card.sortOrder,
+        })
+        if (result.code !== 0) {
+          card.status = 'failed'
+          card.errorMessage = result.message || '任务创建失败'
+          genLogs.value.push(`[${item.name} ${item.index}] 创建失败：${card.errorMessage}`)
+          continue
+        }
+        card.taskId = result.data.task_id
+        genLogs.value.push(`正在生成 [${item.name}] 第 ${item.index} 张...`)
+        startPollingCard(card)
+        successfullyEnqueued += 1
+      } catch (error) {
+        const status = error.response?.status
+        const message =
+          status === 401
+            ? '登录已过期，请重新登录'
+            : error.response?.data?.message || '任务创建失败'
+        card.status = 'failed'
+        card.errorMessage = message
+        genLogs.value.push(`[${item.name} ${item.index}] 创建失败：${message}`)
+      }
+    }
+
+    genLogs.value.push(`已创建 ${successfullyEnqueued} 个商品套图任务`)
+    if (successfullyEnqueued === 0) {
+      maybeFinishGenerating()
+      if (generating.value) {
+        generating.value = false
+      }
+      jobTotal.value = 0
+      toast.error('所有套图任务都创建失败，请稍后重试')
+    }
+  }
+
+  function buildPromptForItem(item) {
+    const lines = [
+      '【参考图】必须以用户上传的商品图为商品主体，保持商品款式、颜色、材质、结构和外观完全一致。',
+      `【投放平台】${settings.platform}`,
+      `【排版语言】${settings.language}`,
+      `【画面比例】${settings.ratio}`,
+      `【图类型】${item.name}`,
+      `【图类型说明】${item.description}`,
+      '【商品卖点与要求】',
+      settings.productInput.trim(),
+      '【强约束】禁止虚构品牌 Logo、认证标识、价格、销量、参数等无法从参考图与上述卖点确认的信息；如需添加文字必须使用上述指定语言，文字简洁清晰，适合电商平台展示。',
+    ]
+    return lines.filter(Boolean).join('\n')
+  }
+
+  function startPollingCard(card) {
+    if (!card.taskId) return
+    const timer = window.setInterval(() => {
+      pollCardOnce(card).catch(() => {})
+    }, POLL_INTERVAL_MS)
+    pollTimers.set(card.id, timer)
+    pollCardOnce(card).catch(() => {})
+  }
+
+  async function pollCardOnce(card) {
+    if (!card.taskId) return
+    if (TERMINAL_STATUSES.has(card.status)) {
+      stopPollingCard(card.id)
+      return
+    }
+    if (pollInFlight.has(card.id)) return
+    pollInFlight.add(card.id)
+    try {
+      const result = await getImageTask(card.taskId)
+      if (result.code !== 0) {
+        return
+      }
+      // 处理本次响应前再校验一次终态，避免并发响应叠加导致 generatedCount 重复 +1
+      if (TERMINAL_STATUSES.has(card.status)) {
+        stopPollingCard(card.id)
+        return
+      }
+      const data = result.data || {}
+      const status = data.status || 'processing'
+      const resultUrl = data.result_url || ''
+
+      if (status === 'done' && resultUrl) {
+        card.status = 'done'
+        card.resultUrl = resultUrl
+        card.dataUrl = resultUrl
+        generatedCount.value += 1
+        genLogs.value.push(`[${card.strategyTitle}] 已完成`)
+        genLogs.value.push(`已完成 ${generatedCount.value}/${jobTotal.value}`)
+        stopPollingCard(card.id)
+      } else if (status === 'failed' || status === 'timeout') {
+        card.status = status
+        card.errorMessage = data.error_message || (status === 'timeout' ? '生成超时' : '生成失败')
+        genLogs.value.push(`[${card.strategyTitle}] ${status === 'timeout' ? '超时' : '失败'}：${card.errorMessage}`)
+        stopPollingCard(card.id)
+      } else {
+        // 包含两种情况：1) processing；2) done 但 result_url 仍未落库（worker 写入竞态/降级）
+        card.status = status === 'done' ? 'processing' : status
+      }
+
+      maybeFinishGenerating()
+    } catch {
+      // 单次轮询异常不停止该任务，等下一次 tick；网络抖动等场景靠后端最终态收敛
+    } finally {
+      pollInFlight.delete(card.id)
+    }
+  }
+
+  function stopPollingCard(cardId) {
+    const timer = pollTimers.get(cardId)
+    if (timer) {
+      window.clearInterval(timer)
+      pollTimers.delete(cardId)
+    }
+  }
+
+  function clearAllPollTimers() {
+    for (const timer of pollTimers.values()) {
+      window.clearInterval(timer)
+    }
+    pollTimers.clear()
+    pollInFlight.clear()
+  }
+
+  function maybeFinishGenerating() {
+    if (!generating.value) return
+    const batchId = activeBatchRunId.value
+    const batchCards = batchId
+      ? outputCards.value.filter((card) => card.batchRunId === batchId)
+      : outputCards.value
+    if (batchCards.length === 0) return
+    const allTerminal = batchCards.every((card) => TERMINAL_STATUSES.has(card.status))
+    if (allTerminal) {
+      generating.value = false
+      genLogs.value.push('全部商品套图任务已结束')
+      const failedCount = batchCards.filter((card) => card.status !== 'done').length
+      if (failedCount === 0) {
+        toast.success('商品套图已全部生成')
+      } else if (failedCount === batchCards.length) {
+        toast.error('套图生成失败，请稍后重试')
+      } else {
+        toast.info(`部分套图生成失败（${failedCount} 张）`)
+      }
+    }
   }
 
   function buildSuiteQueue() {
@@ -141,136 +521,16 @@ export function useProductSuiteGenerator() {
   }
 
   function getCardSize() {
-    const [width, height] = resolutionMap[settings.quality]?.[settings.ratio] || resolutionMap['1K']['1:1']
+    const effectiveQuality = resolveQuality(settings.ratio, settings.quality) || settings.quality
+    const dims = resolutionMap[settings.ratio]?.[effectiveQuality]
+    if (!dims) {
+      throw new Error(`不支持的尺寸组合：${settings.ratio} / ${settings.quality}`)
+    }
+    if (effectiveQuality !== settings.quality) {
+      settings.quality = effectiveQuality
+    }
+    const [width, height] = dims
     return { width, height }
-  }
-
-  function renderSuiteImage(item, productImgSrc) {
-    return new Promise((resolve, reject) => {
-      const canvas = document.createElement('canvas')
-      const ctx = canvas.getContext('2d')
-      const { width, height } = getCardSize()
-
-      canvas.width = width
-      canvas.height = height
-      paintSuiteBackground(ctx, width, height, item)
-
-      const img = new window.Image()
-      img.onload = () => {
-        paintProduct(ctx, img, width, height, item)
-        paintSuiteCopy(ctx, width, height, item)
-        resolve(canvas.toDataURL('image/png'))
-      }
-      img.onerror = reject
-      img.src = productImgSrc
-    })
-  }
-
-  function paintSuiteBackground(ctx, width, height, item) {
-    const gradient = ctx.createLinearGradient(0, 0, width, height)
-    if (item.id === 'white-bg') {
-      gradient.addColorStop(0, '#ffffff')
-      gradient.addColorStop(1, '#f8fafc')
-    } else if (item.id === 'scene') {
-      gradient.addColorStop(0, '#ecfdf5')
-      gradient.addColorStop(1, '#f8fafc')
-    } else if (item.id === 'selling-point') {
-      gradient.addColorStop(0, '#f0fdfa')
-      gradient.addColorStop(1, '#ffffff')
-    } else {
-      gradient.addColorStop(0, '#f8fafc')
-      gradient.addColorStop(1, '#e2e8f0')
-    }
-
-    ctx.fillStyle = gradient
-    ctx.fillRect(0, 0, width, height)
-    ctx.strokeStyle = 'rgba(16, 185, 129, 0.08)'
-    ctx.lineWidth = 1
-    for (let x = 0; x < width; x += 48) {
-      ctx.beginPath()
-      ctx.moveTo(x, 0)
-      ctx.lineTo(x, height)
-      ctx.stroke()
-    }
-  }
-
-  function paintProduct(ctx, img, width, height, item) {
-    const isInfoLayout = item.id === 'selling-point' || item.id === 'detail'
-    const productX = isInfoLayout ? width * 0.68 : width * 0.5
-    const productY = isInfoLayout ? height * 0.58 : height * 0.54
-    const productW = width * (isInfoLayout ? 0.42 : 0.58)
-    const productH = height * (isInfoLayout ? 0.5 : 0.6)
-
-    ctx.shadowColor = 'rgba(15, 23, 42, 0.12)'
-    ctx.shadowBlur = 30
-    ctx.shadowOffsetY = 16
-    ctx.drawImage(img, productX - productW / 2, productY - productH / 2, productW, productH)
-    ctx.shadowColor = 'transparent'
-    ctx.shadowBlur = 0
-    ctx.shadowOffsetY = 0
-  }
-
-  function paintSuiteCopy(ctx, width, height, item) {
-    const productName = getProductNameFromInput(settings.productInput)
-    const titleMap = {
-      'white-bg': `${productName} 官方标准白底图`,
-      scene: `${productName} 高转化使用场景`,
-      'selling-point': `${productName} 核心卖点拆解`,
-      detail: `${productName} 精细材质细节`,
-    }
-    const lines = getCopyLines(item)
-
-    ctx.fillStyle = 'rgba(255,255,255,0.92)'
-    ctx.beginPath()
-    ctx.roundRect(width * 0.06, height * 0.07, width * 0.43, height * 0.34, 18)
-    ctx.fill()
-    ctx.strokeStyle = 'rgba(16, 185, 129, 0.18)'
-    ctx.stroke()
-
-    ctx.fillStyle = THEME_COLORS.primary
-    ctx.beginPath()
-    ctx.roundRect(width * 0.085, height * 0.105, 122, 30, 8)
-    ctx.fill()
-    ctx.fillStyle = '#ffffff'
-    ctx.font = 'bold 14px "Noto Sans SC", sans-serif'
-    ctx.fillText('NodePass AI', width * 0.105, height * 0.105 + 20)
-
-    ctx.fillStyle = THEME_COLORS.slate900
-    ctx.font = 'bold 30px "Noto Sans SC", sans-serif'
-    ctx.fillText(titleMap[item.id] || item.name, width * 0.085, height * 0.105 + 72)
-
-    let lineY = height * 0.105 + 118
-    lines.forEach((line, index) => {
-      ctx.fillStyle = THEME_COLORS.primaryDark
-      ctx.beginPath()
-      ctx.arc(width * 0.095, lineY - 5, 9, 0, Math.PI * 2)
-      ctx.fill()
-      ctx.fillStyle = '#ffffff'
-      ctx.font = 'bold 11px "Plus Jakarta Sans", sans-serif'
-      ctx.fillText(index + 1, width * 0.091, lineY - 1)
-      ctx.fillStyle = THEME_COLORS.slate700
-      ctx.font = '15px "Noto Sans SC", sans-serif'
-      ctx.fillText(line, width * 0.12, lineY)
-      lineY += 38
-    })
-
-    ctx.fillStyle = THEME_COLORS.slate100
-    ctx.beginPath()
-    ctx.roundRect(width - 190, 24, 164, 30, 7)
-    ctx.fill()
-    ctx.fillStyle = THEME_COLORS.slate700
-    ctx.font = 'bold 12px "Noto Sans SC", sans-serif'
-    ctx.fillText(`${settings.platform} / ${settings.language}`, width - 176, 44)
-  }
-
-  function getCopyLines(item) {
-    const map = {
-      'white-bg': ['平台规范首图', '主体清晰突出', '减少干扰元素'],
-      scene: ['真实使用场景', '提升购买代入', '强化生活质感'],
-      'selling-point': ['三段式卖点表达', '重点参数可视化', '信息层级清晰'],
-      detail: ['局部细节放大', '材质工艺说明', '降低售前疑虑'],
-    }
-    return map[item.id] || ['统一视觉风格', '适配多平台规范', '提升商品转化']
   }
 
   function getStructureName(id) {
@@ -293,12 +553,13 @@ export function useProductSuiteGenerator() {
   }
 
   function batchDownload() {
-    if (selectedCards.value.length === 0) {
-      toast.info('请先勾选需要下载的套图')
+    const downloadable = selectedCards.value.filter((card) => card.status === 'done' && card.dataUrl)
+    if (downloadable.length === 0) {
+      toast.info('请先勾选已生成完成的套图')
       return
     }
 
-    selectedCards.value.forEach((card, index) => {
+    downloadable.forEach((card, index) => {
       window.setTimeout(() => {
         downloadSingleImage(card)
       }, index * 150)
@@ -306,31 +567,25 @@ export function useProductSuiteGenerator() {
   }
 
   function downloadSingleImage(card) {
+    if (!card.dataUrl) {
+      toast.info('该套图还未生成完成')
+      return
+    }
     const link = document.createElement('a')
     link.href = card.dataUrl
     link.download = `${currentTaskTitle.value}_${card.strategyTitle || getStructureName(card.typeId)}.png`
+    link.target = '_blank'
+    link.rel = 'noopener'
     link.click()
   }
 
-  async function regenerateSingleCard(card) {
-    if (uploadedImages.value.length === 0) {
-      toast.info('请先上传商品图片')
-      return
-    }
-
-    const mainImg = uploadedImages.value[mainImageIndex.value]
-    const suiteItem = suiteStructureDefaults.find((item) => item.id === card.typeId)
-    card.dataUrl = await renderSuiteImage(
-      {
-        id: card.typeId,
-        name: suiteItem?.name || card.strategyTitle || '商品套图',
-        description: suiteItem?.description || card.strategyContent || '商品套图生成',
-        index: 1,
-      },
-      mainImg,
-    )
-    toast.success('该套图已重新生成')
+  function regenerateSingleCard(_card) {
+    toast.info('单张重算暂未支持，可调整参数后重新生成全部套图')
   }
+
+  onBeforeUnmount(() => {
+    clearAllPollTimers()
+  })
 
   return {
     uploadedImages,
@@ -338,10 +593,16 @@ export function useProductSuiteGenerator() {
     aiLoading,
     generating,
     generatedCount,
+    jobTotal,
     genLogs,
     outputCards,
     zoomCard,
+    currentJobId,
     currentTaskTitle,
+    historyTasks,
+    showHistoryDrawer,
+    historyLoading,
+    jobLoading,
     settings,
     suiteStructure,
     totalCount,
@@ -352,6 +613,9 @@ export function useProductSuiteGenerator() {
     selectedImageLabel,
     generateSellingPointsWithAI,
     generateSuiteImages,
+    createNewTask,
+    loadHistoryTasks,
+    loadGenerationJob,
     showNotice: toast.info,
     getStructureName,
     getStructureStrategy,
@@ -363,21 +627,6 @@ export function useProductSuiteGenerator() {
   }
 }
 
-function wait(ms) {
-  return new Promise((resolve) => {
-    window.setTimeout(resolve, ms)
-  })
-}
-
 function makeId() {
   return `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
-}
-
-function getProductNameFromInput(input) {
-  return (
-    input
-      .split('\n')
-      .map((line) => line.trim())
-      .filter(Boolean)[0] || '当前商品'
-  )
 }
