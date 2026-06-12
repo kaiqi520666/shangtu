@@ -526,12 +526,15 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
           genLogs.value.push(`[${card.strategyTitle}] 已完成`)
           genLogs.value.push(`已完成 ${generatedCount.value}/${jobTotal.value}`)
           stopPollingCard(card.id)
+          // 强制触发 ref 更新，确保 prop 链重新渲染新图
+          outputCards.value = [...outputCards.value]
         }
       } else if (status === 'failed' || status === 'timeout') {
         card.status = status
         card.errorMessage = data.error_message || (status === 'timeout' ? '生成超时' : '生成失败')
         genLogs.value.push(`[${card.strategyTitle}] ${status === 'timeout' ? '超时' : '失败'}：${card.errorMessage}`)
         stopPollingCard(card.id)
+        outputCards.value = [...outputCards.value]
       } else {
         // 包含两种情况：1) processing；2) done 但 result_url 仍未落库（worker 写入竞态/降级）
         card.status = status === 'done' ? 'processing' : status
