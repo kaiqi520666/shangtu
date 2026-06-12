@@ -114,7 +114,7 @@ function handleDownload(card) {
 
       <div class="flex flex-1 flex-col justify-between space-y-1.5 border-t border-slate-100 bg-white p-3">
         <div>
-          <span class="text-xs font-medium text-slate-500">{{ platform }}，{{ language }}，{{ imageLabel }}</span>
+          <span class="text-xs font-medium text-slate-500">{{ platform }} {{ language }} {{ imageLabel }}</span>
           <div v-if="isFailed(card)" class="mt-1.5 space-y-0.5">
             <p class="line-clamp-2 text-[11px] font-medium leading-snug text-rose-500" :title="shortFailReason(card)">
               原因：{{ shortFailReason(card) }}
