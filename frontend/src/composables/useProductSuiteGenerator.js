@@ -7,6 +7,7 @@ import {
   createGenerationJob,
   getGenerationJob,
   listGenerationJobs,
+  updateGenerationJob,
 } from '@/api/generation.js'
 
 const POLL_INTERVAL_MS = 5000
@@ -171,10 +172,20 @@ export function useProductSuiteGenerator() {
       currentJobId.value = data.job_id
       currentTaskTitle.value = data.title || ''
       if (data.settings && typeof data.settings === 'object') {
-        Object.assign(settings, data.settings)
+        const s = data.settings
+        if (typeof s.platform === 'string') settings.platform = s.platform
+        if (typeof s.language === 'string') settings.language = s.language
+        if (typeof s.ratio === 'string' && resolutionMap[s.ratio]) {
+          settings.ratio = s.ratio
+        }
+        const desiredQuality = typeof s.quality === 'string' ? s.quality : settings.quality
+        settings.quality = resolveQuality(settings.ratio, desiredQuality) || '1K'
       }
       if (Array.isArray(data.source_images)) {
-        uploadedImages.value = data.source_images
+        uploadedImages.value = data.source_images.map((img) => ({
+          ...img,
+          previewUrl: img?.url || img?.previewUrl || '',
+        }))
         mainImageIndex.value = 0
       } else {
         uploadedImages.value = []
@@ -206,6 +217,7 @@ export function useProductSuiteGenerator() {
           errorMessage: item.error_message || '',
           sortOrder: item.sort_order || 0,
           batchRunId: '',
+          creditRefunded: !!item.credit_refunded,
         }),
       )
       outputCards.value = restoredCards
@@ -314,6 +326,41 @@ export function useProductSuiteGenerator() {
     const jobId = await ensureCurrentJob()
     if (!jobId) return
 
+    const snapshotPayload = {
+      title: currentTaskTitle.value,
+      settings: {
+        platform: settings.platform,
+        language: settings.language,
+        ratio: settings.ratio,
+        quality: settings.quality,
+      },
+      source_images: uploadedImages.value.map((img) => ({
+        id: img.id,
+        url: img.url,
+        objectKey: img.objectKey,
+        contentType: img.contentType,
+        size: img.size,
+        previewUrl: img.url || img.previewUrl,
+      })),
+      input_text: settings.productInput,
+      structure: suiteStructure.value,
+    }
+    try {
+      const saveRes = await updateGenerationJob(jobId, snapshotPayload)
+      if (saveRes.code !== 0) {
+        toast.error(saveRes.message || '保存任务配置失败，请稍后重试')
+        return
+      }
+    } catch (error) {
+      const status = error.response?.status
+      if (status === 401) {
+        toast.error('登录已过期，请重新登录')
+      } else {
+        toast.error(error.response?.data?.message || '保存任务配置失败，请稍后重试')
+      }
+      return
+    }
+
     generating.value = true
     generatedCount.value = 0
     jobTotal.value = queue.length
@@ -344,6 +391,7 @@ export function useProductSuiteGenerator() {
         errorMessage: '',
         sortOrder: baseSortOrder + index,
         batchRunId,
+        creditRefunded: false,
       })
       createdCards.push({ card, item })
     })

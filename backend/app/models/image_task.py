@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, Integer, String, Text, func
+from sqlalchemy import Boolean, DateTime, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -23,4 +23,5 @@ class ImageTask(Base):
     progress: Mapped[int] = mapped_column(Integer, default=0)
     provider: Mapped[str] = mapped_column(String(32), default="toapis")
     provider_task_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    credit_refunded: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())

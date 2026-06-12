@@ -144,7 +144,7 @@ async def create_task(
             await db.execute(
                 update(ImageTask)
                 .where(ImageTask.id == task_id)
-                .values(status="failed")
+                .values(status="failed", credit_refunded=True)
             )
             await db.commit()
         except Exception:

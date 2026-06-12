@@ -1,6 +1,7 @@
 import json
 import uuid
 from datetime import datetime
+from typing import Any
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
@@ -22,6 +23,14 @@ TERMINAL_FAILED = {"failed", "timeout"}
 
 class CreateJobRequest(BaseModel):
     scenario: str
+
+
+class UpdateJobRequest(BaseModel):
+    title: str | None = None
+    settings: dict[str, Any] | None = None
+    source_images: list[Any] | None = None
+    input_text: str | None = None
+    structure: list[Any] | None = None
 
 
 def _parse_json(raw: str | None):
@@ -165,6 +174,7 @@ async def get_job(
             "progress": task.progress or 0,
             "result_url": task.result_url,
             "error_message": task.error_message,
+            "credit_refunded": bool(task.credit_refunded),
         }
         for task in tasks_result.scalars().all()
     ]
@@ -181,6 +191,61 @@ async def get_job(
             "structure": _parse_json(job.structure_json),
             "items": items,
             "created_at": job.created_at,
+            "updated_at": job.updated_at,
+        }
+    )
+
+
+def _dump_json(value) -> str:
+    return json.dumps(value, ensure_ascii=False)
+
+
+@router.patch("/jobs/{job_id}", response_model=Response)
+async def update_job(
+    job_id: str,
+    req: UpdateJobRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(GenerationJob).where(
+            GenerationJob.id == job_id,
+            GenerationJob.user_id == current_user.id,
+        )
+    )
+    job = result.scalar_one_or_none()
+    if not job:
+        return fail("任务不存在")
+
+    if req.title is not None:
+        title = req.title.strip()
+        if not (1 <= len(title) <= 100):
+            return fail("任务标题长度需在 1-100 字之间")
+        job.title = title
+    if req.settings is not None:
+        job.settings_json = _dump_json(req.settings)
+    if req.source_images is not None:
+        job.source_images_json = _dump_json(req.source_images)
+    if req.input_text is not None:
+        job.input_text = req.input_text
+    if req.structure is not None:
+        job.structure_json = _dump_json(req.structure)
+
+    job.updated_at = datetime.now()
+
+    try:
+        await db.commit()
+        await db.refresh(job)
+    except Exception:
+        await db.rollback()
+        return fail("任务更新失败，请稍后重试")
+
+    return success(
+        {
+            "job_id": job.id,
+            "scenario": job.scenario,
+            "title": job.title,
+            "status": job.status,
             "updated_at": job.updated_at,
         }
     )

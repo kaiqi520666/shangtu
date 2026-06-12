@@ -258,15 +258,76 @@ async def _set_progress(redis, task_id: str, value: int) -> None:
     )
 
 
-async def _mark_failed(redis, task_id: str, message: str) -> None:
-    await update_task_in_db(task_id, status="failed", error_message=message)
-    await redis.set(f"task:{task_id}:error", message, ex=3600)
+def normalize_provider_error(message: str | None) -> str:
+    """把上游 / 第三方原始错误归一化为对用户友好的中文文案；技术原文交给日志。
+
+    规则：
+    1. 命中 image_unsafe / 上游 API failed / timeout / rate limit 等关键词 → 对应固定文案
+    2. 不命中关键词、但消息包含中文 → 直接保留（属于我们自己写的中文错误，如 "OSS 上传失败: xxx"）
+    3. 都不命中 → 兜底文案，避免把上游英文 JSON 暴露给用户
+    """
+    if not message:
+        return "生图失败，请调整提示词后重试。"
+    lower = message.lower()
+    if "image_unsafe" in lower or "unsafe" in lower:
+        return "生成内容触发平台安全策略，请尝试减少敏感词、夸张功效、品牌/认证/人物相关描述后重新生成。"
+    if "rate limit" in lower or "too many requests" in lower or "429" in lower:
+        return "生图服务繁忙，请稍后再试。"
+    if "timeout" in lower or "timed out" in lower or "超时" in message:
+        return "生图任务超时，请稍后重试。"
+    if "upstream api failed" in lower or "upstream" in lower:
+        return "上游生图服务暂时失败，请稍后重试。"
+    if any("一" <= ch <= "鿿" for ch in message):
+        return message
+    return "生图失败，请调整提示词后重试。"
+
+
+async def refund_task_credit(task_id: str) -> bool:
+    """幂等退款：未退过则把对应用户 credits +1 并把 task.credit_refunded 置 True，已退过直接 no-op。返回是否本次执行了退款。"""
+    from app.models import ImageTask, User
+
+    async with SessionLocal() as session:
+        async with session.begin():
+            task_row = await session.execute(
+                select(
+                    ImageTask.user_id,
+                    ImageTask.credit_refunded,
+                ).where(ImageTask.id == task_id).with_for_update()
+            )
+            row = task_row.first()
+            if not row:
+                return False
+            user_id, refunded = row
+            if refunded:
+                return False
+            await session.execute(
+                update(User).where(User.id == user_id).values(
+                    credits=User.credits + 1
+                )
+            )
+            await session.execute(
+                update(ImageTask).where(ImageTask.id == task_id).values(
+                    credit_refunded=True
+                )
+            )
+    return True
+
+
+async def _mark_failed(redis, task_id: str, raw_message: str) -> None:
+    print(f"[task {task_id}] failed (raw): {raw_message}")
+    friendly = normalize_provider_error(raw_message)
+    await update_task_in_db(task_id, status="failed", error_message=friendly)
+    await refund_task_credit(task_id)
+    await redis.set(f"task:{task_id}:error", friendly, ex=3600)
     await redis.set(f"task:{task_id}:status", "failed", ex=3600)
 
 
-async def _mark_timeout(redis, task_id: str, message: str) -> None:
-    await update_task_in_db(task_id, status="timeout", error_message=message)
-    await redis.set(f"task:{task_id}:error", message, ex=3600)
+async def _mark_timeout(redis, task_id: str, raw_message: str) -> None:
+    print(f"[task {task_id}] timeout (raw): {raw_message}")
+    friendly = normalize_provider_error(raw_message)
+    await update_task_in_db(task_id, status="timeout", error_message=friendly)
+    await refund_task_credit(task_id)
+    await redis.set(f"task:{task_id}:error", friendly, ex=3600)
     await redis.set(f"task:{task_id}:status", "timeout", ex=3600)
 
 

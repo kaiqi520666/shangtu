@@ -5,6 +5,20 @@
 
 ---
 
+## 2026-06-12 — 上游错误归一化 + 失败退积分 + 工作台快照保存/恢复
+
+- worker：新增 `normalize_provider_error(message)`，把上游英文 JSON / 关键字归一为中文友好文案 —— `image_unsafe`→"生成内容触发平台安全策略，请尝试减少敏感词、夸张功效、品牌/认证/人物相关描述后重新生成。"；`upstream API failed`→"上游生图服务暂时失败，请稍后重试。"；`timeout/超时`→"生图任务超时，请稍后重试。"；`rate limit / 429`→"生图服务繁忙，请稍后再试。"；其它非中文→"生图失败，请调整提示词后重试。"；含中文则原样保留（`OSS 上传失败:` / `TOAPIS_KEY 未配置` 等本地错误不被覆盖）
+- worker：`_mark_failed/_mark_timeout` 调整为先 `print` 原始 raw message 到日志（开发排查用），再用归一化文案写 DB.error_message + Redis `task:{id}:error`，永远不向前端暴露上游英文 JSON
+- worker：新增 `refund_task_credit(task_id)` 幂等退款 —— 行级锁 + `image_tasks.credit_refunded`（新加列，`Boolean default False not null`）；已退过直接 no-op，未退则 `User.credits += 1` 并把标志位置 True；`_mark_failed/_mark_timeout` 内部统一调用，所有失败/超时路径都退分；`done` 路径不调用，所以成功不退；`/image/generate` 入队失败的兜底退分也补上 `credit_refunded=True`
+- 后端新增 `PATCH /generation/jobs/{job_id}`：可选字段 `{title, settings, source_images, input_text, structure}`，传哪个改哪个；`settings/source_images/structure` 由后端 `json.dumps(..., ensure_ascii=False)` 写对应 JSON 列；`title` 校验 1-100 字（`strip` 后非空）；只能改自己的 job；`updated_at` 自动更新；返回 `{job_id, scenario, title, status, updated_at}`
+- `GET /generation/jobs/{id}` 的 `items[]` 增加 `credit_refunded` 字段，前端用来判断"未消耗额度"标记
+- 前端 `api/generation.js` 增 `updateGenerationJob(jobId, payload)`
+- `useProductSuiteGenerator.generateSuiteImages`：`ensureCurrentJob` 拿到 jobId 之后、创建 cards 之前先 `updateGenerationJob` 保快照（`title / settings.{platform,language,ratio,quality} / source_images / input_text / structure`），`source_images` 里 `previewUrl` 兜底等于 `url`；保存失败直接 toast 并 `return`，不进入入队流程
+- `useProductSuiteGenerator.loadGenerationJob`：恢复 settings 改成白名单（platform/language/ratio/quality），ratio 校验存在于 `resolutionMap`，quality 用 `resolveQuality(settings.ratio, ...)` 修正不兼容组合（如 9:16 历史 quality=2K 没问题；切到 1:1 后历史里有 4K 的话回落到 1K）；`source_images` 恢复时给每条补 `previewUrl = url`；新建 cards 默认 `creditRefunded:false`，恢复历史 cards 时从 `item.credit_refunded` 读
+- `GeneratedCardGrid` 失败态重做：图片区只显示图标 + "生成失败"标题 + `errorMessage` 两行截断（`line-clamp-2` + `title` hover）；底部继续展示 `strategyContent`（不被错误文案替代），下方追加"原因：xxx"两行截断 + 绿色"本次失败未消耗额度"提示；`failed/timeout` 状态下下载按钮置灰且点击 toast"该图片生成失败，无法下载"，不再显示原始英文 JSON
+- 旧库需要 `ALTER TABLE image_tasks ADD COLUMN credit_refunded BOOLEAN NOT NULL DEFAULT FALSE`（已在开发库执行）
+- 验证（11 项端到端）：① `normalize_provider_error` 9 个分支全部命中预期文案 ② `PATCH` 写入快照 + `GET` 回读字段一致 ③ `PATCH` 局部 `{title}` 不丢其它字段 ④ `title` 空白 / >100 字 报错 ⑤ 跨用户 PATCH 隔离 ⑥ `/image/generate` 扣 1 credits 10→9 ⑦ `_mark_failed("image_unsafe")` 把 status=failed、`error_message` 含"安全策略"、`credit_refunded=True`、Redis `task:*:status=failed`，`/error` 是友好文案，credits 退到 10 ⑧ 重复 `_mark_failed` + 重复 `refund_task_credit` 幂等，credits 仍 10 ⑨ `_mark_timeout` 同样退分到原值 ⑩ done 任务保持 9 不退 ⑪ `GET items[]` 含 `credit_refunded`（failed 任务=True，done 任务=False）；前端 `npm run lint` + `npm run build` 全绿
+
 ## 2026-06-12 — 商品套图父任务接入：刷新可恢复 + 同任务追加生成
 
 - 后端 `/image/generate` `GenerateRequest` 增加可选 `job_id / type_id / title / sort_order`；带 `job_id` 时校验归属（属于当前用户）+ scenario（仅 `product_suite`），不存在/不匹配 → `fail("任务不存在")`；建 `ImageTask` 时透写四个字段；入队成功后若 `GenerationJob.status != 'generating'` 把它置为 `generating`；旧路径（不传 `job_id`）行为不变

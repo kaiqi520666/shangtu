@@ -60,8 +60,8 @@ shangtu/
 
 - `POST /image/upload`：multipart 上传 OSS（≤10MB，jpg/png/webp/gif），返回 `url` + `object_key`
 - `POST /image/analyze`：DashScope `qwen3.6-flash` 多模态分析商品图，输出标准化产品名/卖点/适用人群/场景/参数
-- `POST /image/generate`：扣 1 积分 + 建 `ImageTask(pending)` 同事务；接受 `{prompt, image_url?, ratio="1:1", resolution="1K", job_id?, type_id?, title?, sort_order=0}`，落库 `size = "{ratio}/{resolution}"` 仅作审计标记；入队失败退回积分 + 任务标 `failed`；带 `job_id` 时校验归属 + scenario，入队成功后把 `GenerationJob.status` 置 `generating`；返回 `task_id`
-- `GET /image/task/{task_id}`：优先读 Redis（`task:{id}:status` / `:error` / `:result` / `:progress`），回退 DB；`status=done` 但 `result_url` 缺失时降级为 `processing`，让前端继续轮询；响应字段 `{status, result_url, prompt, created_at, error_message, progress}`
+- `POST /image/generate`：扣 1 积分 + 建 `ImageTask(pending)` 同事务；接受 `{prompt, image_url?, ratio="1:1", resolution="1K", job_id?, type_id?, title?, sort_order=0}`，落库 `size = "{ratio}/{resolution}"` 仅作审计标记；入队失败退回积分 + 任务标 `failed` 且 `credit_refunded=True`；带 `job_id` 时校验归属 + scenario，入队成功后把 `GenerationJob.status` 置 `generating`；返回 `task_id`
+- `GET /image/task/{task_id}`：优先读 Redis（`task:{id}:status` / `:error` / `:result` / `:progress`），回退 DB；`status=done` 但 `result_url` 缺失时降级为 `processing`，让前端继续轮询；响应字段 `{status, result_url, prompt, created_at, error_message, progress}`，`error_message` 是 worker 已归一化后的中文友好文案
 - `GET /image/tasks`：当前用户历史任务（按 `created_at` desc）
 
 #### 异步生图 Worker（`app/worker/tasks.py`）
@@ -70,6 +70,8 @@ shangtu/
 - 尺寸校验：`TOAPIS_SIZE_TABLE`（与前端 `resolutionMap` 完全对齐）严校验 `(ratio, resolution)`，未支持直接 failed + `error_message`（如 `"当前比例 1:1 不支持 4K，请选择 1K/2K"`），不打远端。4K 仅 `16:9 / 9:16 / 2:1 / 1:2 / 21:9 / 9:21` 支持
 - 状态机：`pending → processing → done/failed/timeout`；ToAPIS `queued/in_progress` 映射 `processing`，`completed→done`，`failed→failed`
 - 失败分类（写 Redis `task:{id}:error` + DB `error_message`）：`TOAPIS_KEY` 缺失 / 不支持的尺寸组合 / 创建失败 / 轮询超时 / 任务失败 / completed 无 URL / 下载失败 / OSS 上传失败
+- **错误归一化**：`_mark_failed/_mark_timeout` 内部走 `normalize_provider_error`，把上游英文 JSON（如 `image_unsafe`、`upstream API failed`、`rate limit`、`timeout`）映射为中文友好文案，原始错误只 print 到日志；含中文的本地错误（如 `OSS 上传失败:` / `TOAPIS_KEY 未配置`）原样保留，但永远不向用户暴露原生英文 JSON
+- **失败退积分**：`_mark_failed/_mark_timeout` 都会调 `refund_task_credit(task_id)`，幂等（行级锁 + `image_tasks.credit_refunded` 标志位），重复处理只退一次；done 路径不退；`/image/generate` 入队失败退分时也置 `credit_refunded=True`
 - 进度同步：ToAPIS 返回 `progress` 时写入 Redis `task:{id}:progress` + DB `image_tasks.progress`，完成后强制 100
 - 写入顺序：先 DB 再 Redis 终态，避免 `done` 但 `result_url` 空的竞态
 - `image_url` 存在时 prompt 头部拼 `PRODUCT_IMAGE_SYSTEM_PROMPT` 强约束保持商品主体一致，并向 ToAPIS 传 `image_urls=[image_url]`；ToAPIS payload 的 `size` 字段是比例字符串（`"9:16"`），不是像素 `"720x1280"`
@@ -79,8 +81,9 @@ shangtu/
 
 - `POST /generation/jobs`：scenario 当前仅支持 `product_suite`，自动生成标题 `商品套图_YYYYMMDD_HHMMSS`，落 `generation_jobs(status=draft)`，返回 `{job_id, scenario, title, status, created_at}`
 - `GET /generation/jobs?scenario=...`：返回当前用户该场景的父任务列表（按 `created_at desc`），每条带 `total/completed/failed`（按 `image_tasks.job_id` 聚合，`done` 计 completed，`failed/timeout` 计 failed）
-- `GET /generation/jobs/{job_id}`：返回父任务设置 + 子任务清单 `items[]`（含 `task_id/type_id/title/sort_order/status/progress/result_url/error_message`，按 `sort_order asc, created_at asc`），`settings/source_images/structure` 为反序列化后的 JSON
-- 子任务关联：`image_tasks` 新增 `job_id / type_id / title / sort_order` 字段，由 `/image/generate` 在请求体里收到后写入；商品套图前端默认在第一次点击「生成」时延迟创建 job（`POST /generation/jobs`），后续同 job 内多次点击追加生成（不清空旧 cards），sort_order 接续递增；当前仅父任务表结构 + 三个只读接口 + `/image/generate` 关联，**不做提交/删除/改名/独立提交接口**
+- `GET /generation/jobs/{job_id}`：返回父任务设置 + 子任务清单 `items[]`（含 `task_id/type_id/title/sort_order/status/progress/result_url/error_message/credit_refunded`，按 `sort_order asc, created_at asc`），`settings/source_images/structure` 为反序列化后的 JSON
+- `PATCH /generation/jobs/{job_id}`：保存/恢复工作台快照。可选字段 `{title, settings, source_images, input_text, structure}`，传哪个改哪个；`settings/source_images/structure` 由后端 `json.dumps(..., ensure_ascii=False)` 写入对应 JSON 列；`title` 校验 1-100 字；只能改自己的 job；返回 `{job_id, scenario, title, status, updated_at}`
+- 子任务关联：`image_tasks` 新增 `job_id / type_id / title / sort_order` 字段，由 `/image/generate` 在请求体里收到后写入；商品套图前端默认在第一次点击「生成」时延迟创建 job（`POST /generation/jobs`），再调 `PATCH /generation/jobs/{id}` 把当前左侧工作台（标题/平台·语言·比例·质量/上传图/卖点/套图结构）落盘成快照，然后 `/image/generate` 每张图入队；后续同 job 内多次点击追加生成（不清空旧 cards），sort_order 接续递增；当前**不做提交/删除/改名/独立提交接口**
 
 #### 基础设施
 

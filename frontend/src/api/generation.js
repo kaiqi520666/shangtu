@@ -11,3 +11,7 @@ export function listGenerationJobs(scenario) {
 export function getGenerationJob(jobId) {
   return request.get(`/generation/jobs/${jobId}`, { timeout: 15000 })
 }
+
+export function updateGenerationJob(jobId, payload) {
+  return request.patch(`/generation/jobs/${jobId}`, payload, { timeout: 15000 })
+}
