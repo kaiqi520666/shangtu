@@ -156,6 +156,9 @@ const emit = defineEmits([
         </div>
         <GeneratedCardGrid
           :cards="outputCards"
+          :platform="settings.platform"
+          :language="settings.language"
+          :image-label="selectedImageLabel"
           :get-module-name="getStructureName"
           @toggle-card="emit('toggle-card', $event)"
           @download-card="emit('download-card', $event)"
