@@ -1,4 +1,5 @@
 import { computed, onBeforeUnmount, reactive, ref } from 'vue'
+import JSZip from 'jszip'
 import { ratioOptions, resolutionMap, resolveQuality } from '@/constants/generator.js'
 import { suiteStructureDefaults } from '@/constants/productSuite.js'
 import { useToast } from '@/composables/useToast.js'
@@ -650,24 +651,78 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
       return
     }
 
-    downloadable.forEach((card, index) => {
-      window.setTimeout(() => {
-        downloadSingleImage(card)
-      }, index * 150)
-    })
+    if (downloadable.length === 1) {
+      downloadSingleImage(downloadable[0])
+      return
+    }
+
+    // 多张打 zip 包下载
+    downloadAsZip(downloadable)
   }
 
-  function downloadSingleImage(card) {
+  async function downloadAsZip(cards) {
+    toast.info(`正在打包 ${cards.length} 张图片...`)
+    const zip = new JSZip()
+
+    const results = await Promise.allSettled(
+      cards.map(async (card, index) => {
+        const res = await fetch(card.dataUrl)
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const blob = await res.blob()
+        const ext = blob.type === 'image/jpeg' ? 'jpg' : 'png'
+        const name = `${card.strategyTitle || getStructureName(card.typeId)}_${index + 1}.${ext}`
+        zip.file(name, blob)
+      }),
+    )
+
+    const succeeded = results.filter((r) => r.status === 'fulfilled').length
+    if (succeeded === 0) {
+      toast.error('图片下载失败，请稍后重试')
+      return
+    }
+
+    try {
+      const content = await zip.generateAsync({ type: 'blob' })
+      const url = URL.createObjectURL(content)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `${currentTaskTitle.value || '商品套图'}.zip`
+      link.click()
+      URL.revokeObjectURL(url)
+      if (succeeded < cards.length) {
+        toast.info(`已打包 ${succeeded}/${cards.length} 张，部分图片下载失败`)
+      } else {
+        toast.success('打包下载完成')
+      }
+    } catch {
+      toast.error('打包失败，请稍后重试')
+    }
+  }
+
+  async function downloadSingleImage(card) {
     if (!card.dataUrl) {
       toast.info('该套图还未生成完成')
       return
     }
-    const link = document.createElement('a')
-    link.href = card.dataUrl
-    link.download = `${currentTaskTitle.value}_${card.strategyTitle || getStructureName(card.typeId)}.png`
-    link.target = '_blank'
-    link.rel = 'noopener'
-    link.click()
+    try {
+      const res = await fetch(card.dataUrl)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const blob = await res.blob()
+      const ext = blob.type === 'image/jpeg' ? 'jpg' : 'png'
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `${currentTaskTitle.value}_${card.strategyTitle || getStructureName(card.typeId)}.${ext}`
+      link.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      // fetch 失败时 fallback 到直接打开
+      const link = document.createElement('a')
+      link.href = card.dataUrl
+      link.target = '_blank'
+      link.rel = 'noopener'
+      link.click()
+    }
   }
 
   function regenerateSingleCard(_card) {
