@@ -39,6 +39,11 @@ const router = createRouter({
       name: "outfit",
       component: () => import("../views/OutfitView.vue"),
     },
+    {
+      path: "/generator/assets",
+      name: "assets",
+      component: () => import("../views/AssetLibraryView.vue"),
+    },
   ],
 });
 
