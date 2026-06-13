@@ -34,6 +34,7 @@ class GenerateRequest(BaseModel):
     prompt: str
     user_prompt: str | None = None
     image_url: str | None = None
+    image_urls: list[str] | None = None
     ratio: str = "1:1"
     resolution: str = "1K"
     job_id: str | None = None
@@ -158,7 +159,7 @@ async def create_task(
         job = job_result.scalar_one_or_none()
         if not job:
             return fail("任务不存在")
-        if job.scenario not in {"product_suite", "product_image"}:
+        if job.scenario not in {"product_suite", "product_image", "outfit"}:
             return fail("任务类型不匹配")
 
     task_id = str(uuid.uuid4())
@@ -169,7 +170,7 @@ async def create_task(
     prompt_template_refs_json = None
     prepend_reference_prompt = True
 
-    if job is not None and job.scenario in {"product_suite", "product_image"}:
+    if job is not None and job.scenario in {"product_suite", "product_image", "outfit"}:
         try:
             built_prompt = await build_image_generate_prompt(
                 db,
@@ -211,6 +212,10 @@ async def create_task(
         await db.rollback()
         return fail("任务创建失败，请稍后重试")
 
+    reference_image_urls = [url for url in (req.image_urls or []) if url]
+    if not reference_image_urls and req.image_url:
+        reference_image_urls = [req.image_url]
+
     # 入队失败：标记任务 failed 并退回积分，避免用户被扣却没活
     try:
         await request.app.state.redis_pool.enqueue_job(
@@ -221,6 +226,7 @@ async def create_task(
             req.resolution,
             req.image_url,
             prepend_reference_prompt,
+            reference_image_urls,
         )
     except Exception:
         try:

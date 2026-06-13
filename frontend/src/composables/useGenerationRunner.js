@@ -190,6 +190,7 @@ export function useGenerationRunner({
   async function enqueueImageBatch({
     queue,
     imageUrl,
+    imageUrls,
     ratio,
     resolution,
     snapshotPayload,
@@ -258,6 +259,7 @@ export function useGenerationRunner({
           prompt,
           user_prompt: userPrompt,
           image_url: imageUrl,
+          image_urls: imageUrls,
           ratio,
           resolution,
           job_id: jobId,

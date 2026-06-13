@@ -26,7 +26,15 @@ const props = defineProps({
   },
   generateSellingPoints: {
     type: Function,
-    required: true,
+    default: null,
+  },
+  showProductInput: {
+    type: Boolean,
+    default: true,
+  },
+  showAiWrite: {
+    type: Boolean,
+    default: true,
   },
 })
 
@@ -50,6 +58,7 @@ watch(
 )
 
 async function handleAiWrite() {
+  if (!props.generateSellingPoints) return
   const draft = await props.generateSellingPoints()
   if (!draft) return
   aiDraft.value = draft
@@ -141,13 +150,14 @@ function updateSetting(key, value) {
       <p class="mt-2 text-xs text-slate-400">当前输出：{{ selectedImageLabel }}</p>
     </div>
 
-    <div>
+    <div v-if="showProductInput">
       <div class="relative mb-1.5 flex items-center justify-between">
         <label class="flex items-center gap-1 text-xs font-bold text-slate-800">
           商品卖点&要求
           <HelpCircle class="h-3.5 w-3.5 text-slate-400" />
         </label>
         <button
+          v-if="showAiWrite"
           type="button"
           data-testid="ai-write-button"
           class="flex cursor-pointer items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-primary shadow-sm transition-colors hover:border-primary/30 hover:bg-primary/5 disabled:opacity-50"

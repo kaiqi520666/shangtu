@@ -31,6 +31,7 @@ export function generateImage({
   prompt,
   user_prompt = null,
   image_url = null,
+  image_urls = null,
   ratio,
   resolution,
   job_id = null,
@@ -40,7 +41,18 @@ export function generateImage({
 }) {
   return request.post(
     "/image/generate",
-    { prompt, user_prompt, image_url, ratio, resolution, job_id, type_id, title, sort_order },
+    {
+      prompt,
+      user_prompt,
+      image_url,
+      image_urls,
+      ratio,
+      resolution,
+      job_id,
+      type_id,
+      title,
+      sort_order,
+    },
     { timeout: 60000 },
   );
 }

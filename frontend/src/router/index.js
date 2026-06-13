@@ -35,7 +35,7 @@ const router = createRouter({
       component: () => import("../views/generator/product-image/ProductImageView.vue"),
     },
     {
-      path: "/generator/outfit",
+      path: "/generator/outfit/:jobId?",
       name: "outfit",
       component: () => import("../views/generator/outfit/OutfitView.vue"),
     },

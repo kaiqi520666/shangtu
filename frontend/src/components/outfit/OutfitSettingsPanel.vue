@@ -1,14 +1,19 @@
 <script setup>
 import { computed } from 'vue'
-import { LoaderCircle, RectangleVertical, Smartphone, Square, WandSparkles } from 'lucide-vue-next'
+import { LoaderCircle, WandSparkles } from 'lucide-vue-next'
 import GeneratorActionFooter from '@/components/generation/GeneratorActionFooter.vue'
 import GeneratorSidePanelShell from '@/components/generation/GeneratorSidePanelShell.vue'
 import ImageUploader from '@/components/generation/ImageUploader.vue'
+import ProductGenerationBasics from '@/components/generation/ProductGenerationBasics.vue'
 import ModelSelector from '@/components/outfit/ModelSelector.vue'
 import ScenePresetSelector from '@/components/outfit/ScenePresetSelector.vue'
-import { outfitRatioOptions, scenePresets } from '@/constants/outfit.js'
+import { scenePresets } from '@/constants/outfit.js'
 
 const props = defineProps({
+  settings: {
+    type: Object,
+    required: true,
+  },
   garmentImages: {
     type: Array,
     required: true,
@@ -37,9 +42,9 @@ const props = defineProps({
     type: String,
     default: '',
   },
-  ratio: {
-    type: String,
+  selectedImageLabel: {
     required: true,
+    type: String,
   },
   loading: {
     type: Boolean,
@@ -52,28 +57,17 @@ const props = defineProps({
 })
 
 const emit = defineEmits([
+  'update:settings',
   'update:garmentImages',
   'update:mainGarmentIndex',
   'update:selectedModelId',
   'update:selectedScenes',
   'update:sceneDescription',
-  'update:ratio',
   'notify',
-  'generate-scenes',
+  'generate-images',
 ])
 
-const primaryText = computed(() => {
-  if (props.modelsLoading) return '正在加载模特...'
-  if (!props.canGenerate) return '请上传服装图并选择模特'
-  if (props.loading) return '正在生成推荐场景...'
-  return '生成推荐场景'
-})
-
-const ratioIconMap = {
-  '3:4': RectangleVertical,
-  '1:1': Square,
-  '9:16': Smartphone,
-}
+const primaryText = computed(() => (props.loading ? '正在生成...' : '生成图片'))
 </script>
 
 <template>
@@ -98,6 +92,14 @@ const ratioIconMap = {
       @update:selected-id="emit('update:selectedModelId', $event)"
     />
 
+    <ProductGenerationBasics
+      :settings="settings"
+      :selected-image-label="selectedImageLabel"
+      :show-product-input="false"
+      :show-ai-write="false"
+      @update:settings="emit('update:settings', $event)"
+    />
+
     <ScenePresetSelector
       :scenes="scenePresets"
       :selected="selectedScenes"
@@ -106,28 +108,11 @@ const ratioIconMap = {
       @update:description="emit('update:sceneDescription', $event)"
     />
 
-    <section class="space-y-3 p-5">
-      <h3 class="text-xs font-bold text-slate-900">图片比例</h3>
-      <div class="grid grid-cols-3 gap-2 rounded-xl bg-slate-100 p-1">
-        <button
-          v-for="option in outfitRatioOptions"
-          :key="option.value"
-          type="button"
-          class="flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold transition-colors"
-          :class="ratio === option.value ? 'bg-white text-primary shadow-sm' : 'text-slate-500 hover:text-slate-800'"
-          @click="emit('update:ratio', option.value)"
-        >
-          <component :is="ratioIconMap[option.value]" class="h-3.5 w-3.5" />
-          {{ option.label }}
-        </button>
-      </div>
-    </section>
-
     <template #footer>
       <GeneratorActionFooter
         :primary-text="primaryText"
         :primary-disabled="modelsLoading || !canGenerate"
-        @primary="emit('generate-scenes')"
+        @primary="emit('generate-images')"
       >
         <template #primary-icon>
           <LoaderCircle v-if="loading" class="h-4 w-4 animate-spin" />

@@ -14,8 +14,12 @@ from app.schemas.response import Response, fail, success
 
 router = APIRouter(prefix="/generation", tags=["生成任务"])
 
-SUPPORTED_SCENARIOS = {"product_suite", "product_image"}
-SCENARIO_TITLE_PREFIX = {"product_suite": "商品套图", "product_image": "商品详情图"}
+SUPPORTED_SCENARIOS = {"product_suite", "product_image", "outfit"}
+SCENARIO_TITLE_PREFIX = {
+    "product_suite": "商品套图",
+    "product_image": "商品详情图",
+    "outfit": "服饰穿搭",
+}
 
 TERMINAL_DONE = "done"
 TERMINAL_FAILED = {"failed", "timeout"}

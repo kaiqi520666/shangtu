@@ -1,23 +1,3 @@
-export const outfitRatioOptions = [
-  { value: '3:4', label: '3:4' },
-  { value: '1:1', label: '1:1' },
-  { value: '9:16', label: '9:16' },
-]
-
-export const outfitFrameOptions = [
-  { value: '全身', label: '全身' },
-  { value: '四分之三', label: '四分之三' },
-  { value: '半身', label: '半身' },
-  { value: '特写', label: '特写' },
-]
-
-export const outfitAngleOptions = [
-  { value: '正面', label: '正面' },
-  { value: '侧面', label: '侧面' },
-  { value: '3/4侧', label: '3/4侧' },
-  { value: '背面', label: '背面' },
-]
-
 export const scenePresets = [
   { id: 'studio', label: '纯色棚拍' },
   { id: 'street', label: '都市街头' },
@@ -26,33 +6,6 @@ export const scenePresets = [
   { id: 'beach', label: '度假海滩' },
   { id: 'home', label: '温馨居家' },
   { id: 'gallery', label: '艺术展馆' },
-]
-
-export const outfitPoseTemplates = [
-  {
-    id: 'pose-stand-front',
-    text: '自然站立，双手垂在身侧，直视镜头，放松展示毛衣整体版型',
-    frame: '全身',
-    angle: '正面',
-  },
-  {
-    id: 'pose-pocket-side',
-    text: '身体微侧，一只手插牛仔裤口袋，另一只手轻抓袖口看向镜头',
-    frame: '四分之三',
-    angle: '3/4侧',
-  },
-  {
-    id: 'pose-detail-collar',
-    text: '微微抬手整理毛衣领口，身体稍前倾，表情柔和展示领口细节',
-    frame: '四分之三',
-    angle: '正面',
-  },
-  {
-    id: 'pose-walk-back',
-    text: '脚步微错开站立，双手向后轻拢头发，展示毛衣落肩版型',
-    frame: '全身',
-    angle: '3/4侧',
-  },
 ]
 
 export const outfitPreviewSlides = [
@@ -74,11 +27,4 @@ export const outfitPreviewSlides = [
       'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=420&q=80',
     ],
   },
-]
-
-export const outfitResultImages = [
-  'https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&w=900&q=80',
-  'https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&w=900&q=80',
-  'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?auto=format&fit=crop&w=900&q=80',
-  'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=900&q=80',
 ]

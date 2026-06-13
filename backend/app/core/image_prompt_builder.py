@@ -83,6 +83,28 @@ def _format_task_prompt(
             "【任务】生成一张电商商品详情页模块图，不要生成整张长详情页。",
             f"【详情图模块】{title or type_id or '详情图'}",
         ]
+    elif job.scenario == "outfit":
+        scene_description = str(settings.get("sceneDescription") or "").strip()
+        selected_model_name = str(settings.get("selectedModelName") or "").strip()
+        model_suffix = f"，模特名称：{selected_model_name}" if selected_model_name else ""
+        extra_requirement = (
+            product_input if product_input and product_input != scene_description else ""
+        )
+        lines = [
+            "【任务】生成一张服饰穿搭图。",
+            f"【拍摄场景】{title or type_id or '服饰穿搭场景'}",
+            f"【投放平台】{platform}",
+            f"【排版语言】{language}",
+            f"【画面比例】{ratio}",
+            scene_description
+            and f"【自定义场景要求】{scene_description}",
+            "【服装要求】保持用户上传服装图的颜色、版型、材质、图案和核心外观一致。",
+            f"【模特要求】使用用户选择的模特图作为人物参考{model_suffix}。",
+            extra_requirement and "【补充要求】",
+            extra_requirement,
+            "【强约束】只生成一位模特；不要换服装；不要改变模特主体身份特征；不要虚构品牌 Logo、价格、促销文字、认证标识或无法确认的信息。",
+        ]
+        return "\n".join(line for line in lines if line)
     else:
         task_lines = [
             "【任务】生成一张电商商品套图素材。",

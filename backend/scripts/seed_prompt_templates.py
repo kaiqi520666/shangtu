@@ -61,6 +61,45 @@ PRODUCT_IMAGE_TYPES = [
 ]
 
 
+OUTFIT_SCENE_TYPES = [
+    (
+        "studio",
+        "纯色棚拍",
+        "纯色或浅灰棚拍背景，柔和商业摄影布光，模特自然站立展示服装整体版型、长度、肩线和垂坠感，画面干净专业。",
+    ),
+    (
+        "street",
+        "都市街头",
+        "都市街头场景，干净街区、自然日光或轻微电影感光影，模特自然行走或站立，突出服装的日常穿搭感和街拍质感。",
+    ),
+    (
+        "cafe",
+        "街角咖啡",
+        "街角咖啡店或轻松休闲空间，暖色自然光，模特坐姿或站姿自然放松，强化服装的生活方式氛围和亲和力。",
+    ),
+    (
+        "lawn",
+        "自然草坪",
+        "自然草坪或公园绿地场景，柔和户外光线，背景清爽不过度杂乱，呈现舒适、清新、自然的穿搭氛围。",
+    ),
+    (
+        "beach",
+        "度假海滩",
+        "度假海滩或滨海步道场景，明亮自然光和轻松假日氛围，模特姿态自然，突出服装在户外度假场景中的搭配效果。",
+    ),
+    (
+        "home",
+        "温馨居家",
+        "温馨居家室内场景，柔和窗光、简洁家具和舒适氛围，模特自然坐立或轻松活动，展示服装的居家穿搭质感。",
+    ),
+    (
+        "gallery",
+        "艺术展馆",
+        "艺术展馆或现代极简空间，留白充足、线条干净、光影高级，模特姿态克制自然，突出服装的时尚感和高级质感。",
+    ),
+]
+
+
 PLATFORM_RULES = {
     "亚马逊": {
         "image_generate": (
@@ -332,6 +371,19 @@ def _template_rows() -> list[dict]:
             ),
         },
         {
+            "scenario": "outfit",
+            "purpose": "image_generate",
+            "platform": None,
+            "type_id": None,
+            "model": "gpt-image-2",
+            "name": "服饰穿搭-生图场景规则",
+            "content": (
+                "生成一张电商服饰穿搭图。必须同时参考用户上传的服装图和选择的模特图：服装的颜色、版型、材质、"
+                "图案和核心外观要保持一致，人物主体以模特图为参考，画面可根据拍摄场景调整背景、姿态、光影和构图。"
+                "输出应像真实商业摄影或高质量电商穿搭图，不要生成多人物、不要换款、不要添加无法确认的品牌和促销信息。"
+            ),
+        },
+        {
             "scenario": None,
             "purpose": "ai_write",
             "platform": None,
@@ -437,6 +489,19 @@ def _template_rows() -> list[dict]:
                 "type_id": type_id,
                 "model": "gpt-image-2",
                 "name": f"商品详情图-{module_name}默认用户提示词",
+                "content": content,
+            }
+        )
+
+    for type_id, scene_name, content in OUTFIT_SCENE_TYPES:
+        rows.append(
+            {
+                "scenario": "outfit",
+                "purpose": "image_generate",
+                "platform": None,
+                "type_id": type_id,
+                "model": "gpt-image-2",
+                "name": f"服饰穿搭-{scene_name}默认用户提示词",
                 "content": content,
             }
         )
@@ -571,8 +636,30 @@ async def verify_lookup() -> None:
         if "生图通用主体一致规则" not in fallback_names:
             raise RuntimeError("平台不匹配时应回退通用生图模板")
 
+        outfit = await get_prompt_templates(
+            db,
+            scenario="outfit",
+            purpose="image_generate",
+            platform="亚马逊",
+            type_id="studio",
+            model="gpt-image-2",
+        )
+        outfit_names = [template.name for template in outfit.templates]
+        outfit_required = {
+            "生图通用主体一致规则",
+            "亚马逊-生图平台规则",
+            "服饰穿搭-生图场景规则",
+            "服饰穿搭-纯色棚拍默认用户提示词",
+        }
+        outfit_missing = outfit_required - set(outfit_names)
+        if outfit_missing:
+            raise RuntimeError(
+                f"服饰穿搭提示词模板查询缺少: {', '.join(sorted(outfit_missing))}"
+            )
+
         print("lookup order:", " -> ".join(names))
         print("fallback order:", " -> ".join(fallback_names))
+        print("outfit order:", " -> ".join(outfit_names))
 
 
 async def main() -> None:
