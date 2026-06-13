@@ -6,7 +6,7 @@ import GeneratorSidePanelShell from '@/components/generation/GeneratorSidePanelS
 import ImageUploader from '@/components/generation/ImageUploader.vue'
 import ModelSelector from '@/components/outfit/ModelSelector.vue'
 import ScenePresetSelector from '@/components/outfit/ScenePresetSelector.vue'
-import { modelLibrary, outfitRatioOptions, scenePresets } from '@/constants/outfit.js'
+import { outfitRatioOptions, scenePresets } from '@/constants/outfit.js'
 
 const props = defineProps({
   garmentImages: {
@@ -16,6 +16,14 @@ const props = defineProps({
   mainGarmentIndex: {
     type: Number,
     required: true,
+  },
+  models: {
+    type: Array,
+    required: true,
+  },
+  modelsLoading: {
+    type: Boolean,
+    default: false,
   },
   selectedModelId: {
     type: String,
@@ -55,6 +63,7 @@ const emit = defineEmits([
 ])
 
 const primaryText = computed(() => {
+  if (props.modelsLoading) return '正在加载模特...'
   if (!props.canGenerate) return '请上传服装图并选择模特'
   if (props.loading) return '正在生成推荐场景...'
   return '生成推荐场景'
@@ -83,7 +92,8 @@ const ratioIconMap = {
     />
 
     <ModelSelector
-      :models="modelLibrary"
+      :models="models"
+      :loading="modelsLoading"
       :selected-id="selectedModelId"
       @update:selected-id="emit('update:selectedModelId', $event)"
     />
@@ -116,7 +126,7 @@ const ratioIconMap = {
     <template #footer>
       <GeneratorActionFooter
         :primary-text="primaryText"
-        :primary-disabled="!canGenerate"
+        :primary-disabled="modelsLoading || !canGenerate"
         @primary="emit('generate-scenes')"
       >
         <template #primary-icon>

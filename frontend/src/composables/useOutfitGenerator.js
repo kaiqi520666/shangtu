@@ -1,18 +1,20 @@
-import { computed, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import {
-  modelLibrary,
   outfitPoseTemplates,
   outfitPreviewSlides,
   outfitResultImages,
   scenePresets,
 } from '@/constants/outfit.js'
+import { listOutfitModels } from '@/api/outfit.js'
 import { useToast } from '@/composables/useToast.js'
 
 export function useOutfitGenerator() {
   const toast = useToast()
   const garmentImages = ref([])
   const mainGarmentIndex = ref(0)
-  const selectedModelId = ref(modelLibrary[0]?.id || '')
+  const modelLibrary = ref([])
+  const modelsLoading = ref(false)
+  const selectedModelId = ref('')
   const selectedScenes = ref(['street'])
   const sceneDescription = ref('')
   const ratio = ref('3:4')
@@ -31,7 +33,7 @@ export function useOutfitGenerator() {
     language: '中文',
   })
 
-  const selectedModel = computed(() => modelLibrary.find((model) => model.id === selectedModelId.value))
+  const selectedModel = computed(() => modelLibrary.value.find((model) => model.id === selectedModelId.value))
   const canGenerateScenes = computed(() => garmentImages.value.length > 0 && Boolean(selectedModelId.value))
   const selectedPoseCount = computed(() => recommendedPoses.value.filter((pose) => pose.selected).length)
   const selectedCards = computed(() => outputCards.value.filter((card) => card.selected))
@@ -46,6 +48,41 @@ export function useOutfitGenerator() {
       sourceImage: src,
     }))
   })
+
+  async function loadOutfitModels() {
+    modelsLoading.value = true
+    try {
+      const result = await listOutfitModels()
+      if (result.code !== 0) {
+        toast.error(result.message || '加载模特失败')
+        modelLibrary.value = []
+        selectedModelId.value = ''
+        return
+      }
+
+      modelLibrary.value = (result.data || []).map((model) => ({
+        id: model.id,
+        name: model.name,
+        image: model.image_url,
+        objectKey: model.object_key,
+        sortOrder: model.sort_order || 0,
+      }))
+      if (!selectedModelId.value && modelLibrary.value.length > 0) {
+        selectedModelId.value = modelLibrary.value[0].id
+      }
+    } catch (error) {
+      const status = error.response?.status
+      if (status === 401) {
+        toast.error('登录已过期，请重新登录')
+      } else {
+        toast.error(error.response?.data?.message || '加载模特失败')
+      }
+      modelLibrary.value = []
+      selectedModelId.value = ''
+    } finally {
+      modelsLoading.value = false
+    }
+  }
 
   async function generateRecommendedScenes() {
     if (!canGenerateScenes.value) {
@@ -155,9 +192,15 @@ export function useOutfitGenerator() {
     return recommendedPoses.value.find((pose) => pose.id === id)?.text || '服饰穿搭场景生成'
   }
 
+  onMounted(() => {
+    loadOutfitModels()
+  })
+
   return {
     garmentImages,
     mainGarmentIndex,
+    modelLibrary,
+    modelsLoading,
     selectedModelId,
     selectedScenes,
     sceneDescription,
@@ -180,6 +223,7 @@ export function useOutfitGenerator() {
     selectedImageLabel,
     previewSlides,
     showNotice: toast.info,
+    loadOutfitModels,
     generateRecommendedScenes,
     updatePose,
     togglePose,

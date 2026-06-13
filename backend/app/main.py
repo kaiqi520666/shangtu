@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 
 from app.core.database import Base, engine
-from app.routers import asset, auth, generation, image
+from app.routers import asset, auth, generation, image, outfit
 import app.models
 
 load_dotenv()
@@ -32,3 +32,4 @@ app.include_router(auth.router)
 app.include_router(image.router)
 app.include_router(generation.router)
 app.include_router(asset.router)
+app.include_router(outfit.router)

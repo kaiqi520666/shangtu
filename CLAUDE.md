@@ -155,7 +155,8 @@ CREATE INDEX ix_prompt_templates_lookup
 
 - 两步式：① 设置（服装上传 / `ModelSelector` / `ScenePresetSelector` / 自定义场景 / 比例）→ ② `OutfitSceneReviewPanel`（编辑 `OutfitPoseCard` 姿态卡片）→ ③ 生成
 - 工作区 `OutfitWorkspace`：预览幻灯片、任务卡片、单卡操作
-- **数据状态：图片上传走 OSS；其余仍 Mock**
+- 模特库已接后端 `GET /outfit/models`，数据来自 `outfit_models` 表，图片存 OSS，按 `sort_order asc` 展示；一次性上传脚本：`backend/scripts/upload_outfit_models.py`
+- **数据状态：图片上传走 OSS；模特库走 OSS + DB；穿搭策略 / 生图仍 Mock**
 
 ---
 
@@ -193,6 +194,7 @@ TOAPIS_URL=                   # 可选，默认 https://toapis.com
 uv sync
 uv run uvicorn app.main:app --reload
 uv run arq app.worker.settings.WorkerSettings   # 另起一个终端
+.\.venv\Scripts\python.exe scripts\upload_outfit_models.py
 
 # 前端（在 frontend/ 下）
 npm install

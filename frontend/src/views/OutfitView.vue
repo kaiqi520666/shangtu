@@ -26,6 +26,8 @@ const outfit = useOutfitGenerator()
       v-else
       :garment-images="outfit.garmentImages.value"
       :main-garment-index="outfit.mainGarmentIndex.value"
+      :models="outfit.modelLibrary.value"
+      :models-loading="outfit.modelsLoading.value"
       :selected-model-id="outfit.selectedModelId.value"
       :selected-scenes="outfit.selectedScenes.value"
       :scene-description="outfit.sceneDescription.value"

@@ -18,39 +18,6 @@ export const outfitAngleOptions = [
   { value: '背面', label: '背面' },
 ]
 
-export const modelLibrary = [
-  {
-    id: 'model-01',
-    name: '清透自然女模',
-    image: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=320&q=80',
-  },
-  {
-    id: 'model-02',
-    name: '都市短发女模',
-    image: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=320&q=80',
-  },
-  {
-    id: 'model-03',
-    name: '休闲男模',
-    image: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=320&q=80',
-  },
-  {
-    id: 'model-04',
-    name: '欧美卷发女模',
-    image: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=320&q=80',
-  },
-  {
-    id: 'model-05',
-    name: '韩系长发女模',
-    image: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=320&q=80',
-  },
-  {
-    id: 'model-06',
-    name: '金发男模',
-    image: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=320&q=80',
-  },
-]
-
 export const scenePresets = [
   { id: 'studio', label: '纯色棚拍' },
   { id: 'street', label: '都市街头' },

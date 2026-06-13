@@ -316,6 +316,23 @@ frontend/src/
 
 注意：当前资产库删除接口是硬删除 `ImageTask` 记录，但不物理删除 OSS 文件。后续最好改成软删除或补 OSS 物理删除能力，避免“永久删除”语义不一致。
 
+### 服饰穿搭模特库
+
+入口：
+
+- 前端 `frontend/src/composables/useOutfitGenerator.js`
+- 前端接口 `frontend/src/api/outfit.js`
+- 后端接口 `backend/app/routers/outfit.py`
+- 后端模型 `backend/app/models/outfit_model.py`
+- 上传脚本 `backend/scripts/upload_outfit_models.py`
+
+能力：
+
+- `GET /outfit/models` 返回 active 模特列表
+- 图片存 OSS，元数据存 `outfit_models`
+- 前端按后端返回顺序显示，后端按 `sort_order asc, created_at asc` 排序
+- 本地 `frontend/public/model/` 只作为上传源，不要提交到 git
+
 ## 常用命令
 
 后端：
@@ -326,6 +343,7 @@ uv sync
 uv run uvicorn app.main:app --reload
 uv run arq app.worker.settings.WorkerSettings
 .\.venv\Scripts\python.exe -m compileall app
+.\.venv\Scripts\python.exe scripts\upload_outfit_models.py
 ```
 
 前端：
