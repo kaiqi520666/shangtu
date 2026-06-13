@@ -1,7 +1,7 @@
 # AGENTS.md
 
 给新开的 AI / Codex / Claude 窗口快速接手 Shangtu 项目用。  
-更完整的项目记忆见 [CLAUDE.md](CLAUDE.md)，开发流水见 [DEVLOG.md](DEVLOG.md)。
+更完整的项目记忆见 [CLAUDE.md](CLAUDE.md)。
 
 ## 项目定位
 
@@ -356,6 +356,7 @@ VITE_API_BASE_URL=
 - 手工编辑文件优先用 `apply_patch`。
 - 不要随意重置用户改动，不要使用 `git reset --hard`。
 - 每次完成任务（新增功能、修改功能、修复 bug）后，自动执行 `git commit`，commit message 简明描述本次变更，不需要询问。
+- `DEVLOG.md` 已不再作为必维护文件；完成任务后不要为了记录流水而更新它。
 - 后端接口保持统一响应壳。
 - 前端业务逻辑尽量放 composables，组件保持薄。
 - 新增场景时优先复用 `useGenerationCards` / `useCardActions`。
@@ -383,12 +384,11 @@ VITE_API_BASE_URL=
 接手时优先看：
 
 1. [CLAUDE.md](CLAUDE.md)
-2. [DEVLOG.md](DEVLOG.md)
-3. `frontend/src/composables/useProductSuiteGenerator.js`
-4. `frontend/src/composables/useGenerationCards.js`
-5. `frontend/src/composables/useCardActions.js`
-6. `backend/app/routers/image.py`
-7. `backend/app/routers/generation.py`
-8. `backend/app/worker/tasks.py`
+2. `frontend/src/composables/useProductSuiteGenerator.js`
+3. `frontend/src/composables/useGenerationCards.js`
+4. `frontend/src/composables/useCardActions.js`
+5. `backend/app/routers/image.py`
+6. `backend/app/routers/generation.py`
+7. `backend/app/worker/tasks.py`
 
 如果要继续做商品详情图，不要从旧 `useGenerator.js` 直接复制大块 Mock 逻辑。应该以商品套图的真实任务闭环为模板，组合通用 composable，再只写详情图自己的结构、队列和 prompt。
