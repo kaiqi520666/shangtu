@@ -34,6 +34,8 @@ shangtu/
 │   │   ├── routers/                      # auth.py / image.py / generation.py
 │   │   ├── schemas/response.py           # 统一响应壳 {code, message, data}
 │   │   └── worker/                       # settings.py (WorkerSettings) / tasks.py (generate_image)
+│   ├── scripts/
+│   │   └── seed_prompt_templates.py       # 幂等写入第一批提示词模板种子数据
 │   └── pyproject.toml / uv.lock / uv.toml
 └── frontend/
     └── src/
@@ -92,6 +94,7 @@ shangtu/
 - `scenario/platform/type_id` 可为空，表示通用模板；`purpose` 示例：`ai_write / strategy / image_generate / video_generate`；`model` 示例：`qwen3.6-flash / gpt-image-2`
 - 内部查询服务：`app.core.prompt_templates.get_prompt_templates(db, scenario, purpose, platform, type_id, model)`，只取 `active=True` 且匹配 `purpose + model` 的模板；`scenario/platform/type_id` 使用"精确值或 NULL 通用模板"匹配，返回模板列表和按稳定顺序拼接后的 `content`
 - 拼接顺序从通用到具体：通用用途模板 → 场景模板 → 平台模板 → 图种/模块模板 → 最精确模板；同优先级按 `version asc, created_at asc, id asc`
+- 种子脚本：`backend/scripts/seed_prompt_templates.py`，幂等写入第一批默认模板（通用生图规则、亚马逊平台规则、商品套图图种默认提示词、商品详情图模块默认提示词、AI 帮写和详情图策略提示词）。执行命令：在 `backend/` 下运行 `.\.venv\Scripts\python.exe scripts\seed_prompt_templates.py`
 - 旧库立即使用可手动建表：
 
 ```sql

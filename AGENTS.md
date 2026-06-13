@@ -51,12 +51,14 @@ backend/app/
 │   ├── database.py          # async engine / session
 │   ├── deps.py              # get_current_user / get_db
 │   ├── image_analyzer.py    # DashScope AI 读图
+│   ├── prompt_templates.py  # 提示词模板查询服务
 │   ├── oss.py               # OSS 上传
 │   └── time.py              # UTC 时间工具 utc_now / to_utc_iso
 ├── models/
 │   ├── user.py
 │   ├── image_task.py
-│   └── generation_job.py
+│   ├── generation_job.py
+│   └── prompt_template.py
 ├── routers/
 │   ├── auth.py
 │   ├── image.py             # 上传 / AI读图 / 生图任务 / 单图删除重生下载
@@ -66,6 +68,9 @@ backend/app/
 └── worker/
     ├── settings.py          # arq WorkerSettings
     └── tasks.py             # generate_image 后台任务
+
+backend/scripts/
+└── seed_prompt_templates.py  # 幂等写入第一批提示词模板种子数据
 
 frontend/src/
 ├── api/
@@ -160,6 +165,15 @@ frontend/src/
 - `product_image`
 
 `/image/generate` 允许上述场景的 job。Worker 不关心场景，只处理 prompt、尺寸、参考图和任务 ID。
+
+### PromptTemplate
+
+`prompt_templates` 是后端内部提示词模板表，当前只作为基础设施和种子数据存在，尚未接入现有生成链路。
+
+- 查询服务：`backend/app/core/prompt_templates.py`
+- 种子脚本：`backend/scripts/seed_prompt_templates.py`
+- 执行方式：在 `backend/` 下运行 `.\.venv\Scripts\python.exe scripts\seed_prompt_templates.py`
+- 当前 seed 覆盖通用生图规则、亚马逊平台规则、商品套图图种默认提示词、商品详情图模块默认提示词、AI 帮写和详情图策略提示词。
 
 ### 生图任务流
 
