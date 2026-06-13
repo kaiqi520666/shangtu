@@ -204,6 +204,10 @@ async def get_job(
             "credit_refunded": bool(task.credit_refunded),
             "prompt": task.prompt,
             "edit_instruction": task.edit_instruction,
+            "system_prompt_snapshot": task.system_prompt_snapshot,
+            "task_prompt_snapshot": task.task_prompt_snapshot,
+            "user_prompt": task.user_prompt,
+            "prompt_template_refs": _parse_json(task.prompt_template_refs_json),
         }
         for task in tasks_result.scalars().all()
     ]

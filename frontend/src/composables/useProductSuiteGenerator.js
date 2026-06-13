@@ -87,6 +87,7 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
         sortOrder: item.sort_order || 0,
         batchRunId: "",
         creditRefunded: !!item.credit_refunded,
+        userPrompt: item.user_prompt || "",
       });
     },
   });
@@ -301,18 +302,7 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
   // --- 套图特有辅助 ---
 
   function buildPromptForItem(item) {
-    const lines = [
-      "【参考图】必须以用户上传的商品图为商品主体，保持商品款式、颜色、材质、结构和外观完全一致。",
-      `【投放平台】${settings.platform}`,
-      `【排版语言】${settings.language}`,
-      `【画面比例】${settings.ratio}`,
-      `【图类型】${item.name}`,
-      `【图类型说明】${item.description}`,
-      "【商品卖点与要求】",
-      settings.productInput.trim(),
-      "【强约束】禁止虚构品牌 Logo、认证标识、价格、销量、参数等无法从参考图与上述卖点确认的信息；如需添加文字必须使用上述指定语言，文字简洁清晰，适合电商平台展示。",
-    ];
-    return lines.filter(Boolean).join("\n");
+    return "";
   }
 
   function buildSuiteQueue() {

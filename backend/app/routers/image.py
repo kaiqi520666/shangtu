@@ -14,6 +14,7 @@ from app.core.image_analyzer import (
     analyze_product_image,
     generate_product_image_strategy,
 )
+from app.core.image_prompt_builder import build_product_suite_image_prompt
 from app.core.oss import OssConfigError, upload_image_bytes
 from app.core.time import to_utc_iso, utc_now
 from app.models import GenerationJob, ImageTask, User
@@ -26,6 +27,7 @@ CREDITS_PER_IMAGE = 1
 
 class GenerateRequest(BaseModel):
     prompt: str
+    user_prompt: str | None = None
     image_url: str | None = None
     ratio: str = "1:1"
     resolution: str = "1K"
@@ -141,19 +143,47 @@ async def create_task(
             return fail("任务类型不匹配")
 
     task_id = str(uuid.uuid4())
+    final_prompt = req.prompt
+    user_prompt = req.user_prompt
+    system_prompt_snapshot = None
+    task_prompt_snapshot = None
+    prompt_template_refs_json = None
+    prepend_reference_prompt = True
+
+    if job is not None and job.scenario == "product_suite":
+        try:
+            built_prompt = await build_product_suite_image_prompt(
+                db,
+                job=job,
+                type_id=req.type_id,
+                title=req.title,
+                user_prompt=req.user_prompt or req.prompt,
+            )
+        except ValueError as exc:
+            return fail(str(exc))
+        final_prompt = built_prompt.final_prompt
+        user_prompt = built_prompt.user_prompt
+        system_prompt_snapshot = built_prompt.system_prompt_snapshot
+        task_prompt_snapshot = built_prompt.task_prompt_snapshot
+        prompt_template_refs_json = built_prompt.prompt_template_refs_json
+        prepend_reference_prompt = False
 
     # 扣积分 + 建任务同一事务，避免一致性漂移
     current_user.credits -= CREDITS_PER_IMAGE
     task = ImageTask(
         id=task_id,
         user_id=current_user.id,
-        prompt=req.prompt,
+        prompt=final_prompt,
         size=f"{req.ratio}/{req.resolution}",
         status="pending",
         job_id=req.job_id,
         type_id=req.type_id,
         title=req.title,
         sort_order=req.sort_order,
+        system_prompt_snapshot=system_prompt_snapshot,
+        task_prompt_snapshot=task_prompt_snapshot,
+        user_prompt=user_prompt,
+        prompt_template_refs_json=prompt_template_refs_json,
     )
     db.add(task)
     try:
@@ -167,10 +197,11 @@ async def create_task(
         await request.app.state.redis_pool.enqueue_job(
             "generate_image",
             task_id,
-            req.prompt,
+            final_prompt,
             req.ratio,
             req.resolution,
             req.image_url,
+            prepend_reference_prompt,
         )
     except Exception:
         try:
@@ -291,6 +322,14 @@ async def get_task(
             "status": status,
             "result_url": result_url,
             "prompt": task.prompt,
+            "system_prompt_snapshot": task.system_prompt_snapshot,
+            "task_prompt_snapshot": task.task_prompt_snapshot,
+            "user_prompt": task.user_prompt,
+            "prompt_template_refs": (
+                json.loads(task.prompt_template_refs_json)
+                if task.prompt_template_refs_json
+                else []
+            ),
             "created_at": to_utc_iso(task.created_at),
             "error_message": error_message,
             "progress": progress,
@@ -427,6 +466,12 @@ async def regenerate_task(
 
     # 构造新 prompt
     new_prompt = task.prompt + "\n\n【用户修改要求】" + edit_instruction
+    new_user_prompt = (
+        f"{task.user_prompt}\n\n【用户修改要求】{edit_instruction}"
+        if task.user_prompt
+        else None
+    )
+    prepend_reference_prompt = not bool(task.system_prompt_snapshot)
 
     # 扣积分 + 更新 task 同一事务
     current_user.credits -= CREDITS_PER_IMAGE
@@ -435,6 +480,7 @@ async def regenerate_task(
     task.progress = 0
     task.edit_instruction = edit_instruction
     task.prompt = new_prompt
+    task.user_prompt = new_user_prompt
     # 保留 result_url 不清空，前端继续显示旧图
     task.credit_refunded = False
     task.provider_task_id = None
@@ -462,6 +508,7 @@ async def regenerate_task(
             ratio,
             resolution,
             old_result_url,  # 使用当前已生成图作为参考图
+            prepend_reference_prompt,
         )
     except Exception:
         # 入队失败：退积分 + 标记 failed

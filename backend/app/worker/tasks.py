@@ -130,9 +130,12 @@ def build_create_payload(
     ratio: str,
     resolution: str,
     image_url: str | None,
+    prepend_reference_prompt: bool = True,
 ) -> dict:
     full_prompt = (
-        f"{PRODUCT_IMAGE_SYSTEM_PROMPT}\n\n{prompt}" if image_url else prompt
+        f"{PRODUCT_IMAGE_SYSTEM_PROMPT}\n\n{prompt}"
+        if image_url and prepend_reference_prompt
+        else prompt
     )
     payload: dict[str, Any] = {
         "model": "gpt-image-2",
@@ -338,6 +341,7 @@ async def generate_image(
     ratio: str = "1:1",
     resolution: str = "1K",
     image_url: str | None = None,
+    prepend_reference_prompt: bool = True,
 ):
     redis = ctx["redis"]
 
@@ -365,6 +369,7 @@ async def generate_image(
             ratio=ratio,
             resolution=resolution,
             image_url=image_url,
+            prepend_reference_prompt=prepend_reference_prompt,
         )
 
         transport = httpx.AsyncHTTPTransport(proxy=None)

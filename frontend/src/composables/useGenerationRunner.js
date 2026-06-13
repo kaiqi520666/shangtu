@@ -195,6 +195,7 @@ export function useGenerationRunner({
     snapshotPayload,
     createCard,
     buildPrompt,
+    buildUserPrompt,
     initialLogs = [],
     repeatLog = "",
     getCreateLog,
@@ -248,9 +249,11 @@ export function useGenerationRunner({
     let successfullyEnqueued = 0;
     for (const { card, item } of createdCards) {
       const prompt = buildPrompt(item, card);
+      const userPrompt = buildUserPrompt?.(item, card) || null;
       try {
         const result = await generateImage({
           prompt,
+          user_prompt: userPrompt,
           image_url: imageUrl,
           ratio,
           resolution,

@@ -157,6 +157,10 @@ frontend/src/
 - `provider_task_id`
 - `credit_refunded`
 - `edit_instruction`
+- `system_prompt_snapshot`
+- `task_prompt_snapshot`
+- `user_prompt`
+- `prompt_template_refs_json`
 - `archived`
 
 场景目前后端已支持：
@@ -174,6 +178,7 @@ frontend/src/
 - 种子脚本：`backend/scripts/seed_prompt_templates.py`
 - 执行方式：在 `backend/` 下运行 `.\.venv\Scripts\python.exe scripts\seed_prompt_templates.py`
 - 当前 seed 覆盖通用生图规则、前端平台列表的平台专属规则、商品套图图种默认提示词、商品详情图模块默认提示词、AI 帮写和详情图策略提示词。
+- 商品套图 `/image/generate` 已优先接入 `image_generate` 模板拼接：通用规则 + 商品套图场景规则 + 平台规则 + 图种默认用户提示词 + 用户提示词，最终完整 prompt 仍写入 `image_tasks.prompt`。
 
 ### 生图任务流
 
@@ -386,7 +391,7 @@ VITE_API_BASE_URL=
 
 ## 已知技术债
 
-- 没有 Alembic，开发期依赖 `Base.metadata.create_all`，旧库字段需要手动迁移。
+- 没有 Alembic，开发期依赖 `Base.metadata.create_all`，旧库字段需要手动迁移。提示词快照字段旧库需补：`ALTER TABLE image_tasks ADD COLUMN IF NOT EXISTS system_prompt_snapshot TEXT, ADD COLUMN IF NOT EXISTS task_prompt_snapshot TEXT, ADD COLUMN IF NOT EXISTS user_prompt TEXT, ADD COLUMN IF NOT EXISTS prompt_template_refs_json TEXT;`
 - 商品详情图和服饰穿搭还没有完全接入真实生图任务闭环。
 - 资产库删除目前只删 DB 记录，不删 OSS 文件。
 - 用户额度前端展示还没有完全从后端实时读取。
