@@ -4,15 +4,16 @@ import { suiteStructureDefaults } from "@/constants/productSuite.js";
 import { useToast } from "@/composables/useToast.js";
 import { useGenerationCards } from "@/composables/useGenerationCards.js";
 import { useCardActions } from "@/composables/useCardActions.js";
-import { analyzeImage, generateImage } from "@/api/image.js";
-import {
-  createGenerationJob,
-  getGenerationJob,
-  listGenerationJobs,
-  updateGenerationJob,
-} from "@/api/generation.js";
+import { useGenerationRunner } from "@/composables/useGenerationRunner.js";
+import { analyzeImage } from "@/api/image.js";
 
-const TITLE_DEBOUNCE_MS = 600;
+function createDefaultSuiteStructure() {
+  return suiteStructureDefaults.map((item) => ({
+    ...item,
+    enabled: true,
+    count: item.defaultCount,
+  }));
+}
 
 export function useProductSuiteGenerator({ onJobCreated } = {}) {
   const toast = useToast();
@@ -38,18 +39,74 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
     generating,
     generatedCount,
     jobTotal,
-    activeBatchRunId,
     startPollingCard,
-    clearAllPollTimers,
-    maybeFinishGenerating,
     makeId,
-    TERMINAL_STATUSES,
   } = cards;
 
-  // --- 通用卡片操作：选择 / 下载 ---
-  const currentJobId = ref("");
-  const currentTaskTitle = ref("");
+  // --- 场景特有状态 ---
+  const uploadedImages = ref([]);
+  const mainImageIndex = ref(0);
+  const aiLoading = ref(false);
 
+  const settings = reactive({
+    platform: "亚马逊",
+    language: "中文",
+    ratio: "1:1",
+    quality: "1K",
+    productInput: "",
+  });
+
+  const suiteStructure = ref(createDefaultSuiteStructure());
+
+  const runner = useGenerationRunner({
+    scenario: "product_suite",
+    cards,
+    toast,
+    onJobCreated,
+    resetSceneState() {
+      uploadedImages.value = [];
+      mainImageIndex.value = 0;
+      settings.productInput = "";
+      suiteStructure.value = createDefaultSuiteStructure();
+    },
+    applyJobData(data) {
+      restoreSuiteJobData(data);
+    },
+    restoreCard(item) {
+      return reactive({
+        id: item.task_id,
+        taskId: item.task_id,
+        typeId: item.type_id || "",
+        dataUrl: item.result_url || "",
+        resultUrl: item.result_url || "",
+        selected: true,
+        status: item.status || "pending",
+        strategyTitle: item.title || getStructureName(item.type_id),
+        strategyContent: getStructureStrategy(item.type_id),
+        errorMessage: item.error_message || "",
+        sortOrder: item.sort_order || 0,
+        batchRunId: "",
+        creditRefunded: !!item.credit_refunded,
+      });
+    },
+  });
+
+  const {
+    currentJobId,
+    currentTaskTitle,
+    historyTasks,
+    showHistoryDrawer,
+    historyLoading,
+    jobLoading,
+    updateCurrentJobTitle,
+    createNewTask,
+    resetWorkspaceToDraft,
+    loadHistoryTasks,
+    loadGenerationJob,
+    enqueueImageBatch,
+  } = runner;
+
+  // --- 通用卡片操作：选择 / 下载 ---
   const actions = useCardActions({
     outputCards,
     currentTaskTitle,
@@ -66,31 +123,6 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
     batchDownload,
     downloadSingleImage,
   } = actions;
-
-  // --- 场景特有状态 ---
-  const uploadedImages = ref([]);
-  const mainImageIndex = ref(0);
-  const aiLoading = ref(false);
-  const historyTasks = ref([]);
-  const showHistoryDrawer = ref(false);
-  const historyLoading = ref(false);
-  const jobLoading = ref(false);
-
-  const settings = reactive({
-    platform: "亚马逊",
-    language: "中文",
-    ratio: "1:1",
-    quality: "1K",
-    productInput: "",
-  });
-
-  const suiteStructure = ref(
-    suiteStructureDefaults.map((item) => ({
-      ...item,
-      enabled: true,
-      count: item.defaultCount,
-    })),
-  );
 
   // --- 计算属性 ---
   const totalCount = computed(() =>
@@ -113,205 +145,32 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
     return `${settings.quality} / ${selectedRatioOption.value.label} / ${width}x${height}`;
   });
 
-  // --- 任务标题（debounce 保存） ---
-  let titleDebounceTimer = null;
-
-  function updateCurrentJobTitle(title) {
-    const trimmed = (title || "").trim();
-    currentTaskTitle.value = title;
-    if (!currentJobId.value) return;
-    if (!trimmed) return;
-
-    if (titleDebounceTimer) {
-      clearTimeout(titleDebounceTimer);
+  function restoreSuiteJobData(data) {
+    if (data.settings && typeof data.settings === "object") {
+      const s = data.settings;
+      if (typeof s.platform === "string") settings.platform = s.platform;
+      if (typeof s.language === "string") settings.language = s.language;
+      if (typeof s.ratio === "string" && resolutionMap[s.ratio]) {
+        settings.ratio = s.ratio;
+      }
+      const desiredQuality = typeof s.quality === "string" ? s.quality : settings.quality;
+      settings.quality = resolveQuality(settings.ratio, desiredQuality) || "1K";
     }
-    titleDebounceTimer = setTimeout(async () => {
-      try {
-        const res = await updateGenerationJob(currentJobId.value, { title: trimmed });
-        if (res.code !== 0) {
-          toast.error("任务标题保存失败");
-        }
-      } catch {
-        toast.error("任务标题保存失败");
-      }
-    }, TITLE_DEBOUNCE_MS);
-  }
-
-  // --- Job 生命周期 ---
-
-  async function ensureCurrentJob() {
-    if (currentJobId.value) return currentJobId.value;
-    try {
-      const result = await createGenerationJob("product_suite");
-      if (result.code !== 0) {
-        toast.error(result.message || "创建任务失败");
-        return "";
-      }
-      currentJobId.value = result.data.job_id;
-      currentTaskTitle.value = result.data.title;
-      onJobCreated?.(currentJobId.value);
-      return currentJobId.value;
-    } catch (error) {
-      const status = error.response?.status;
-      if (status === 401) {
-        toast.error("登录已过期，请重新登录");
-      } else {
-        toast.error(error.response?.data?.message || "创建任务失败");
-      }
-      return "";
+    if (Array.isArray(data.source_images)) {
+      uploadedImages.value = data.source_images.map((img) => ({
+        ...img,
+        previewUrl: img?.url || img?.previewUrl || "",
+      }));
+      mainImageIndex.value = 0;
+    } else {
+      uploadedImages.value = [];
+      mainImageIndex.value = 0;
     }
-  }
-
-  async function createNewTask() {
-    if (generating.value) {
-      toast.info("当前任务正在生成中，请稍后再新建任务");
-      return false;
-    }
-    clearAllPollTimers();
-    resetWorkspaceToDraft();
-    return true;
-  }
-
-  function resetWorkspaceToDraft() {
-    clearAllPollTimers();
-    uploadedImages.value = [];
-    mainImageIndex.value = 0;
-    settings.productInput = "";
-    outputCards.value = [];
-    genLogs.value = [];
-    generatedCount.value = 0;
-    jobTotal.value = 0;
-    activeBatchRunId.value = "";
-    currentJobId.value = "";
-    currentTaskTitle.value = "";
-    suiteStructure.value = suiteStructureDefaults.map((item) => ({
-      ...item,
-      enabled: true,
-      count: item.defaultCount,
-    }));
-  }
-
-  async function loadHistoryTasks() {
-    historyLoading.value = true;
-    try {
-      const result = await listGenerationJobs("product_suite");
-      if (result.code !== 0) {
-        toast.error(result.message || "加载历史任务失败");
-        historyTasks.value = [];
-        return;
-      }
-      historyTasks.value = result.data || [];
-    } catch (error) {
-      const status = error.response?.status;
-      if (status === 401) {
-        toast.error("登录已过期，请重新登录");
-      } else {
-        toast.error(error.response?.data?.message || "加载历史任务失败");
-      }
-      historyTasks.value = [];
-    } finally {
-      historyLoading.value = false;
-    }
-  }
-
-  async function loadGenerationJob(jobId) {
-    if (!jobId) return false;
-    if (generating.value) {
-      toast.info("当前任务正在生成中，请稍后再切换任务");
-      return false;
-    }
-    jobLoading.value = true;
-    try {
-      const result = await getGenerationJob(jobId);
-      if (result.code !== 0) {
-        toast.error(result.message || "任务不存在或无权限访问");
-        return false;
-      }
-      const data = result.data || {};
-      clearAllPollTimers();
-      currentJobId.value = data.job_id;
-      currentTaskTitle.value = data.title || "";
-      if (data.settings && typeof data.settings === "object") {
-        const s = data.settings;
-        if (typeof s.platform === "string") settings.platform = s.platform;
-        if (typeof s.language === "string") settings.language = s.language;
-        if (typeof s.ratio === "string" && resolutionMap[s.ratio]) {
-          settings.ratio = s.ratio;
-        }
-        const desiredQuality = typeof s.quality === "string" ? s.quality : settings.quality;
-        settings.quality = resolveQuality(settings.ratio, desiredQuality) || "1K";
-      }
-      if (Array.isArray(data.source_images)) {
-        uploadedImages.value = data.source_images.map((img) => ({
-          ...img,
-          previewUrl: img?.url || img?.previewUrl || "",
-        }));
-        mainImageIndex.value = 0;
-      } else {
-        uploadedImages.value = [];
-        mainImageIndex.value = 0;
-      }
-      settings.productInput = data.input_text || "";
-      if (Array.isArray(data.structure) && data.structure.length > 0) {
-        suiteStructure.value = data.structure;
-      } else {
-        suiteStructure.value = suiteStructureDefaults.map((item) => ({
-          ...item,
-          enabled: true,
-          count: item.defaultCount,
-        }));
-      }
-
-      const items = Array.isArray(data.items) ? data.items : [];
-      const restoredCards = items.map((item) =>
-        reactive({
-          id: item.task_id,
-          taskId: item.task_id,
-          typeId: item.type_id || "",
-          dataUrl: item.result_url || "",
-          resultUrl: item.result_url || "",
-          selected: true,
-          status: item.status || "pending",
-          strategyTitle: item.title || getStructureName(item.type_id),
-          strategyContent: getStructureStrategy(item.type_id),
-          errorMessage: item.error_message || "",
-          sortOrder: item.sort_order || 0,
-          batchRunId: "",
-          creditRefunded: !!item.credit_refunded,
-        }),
-      );
-      outputCards.value = restoredCards;
-
-      const pendingCards = restoredCards.filter((card) => !TERMINAL_STATUSES.has(card.status));
-      const doneCount = restoredCards.filter((card) => card.status === "done").length;
-      generatedCount.value = doneCount;
-      jobTotal.value = restoredCards.length;
-      genLogs.value = restoredCards.length
-        ? [`已恢复任务「${currentTaskTitle.value}」，共 ${restoredCards.length} 张`]
-        : [];
-
-      if (pendingCards.length > 0) {
-        generating.value = true;
-        const resumeBatchId = makeId();
-        activeBatchRunId.value = resumeBatchId;
-        pendingCards.forEach((card) => {
-          card.batchRunId = resumeBatchId;
-          startPollingCard(card);
-        });
-      } else {
-        generating.value = false;
-      }
-      return true;
-    } catch (error) {
-      const status = error.response?.status;
-      if (status === 401) {
-        toast.error("登录已过期，请重新登录");
-      } else {
-        toast.error(error.response?.data?.message || "任务不存在或无权限访问");
-      }
-      return false;
-    } finally {
-      jobLoading.value = false;
+    settings.productInput = data.input_text || "";
+    if (Array.isArray(data.structure) && data.structure.length > 0) {
+      suiteStructure.value = data.structure;
+    } else {
+      suiteStructure.value = createDefaultSuiteStructure();
     }
   }
 
@@ -388,11 +247,7 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
       return;
     }
 
-    const jobId = await ensureCurrentJob();
-    if (!jobId) return;
-
     const snapshotPayload = {
-      title: currentTaskTitle.value,
       settings: {
         platform: settings.platform,
         language: settings.language,
@@ -410,105 +265,37 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
       input_text: settings.productInput,
       structure: suiteStructure.value,
     };
-    try {
-      const saveRes = await updateGenerationJob(jobId, snapshotPayload);
-      if (saveRes.code !== 0) {
-        toast.error(saveRes.message || "保存任务配置失败，请稍后重试");
-        return;
-      }
-    } catch (error) {
-      const status = error.response?.status;
-      if (status === 401) {
-        toast.error("登录已过期，请重新登录");
-      } else {
-        toast.error(error.response?.data?.message || "保存任务配置失败，请稍后重试");
-      }
-      return;
-    }
 
-    generating.value = true;
-    generatedCount.value = 0;
-    jobTotal.value = queue.length;
-    const baseSortOrder = outputCards.value.length;
-    const batchRunId = makeId();
-    activeBatchRunId.value = batchRunId;
-    if (genLogs.value.length === 0) {
-      genLogs.value.push("商品套图生成任务初始化...", "读取商品图片、平台规范与套图结构...");
-    } else {
-      genLogs.value.push(`新一批套图开始生成，共 ${queue.length} 张`);
-    }
-
-    const imageUrl = mainImg.url;
-
-    const createdCards = [];
-
-    queue.forEach((item, index) => {
-      const card = reactive({
-        id: makeId(),
-        taskId: "",
-        typeId: item.id,
-        dataUrl: "",
-        resultUrl: "",
-        selected: true,
-        status: "pending",
-        strategyTitle: `${item.name} ${item.index}`,
-        strategyContent: item.description,
-        errorMessage: "",
-        sortOrder: baseSortOrder + index,
-        batchRunId,
-        creditRefunded: false,
-      });
-      createdCards.push({ card, item });
-    });
-
-    // 新批次插到前面
-    outputCards.value = [...createdCards.map((c) => c.card), ...outputCards.value];
-
-    let successfullyEnqueued = 0;
-    for (const { card, item } of createdCards) {
-      const prompt = buildPromptForItem(item);
-      try {
-        const result = await generateImage({
-          prompt,
-          image_url: imageUrl,
-          ratio: settings.ratio,
-          resolution: settings.quality,
-          job_id: jobId,
-          type_id: item.id,
-          title: card.strategyTitle,
-          sort_order: card.sortOrder,
+    await enqueueImageBatch({
+      queue,
+      imageUrl: mainImg.url,
+      ratio: settings.ratio,
+      resolution: settings.quality,
+      snapshotPayload,
+      initialLogs: ["商品套图生成任务初始化...", "读取商品图片、平台规范与套图结构..."],
+      repeatLog: `新一批套图开始生成，共 ${queue.length} 张`,
+      createCard({ item, sortOrder, batchRunId }) {
+        return reactive({
+          id: makeId(),
+          taskId: "",
+          typeId: item.id,
+          dataUrl: "",
+          resultUrl: "",
+          selected: true,
+          status: "pending",
+          strategyTitle: `${item.name} ${item.index}`,
+          strategyContent: item.description,
+          errorMessage: "",
+          sortOrder,
+          batchRunId,
+          creditRefunded: false,
         });
-        if (result.code !== 0) {
-          card.status = "failed";
-          card.errorMessage = result.message || "任务创建失败";
-          genLogs.value.push(`[${item.name} ${item.index}] 创建失败：${card.errorMessage}`);
-          continue;
-        }
-        card.taskId = result.data.task_id;
-        genLogs.value.push(`正在生成 [${item.name}] 第 ${item.index} 张...`);
-        startPollingCard(card);
-        successfullyEnqueued += 1;
-      } catch (error) {
-        const status = error.response?.status;
-        const message =
-          status === 401
-            ? "登录已过期，请重新登录"
-            : error.response?.data?.message || "任务创建失败";
-        card.status = "failed";
-        card.errorMessage = message;
-        genLogs.value.push(`[${item.name} ${item.index}] 创建失败：${message}`);
-      }
-    }
-
-    genLogs.value.push(`已创建 ${successfullyEnqueued} 个商品套图任务`);
-    if (successfullyEnqueued === 0) {
-      maybeFinishGenerating();
-      if (generating.value) {
-        generating.value = false;
-      }
-      jobTotal.value = 0;
-      toast.error("所有套图任务都创建失败，请稍后重试");
-    }
+      },
+      buildPrompt: buildPromptForItem,
+      getCreateLog: (item) => `正在生成 [${item.name}] 第 ${item.index} 张...`,
+      getFailLogName: (item) => `${item.name} ${item.index}`,
+      allFailedMessage: "所有套图任务都创建失败，请稍后重试",
+    });
   }
 
   // --- 套图特有辅助 ---
@@ -568,11 +355,7 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
   // --- 生命周期 ---
 
   onBeforeUnmount(() => {
-    clearAllPollTimers();
-    if (titleDebounceTimer) {
-      clearTimeout(titleDebounceTimer);
-      titleDebounceTimer = null;
-    }
+    runner.cleanup();
   });
 
   // --- 对外接口（保持与原版一致）---
