@@ -90,10 +90,15 @@ frontend/src/
 │   ├── useOutfitGenerator.js
 │   └── useAssetLibrary.js
 ├── views/
-│   ├── ProductSuiteView.vue
-│   ├── GeneratorView.vue
-│   ├── OutfitView.vue
-│   └── AssetLibraryView.vue
+│   ├── auth/
+│   │   ├── LoginView.vue
+│   │   └── RegisterView.vue
+│   ├── generator/
+│   │   ├── product-suite/ProductSuiteView.vue
+│   │   ├── product-image/ProductImageView.vue
+│   │   ├── outfit/OutfitView.vue
+│   │   └── assets/AssetLibraryView.vue
+│   └── HomeView.vue
 ├── components/
 └── constants/
 ```
@@ -232,7 +237,7 @@ frontend/src/
 
 入口：
 
-- `frontend/src/views/ProductSuiteView.vue`
+- `frontend/src/views/generator/product-suite/ProductSuiteView.vue`
 - `frontend/src/composables/useProductSuiteGenerator.js`
 - `frontend/src/constants/productSuite.js`
 
@@ -300,7 +305,7 @@ frontend/src/
 入口：
 
 - `/generator/assets`
-- `frontend/src/views/AssetLibraryView.vue`
+- `frontend/src/views/generator/assets/AssetLibraryView.vue`
 - `frontend/src/composables/useAssetLibrary.js`
 - `frontend/src/components/AssetCardGrid.vue`
 - 后端 `backend/app/routers/asset.py`

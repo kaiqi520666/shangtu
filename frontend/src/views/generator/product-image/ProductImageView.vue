@@ -6,8 +6,8 @@ import AppDrawer from '@/components/ui/AppDrawer.vue'
 import AppModal from '@/components/ui/AppModal.vue'
 import ImageEditModal from '@/components/generation/ImageEditModal.vue'
 import GeneratorLayout from '@/components/layout/GeneratorLayout.vue'
-import GeneratorSettingsPanel from '@/components/product-image/GeneratorSettingsPanel.vue'
-import GeneratorWorkspace from '@/components/product-image/GeneratorWorkspace.vue'
+import ProductImageSettingsPanel from '@/components/product-image/ProductImageSettingsPanel.vue'
+import ProductImageWorkspace from '@/components/product-image/ProductImageWorkspace.vue'
 import StrategyReviewPanel from '@/components/product-image/StrategyReviewPanel.vue'
 import { useProductImageGenerator } from '@/composables/useProductImageGenerator.js'
 import { useConfirm } from '@/composables/useConfirm.js'
@@ -249,7 +249,7 @@ watch(
       @remove-module="generator.removeModuleContent"
     />
 
-    <GeneratorSettingsPanel
+    <ProductImageSettingsPanel
       v-else
       :settings="generator.settings"
       :uploaded-images="generator.uploadedImages.value"
@@ -270,7 +270,7 @@ watch(
       @generate="generator.triggerStrategyGeneration"
     />
 
-    <GeneratorWorkspace
+    <ProductImageWorkspace
       :settings="generator.settings"
       :current-task-title="generator.currentTaskTitle.value"
       :output-cards="generator.outputCards.value"

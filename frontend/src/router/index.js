@@ -13,12 +13,12 @@ const router = createRouter({
     {
       path: "/login",
       name: "login",
-      component: () => import("../views/LoginView.vue"),
+      component: () => import("../views/auth/LoginView.vue"),
     },
     {
       path: "/register",
       name: "register",
-      component: () => import("../views/RegisterView.vue"),
+      component: () => import("../views/auth/RegisterView.vue"),
     },
     {
       path: "/generator",
@@ -27,22 +27,22 @@ const router = createRouter({
     {
       path: "/generator/product-suite/:jobId?",
       name: "product-suite",
-      component: () => import("../views/ProductSuiteView.vue"),
+      component: () => import("../views/generator/product-suite/ProductSuiteView.vue"),
     },
     {
       path: "/generator/product-image/:jobId?",
-      name: "generator",
-      component: () => import("../views/GeneratorView.vue"),
+      name: "product-image",
+      component: () => import("../views/generator/product-image/ProductImageView.vue"),
     },
     {
       path: "/generator/outfit",
       name: "outfit",
-      component: () => import("../views/OutfitView.vue"),
+      component: () => import("../views/generator/outfit/OutfitView.vue"),
     },
     {
       path: "/generator/assets",
       name: "assets",
-      component: () => import("../views/AssetLibraryView.vue"),
+      component: () => import("../views/generator/assets/AssetLibraryView.vue"),
     },
   ],
 });

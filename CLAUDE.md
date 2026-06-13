@@ -42,7 +42,7 @@ shangtu/
         ├── router/index.js               # /login /register /generator/{product-suite|product-image|outfit}
         ├── api/                          # request.js / auth.js / image.js / generation.js
         ├── composables/                  # useAuth / useToast / useGenerator / useOutfitGenerator / useProductSuiteGenerator
-        ├── views/                        # Home / Login / Register / Generator / ProductSuite / Outfit
+        ├── views/                        # auth/ + generator/{product-suite|product-image|outfit|assets}/ + Home
         ├── components/                   # Generator* / Outfit* / ProductSuite* / AppModal / AppDrawer ...
         └── constants/                    # app.js / generator.js / outfit.js / productSuite.js
 ```
