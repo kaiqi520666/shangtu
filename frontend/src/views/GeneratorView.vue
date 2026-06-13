@@ -1,20 +1,241 @@
 <script setup>
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { Trash2 } from 'lucide-vue-next'
+import AppDrawer from '@/components/ui/AppDrawer.vue'
+import AppModal from '@/components/ui/AppModal.vue'
 import GeneratorLayout from '@/components/layout/GeneratorLayout.vue'
-import GeneratorOverlays from '@/components/product-image/GeneratorOverlays.vue'
 import GeneratorSettingsPanel from '@/components/product-image/GeneratorSettingsPanel.vue'
 import GeneratorWorkspace from '@/components/product-image/GeneratorWorkspace.vue'
 import StrategyReviewPanel from '@/components/product-image/StrategyReviewPanel.vue'
-import { useGenerator } from '@/composables/useGenerator.js'
+import { useProductImageGenerator } from '@/composables/useProductImageGenerator.js'
+import { useConfirm } from '@/composables/useConfirm.js'
+import { useToast } from '@/composables/useToast.js'
+import { deleteGenerationJob } from '@/api/generation.js'
+import { deleteImageTask, regenerateImageTask } from '@/api/image.js'
 
-const generator = useGenerator()
+const route = useRoute()
+const router = useRouter()
+const confirm = useConfirm()
+const toast = useToast()
+
+const generator = useProductImageGenerator({
+  onJobCreated(jobId) {
+    router.replace(`/generator/product-image/${jobId}`)
+  },
+})
+
+const editModalOpen = ref(false)
+const editCard = ref(null)
+const editInstruction = ref('')
+const editSubmitting = ref(false)
+
+const STATUS_LABEL = {
+  draft: '草稿',
+  generating: '生成中',
+  done: '已完成',
+  partial_failed: '部分失败',
+  failed: '失败',
+  timeout: '超时',
+}
+
+const sortedHistory = computed(() => generator.historyTasks.value)
+
+function getStatusLabel(job) {
+  const key = job.display_status || job.status || 'draft'
+  return STATUS_LABEL[key] || key
+}
+
+function formatTime(value) {
+  if (!value) return ''
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return ''
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+async function openHistory() {
+  generator.showHistoryDrawer.value = true
+  await generator.loadHistoryTasks()
+}
+
+function pickHistory(jobId) {
+  generator.showHistoryDrawer.value = false
+  router.push(`/generator/product-image/${jobId}`)
+}
+
+async function handleCreateNewTask() {
+  const ok = await generator.createNewTask()
+  if (ok) {
+    router.push('/generator/product-image')
+  }
+}
+
+async function handleRouteJobId(jobId) {
+  if (jobId && jobId !== generator.currentJobId.value) {
+    const ok = await generator.loadGenerationJob(jobId)
+    if (!ok) {
+      router.replace('/generator/product-image')
+    }
+  } else if (!jobId && generator.currentJobId.value) {
+    generator.resetWorkspaceToDraft()
+  }
+}
+
+async function handleDeleteJob(job) {
+  const displayStatus = job.display_status || job.status
+  if (displayStatus === 'generating') {
+    toast.info('任务生成中，暂不能删除')
+    return
+  }
+  const ok = await confirm.open({
+    title: '删除任务',
+    message: '确定删除这个生成任务吗？已生成图片不会立即从存储中物理删除。',
+    confirmText: '删除',
+    cancelText: '取消',
+    tone: 'danger',
+  })
+  if (!ok) return
+
+  try {
+    const res = await deleteGenerationJob(job.job_id)
+    if (res.code !== 0) {
+      toast.error(res.message || '删除失败')
+      return
+    }
+    const idx = generator.historyTasks.value.findIndex((t) => t.job_id === job.job_id)
+    if (idx > -1) generator.historyTasks.value.splice(idx, 1)
+    if (job.job_id === generator.currentJobId.value) {
+      generator.resetWorkspaceToDraft()
+      router.push('/generator/product-image')
+    }
+    toast.success('任务已删除')
+  } catch {
+    toast.error('删除失败，请稍后重试')
+  }
+}
+
+function openEditModal(card) {
+  if (card.status !== 'done' || !card.dataUrl) return
+  editCard.value = card
+  editInstruction.value = ''
+  editModalOpen.value = true
+}
+
+function closeEditModal() {
+  editModalOpen.value = false
+  editCard.value = null
+  editInstruction.value = ''
+  editSubmitting.value = false
+}
+
+async function handleRegenerate() {
+  const instruction = editInstruction.value.trim()
+  if (!instruction) {
+    toast.info('请输入修改要求')
+    return
+  }
+  const card = editCard.value
+  if (!card) return
+  if (!card.taskId) {
+    toast.error('该图片缺少任务 ID，无法重新生成')
+    return
+  }
+
+  editSubmitting.value = true
+  try {
+    const res = await regenerateImageTask(card.taskId, instruction)
+    if (!res || res.code !== 0) {
+      toast.error((res && res.message) || '重新生成失败')
+      editSubmitting.value = false
+      return
+    }
+
+    const target = generator.outputCards.value.find((c) => c.taskId === card.taskId)
+    if (target) {
+      target.previousResultUrl = target.resultUrl || target.dataUrl || ''
+      target.status = 'processing'
+      target.errorMessage = ''
+      target.editInstruction = instruction
+    }
+    closeEditModal()
+    toast.success('已提交重新生成，请稍候...')
+    if (target) {
+      generator.startPollingCard(target)
+    }
+  } catch {
+    toast.error('重新生成失败，请稍后重试')
+    editSubmitting.value = false
+  }
+}
+
+async function handleDeleteCard() {
+  const card = editCard.value
+  if (!card) return
+  const ok = await confirm.open({
+    title: '删除图片',
+    message: '确定删除这张图片吗？图片不会立即从存储中物理删除。',
+    confirmText: '删除',
+    cancelText: '取消',
+    tone: 'danger',
+  })
+  if (!ok) return
+  try {
+    const res = await deleteImageTask(card.taskId)
+    if (res.code !== 0) {
+      toast.error(res.message || '删除失败')
+      return
+    }
+    const idx = generator.outputCards.value.findIndex((c) => c.id === card.id)
+    if (idx > -1) generator.outputCards.value.splice(idx, 1)
+    closeEditModal()
+    toast.success('图片已删除')
+  } catch {
+    toast.error('删除失败，请稍后重试')
+  }
+}
+
+async function handleDeleteCardDirect(card) {
+  if (!card) return
+  const ok = await confirm.open({
+    title: '删除图片',
+    message: '确定删除这张图片吗？',
+    confirmText: '删除',
+    cancelText: '取消',
+    tone: 'danger',
+  })
+  if (!ok) return
+  try {
+    const res = await deleteImageTask(card.taskId)
+    if (res.code !== 0) {
+      toast.error(res.message || '删除失败')
+      return
+    }
+    const idx = generator.outputCards.value.findIndex((c) => c.id === card.id)
+    if (idx > -1) generator.outputCards.value.splice(idx, 1)
+    toast.success('图片已删除')
+  } catch {
+    toast.error('删除失败，请稍后重试')
+  }
+}
+
+onMounted(() => {
+  const jobId = route.params.jobId
+  if (jobId) {
+    handleRouteJobId(jobId)
+  }
+})
+
+watch(
+  () => route.params.jobId,
+  (newJobId) => {
+    handleRouteJobId(newJobId)
+  },
+)
 </script>
 
 <template>
-  <GeneratorLayout
-    :task-count="generator.taskQueue.value.length"
-    @open-queue="generator.showQueueDrawer.value = true"
-    @open-history="generator.showHistoryDrawer.value = true"
-  >
+  <GeneratorLayout>
     <StrategyReviewPanel
       v-if="generator.strategyPanelVisible.value"
       placement="side"
@@ -57,42 +278,135 @@ const generator = useGenerator()
       :output-cards="generator.outputCards.value"
       :generating="generator.generating.value"
       :generated-count="generator.generatedCount.value"
-      :selected-modules="generator.selectedModules.value"
+      :total-count="generator.totalCount.value"
+      :job-total="generator.jobTotal.value"
       :gen-logs="generator.genLogs.value"
       :selected-cards-count="generator.selectedCardsCount.value"
-      :generation-progress-class="generator.generationProgressClass.value"
       :selected-image-label="generator.selectedImageLabel.value"
       :get-module-name="generator.getModuleName"
-      :get-module-strategy="generator.getModuleStrategy"
-      @update:current-task-title="generator.currentTaskTitle.value = $event"
+      @update:current-task-title="generator.updateCurrentJobTitle"
       @select-all-cards="generator.toggleSelectAllCards"
-      @preview-long-image="generator.previewLongImage"
       @batch-download="generator.batchDownload"
       @toggle-card="generator.toggleCardSelection"
       @download-card="generator.downloadSingleImage"
-      @regenerate-card="generator.regenerateSingleCard"
-      @zoom-card="generator.zoomCard.value = $event"
+      @edit-card="openEditModal"
+      @zoom-card="(card) => { generator.zoomCard.value = card }"
+      @delete-card="handleDeleteCardDirect"
+      @create-new-task="handleCreateNewTask"
+      @open-history="openHistory"
     />
 
-    <GeneratorOverlays
-      :show-long-preview-modal="generator.showLongPreviewModal.value"
-      :show-history-drawer="generator.showHistoryDrawer.value"
-      :show-queue-drawer="generator.showQueueDrawer.value"
-      :zoom-card="generator.zoomCard.value"
-      :selected-cards="generator.selectedCards.value"
-      :selected-cards-count="generator.selectedCardsCount.value"
-      :long-preview-height="generator.longPreviewHeight.value"
-      :history-tasks="generator.historyTasks.value"
-      :task-queue="generator.taskQueue.value"
-      :get-module-name="generator.getModuleName"
-      :get-module-strategy="generator.getModuleStrategy"
-      :get-progress-width-class="generator.getProgressWidthClass"
-      @close-long-preview="generator.showLongPreviewModal.value = false"
-      @download-long-image="generator.downloadLongCombinedImage"
-      @close-history="generator.showHistoryDrawer.value = false"
-      @load-history="generator.loadHistoryTask"
-      @close-queue="generator.showQueueDrawer.value = false"
-      @close-zoom="generator.zoomCard.value = null"
-    />
+    <AppDrawer
+      :open="generator.showHistoryDrawer.value"
+      title="生成记录"
+      subtitle="选择历史任务可恢复到当前工作区"
+      @close="generator.showHistoryDrawer.value = false"
+    >
+      <div v-if="generator.historyLoading.value" class="flex items-center justify-center py-8 text-xs text-slate-400">
+        正在加载...
+      </div>
+      <div v-else-if="sortedHistory.length === 0" class="flex flex-col items-center justify-center gap-2 py-12 text-center text-xs text-slate-400">
+        <span>暂无生成记录</span>
+        <span>点击「+ 新建任务」开始你的第一次生成</span>
+      </div>
+      <ul v-else class="space-y-2">
+        <li
+          v-for="job in sortedHistory"
+          :key="job.job_id"
+          class="group cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs transition-all hover:border-primary/40 hover:bg-primary/5"
+          :class="{ 'border-primary/60 bg-primary/5': job.job_id === generator.currentJobId.value }"
+          @click="pickHistory(job.job_id)"
+        >
+          <div class="flex items-center justify-between gap-2">
+            <span class="truncate font-bold text-slate-800">{{ job.title }}</span>
+            <div class="flex shrink-0 items-center gap-1.5">
+              <button
+                type="button"
+                class="rounded p-0.5 text-slate-300 opacity-0 transition-all hover:bg-rose-50 hover:text-rose-500 group-hover:opacity-100"
+                title="删除任务"
+                @click.stop="handleDeleteJob(job)"
+              >
+                <Trash2 class="h-3.5 w-3.5" />
+              </button>
+              <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                {{ getStatusLabel(job) }}
+              </span>
+            </div>
+          </div>
+          <div class="mt-1.5 flex items-center justify-between text-[11px] text-slate-500">
+            <span>{{ formatTime(job.created_at) }}</span>
+            <span>
+              共 {{ job.total }} 张
+              <span v-if="job.completed > 0" class="text-primary">· {{ job.completed }} 完成</span>
+              <span v-if="job.failed > 0" class="text-rose-500">· {{ job.failed }} 失败</span>
+            </span>
+          </div>
+        </li>
+      </ul>
+    </AppDrawer>
+
+    <AppModal
+      :open="Boolean(generator.zoomCard.value)"
+      title="商品详情图大图预览"
+      panel-class="w-full max-w-4xl"
+      @close="generator.zoomCard.value = null"
+    >
+      <div v-if="generator.zoomCard.value" class="bg-slate-100 p-6">
+        <img :src="generator.zoomCard.value.dataUrl" class="mx-auto max-h-[75vh] rounded-xl object-contain shadow-lg" alt="商品详情图预览" />
+      </div>
+    </AppModal>
+
+    <AppModal
+      :open="editModalOpen"
+      title="编辑图片"
+      panel-class="w-full max-w-lg"
+      @close="closeEditModal"
+    >
+      <div v-if="editCard" class="space-y-4 p-5">
+        <div class="overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+          <img :src="editCard.dataUrl" class="mx-auto max-h-56 object-contain" referrerpolicy="no-referrer" alt="当前图片" />
+        </div>
+        <div class="flex items-center gap-2 text-xs text-slate-600">
+          <span class="rounded-full bg-slate-100 px-2 py-0.5 font-semibold">{{ generator.getModuleName(editCard.typeId) }}</span>
+          <span class="text-slate-400">{{ editCard.strategyTitle }}</span>
+        </div>
+        <div>
+          <label class="mb-1.5 block text-xs font-semibold text-slate-700">修改要求</label>
+          <textarea
+            v-model="editInstruction"
+            rows="3"
+            class="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30"
+            placeholder="例如：减少文字信息，突出材质细节，背景换成浅色家居场景"
+          />
+        </div>
+        <div class="flex items-center justify-between border-t border-slate-100 pt-4">
+          <button
+            type="button"
+            class="flex items-center gap-1 text-xs font-semibold text-rose-500 hover:text-rose-600"
+            @click="handleDeleteCard"
+          >
+            <Trash2 class="h-3.5 w-3.5" />
+            删除图片
+          </button>
+          <div class="flex items-center gap-2">
+            <button
+              type="button"
+              class="rounded-lg border border-slate-200 px-3.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+              @click="closeEditModal"
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              class="rounded-lg bg-primary px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50"
+              :disabled="editSubmitting || !editInstruction.trim()"
+              @click="handleRegenerate"
+            >
+              {{ editSubmitting ? '提交中...' : '重新生成' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </AppModal>
   </GeneratorLayout>
 </template>

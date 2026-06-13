@@ -30,7 +30,7 @@ const router = createRouter({
       component: () => import("../views/ProductSuiteView.vue"),
     },
     {
-      path: "/generator/product-image",
+      path: "/generator/product-image/:jobId?",
       name: "generator",
       component: () => import("../views/GeneratorView.vue"),
     },
