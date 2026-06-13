@@ -173,7 +173,7 @@ frontend/src/
 - 查询服务：`backend/app/core/prompt_templates.py`
 - 种子脚本：`backend/scripts/seed_prompt_templates.py`
 - 执行方式：在 `backend/` 下运行 `.\.venv\Scripts\python.exe scripts\seed_prompt_templates.py`
-- 当前 seed 覆盖通用生图规则、亚马逊平台规则、商品套图图种默认提示词、商品详情图模块默认提示词、AI 帮写和详情图策略提示词。
+- 当前 seed 覆盖通用生图规则、前端平台列表的平台专属规则、商品套图图种默认提示词、商品详情图模块默认提示词、AI 帮写和详情图策略提示词。
 
 ### 生图任务流
 
