@@ -14,7 +14,12 @@ from app.core.image_analyzer import (
     analyze_product_image,
     generate_product_image_strategy,
 )
-from app.core.image_prompt_builder import build_product_suite_image_prompt
+from app.core.image_prompt_builder import (
+    build_ai_write_prompt,
+    build_image_generate_prompt,
+    build_product_image_strategy_template_prompt,
+    compose_image_prompt,
+)
 from app.core.oss import OssConfigError, upload_image_bytes
 from app.core.time import to_utc_iso, utc_now
 from app.models import GenerationJob, ImageTask, User
@@ -40,6 +45,7 @@ class GenerateRequest(BaseModel):
 class AnalyzeImageRequest(BaseModel):
     image_url: str
     platform: str = ""
+    scenario: str | None = None
 
 
 class ProductImageStrategyRequest(BaseModel):
@@ -83,11 +89,18 @@ async def upload_image(
 async def analyze_image(
     req: AnalyzeImageRequest,
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     try:
+        template_prompt = await build_ai_write_prompt(
+            db,
+            scenario=req.scenario or "product_suite",
+            platform=req.platform,
+        )
         content = await analyze_product_image(
             image_url=req.image_url,
             platform=req.platform,
+            prompt=template_prompt or None,
         )
     except (ValueError, DashScopeConfigError, RuntimeError) as e:
         return fail(str(e))
@@ -101,14 +114,20 @@ async def analyze_image(
 async def product_image_strategy(
     req: ProductImageStrategyRequest,
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     try:
+        template_prompt = await build_product_image_strategy_template_prompt(
+            db,
+            platform=req.platform,
+        )
         strategy = await generate_product_image_strategy(
             image_url=req.image_url,
             platform=req.platform,
             language=req.language,
             product_input=req.product_input,
             module_ids=req.module_ids,
+            template_prompt=template_prompt,
         )
     except (ValueError, DashScopeConfigError, RuntimeError) as e:
         return fail(str(e))
@@ -150,9 +169,9 @@ async def create_task(
     prompt_template_refs_json = None
     prepend_reference_prompt = True
 
-    if job is not None and job.scenario == "product_suite":
+    if job is not None and job.scenario in {"product_suite", "product_image"}:
         try:
-            built_prompt = await build_product_suite_image_prompt(
+            built_prompt = await build_image_generate_prompt(
                 db,
                 job=job,
                 type_id=req.type_id,
@@ -423,7 +442,8 @@ async def delete_task(
 
 
 class RegenerateRequest(BaseModel):
-    edit_instruction: str
+    edit_instruction: str | None = None
+    user_prompt: str | None = None
 
 
 @router.post("/task/{task_id}/regenerate", response_model=Response)
@@ -435,9 +455,10 @@ async def regenerate_task(
     db: AsyncSession = Depends(get_db),
 ):
     """基于已有图片重新生成。复用同一个 task_id，覆盖结果。"""
-    edit_instruction = req.edit_instruction.strip()
-    if not edit_instruction:
-        return fail("请输入修改要求")
+    edit_instruction = (req.edit_instruction or "").strip()
+    requested_user_prompt = (req.user_prompt or "").strip()
+    if not requested_user_prompt and not edit_instruction:
+        return fail("请输入用户提示词")
 
     result = await db.execute(
         select(ImageTask).where(
@@ -464,21 +485,34 @@ async def regenerate_task(
     # 保留旧 result_url 供前端继续展示
     old_result_url = task.result_url
 
-    # 构造新 prompt
-    new_prompt = task.prompt + "\n\n【用户修改要求】" + edit_instruction
-    new_user_prompt = (
-        f"{task.user_prompt}\n\n【用户修改要求】{edit_instruction}"
-        if task.user_prompt
-        else None
+    # 构造新 prompt。新模板任务优先编辑 user_prompt；旧历史任务仍兼容追加修改要求。
+    has_prompt_snapshot = bool(
+        task.system_prompt_snapshot
+        or task.task_prompt_snapshot
+        or task.prompt_template_refs_json
     )
-    prepend_reference_prompt = not bool(task.system_prompt_snapshot)
+    if has_prompt_snapshot or task.user_prompt:
+        new_user_prompt = requested_user_prompt or (
+            f"{task.user_prompt}\n\n【用户修改要求】{edit_instruction}"
+            if task.user_prompt
+            else edit_instruction
+        )
+        new_prompt = compose_image_prompt(
+            system_prompt=task.system_prompt_snapshot,
+            task_prompt=task.task_prompt_snapshot,
+            user_prompt=new_user_prompt,
+        )
+    else:
+        new_user_prompt = None
+        new_prompt = task.prompt + "\n\n【用户修改要求】" + edit_instruction
+    prepend_reference_prompt = not has_prompt_snapshot
 
     # 扣积分 + 更新 task 同一事务
     current_user.credits -= CREDITS_PER_IMAGE
     task.status = "pending"
     task.error_message = None
     task.progress = 0
-    task.edit_instruction = edit_instruction
+    task.edit_instruction = edit_instruction or None
     task.prompt = new_prompt
     task.user_prompt = new_user_prompt
     # 保留 result_url 不清空，前端继续显示旧图

@@ -95,7 +95,7 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
         sortOrder: item.sort_order || 0,
         batchRunId: "",
         creditRefunded: !!item.credit_refunded,
-        editInstruction: item.edit_instruction || "",
+        userPrompt: item.user_prompt || "",
       });
     },
   });
@@ -214,6 +214,7 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
       const result = await analyzeImage({
         image_url: mainImg.url,
         platform: settings.platform,
+        scenario: "product_image",
       });
       if (result.code !== 0) {
         toast.error(result.message || "AI 分析失败，请稍后重试");
@@ -382,7 +383,7 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
           creditRefunded: false,
         });
       },
-      buildPrompt: buildPromptForItem,
+      buildUserPrompt: buildUserPromptForItem,
       getCreateLog: (item) => `正在生成 [${item.moduleName}]...`,
       getFailLogName: (item) => item.moduleName,
       allFailedMessage: "所有详情图任务都创建失败，请稍后重试",
@@ -415,20 +416,11 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
     }));
   }
 
-  function buildPromptForItem(item) {
+  function buildUserPromptForItem(item) {
     const lines = [
-      "【参考图】必须以用户上传的商品图为商品主体，保持商品款式、颜色、材质、结构和外观完全一致。",
-      "【任务】生成一张电商商品详情页模块图，不要生成整张长详情页。",
-      `【投放平台】${settings.platform}`,
-      `【排版语言】${settings.language}`,
-      `【画面比例】${settings.ratio}`,
-      `【详情图模块】${item.moduleName}`,
       `【模块标题】${item.title}`,
       item.strategy ? `【视觉策略】${item.strategy}` : "",
       item.content ? `【模块内容】${item.content}` : "",
-      "【商品卖点与要求】",
-      settings.productInput.trim(),
-      "【强约束】禁止虚构品牌 Logo、认证标识、价格、销量、参数等无法从参考图与上述卖点确认的信息；如需添加文字必须使用上述指定语言，文字简洁清晰，适合电商详情页展示。",
     ];
     return lines.filter(Boolean).join("\n");
   }

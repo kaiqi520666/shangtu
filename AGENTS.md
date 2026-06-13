@@ -178,7 +178,8 @@ frontend/src/
 - 种子脚本：`backend/scripts/seed_prompt_templates.py`
 - 执行方式：在 `backend/` 下运行 `.\.venv\Scripts\python.exe scripts\seed_prompt_templates.py`
 - 当前 seed 覆盖通用生图规则、前端平台列表的平台专属规则、商品套图图种默认提示词、商品详情图模块默认提示词、AI 帮写和详情图策略提示词。
-- 商品套图 `/image/generate` 已优先接入 `image_generate` 模板拼接：通用规则 + 商品套图场景规则 + 平台规则 + 图种默认用户提示词 + 用户提示词，最终完整 prompt 仍写入 `image_tasks.prompt`。
+- 商品套图和商品详情图 `/image/generate` 已优先接入 `image_generate` 模板拼接：通用规则 + 场景规则 + 平台规则 + 图种默认用户提示词 + 用户提示词，最终完整 prompt 仍写入 `image_tasks.prompt`。
+- AI 帮写已接 `ai_write` 模板；商品详情图策略生成已接 `strategy` 模板。
 
 ### 生图任务流
 

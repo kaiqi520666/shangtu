@@ -62,7 +62,7 @@ shangtu/
 
 - `POST /image/upload`：multipart 上传 OSS（≤10MB，jpg/png/webp/gif），返回 `url` + `object_key`
 - `POST /image/analyze`：DashScope `qwen3.6-flash` 多模态分析商品图，输出标准化产品名/卖点/适用人群/场景/参数
-- `POST /image/generate`：扣 1 积分 + 建 `ImageTask(pending)` 同事务；接受 `{prompt, user_prompt?, image_url?, ratio="1:1", resolution="1K", job_id?, type_id?, title?, sort_order=0}`，落库 `size = "{ratio}/{resolution}"` 仅作审计标记；入队失败退回积分 + 任务标 `failed` 且 `credit_refunded=True`；带 `job_id` 时校验归属 + scenario；`product_suite` 会用 `prompt_templates` 的 `image_generate` 模板拼接最终 prompt，并写入 `system_prompt_snapshot / task_prompt_snapshot / user_prompt / prompt_template_refs_json`；入队成功后把 `GenerationJob.status` 置 `generating`；返回 `task_id`
+- `POST /image/generate`：扣 1 积分 + 建 `ImageTask(pending)` 同事务；接受 `{prompt, user_prompt?, image_url?, ratio="1:1", resolution="1K", job_id?, type_id?, title?, sort_order=0}`，落库 `size = "{ratio}/{resolution}"` 仅作审计标记；入队失败退回积分 + 任务标 `failed` 且 `credit_refunded=True`；带 `job_id` 时校验归属 + scenario；`product_suite / product_image` 会用 `prompt_templates` 的 `image_generate` 模板拼接最终 prompt，并写入 `system_prompt_snapshot / task_prompt_snapshot / user_prompt / prompt_template_refs_json`；入队成功后把 `GenerationJob.status` 置 `generating`；返回 `task_id`
 - `GET /image/task/{task_id}`：优先读 Redis（`task:{id}:status` / `:error` / `:result` / `:progress`），回退 DB；`status=done` 但 `result_url` 缺失时降级为 `processing`，让前端继续轮询；响应字段 `{status, result_url, prompt, created_at, error_message, progress}`，`error_message` 是 worker 已归一化后的中文友好文案
 - `GET /image/tasks`：当前用户历史任务（按 `created_at` desc）
 
@@ -95,7 +95,8 @@ shangtu/
 - 内部查询服务：`app.core.prompt_templates.get_prompt_templates(db, scenario, purpose, platform, type_id, model)`，只取 `active=True` 且匹配 `purpose + model` 的模板；`scenario/platform/type_id` 使用"精确值或 NULL 通用模板"匹配，返回模板列表和按稳定顺序拼接后的 `content`
 - 拼接顺序从通用到具体：通用用途模板 → 场景模板 → 平台模板 → 图种/模块模板 → 最精确模板；同优先级按 `version asc, created_at asc, id asc`
 - 种子脚本：`backend/scripts/seed_prompt_templates.py`，幂等写入第一批默认模板（通用生图规则、前端平台列表的平台专属规则、商品套图图种默认提示词、商品详情图模块默认提示词、AI 帮写和详情图策略提示词）。执行命令：在 `backend/` 下运行 `.\.venv\Scripts\python.exe scripts\seed_prompt_templates.py`
-- 商品套图生图已接 `image_generate` 模板：后端按 `GenerationJob.settings_json/input_text + type_id + platform` 拼出最终 prompt，前端不再拼商品套图完整 prompt；Worker 对该链路关闭旧的 `PRODUCT_IMAGE_SYSTEM_PROMPT` 前缀，避免重复。
+- 商品套图和商品详情图生图已接 `image_generate` 模板：后端按 `GenerationJob.settings_json/input_text + type_id + platform + user_prompt` 拼出最终 prompt；前端不再拼完整生图 prompt；Worker 对模板链路关闭旧的 `PRODUCT_IMAGE_SYSTEM_PROMPT` 前缀，避免重复。
+- AI 帮写已接 `ai_write` 模板；商品详情图策略生成已接 `strategy` 模板，代码仍动态拼入当前选择的模块列表和 JSON 输出约束。
 - 旧库立即使用可手动建表：
 
 ```sql

@@ -248,8 +248,11 @@ export function useGenerationRunner({
 
     let successfullyEnqueued = 0;
     for (const { card, item } of createdCards) {
-      const prompt = buildPrompt(item, card);
+      const prompt = buildPrompt?.(item, card) || "";
       const userPrompt = buildUserPrompt?.(item, card) || null;
+      if (userPrompt) {
+        card.userPrompt = userPrompt;
+      }
       try {
         const result = await generateImage({
           prompt,

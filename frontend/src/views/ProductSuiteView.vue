@@ -1,8 +1,10 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { Trash2 } from 'lucide-vue-next'
 import AppDrawer from '@/components/ui/AppDrawer.vue'
 import AppModal from '@/components/ui/AppModal.vue'
+import ImageEditModal from '@/components/generation/ImageEditModal.vue'
 import GeneratorLayout from '@/components/layout/GeneratorLayout.vue'
 import ProductSuiteSettingsPanel from '@/components/product-suite/ProductSuiteSettingsPanel.vue'
 import ProductSuiteWorkspace from '@/components/product-suite/ProductSuiteWorkspace.vue'
@@ -11,7 +13,6 @@ import { useConfirm } from '@/composables/useConfirm.js'
 import { useToast } from '@/composables/useToast.js'
 import { deleteGenerationJob } from '@/api/generation.js'
 import { deleteImageTask, regenerateImageTask } from '@/api/image.js'
-import { Trash2 } from 'lucide-vue-next'
 
 const route = useRoute()
 const router = useRouter()
@@ -27,7 +28,6 @@ const suite = useProductSuiteGenerator({
 // 编辑弹窗状态
 const editModalOpen = ref(false)
 const editCard = ref(null)
-const editInstruction = ref('')
 const editSubmitting = ref(false)
 
 const STATUS_LABEL = {
@@ -118,21 +118,19 @@ async function handleDeleteJob(job) {
 function openEditModal(card) {
   if (card.status !== 'done' || !card.dataUrl) return
   editCard.value = card
-  editInstruction.value = ''
   editModalOpen.value = true
 }
 
 function closeEditModal() {
   editModalOpen.value = false
   editCard.value = null
-  editInstruction.value = ''
   editSubmitting.value = false
 }
 
-async function handleRegenerate() {
-  const instruction = editInstruction.value.trim()
-  if (!instruction) {
-    toast.info('请输入修改要求')
+async function handleRegenerate(userPrompt) {
+  const prompt = (userPrompt || '').trim()
+  if (!prompt) {
+    toast.info('请输入用户提示词')
     return
   }
   const card = editCard.value
@@ -144,7 +142,7 @@ async function handleRegenerate() {
 
   editSubmitting.value = true
   try {
-    const res = await regenerateImageTask(card.taskId, instruction)
+    const res = await regenerateImageTask(card.taskId, '', prompt)
     if (!res || res.code !== 0) {
       toast.error((res && res.message) || '重新生成失败')
       editSubmitting.value = false
@@ -156,7 +154,7 @@ async function handleRegenerate() {
       target.previousResultUrl = target.resultUrl || target.dataUrl || ''
       target.status = 'processing'
       target.errorMessage = ''
-      target.editInstruction = instruction
+      target.userPrompt = prompt
     }
     closeEditModal()
     toast.success('已提交重新生成，请稍候...')
@@ -344,57 +342,14 @@ watch(
       </div>
     </AppModal>
 
-    <AppModal
+    <ImageEditModal
       :open="editModalOpen"
-      title="编辑图片"
-      panel-class="w-full max-w-lg"
+      :card="editCard"
+      :module-name="editCard ? suite.getStructureName(editCard.typeId) : ''"
+      :submitting="editSubmitting"
       @close="closeEditModal"
-    >
-      <div v-if="editCard" class="space-y-4 p-5">
-        <div class="overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
-          <img :src="editCard.dataUrl" class="mx-auto max-h-56 object-contain" referrerpolicy="no-referrer" alt="当前图片" />
-        </div>
-        <div class="flex items-center gap-2 text-xs text-slate-600">
-          <span class="rounded-full bg-slate-100 px-2 py-0.5 font-semibold">{{ suite.getStructureName(editCard.typeId) }}</span>
-          <span class="text-slate-400">{{ editCard.strategyTitle }}</span>
-        </div>
-        <div>
-          <label class="mb-1.5 block text-xs font-semibold text-slate-700">修改要求</label>
-          <textarea
-            v-model="editInstruction"
-            rows="3"
-            class="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30"
-            placeholder="例如：背景换成浅色办公室，商品放大 20%，减少文字信息"
-          />
-        </div>
-        <div class="flex items-center justify-between border-t border-slate-100 pt-4">
-          <button
-            type="button"
-            class="flex items-center gap-1 text-xs font-semibold text-rose-500 hover:text-rose-600"
-            @click="handleDeleteCard"
-          >
-            <Trash2 class="h-3.5 w-3.5" />
-            删除图片
-          </button>
-          <div class="flex items-center gap-2">
-            <button
-              type="button"
-              class="rounded-lg border border-slate-200 px-3.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-              @click="closeEditModal"
-            >
-              取消
-            </button>
-            <button
-              type="button"
-              class="rounded-lg bg-primary px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50"
-              :disabled="editSubmitting || !editInstruction.trim()"
-              @click="handleRegenerate"
-            >
-              {{ editSubmitting ? '提交中...' : '重新生成' }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </AppModal>
+      @submit="handleRegenerate"
+      @delete="handleDeleteCard"
+    />
   </GeneratorLayout>
 </template>

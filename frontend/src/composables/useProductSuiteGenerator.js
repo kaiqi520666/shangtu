@@ -194,6 +194,7 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
       const result = await analyzeImage({
         image_url: mainImg.url,
         platform: settings.platform,
+        scenario: "product_suite",
       });
       if (result.code !== 0) {
         toast.error(result.message || "AI 分析失败，请稍后重试");
@@ -292,7 +293,6 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
           creditRefunded: false,
         });
       },
-      buildPrompt: buildPromptForItem,
       getCreateLog: (item) => `正在生成 [${item.name}] 第 ${item.index} 张...`,
       getFailLogName: (item) => `${item.name} ${item.index}`,
       allFailedMessage: "所有套图任务都创建失败，请稍后重试",
@@ -300,10 +300,6 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
   }
 
   // --- 套图特有辅助 ---
-
-  function buildPromptForItem(item) {
-    return "";
-  }
 
   function buildSuiteQueue() {
     return suiteStructure.value.flatMap((item) => {

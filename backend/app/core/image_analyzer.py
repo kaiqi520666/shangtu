@@ -138,6 +138,7 @@ def build_product_image_strategy_prompt(
     language: str,
     product_input: str,
     modules: list[dict],
+    template_prompt: str | None = None,
 ) -> str:
     modules_text = "\n".join(
         [
@@ -150,7 +151,9 @@ def build_product_image_strategy_prompt(
     )
     module_ids = [item["id"] for item in modules]
 
-    return f"""你是资深电商详情页策划和视觉总监。
+    base_prompt = template_prompt.strip() if template_prompt else "你是资深电商详情页策划和视觉总监。"
+
+    return f"""{base_prompt}
 请结合用户上传的商品图片、用户填写的商品卖点要求，以及用户选择的详情页图种，生成一组可编辑的详情页模块策略。
 
 当前投放平台：{platform or '未指定'}
@@ -189,6 +192,7 @@ async def analyze_product_image(
     *,
     image_url: str,
     platform: str = "",
+    prompt: str | None = None,
 ) -> str:
     if not image_url.startswith(("http://", "https://")):
         raise ValueError("image_url必须是可访问的HTTP地址")
@@ -206,7 +210,7 @@ async def analyze_product_image(
                     },
                     {
                         "type": "text",
-                        "text": build_product_prompt(platform),
+                        "text": prompt or build_product_prompt(platform),
                     },
                 ],
             }
@@ -337,6 +341,7 @@ async def generate_product_image_strategy(
     language: str = "中文",
     product_input: str = "",
     module_ids: list[str],
+    template_prompt: str | None = None,
 ) -> dict:
     if not image_url.startswith(("http://", "https://")):
         raise ValueError("image_url必须是可访问的HTTP地址")
@@ -351,6 +356,7 @@ async def generate_product_image_strategy(
         language=language,
         product_input=normalized_input[:4000],
         modules=selected_modules,
+        template_prompt=template_prompt,
     )
 
     payload = {

@@ -9,8 +9,8 @@ export function uploadImage(file) {
   });
 }
 
-export function analyzeImage({ image_url, platform = "" }) {
-  return request.post("/image/analyze", { image_url, platform }, { timeout: 120000 });
+export function analyzeImage({ image_url, platform = "", scenario = null }) {
+  return request.post("/image/analyze", { image_url, platform, scenario }, { timeout: 120000 });
 }
 
 export function generateProductImageStrategy({
@@ -58,10 +58,10 @@ export function getImageDownloadUrl(taskId) {
   return `${request.defaults.baseURL}/image/task/${taskId}/download`;
 }
 
-export function regenerateImageTask(taskId, editInstruction) {
+export function regenerateImageTask(taskId, editInstruction, userPrompt = null) {
   return request.post(
     `/image/task/${taskId}/regenerate`,
-    { edit_instruction: editInstruction },
+    { edit_instruction: editInstruction, user_prompt: userPrompt },
     { timeout: 60000 },
   );
 }

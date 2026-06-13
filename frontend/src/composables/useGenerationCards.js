@@ -81,6 +81,9 @@ export function useGenerationCards({
       const data = result.data || {};
       const status = data.status || "processing";
       const resultUrl = data.result_url || "";
+      if (typeof data.user_prompt === "string") {
+        card.userPrompt = data.user_prompt;
+      }
 
       if (status === "done" && resultUrl) {
         // 防御：重新生成场景下，如果返回的 resultUrl 跟旧图一样，说明后端还没拿到新图
@@ -176,6 +179,7 @@ export function useGenerationCards({
       sortOrder: sortOrder || 0,
       batchRunId: batchRunId || "",
       creditRefunded: false,
+      userPrompt: "",
     });
   }
 
