@@ -179,7 +179,7 @@ JSON 格式：
       "moduleName": "首屏主视觉",
       "title": "首屏 3 秒内传达核心价值",
       "strategy": "大标题聚焦，高饱和度背板突显商品核心形态。",
-      "content": "模块序号：1\\n主标题：...\\n副标题：...\\n画面层级：..."
+      "content": "主标题：...\\n副标题：...\\n画面层级：..."
     }}
   ]
 }}"""
@@ -293,7 +293,6 @@ def _stringify_content(value) -> str:
 def _fallback_module_content(module: dict, index: int) -> str:
     return "\n".join(
         [
-            f"模块序号：{index + 1}",
             f"模块目标：{module['desc']}",
             f"排版策略：{module['strategy']}",
             "视觉重点：突出商品主体，减少无效装饰，保持电商平台可读性。",
