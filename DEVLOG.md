@@ -5,6 +5,12 @@
 
 ---
 
+## 2026-06-13 — 提示词模板表 + 后端查询服务
+
+- 后端新增 `PromptTemplate` 模型和 `prompt_templates` 表，用于后续承载 AI 帮写、策略生成、生图/视频等固定提示词模板；字段包含 `scenario / purpose / platform / type_id / model / name / content / version / active / created_at / updated_at`
+- 新增内部服务 `app.core.prompt_templates.get_prompt_templates(...)`，按 `purpose + model + active=True` 查询，`scenario/platform/type_id` 支持精确值或 NULL 通用回退，并按通用到具体、`version asc / created_at asc / id asc` 稳定拼接
+- 当前不接入 `/image/analyze`、`/image/product-image/strategy`、`/image/generate`，只完成模板基础设施；旧库需要时可按 `CLAUDE.md` 的 `CREATE TABLE prompt_templates` SQL 手动建表
+
 ## 2026-06-12 — 上游错误归一化 + 失败退积分 + 工作台快照保存/恢复
 
 - worker：新增 `normalize_provider_error(message)`，把上游英文 JSON / 关键字归一为中文友好文案 —— `image_unsafe`→"生成内容触发平台安全策略，请尝试减少敏感词、夸张功效、品牌/认证/人物相关描述后重新生成。"；`upstream API failed`→"上游生图服务暂时失败，请稍后重试。"；`timeout/超时`→"生图任务超时，请稍后重试。"；`rate limit / 429`→"生图服务繁忙，请稍后再试。"；其它非中文→"生图失败，请调整提示词后重试。"；含中文则原样保留（`OSS 上传失败:` / `TOAPIS_KEY 未配置` 等本地错误不被覆盖）

@@ -30,7 +30,7 @@ shangtu/
 │   ├── app/
 │   │   ├── main.py                       # FastAPI 入口，lifespan 注册 redis_pool / 自动建表
 │   │   ├── core/                         # auth.py / database.py / deps.py / oss.py / image_analyzer.py
-│   │   ├── models/                       # User / ImageTask / GenerationJob
+│   │   ├── models/                       # User / ImageTask / GenerationJob / PromptTemplate
 │   │   ├── routers/                      # auth.py / image.py / generation.py
 │   │   ├── schemas/response.py           # 统一响应壳 {code, message, data}
 │   │   └── worker/                       # settings.py (WorkerSettings) / tasks.py (generate_image)
@@ -84,6 +84,35 @@ shangtu/
 - `GET /generation/jobs/{job_id}`：返回父任务设置 + 子任务清单 `items[]`（含 `task_id/type_id/title/sort_order/status/progress/result_url/error_message/credit_refunded`，按 `sort_order asc, created_at asc`），`settings/source_images/structure` 为反序列化后的 JSON
 - `PATCH /generation/jobs/{job_id}`：保存/恢复工作台快照。可选字段 `{title, settings, source_images, input_text, structure}`，传哪个改哪个；`settings/source_images/structure` 由后端 `json.dumps(..., ensure_ascii=False)` 写入对应 JSON 列；`title` 校验 1-100 字；只能改自己的 job；返回 `{job_id, scenario, title, status, updated_at}`
 - 子任务关联：`image_tasks` 新增 `job_id / type_id / title / sort_order` 字段，由 `/image/generate` 在请求体里收到后写入；商品套图前端默认在第一次点击「生成」时延迟创建 job（`POST /generation/jobs`），再调 `PATCH /generation/jobs/{id}` 把当前左侧工作台（标题/平台·语言·比例·质量/上传图/卖点/套图结构）落盘成快照，然后 `/image/generate` 每张图入队；后续同 job 内多次点击追加生成（不清空旧 cards），sort_order 接续递增；当前**不做提交/删除/改名/独立提交接口**
+
+#### 提示词模板（内部能力）
+
+- 新增 `prompt_templates` 表和 `PromptTemplate` 模型，用于后续把固定提示词从代码迁到数据库；当前只完成基础设施，尚未接入 `/image/analyze`、`/image/product-image/strategy`、`/image/generate`
+- 字段：`id / scenario / purpose / platform / type_id / model / name / content / version / active / created_at / updated_at`
+- `scenario/platform/type_id` 可为空，表示通用模板；`purpose` 示例：`ai_write / strategy / image_generate / video_generate`；`model` 示例：`qwen3.6-flash / gpt-image-2`
+- 内部查询服务：`app.core.prompt_templates.get_prompt_templates(db, scenario, purpose, platform, type_id, model)`，只取 `active=True` 且匹配 `purpose + model` 的模板；`scenario/platform/type_id` 使用"精确值或 NULL 通用模板"匹配，返回模板列表和按稳定顺序拼接后的 `content`
+- 拼接顺序从通用到具体：通用用途模板 → 场景模板 → 平台模板 → 图种/模块模板 → 最精确模板；同优先级按 `version asc, created_at asc, id asc`
+- 旧库立即使用可手动建表：
+
+```sql
+CREATE TABLE prompt_templates (
+  id VARCHAR(36) PRIMARY KEY,
+  scenario VARCHAR(32),
+  purpose VARCHAR(32) NOT NULL,
+  platform VARCHAR(64),
+  type_id VARCHAR(50),
+  model VARCHAR(64) NOT NULL,
+  name VARCHAR(100) NOT NULL,
+  content TEXT NOT NULL,
+  version INTEGER NOT NULL DEFAULT 1,
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL
+);
+
+CREATE INDEX ix_prompt_templates_lookup
+  ON prompt_templates (purpose, model, scenario, platform, type_id, active);
+```
 
 #### 基础设施
 
