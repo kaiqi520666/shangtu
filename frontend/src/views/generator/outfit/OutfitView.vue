@@ -148,9 +148,20 @@ async function handleRegenerate(userPrompt) {
       return
     }
 
+    const newTaskId = res.data?.task_id
+    if (!newTaskId) {
+      toast.error('重新生成失败：缺少新任务 ID')
+      editSubmitting.value = false
+      return
+    }
+
     const target = outfit.outputCards.value.find((c) => c.taskId === card.taskId)
     if (target) {
+      target.id = newTaskId
+      target.taskId = newTaskId
       target.previousResultUrl = target.resultUrl || target.dataUrl || ''
+      target.dataUrl = ''
+      target.resultUrl = ''
       target.status = 'processing'
       target.errorMessage = ''
       target.userPrompt = prompt

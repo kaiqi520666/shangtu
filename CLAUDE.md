@@ -62,7 +62,7 @@ shangtu/
 
 - `POST /image/upload`：multipart 上传 OSS（≤10MB，jpg/png/webp/gif），返回 `url` + `object_key`
 - `POST /image/analyze`：DashScope `qwen3.6-flash` 多模态分析商品图，输出标准化产品名/卖点/适用人群/场景/参数
-- `POST /image/generate`：扣 1 积分 + 建 `ImageTask(pending)` 同事务；接受 `{prompt, user_prompt?, image_url?, ratio="1:1", resolution="1K", job_id?, type_id?, title?, sort_order=0}`，落库 `size = "{ratio}/{resolution}"` 仅作审计标记；入队失败退回积分 + 任务标 `failed` 且 `credit_refunded=True`；带 `job_id` 时校验归属 + scenario；`product_suite / product_image` 会用 `prompt_templates` 的 `image_generate` 模板拼接最终 prompt，并写入 `system_prompt_snapshot / task_prompt_snapshot / user_prompt / prompt_template_refs_json`；入队成功后把 `GenerationJob.status` 置 `generating`；返回 `task_id`
+- `POST /image/generate`：扣 1 积分 + 建 `ImageTask(pending)` 同事务；接受 `{prompt, user_prompt?, image_urls=[], ratio="1:1", resolution="1K", job_id?, type_id?, title?, sort_order=0}`，落库 `size = "{ratio}/{resolution}"` 仅作审计标记；入队失败退回积分 + 任务标 `failed` 且 `credit_refunded=True`；带 `job_id` 时校验归属 + scenario；`product_suite / product_image / outfit` 会用 `prompt_templates` 的 `image_generate` 模板拼接最终 prompt，并写入 `system_prompt_snapshot / task_prompt_snapshot / user_prompt / prompt_template_refs_json`；入队成功后把 `GenerationJob.status` 置 `generating`；返回 `task_id`
 - `GET /image/task/{task_id}`：优先读 Redis（`task:{id}:status` / `:error` / `:result` / `:progress`），回退 DB；`status=done` 但 `result_url` 缺失时降级为 `processing`，让前端继续轮询；响应字段 `{status, result_url, prompt, created_at, error_message, progress}`，`error_message` 是 worker 已归一化后的中文友好文案
 - `GET /image/tasks`：当前用户历史任务（按 `created_at` desc）
 
@@ -76,16 +76,17 @@ shangtu/
 - **失败退积分**：`_mark_failed/_mark_timeout` 都会调 `refund_task_credit(task_id)`，幂等（行级锁 + `image_tasks.credit_refunded` 标志位），重复处理只退一次；done 路径不退；`/image/generate` 入队失败退分时也置 `credit_refunded=True`
 - 进度同步：ToAPIS 返回 `progress` 时写入 Redis `task:{id}:progress` + DB `image_tasks.progress`，完成后强制 100
 - 写入顺序：先 DB 再 Redis 终态，避免 `done` 但 `result_url` 空的竞态
-- `image_url` 存在时 prompt 头部拼 `PRODUCT_IMAGE_SYSTEM_PROMPT` 强约束保持商品主体一致，并向 ToAPIS 传 `image_urls=[image_url]`；ToAPIS payload 的 `size` 字段是比例字符串（`"9:16"`），不是像素 `"720x1280"`
+- `image_urls` 存在时会作为参考图数组传给 ToAPIS；ToAPIS payload 的 `size` 字段是比例字符串（`"9:16"`），不是像素 `"720x1280"`
 - 主动剥离 `HTTP[S]_PROXY`，避免 Windows 走代理失败
 
 #### 父任务 `/generation`（需登录）
 
-- `POST /generation/jobs`：scenario 当前仅支持 `product_suite`，自动生成标题 `商品套图_YYYYMMDD_HHMMSS`，落 `generation_jobs(status=draft)`，返回 `{job_id, scenario, title, status, created_at}`
-- `GET /generation/jobs?scenario=...`：返回当前用户该场景的父任务列表（按 `created_at desc`），每条带 `total/completed/failed`（按 `image_tasks.job_id` 聚合，`done` 计 completed，`failed/timeout` 计 failed）
-- `GET /generation/jobs/{job_id}`：返回父任务设置 + 子任务清单 `items[]`（含 `task_id/type_id/title/sort_order/status/progress/result_url/error_message/credit_refunded`，按 `sort_order asc, created_at asc`），`settings/source_images/structure` 为反序列化后的 JSON
+- `POST /generation/jobs`：scenario 当前支持 `product_suite / product_image / outfit`，自动生成对应标题前缀，落 `generation_jobs(status=draft)`，返回 `{job_id, scenario, title, status, created_at}`
+- `GET /generation/jobs?scenario=...`：返回当前用户该场景的父任务列表（按 `created_at desc`），每条带 `total/completed/failed`（按未归档、未被 `replaced_by_task_id` 替换的 `image_tasks.job_id` 聚合，`done` 计 completed，`failed/timeout` 计 failed）
+- `GET /generation/jobs/{job_id}`：返回父任务设置 + 子任务清单 `items[]`（只返回未归档、未被 `replaced_by_task_id` 替换的当前版本，含 `task_id/type_id/title/sort_order/status/progress/result_url/error_message/credit_refunded`，按 `sort_order asc, created_at asc`），`settings/source_images/structure` 为反序列化后的 JSON
 - `PATCH /generation/jobs/{job_id}`：保存/恢复工作台快照。可选字段 `{title, settings, source_images, input_text, structure}`，传哪个改哪个；`settings/source_images/structure` 由后端 `json.dumps(..., ensure_ascii=False)` 写入对应 JSON 列；`title` 校验 1-100 字；只能改自己的 job；返回 `{job_id, scenario, title, status, updated_at}`
 - 子任务关联：`image_tasks` 新增 `job_id / type_id / title / sort_order` 字段，由 `/image/generate` 在请求体里收到后写入；商品套图前端默认在第一次点击「生成」时延迟创建 job（`POST /generation/jobs`），再调 `PATCH /generation/jobs/{id}` 把当前左侧工作台（标题/平台·语言·比例·质量/上传图/卖点/套图结构）落盘成快照，然后 `/image/generate` 每张图入队；后续同 job 内多次点击追加生成（不清空旧 cards），sort_order 接续递增；当前**不做提交/删除/改名/独立提交接口**
+- 单图重新生成：`POST /image/task/{task_id}/regenerate` 会新建一个 `ImageTask`，并把旧任务的 `replaced_by_task_id` 指向新任务；工作台恢复时只显示新版本，旧图仍保留在数据库和资产库里，不覆盖历史记录
 
 #### 提示词模板（内部能力）
 
@@ -218,7 +219,7 @@ npm run dev
 
 ## 已知技术债
 
-- 缺正式迁移工具（Alembic 待引入），靠 `Base.metadata.create_all`：旧库需手动补列 `ALTER TABLE image_tasks ADD COLUMN error_message TEXT, ADD COLUMN progress INTEGER DEFAULT 0, ADD COLUMN provider VARCHAR(32) DEFAULT 'toapis', ADD COLUMN provider_task_id VARCHAR(128);`（之前还需 `ALTER COLUMN prompt TYPE TEXT`）；新增父任务后还需补 `ALTER TABLE image_tasks ADD COLUMN job_id VARCHAR(36), ADD COLUMN type_id VARCHAR(50), ADD COLUMN title VARCHAR(100), ADD COLUMN sort_order INTEGER DEFAULT 0;`；提示词快照字段还需补 `ALTER TABLE image_tasks ADD COLUMN IF NOT EXISTS system_prompt_snapshot TEXT, ADD COLUMN IF NOT EXISTS task_prompt_snapshot TEXT, ADD COLUMN IF NOT EXISTS user_prompt TEXT, ADD COLUMN IF NOT EXISTS prompt_template_refs_json TEXT;`；新表 `generation_jobs` / `prompt_templates` 由 `create_all` 自动建
+- 缺正式迁移工具（Alembic 待引入），靠 `Base.metadata.create_all`：旧库需手动补列 `ALTER TABLE image_tasks ADD COLUMN error_message TEXT, ADD COLUMN progress INTEGER DEFAULT 0, ADD COLUMN provider VARCHAR(32) DEFAULT 'toapis', ADD COLUMN provider_task_id VARCHAR(128);`（之前还需 `ALTER COLUMN prompt TYPE TEXT`）；新增父任务后还需补 `ALTER TABLE image_tasks ADD COLUMN job_id VARCHAR(36), ADD COLUMN type_id VARCHAR(50), ADD COLUMN title VARCHAR(100), ADD COLUMN sort_order INTEGER DEFAULT 0;`；提示词快照字段还需补 `ALTER TABLE image_tasks ADD COLUMN IF NOT EXISTS system_prompt_snapshot TEXT, ADD COLUMN IF NOT EXISTS task_prompt_snapshot TEXT, ADD COLUMN IF NOT EXISTS user_prompt TEXT, ADD COLUMN IF NOT EXISTS prompt_template_refs_json TEXT;`；重新生成保留历史需补 `ALTER TABLE image_tasks ADD COLUMN IF NOT EXISTS replaced_by_task_id VARCHAR(36);`；新表 `generation_jobs` / `prompt_templates` 由 `create_all` 自动建
 - 详情图 / 穿搭工作台的"AI 帮写"和"批量生成"仍 Mock，待对接 `/image/analyze` 和 `/image/generate`
 - 用户额度在 `GeneratorHeader` 是写死的 `1,280 点`，未读 `users.credits`
 - `useAuth` 直读写 `localStorage`，未走 Pinia store

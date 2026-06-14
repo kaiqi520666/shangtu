@@ -148,10 +148,21 @@ async function handleRegenerate(userPrompt) {
       editSubmitting.value = false
       return
     }
+    const newTaskId = res.data?.task_id
+    if (!newTaskId) {
+      toast.error('重新生成失败：缺少新任务 ID')
+      editSubmitting.value = false
+      return
+    }
+
     // 更新 card 状态 —— 先找到 outputCards 中的原始对象确保响应式
     const target = suite.outputCards.value.find((c) => c.taskId === card.taskId)
     if (target) {
+      target.id = newTaskId
+      target.taskId = newTaskId
       target.previousResultUrl = target.resultUrl || target.dataUrl || ''
+      target.dataUrl = ''
+      target.resultUrl = ''
       target.status = 'processing'
       target.errorMessage = ''
       target.userPrompt = prompt

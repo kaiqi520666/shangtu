@@ -456,7 +456,7 @@ async def regenerate_task(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """基于已有图片重新生成。复用同一个 task_id，覆盖结果。"""
+    """基于已有图片重新生成。新建 ImageTask，旧任务保留为历史资产。"""
     edit_instruction = (req.edit_instruction or "").strip()
     requested_user_prompt = (req.user_prompt or "").strip()
     if not requested_user_prompt and not edit_instruction:
@@ -473,6 +473,8 @@ async def regenerate_task(
         return fail("图片不存在")
     if task.archived:
         return fail("图片已被删除")
+    if task.replaced_by_task_id:
+        return fail("该图片已有新的重生版本，请刷新后操作最新图片")
     if not task.result_url:
         return fail("该图片尚未生成完成，无法重新生成")
 
@@ -509,37 +511,49 @@ async def regenerate_task(
         new_prompt = task.prompt + "\n\n【用户修改要求】" + edit_instruction
     prepend_reference_prompt = not has_prompt_snapshot
 
-    # 扣积分 + 更新 task 同一事务
+    new_task_id = str(uuid.uuid4())
+
+    # 扣积分 + 新建重生任务 + 标记旧任务被替换，放在同一事务
     current_user.credits -= CREDITS_PER_IMAGE
-    task.status = "pending"
-    task.error_message = None
-    task.progress = 0
-    task.edit_instruction = edit_instruction or None
-    task.prompt = new_prompt
-    task.user_prompt = new_user_prompt
-    # 保留 result_url 不清空，前端继续显示旧图
-    task.credit_refunded = False
-    task.provider_task_id = None
+    new_task = ImageTask(
+        id=new_task_id,
+        user_id=current_user.id,
+        job_id=task.job_id,
+        type_id=task.type_id,
+        title=task.title,
+        sort_order=task.sort_order,
+        prompt=new_prompt,
+        size=task.size,
+        status="pending",
+        edit_instruction=edit_instruction or None,
+        system_prompt_snapshot=task.system_prompt_snapshot,
+        task_prompt_snapshot=task.task_prompt_snapshot,
+        user_prompt=new_user_prompt,
+        prompt_template_refs_json=task.prompt_template_refs_json,
+        credit_refunded=False,
+    )
+    task.replaced_by_task_id = new_task_id
+    db.add(new_task)
 
     try:
         await db.commit()
+        await db.refresh(new_task)
     except Exception:
         await db.rollback()
         return fail("重新生成失败，请稍后重试")
 
-    # 重置 Redis 运行态，避免前端轮询读到上一轮的 done/result
     # 入队 worker
     # TODO: 后续用 generation_attempts 做严格幂等退款
     try:
         redis = request.app.state.redis_pool
-        await redis.delete(f"task:{task_id}:result")
-        await redis.delete(f"task:{task_id}:error")
-        await redis.set(f"task:{task_id}:status", "pending", ex=7200)
-        await redis.set(f"task:{task_id}:progress", "0", ex=7200)
+        await redis.delete(f"task:{new_task_id}:result")
+        await redis.delete(f"task:{new_task_id}:error")
+        await redis.set(f"task:{new_task_id}:status", "pending", ex=7200)
+        await redis.set(f"task:{new_task_id}:progress", "0", ex=7200)
 
         await redis.enqueue_job(
             "generate_image",
-            task_id,
+            new_task_id,
             new_prompt,
             ratio,
             resolution,
@@ -547,17 +561,18 @@ async def regenerate_task(
             [old_result_url],  # 使用当前已生成图作为参考图
         )
     except Exception:
-        # 入队失败：退积分 + 标记 failed
+        # 入队失败：退积分 + 标记新任务 failed + 恢复旧任务在工作台可见
         try:
             current_user.credits += CREDITS_PER_IMAGE
-            task.status = "failed"
-            task.error_message = "任务入队失败"
-            task.credit_refunded = True
-            # 恢复旧 result_url 确保前端仍可展示
-            task.result_url = old_result_url
+            task.replaced_by_task_id = None
+            new_task.status = "failed"
+            new_task.error_message = "任务入队失败"
+            new_task.credit_refunded = True
+            new_task.archived = True
+            new_task.archived_at = utc_now()
             await db.commit()
         except Exception:
             await db.rollback()
         return fail("任务入队失败，请稍后重试")
 
-    return success({"task_id": task_id})
+    return success({"task_id": new_task_id, "source_task_id": task_id})

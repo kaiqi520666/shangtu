@@ -131,6 +131,8 @@ async def list_jobs(
         select(ImageTask.job_id, ImageTask.status).where(
             ImageTask.user_id == current_user.id,
             ImageTask.job_id.in_(job_ids),
+            ImageTask.archived == False,  # noqa: E712
+            ImageTask.replaced_by_task_id.is_(None),
         )
     )
     stats: dict[str, dict[str, int]] = {
@@ -192,6 +194,7 @@ async def get_job(
             ImageTask.job_id == job_id,
             ImageTask.user_id == current_user.id,
             ImageTask.archived == False,  # noqa: E712
+            ImageTask.replaced_by_task_id.is_(None),
         )
         .order_by(ImageTask.sort_order.asc(), ImageTask.created_at.asc())
     )
@@ -206,6 +209,7 @@ async def get_job(
             "result_url": task.result_url,
             "error_message": task.error_message,
             "credit_refunded": bool(task.credit_refunded),
+            "replaced_by_task_id": task.replaced_by_task_id,
             "prompt": task.prompt,
             "edit_instruction": task.edit_instruction,
             "system_prompt_snapshot": task.system_prompt_snapshot,

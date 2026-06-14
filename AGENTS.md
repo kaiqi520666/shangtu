@@ -150,6 +150,7 @@ frontend/src/
 `ImageTask` 是单张图任务：
 
 - `job_id`
+- `replaced_by_task_id`
 - `type_id`
 - `title`
 - `sort_order`
@@ -168,12 +169,15 @@ frontend/src/
 - `prompt_template_refs_json`
 - `archived`
 
+单图重新生成会新建一条 `ImageTask`，并把旧任务的 `replaced_by_task_id` 指向新任务；工作台恢复只显示当前版本，旧图保留在资产库/历史数据里。
+
 场景目前后端已支持：
 
 - `product_suite`
 - `product_image`
+- `outfit`
 
-`/image/generate` 允许上述场景的 job。Worker 不关心场景，只处理 prompt、尺寸、参考图和任务 ID。
+`/image/generate` 允许上述场景的 job，参考图统一使用 `image_urls` 数组。Worker 不关心场景，只处理 prompt、尺寸、参考图和任务 ID。
 
 ### PromptTemplate
 
@@ -416,7 +420,7 @@ VITE_API_BASE_URL=
 
 ## 已知技术债
 
-- 没有 Alembic，开发期依赖 `Base.metadata.create_all`，旧库字段需要手动迁移。提示词快照字段旧库需补：`ALTER TABLE image_tasks ADD COLUMN IF NOT EXISTS system_prompt_snapshot TEXT, ADD COLUMN IF NOT EXISTS task_prompt_snapshot TEXT, ADD COLUMN IF NOT EXISTS user_prompt TEXT, ADD COLUMN IF NOT EXISTS prompt_template_refs_json TEXT;`
+- 没有 Alembic，开发期依赖 `Base.metadata.create_all`，旧库字段需要手动迁移。提示词快照字段旧库需补：`ALTER TABLE image_tasks ADD COLUMN IF NOT EXISTS system_prompt_snapshot TEXT, ADD COLUMN IF NOT EXISTS task_prompt_snapshot TEXT, ADD COLUMN IF NOT EXISTS user_prompt TEXT, ADD COLUMN IF NOT EXISTS prompt_template_refs_json TEXT;` 重新生成保留历史需补：`ALTER TABLE image_tasks ADD COLUMN IF NOT EXISTS replaced_by_task_id VARCHAR(36);`
 - 商品详情图和服饰穿搭还没有完全接入真实生图任务闭环。
 - 资产库删除目前只删 DB 记录，不删 OSS 文件。
 - 用户额度前端展示还没有完全从后端实时读取。
