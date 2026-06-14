@@ -233,6 +233,7 @@ export function useGenerationCards({
     sortOrder,
     batchRunId,
     settingsSnapshot,
+    userPrompt,
   }) {
     return reactive({
       id: makeId(),
@@ -248,7 +249,7 @@ export function useGenerationCards({
       sortOrder: sortOrder || 0,
       batchRunId: batchRunId || "",
       creditRefunded: false,
-      userPrompt: "",
+      userPrompt: userPrompt || "",
       settingsSnapshot: settingsSnapshot || null,
     });
   }

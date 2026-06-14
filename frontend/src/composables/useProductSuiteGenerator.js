@@ -1,7 +1,7 @@
 import { computed, onBeforeUnmount, reactive, ref } from "vue";
 import {
   createDefaultGenerationSettings,
-  ratioOptions,
+  formatImageLabel,
   resolutionMap,
   resolveQuality,
 } from "@/constants/generator.js";
@@ -47,8 +47,8 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
     generatedCount,
     jobTotal,
     startPollingCard,
+    createCard: createGenerationCard,
     restoreCard: restoreGenerationCard,
-    makeId,
   } = cards;
 
   // --- 场景特有状态 ---
@@ -128,12 +128,9 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
   const canGenerate = computed(
     () => hasGenerationSource.value && totalCount.value > 0 && !generating.value,
   );
-  const selectedRatioOption = computed(
-    () => ratioOptions.find((option) => option.value === settings.ratio) || ratioOptions[0],
-  );
   const selectedImageLabel = computed(() => {
-    const { width, height } = getCardSize();
-    return `${settings.quality} / ${selectedRatioOption.value.label} / ${width}x${height}`;
+    syncQualityForRatio();
+    return formatImageLabel({ ratio: settings.ratio, quality: settings.quality });
   });
 
   function restoreSuiteJobData(data) {
@@ -276,20 +273,12 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
         quality: settings.quality,
       }),
       createCard({ item, sortOrder, batchRunId, settingsSnapshot }) {
-        return reactive({
-          id: makeId(),
-          taskId: "",
+        return createGenerationCard({
           typeId: item.id,
-          dataUrl: "",
-          resultUrl: "",
-          selected: true,
-          status: "pending",
           strategyTitle: `${item.name} ${item.index}`,
           strategyContent: item.description,
-          errorMessage: "",
           sortOrder,
           batchRunId,
-          creditRefunded: false,
           settingsSnapshot,
         });
       },
@@ -313,17 +302,11 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
     });
   }
 
-  function getCardSize() {
+  function syncQualityForRatio() {
     const effectiveQuality = resolveQuality(settings.ratio, settings.quality) || settings.quality;
-    const dims = resolutionMap[settings.ratio]?.[effectiveQuality];
-    if (!dims) {
-      throw new Error(`不支持的尺寸组合：${settings.ratio} / ${settings.quality}`);
-    }
     if (effectiveQuality !== settings.quality) {
       settings.quality = effectiveQuality;
     }
-    const [width, height] = dims;
-    return { width, height };
   }
 
   function getStructureName(id) {
@@ -332,10 +315,6 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
 
   function getStructureStrategy(id) {
     return suiteStructureDefaults.find((item) => item.id === id)?.description || "商品套图生成";
-  }
-
-  function regenerateSingleCard(_card) {
-    toast.info("请点击编辑图片按钮进行重新生成");
   }
 
   // --- 生命周期 ---
@@ -384,7 +363,6 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
     toggleSelectAllCards,
     batchDownload,
     downloadSingleImage,
-    regenerateSingleCard,
     startPollingCard,
   };
 }

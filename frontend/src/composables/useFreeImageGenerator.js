@@ -1,5 +1,5 @@
 import { computed, onBeforeUnmount, reactive, ref } from "vue";
-import { ratioOptions, resolutionMap, resolveQuality } from "@/constants/generator.js";
+import { formatImageLabel, resolutionMap, resolveQuality } from "@/constants/generator.js";
 import { optimizeFreeImagePrompt } from "@/api/image.js";
 import { useCardActions } from "@/composables/useCardActions.js";
 import {
@@ -38,8 +38,8 @@ export function useFreeImageGenerator({ onJobCreated } = {}) {
     generatedCount,
     jobTotal,
     startPollingCard,
+    createCard: createGenerationCard,
     restoreCard: restoreGenerationCard,
-    makeId,
   } = cards;
 
   const referenceImages = ref([]);
@@ -118,12 +118,9 @@ export function useFreeImageGenerator({ onJobCreated } = {}) {
   const canGenerate = computed(
     () => hasPrompt.value && !hasUploadingReference.value && !generating.value,
   );
-  const selectedRatioOption = computed(
-    () => ratioOptions.find((option) => option.value === settings.ratio) || ratioOptions[0],
-  );
   const selectedImageLabel = computed(() => {
-    const { width, height } = getCardSize();
-    return `${settings.quality} / ${selectedRatioOption.value.label} / ${width}x${height}`;
+    syncQualityForRatio();
+    return formatImageLabel({ ratio: settings.ratio, quality: settings.quality });
   });
 
   function restoreFreeImageJobData(data) {
@@ -246,20 +243,12 @@ export function useFreeImageGenerator({ onJobCreated } = {}) {
         quality: settings.quality,
       }),
       createCard({ item, sortOrder, batchRunId, settingsSnapshot }) {
-        return reactive({
-          id: makeId(),
-          taskId: "",
+        return createGenerationCard({
           typeId: item.id,
-          dataUrl: "",
-          resultUrl: "",
-          selected: true,
-          status: "pending",
           strategyTitle: item.title,
           strategyContent: item.prompt,
-          errorMessage: "",
           sortOrder,
           batchRunId,
-          creditRefunded: false,
           userPrompt: item.prompt,
           settingsSnapshot,
         });
@@ -270,17 +259,11 @@ export function useFreeImageGenerator({ onJobCreated } = {}) {
     });
   }
 
-  function getCardSize() {
+  function syncQualityForRatio() {
     const effectiveQuality = resolveQuality(settings.ratio, settings.quality) || settings.quality;
-    const dims = resolutionMap[settings.ratio]?.[effectiveQuality];
-    if (!dims) {
-      throw new Error(`不支持的尺寸组合：${settings.ratio} / ${settings.quality}`);
-    }
     if (effectiveQuality !== settings.quality) {
       settings.quality = effectiveQuality;
     }
-    const [width, height] = dims;
-    return { width, height };
   }
 
   function getModuleName() {

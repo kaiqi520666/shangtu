@@ -1,7 +1,7 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import {
   createDefaultGenerationSettings,
-  ratioOptions,
+  formatImageLabel,
   resolutionMap,
   resolveQuality,
 } from "@/constants/generator.js";
@@ -38,8 +38,8 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
     generatedCount,
     jobTotal,
     startPollingCard,
+    createCard: createGenerationCard,
     restoreCard: restoreGenerationCard,
-    makeId,
   } = cards;
 
   const garmentImages = ref([]);
@@ -119,12 +119,9 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
       selectedScenes.value.length > 0 &&
       !generating.value,
   );
-  const selectedRatioOption = computed(
-    () => ratioOptions.find((option) => option.value === settings.ratio) || ratioOptions[0],
-  );
   const selectedImageLabel = computed(() => {
-    const { width, height } = getCardSize();
-    return `${settings.quality} / ${selectedRatioOption.value.label} / ${width}x${height}`;
+    syncQualityForRatio();
+    return formatImageLabel({ ratio: settings.ratio, quality: settings.quality });
   });
   const previewSlides = computed(() => {
     const uploadedImage = garmentImages.value[mainGarmentIndex.value];
@@ -277,20 +274,12 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
         quality: settings.quality,
       }),
       createCard({ item, sortOrder, batchRunId, settingsSnapshot }) {
-        return reactive({
-          id: makeId(),
-          taskId: "",
+        return createGenerationCard({
           typeId: item.id,
-          dataUrl: "",
-          resultUrl: "",
-          selected: true,
-          status: "pending",
           strategyTitle: item.title,
           strategyContent: item.description,
-          errorMessage: "",
           sortOrder,
           batchRunId,
-          creditRefunded: false,
           settingsSnapshot,
         });
       },
@@ -311,17 +300,11 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
     });
   }
 
-  function getCardSize() {
+  function syncQualityForRatio() {
     const effectiveQuality = resolveQuality(settings.ratio, settings.quality) || settings.quality;
-    const dims = resolutionMap[settings.ratio]?.[effectiveQuality];
-    if (!dims) {
-      throw new Error(`不支持的尺寸组合：${settings.ratio} / ${settings.quality}`);
-    }
     if (effectiveQuality !== settings.quality) {
       settings.quality = effectiveQuality;
     }
-    const [width, height] = dims;
-    return { width, height };
   }
 
   function findScene(id) {
@@ -341,10 +324,6 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
     const scene = scenePresets.find((item) => item.id === id);
     if (!scene) return "服饰穿搭场景生成";
     return `${scene.label}穿搭图，保持服装与模特参考一致，画面自然、清晰、适合电商展示。`;
-  }
-
-  function regenerateSingleCard(_card) {
-    toast.info("请点击编辑图片按钮进行重新生成");
   }
 
   onMounted(() => {
@@ -392,7 +371,6 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
     toggleSelectAllCards,
     batchDownload,
     downloadSingleImage,
-    regenerateSingleCard,
     createNewTask,
     resetWorkspaceToDraft,
     updateCurrentJobTitle,
