@@ -189,7 +189,6 @@ export function useGenerationRunner({
 
   async function enqueueImageBatch({
     queue,
-    imageUrl,
     imageUrls,
     ratio,
     resolution,
@@ -258,7 +257,6 @@ export function useGenerationRunner({
         const result = await generateImage({
           prompt,
           user_prompt: userPrompt,
-          image_url: imageUrl,
           image_urls: imageUrls,
           ratio,
           resolution,

@@ -268,9 +268,11 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
       structure: suiteStructure.value,
     };
 
+    const imageUrls = uploadedImages.value.map((img) => img.url).filter(Boolean);
+
     await enqueueImageBatch({
       queue,
-      imageUrl: mainImg.url,
+      imageUrls,
       ratio: settings.ratio,
       resolution: settings.quality,
       snapshotPayload,

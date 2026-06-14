@@ -273,7 +273,6 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
 
     await enqueueImageBatch({
       queue,
-      imageUrl: mainImg.url,
       imageUrls: [mainImg.url, selectedModel.value.image],
       ratio: settings.ratio,
       resolution: settings.quality,

@@ -30,7 +30,6 @@ export function generateProductImageStrategy({
 export function generateImage({
   prompt,
   user_prompt = null,
-  image_url = null,
   image_urls = null,
   ratio,
   resolution,
@@ -44,7 +43,6 @@ export function generateImage({
     {
       prompt,
       user_prompt,
-      image_url,
       image_urls,
       ratio,
       resolution,

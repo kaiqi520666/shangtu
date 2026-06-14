@@ -358,9 +358,11 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
       structure: moduleContents.value,
     };
 
+    const imageUrls = uploadedImages.value.map((img) => img.url).filter(Boolean);
+
     const ok = await enqueueImageBatch({
       queue,
-      imageUrl: mainImg.url,
+      imageUrls,
       ratio: settings.ratio,
       resolution: settings.quality,
       snapshotPayload,

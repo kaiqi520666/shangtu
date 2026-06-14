@@ -4,7 +4,7 @@ import uuid
 import httpx
 from fastapi import APIRouter, Depends, File, Request, UploadFile
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,8 +33,7 @@ CREDITS_PER_IMAGE = 1
 class GenerateRequest(BaseModel):
     prompt: str
     user_prompt: str | None = None
-    image_url: str | None = None
-    image_urls: list[str] | None = None
+    image_urls: list[str] = Field(default_factory=list)
     ratio: str = "1:1"
     resolution: str = "1K"
     job_id: str | None = None
@@ -213,8 +212,6 @@ async def create_task(
         return fail("任务创建失败，请稍后重试")
 
     reference_image_urls = [url for url in (req.image_urls or []) if url]
-    if not reference_image_urls and req.image_url:
-        reference_image_urls = [req.image_url]
 
     # 入队失败：标记任务 failed 并退回积分，避免用户被扣却没活
     try:
@@ -224,7 +221,6 @@ async def create_task(
             final_prompt,
             req.ratio,
             req.resolution,
-            req.image_url,
             prepend_reference_prompt,
             reference_image_urls,
         )
@@ -547,8 +543,8 @@ async def regenerate_task(
             new_prompt,
             ratio,
             resolution,
-            old_result_url,  # 使用当前已生成图作为参考图
             prepend_reference_prompt,
+            [old_result_url],  # 使用当前已生成图作为参考图
         )
     except Exception:
         # 入队失败：退积分 + 标记 failed

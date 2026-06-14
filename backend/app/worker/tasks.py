@@ -129,13 +129,10 @@ def build_create_payload(
     prompt: str,
     ratio: str,
     resolution: str,
-    image_url: str | None,
     image_urls: list[str] | None = None,
     prepend_reference_prompt: bool = True,
 ) -> dict:
     reference_urls = [url for url in (image_urls or []) if url]
-    if not reference_urls and image_url:
-        reference_urls = [image_url]
     full_prompt = (
         f"{PRODUCT_IMAGE_SYSTEM_PROMPT}\n\n{prompt}"
         if reference_urls and prepend_reference_prompt
@@ -344,7 +341,6 @@ async def generate_image(
     prompt: str,
     ratio: str = "1:1",
     resolution: str = "1K",
-    image_url: str | None = None,
     prepend_reference_prompt: bool = True,
     image_urls: list[str] | None = None,
 ):
@@ -373,7 +369,6 @@ async def generate_image(
             prompt=prompt,
             ratio=ratio,
             resolution=resolution,
-            image_url=image_url,
             image_urls=image_urls,
             prepend_reference_prompt=prepend_reference_prompt,
         )
