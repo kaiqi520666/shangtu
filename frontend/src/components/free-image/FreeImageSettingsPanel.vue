@@ -1,16 +1,16 @@
 <script setup>
-import { computed, watch } from 'vue'
-import { ImagePlus, LoaderCircle, Sparkles } from 'lucide-vue-next'
-import AppSelect from '@/components/ui/AppSelect.vue'
-import GeneratorActionFooter from '@/components/generation/GeneratorActionFooter.vue'
-import GeneratorSidePanelShell from '@/components/generation/GeneratorSidePanelShell.vue'
-import ImageUploader from '@/components/generation/ImageUploader.vue'
+import { computed, watch } from "vue";
+import { ImagePlus, LoaderCircle, Sparkles } from "lucide-vue-next";
+import AppSelect from "@/components/ui/AppSelect.vue";
+import GeneratorActionFooter from "@/components/generation/GeneratorActionFooter.vue";
+import GeneratorSidePanelShell from "@/components/generation/GeneratorSidePanelShell.vue";
+import ImageUploader from "@/components/generation/ImageUploader.vue";
 import {
   isQualitySupported,
   qualityOptions,
   ratioOptions,
   resolveQuality,
-} from '@/constants/generator.js'
+} from "@/constants/generator.js";
 
 const props = defineProps({
   settings: {
@@ -57,46 +57,47 @@ const props = defineProps({
     type: String,
     required: true,
   },
-})
+});
 
 const emit = defineEmits([
-  'update:settings',
-  'update:referenceImages',
-  'update:mainImageIndex',
-  'notify',
-  'optimize',
-  'generate',
-])
+  "update:settings",
+  "update:referenceImages",
+  "update:mainImageIndex",
+  "notify",
+  "optimize",
+  "generate",
+]);
 
 const primaryText = computed(() => {
-  if (!props.settings.prompt.trim()) return '请输入提示词'
-  if (props.referenceImages.some((img) => img?.uploading)) return '参考图上传中...'
-  if (props.generating) return `AI 正在生成... (${props.generatedCount}/${props.jobTotal || props.totalCount})`
-  return '生成图片'
-})
+  if (!props.settings.prompt.trim()) return "请输入提示词";
+  if (props.referenceImages.some((img) => img?.uploading)) return "参考图上传中...";
+  if (props.generating)
+    return `AI 正在生成... (${props.generatedCount}/${props.jobTotal || props.totalCount})`;
+  return "生成图片";
+});
 
-const isQualityEnabled = (quality) => isQualitySupported(props.settings.ratio, quality)
+const isQualityEnabled = (quality) => isQualitySupported(props.settings.ratio, quality);
 
 watch(
   () => props.settings.ratio,
   (ratio) => {
-    const next = resolveQuality(ratio, props.settings.quality)
+    const next = resolveQuality(ratio, props.settings.quality);
     if (next && next !== props.settings.quality) {
-      updateSetting('quality', next)
+      updateSetting("quality", next);
     }
   },
-)
+);
 
 function updateSetting(key, value) {
-  emit('update:settings', {
+  emit("update:settings", {
     ...props.settings,
     [key]: value,
-  })
+  });
 }
 
 function selectQuality(quality) {
-  if (!isQualityEnabled(quality)) return
-  updateSetting('quality', quality)
+  if (!isQualityEnabled(quality)) return;
+  updateSetting("quality", quality);
 }
 </script>
 
@@ -128,12 +129,12 @@ function selectQuality(quality) {
           >
             <LoaderCircle v-if="optimizing" class="h-3.5 w-3.5 animate-spin" />
             <Sparkles v-else class="h-3.5 w-3.5" />
-            {{ optimizing ? 'AI优化中...' : 'AI优化' }}
+            {{ optimizing ? "AI优化中..." : "AI优化" }}
           </button>
         </div>
         <textarea
           :value="settings.prompt"
-          class="h-40 w-full resize-none rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs leading-relaxed text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-primary focus:ring-1 focus:ring-primary"
+          class="h-36 w-full resize-none rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs leading-relaxed text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-primary focus:ring-1 focus:ring-primary"
           placeholder="输入你想生成的画面，例如：一只透明玻璃杯放在木质餐桌上，柔和自然光，真实摄影风格"
           @input="updateSetting('prompt', $event.target.value)"
         ></textarea>
@@ -177,7 +178,7 @@ function selectQuality(quality) {
                     : 'text-slate-400'
               "
             >
-              {{ isQualityEnabled(quality.value) ? quality.subtitle : '不支持' }}
+              {{ isQualityEnabled(quality.value) ? quality.subtitle : "不支持" }}
             </span>
           </button>
         </div>
