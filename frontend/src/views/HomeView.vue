@@ -1,16 +1,10 @@
 <script setup>
-import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import { ArrowRight, ImagePlus, Layers3, Shirt, Sparkles } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth.js'
 
 const authStore = useAuthStore()
-
-const workbenchTarget = computed(() =>
-  authStore.isAuthenticated
-    ? '/generator/product-suite'
-    : { path: '/login', query: { redirect: '/generator/product-suite' } },
-)
+const loginTarget = { path: '/login', query: { redirect: '/generator/product-suite' } }
 
 const featureItems = [
   { icon: Layers3, title: '商品套图', desc: '批量生成主图、场景图、卖点图和细节图。' },
@@ -33,30 +27,20 @@ const featureItems = [
         </div>
       </div>
 
-      <div class="flex items-center gap-2">
+      <div v-if="!authStore.isAuthenticated" class="flex items-center gap-2">
         <RouterLink
-          v-if="authStore.isAuthenticated"
-          to="/generator/product-suite"
+          to="/login"
+          class="rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm transition-colors hover:border-primary/40 hover:text-primary"
+        >
+          登录
+        </RouterLink>
+        <RouterLink
+          to="/register"
           class="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-secondary"
         >
-          进入工作台
+          注册
           <ArrowRight class="h-3.5 w-3.5" />
         </RouterLink>
-        <template v-else>
-          <RouterLink
-            to="/login"
-            class="rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm transition-colors hover:border-primary/40 hover:text-primary"
-          >
-            登录
-          </RouterLink>
-          <RouterLink
-            to="/register"
-            class="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-secondary"
-          >
-            注册
-            <ArrowRight class="h-3.5 w-3.5" />
-          </RouterLink>
-        </template>
       </div>
     </header>
 
@@ -71,19 +55,28 @@ const featureItems = [
         </p>
         <div class="mt-8 flex flex-wrap items-center gap-3">
           <RouterLink
-            :to="workbenchTarget"
+            v-if="authStore.isAuthenticated"
+            to="/generator/product-suite"
             class="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-bold text-white shadow-md transition-colors hover:bg-secondary"
           >
             进入工作台
             <ArrowRight class="h-4 w-4" />
           </RouterLink>
-          <RouterLink
-            v-if="!authStore.isAuthenticated"
-            to="/register"
-            class="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-primary/40 hover:text-primary"
-          >
-            创建账号
-          </RouterLink>
+          <template v-else>
+            <RouterLink
+              :to="loginTarget"
+              class="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-bold text-white shadow-md transition-colors hover:bg-secondary"
+            >
+              登录
+              <ArrowRight class="h-4 w-4" />
+            </RouterLink>
+            <RouterLink
+              to="/register"
+              class="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-primary/40 hover:text-primary"
+            >
+              注册
+            </RouterLink>
+          </template>
         </div>
       </section>
 
