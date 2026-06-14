@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue'
-import { Check, ImagePlus } from 'lucide-vue-next'
+import { Check, ImagePlus, LoaderCircle, Trash2 } from 'lucide-vue-next'
 
 defineProps({
   models: {
@@ -15,10 +15,19 @@ defineProps({
     type: Boolean,
     default: false,
   },
+  uploading: {
+    type: Boolean,
+    default: false,
+  },
+  deletingId: {
+    type: String,
+    default: '',
+  },
 })
 
-const emit = defineEmits(['update:selectedId'])
+const emit = defineEmits(['update:selectedId', 'upload', 'delete'])
 
+const fileInput = ref(null)
 const hoveredModel = ref(null)
 const previewPosition = ref({ top: 96, left: 460 })
 
@@ -53,6 +62,28 @@ function updatePreviewPosition(event) {
 function hidePreview() {
   hoveredModel.value = null
 }
+
+function triggerUpload() {
+  fileInput.value?.click()
+}
+
+function handleFileChange(event) {
+  const file = event.target.files?.[0]
+  if (file) {
+    emit('upload', file)
+  }
+  event.target.value = ''
+}
+
+function deleteModel(model, event) {
+  event.stopPropagation()
+  hidePreview()
+  emit('delete', model.id)
+}
+
+function selectModel(model) {
+  emit('update:selectedId', model.id)
+}
 </script>
 
 <template>
@@ -62,11 +93,15 @@ function hidePreview() {
       <div class="grid grid-cols-4 gap-2">
         <button
           type="button"
-          class="flex aspect-square flex-col items-center justify-center rounded-xl bg-slate-100 text-slate-400 transition-colors hover:bg-slate-200/70"
+          class="flex aspect-square flex-col items-center justify-center rounded-xl bg-slate-100 text-slate-400 transition-colors hover:bg-slate-200/70 disabled:cursor-not-allowed disabled:opacity-70"
+          :disabled="uploading"
+          @click="triggerUpload"
         >
-          <ImagePlus class="h-5 w-5" />
-          <span class="mt-1 text-xs">上传新模特</span>
+          <LoaderCircle v-if="uploading" class="h-5 w-5 animate-spin" />
+          <ImagePlus v-else class="h-5 w-5" />
+          <span class="mt-1 text-xs">{{ uploading ? '上传中' : '上传新模特' }}</span>
         </button>
+        <input ref="fileInput" type="file" accept="image/*" class="hidden" @change="handleFileChange" />
         <div
           v-if="loading"
           class="col-span-3 flex aspect-[3/1] items-center justify-center rounded-xl bg-slate-50 text-xs font-semibold text-slate-400"
@@ -80,17 +115,20 @@ function hidePreview() {
           暂无可用模特
         </div>
         <template v-else>
-          <button
+          <div
             v-for="model in models"
             :key="model.id"
-            type="button"
             class="group relative aspect-square overflow-hidden rounded-xl border bg-slate-100 transition-all"
             :class="selectedId === model.id ? 'border-primary ring-2 ring-primary/10' : 'border-transparent hover:border-slate-200'"
             :title="model.name"
+            role="button"
+            tabindex="0"
             @mouseenter="showPreview(model, $event)"
             @mousemove="updatePreviewPosition"
             @mouseleave="hidePreview"
-            @click="emit('update:selectedId', model.id)"
+            @click="selectModel(model)"
+            @keydown.enter.prevent="selectModel(model)"
+            @keydown.space.prevent="selectModel(model)"
           >
             <img :src="model.image" class="h-full w-full object-cover transition-transform group-hover:scale-105" :alt="model.name" />
             <span
@@ -99,7 +137,19 @@ function hidePreview() {
             >
               <Check class="h-3 w-3 stroke-[3]" />
             </span>
-          </button>
+            <button
+              v-if="model.canDelete"
+              type="button"
+              class="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded bg-white/90 text-rose-500 opacity-0 shadow transition-opacity hover:bg-rose-50 group-hover:opacity-100"
+              :class="deletingId === model.id ? 'opacity-100' : ''"
+              title="删除我的模特"
+              :disabled="deletingId === model.id"
+              @click="deleteModel(model, $event)"
+            >
+              <LoaderCircle v-if="deletingId === model.id" class="h-3 w-3 animate-spin" />
+              <Trash2 v-else class="h-3 w-3" />
+            </button>
+          </div>
         </template>
       </div>
     </div>

@@ -6,7 +6,7 @@ import {
   resolveQuality,
 } from "@/constants/generator.js";
 import { outfitPreviewSlides, scenePresets } from "@/constants/outfit.js";
-import { listOutfitModels } from "@/api/outfit.js";
+import { deleteOutfitModel, listOutfitModels, uploadOutfitModel } from "@/api/outfit.js";
 import { useCardActions } from "@/composables/useCardActions.js";
 import {
   createBatchFinishedHandler,
@@ -46,6 +46,8 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
   const mainGarmentIndex = ref(0);
   const modelLibrary = ref([]);
   const modelsLoading = ref(false);
+  const modelUploading = ref(false);
+  const modelDeletingId = ref("");
   const selectedModelId = ref("");
   const selectedScenes = ref(["street"]);
   const sceneDescription = ref("");
@@ -144,14 +146,12 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
         return;
       }
 
-      modelLibrary.value = (result.data || []).map((model) => ({
-        id: model.id,
-        name: model.name,
-        image: model.image_url,
-        objectKey: model.object_key,
-        sortOrder: model.sort_order || 0,
-      }));
-      if (!selectedModelId.value && modelLibrary.value.length > 0) {
+      modelLibrary.value = (result.data || []).map(normalizeModel);
+      if (
+        (!selectedModelId.value ||
+          !modelLibrary.value.some((model) => model.id === selectedModelId.value)) &&
+        modelLibrary.value.length > 0
+      ) {
         selectedModelId.value = modelLibrary.value[0].id;
       }
     } catch (error) {
@@ -165,6 +165,64 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
       selectedModelId.value = "";
     } finally {
       modelsLoading.value = false;
+    }
+  }
+
+  async function uploadModel(file) {
+    if (!file) return;
+    modelUploading.value = true;
+    try {
+      const result = await uploadOutfitModel(file);
+      if (result.code !== 0) {
+        toast.error(result.message || "模特上传失败");
+        return;
+      }
+
+      const model = normalizeModel(result.data);
+      modelLibrary.value = [model, ...modelLibrary.value];
+      selectedModelId.value = model.id;
+      toast.success("模特已上传");
+    } catch (error) {
+      const status = error.response?.status;
+      if (status === 401) {
+        toast.error("登录已过期，请重新登录");
+      } else {
+        toast.error(error.response?.data?.message || "模特上传失败");
+      }
+    } finally {
+      modelUploading.value = false;
+    }
+  }
+
+  async function deleteModel(modelId) {
+    const model = modelLibrary.value.find((item) => item.id === modelId);
+    if (!model || !model.canDelete) {
+      toast.info("系统默认模特不能删除");
+      return;
+    }
+
+    modelDeletingId.value = modelId;
+    try {
+      const result = await deleteOutfitModel(modelId);
+      if (result.code !== 0) {
+        toast.error(result.message || "删除模特失败");
+        return;
+      }
+
+      modelLibrary.value = modelLibrary.value.filter((item) => item.id !== modelId);
+      if (selectedModelId.value === modelId) {
+        selectedModelId.value = modelLibrary.value[0]?.id || "";
+      }
+      toast.success("模特已删除");
+    } catch (error) {
+      const status = error.response?.status;
+      if (status === 401) {
+        toast.error("登录已过期，请重新登录");
+      } else {
+        toast.error(error.response?.data?.message || "删除模特失败");
+      }
+    } finally {
+      modelDeletingId.value = "";
     }
   }
 
@@ -339,6 +397,8 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
     mainGarmentIndex,
     modelLibrary,
     modelsLoading,
+    modelUploading,
+    modelDeletingId,
     selectedModelId,
     selectedScenes,
     sceneDescription,
@@ -364,6 +424,8 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
     previewSlides,
     showNotice: toast.info,
     loadOutfitModels,
+    uploadModel,
+    deleteModel,
     generateOutfitImages,
     getSceneName,
     getSceneStrategy,
@@ -384,4 +446,17 @@ function getImageSrc(image) {
   if (!image) return "";
   if (typeof image === "string") return image;
   return image.previewUrl || image.url || "";
+}
+
+function normalizeModel(model) {
+  return {
+    id: model.id,
+    name: model.name,
+    image: model.image_url,
+    objectKey: model.object_key,
+    sortOrder: model.sort_order || 0,
+    isSystem: Boolean(model.is_system),
+    canDelete: Boolean(model.can_delete),
+    createdAt: model.created_at || "",
+  };
 }

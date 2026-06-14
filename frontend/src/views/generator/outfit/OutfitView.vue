@@ -58,6 +58,17 @@ function openPreview(card) {
 function closePreview() {
   outfit.zoomCard.value = null
 }
+
+async function handleDeleteModel(modelId) {
+  const ok = await confirm.open({
+    title: '删除模特',
+    message: '删除后该模特不会再出现在你的服饰穿搭模特列表中。',
+    confirmText: '删除',
+    tone: 'danger',
+  })
+  if (!ok) return
+  await outfit.deleteModel(modelId)
+}
 </script>
 
 <template>
@@ -68,6 +79,8 @@ function closePreview() {
       :main-garment-index="outfit.mainGarmentIndex.value"
       :models="outfit.modelLibrary.value"
       :models-loading="outfit.modelsLoading.value"
+      :model-uploading="outfit.modelUploading.value"
+      :model-deleting-id="outfit.modelDeletingId.value"
       :selected-model-id="outfit.selectedModelId.value"
       :selected-scenes="outfit.selectedScenes.value"
       :scene-description="outfit.sceneDescription.value"
@@ -81,6 +94,8 @@ function closePreview() {
       @update:selected-scenes="outfit.selectedScenes.value = $event"
       @update:scene-description="outfit.sceneDescription.value = $event"
       @notify="outfit.showNotice"
+      @upload-model="outfit.uploadModel"
+      @delete-model="handleDeleteModel"
       @generate-images="outfit.generateOutfitImages"
     />
 

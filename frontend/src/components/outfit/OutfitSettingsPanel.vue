@@ -30,6 +30,14 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  modelUploading: {
+    type: Boolean,
+    default: false,
+  },
+  modelDeletingId: {
+    type: String,
+    default: '',
+  },
   selectedModelId: {
     type: String,
     required: true,
@@ -64,6 +72,8 @@ const emit = defineEmits([
   'update:selectedScenes',
   'update:sceneDescription',
   'notify',
+  'upload-model',
+  'delete-model',
   'generate-images',
 ])
 
@@ -88,8 +98,12 @@ const primaryText = computed(() => (props.loading ? '正在生成...' : '生成�
     <ModelSelector
       :models="models"
       :loading="modelsLoading"
+      :uploading="modelUploading"
+      :deleting-id="modelDeletingId"
       :selected-id="selectedModelId"
       @update:selected-id="emit('update:selectedModelId', $event)"
+      @upload="emit('upload-model', $event)"
+      @delete="emit('delete-model', $event)"
     />
 
     <ProductGenerationBasics
