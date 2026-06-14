@@ -2,7 +2,10 @@ import { computed, onBeforeUnmount, reactive, ref } from "vue";
 import { ratioOptions, resolutionMap, resolveQuality } from "@/constants/generator.js";
 import { optimizeFreeImagePrompt } from "@/api/image.js";
 import { useCardActions } from "@/composables/useCardActions.js";
-import { useGenerationCards } from "@/composables/useGenerationCards.js";
+import {
+  createBatchFinishedHandler,
+  useGenerationCards,
+} from "@/composables/useGenerationCards.js";
 import { useGenerationRunner } from "@/composables/useGenerationRunner.js";
 import { useToast } from "@/composables/useToast.js";
 
@@ -17,16 +20,14 @@ export function useFreeImageGenerator({ onJobCreated } = {}) {
 
   const cards = useGenerationCards({
     getLogPrefix: (card) => card.strategyTitle || "自由生图",
-    onBatchFinished({ total, failed }) {
-      genLogs.value.push("自由生图任务已结束");
-      if (failed === 0) {
-        toast.success("自由生图已生成");
-      } else if (failed === total) {
-        toast.error("自由生图生成失败，请稍后重试");
-      } else {
-        toast.info(`部分自由生图生成失败（${failed} 张）`);
-      }
-    },
+    onBatchFinished: createBatchFinishedHandler({
+      getGenLogs: () => genLogs,
+      toast,
+      doneLog: "自由生图任务已结束",
+      successText: "自由生图已生成",
+      allFailedText: "自由生图生成失败，请稍后重试",
+      partialFailedText: (failed) => `部分自由生图生成失败（${failed} 张）`,
+    }),
   });
 
   const {
@@ -36,6 +37,7 @@ export function useFreeImageGenerator({ onJobCreated } = {}) {
     generatedCount,
     jobTotal,
     startPollingCard,
+    restoreCard: restoreGenerationCard,
     makeId,
   } = cards;
 
@@ -65,22 +67,11 @@ export function useFreeImageGenerator({ onJobCreated } = {}) {
       restoreFreeImageJobData(data);
     },
     restoreCard(item) {
-      return reactive({
-        id: item.task_id,
-        taskId: item.task_id,
+      return restoreGenerationCard(item, {
         typeId: item.type_id || "free",
-        dataUrl: item.result_url || "",
-        resultUrl: item.result_url || "",
-        selected: true,
-        status: item.status || "pending",
         strategyTitle: item.title || makePromptTitle(item.user_prompt || item.prompt),
         strategyContent: item.user_prompt || item.prompt || "",
-        errorMessage: item.error_message || "",
-        sortOrder: item.sort_order || 0,
-        batchRunId: "",
-        creditRefunded: !!item.credit_refunded,
         userPrompt: item.user_prompt || item.prompt || "",
-        settingsSnapshot: item.settings_snapshot || null,
       });
     },
   });

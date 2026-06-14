@@ -1,7 +1,16 @@
 import { computed, onBeforeUnmount, reactive, ref } from "vue";
-import { availableModules, ratioOptions, resolutionMap, resolveQuality } from "@/constants/generator.js";
+import {
+  availableModules,
+  createDefaultGenerationSettings,
+  ratioOptions,
+  resolutionMap,
+  resolveQuality,
+} from "@/constants/generator.js";
 import { useCardActions } from "@/composables/useCardActions.js";
-import { useGenerationCards } from "@/composables/useGenerationCards.js";
+import {
+  createBatchFinishedHandler,
+  useGenerationCards,
+} from "@/composables/useGenerationCards.js";
 import { useGenerationRunner } from "@/composables/useGenerationRunner.js";
 import { useToast } from "@/composables/useToast.js";
 import { analyzeImage, generateProductImageStrategy } from "@/api/image.js";
@@ -24,16 +33,14 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
 
   const cards = useGenerationCards({
     getLogPrefix: (card) => card.strategyTitle || card.typeId || "",
-    onBatchFinished({ total, failed }) {
-      genLogs.value.push("全部商品详情图任务已结束");
-      if (failed === 0) {
-        toast.success("商品详情图已全部生成");
-      } else if (failed === total) {
-        toast.error("详情图生成失败，请稍后重试");
-      } else {
-        toast.info(`部分详情图生成失败（${failed} 张）`);
-      }
-    },
+    onBatchFinished: createBatchFinishedHandler({
+      getGenLogs: () => genLogs,
+      toast,
+      doneLog: "全部商品详情图任务已结束",
+      successText: "商品详情图已全部生成",
+      allFailedText: "详情图生成失败，请稍后重试",
+      partialFailedText: (failed) => `部分详情图生成失败（${failed} 张）`,
+    }),
   });
 
   const {
@@ -43,6 +50,7 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
     generatedCount,
     jobTotal,
     startPollingCard,
+    restoreCard: restoreGenerationCard,
     makeId,
   } = cards;
 
@@ -54,13 +62,7 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
   const strategyBrief = ref("");
   const moduleContents = ref([]);
 
-  const settings = reactive({
-    platform: "亚马逊",
-    language: "中文",
-    ratio: "1:1",
-    quality: "1K",
-    productInput: "",
-  });
+  const settings = reactive(createDefaultGenerationSettings());
 
   const runner = useGenerationRunner({
     scenario: "product_image",
@@ -81,22 +83,9 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
     },
     restoreCard(item) {
       const moduleItem = findModuleContent(item.type_id, item.title);
-      return reactive({
-        id: item.task_id,
-        taskId: item.task_id,
-        typeId: item.type_id || "",
-        dataUrl: item.result_url || "",
-        resultUrl: item.result_url || "",
-        selected: true,
-        status: item.status || "pending",
+      return restoreGenerationCard(item, {
         strategyTitle: item.title || moduleItem.title,
         strategyContent: moduleItem.content || moduleItem.strategy,
-        errorMessage: item.error_message || "",
-        sortOrder: item.sort_order || 0,
-        batchRunId: "",
-        creditRefunded: !!item.credit_refunded,
-        userPrompt: item.user_prompt || "",
-        settingsSnapshot: item.settings_snapshot || null,
       });
     },
   });

@@ -17,6 +17,32 @@ function makeId() {
   return `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
+export function createBatchFinishedHandler({
+  genLogs,
+  getGenLogs,
+  toast,
+  doneLog,
+  successText,
+  allFailedText,
+  partialFailedText,
+}) {
+  return ({ total, failed }) => {
+    const logs = genLogs || getGenLogs?.();
+    logs?.value?.push(doneLog);
+    if (failed === 0) {
+      toast.success(successText);
+    } else if (failed === total) {
+      toast.error(allFailedText);
+    } else {
+      toast.info(
+        typeof partialFailedText === "function"
+          ? partialFailedText(failed)
+          : partialFailedText,
+      );
+    }
+  };
+}
+
 /**
  * 通用生图卡片状态 + 轮询引擎。
  * 与场景无关，可被商品套图 / 详情图 / 穿搭等场景 composable 复用。
@@ -194,6 +220,26 @@ export function useGenerationCards({
     });
   }
 
+  function restoreCard(item, extra = {}) {
+    return reactive({
+      id: item.task_id,
+      taskId: item.task_id,
+      typeId: extra.typeId ?? item.type_id ?? "",
+      dataUrl: item.result_url || "",
+      resultUrl: item.result_url || "",
+      selected: true,
+      status: item.status || "pending",
+      strategyTitle: extra.strategyTitle ?? item.title ?? "",
+      strategyContent: extra.strategyContent ?? "",
+      errorMessage: item.error_message || "",
+      sortOrder: item.sort_order || 0,
+      batchRunId: "",
+      creditRefunded: !!item.credit_refunded,
+      userPrompt: extra.userPrompt ?? item.user_prompt ?? "",
+      settingsSnapshot: item.settings_snapshot || null,
+    });
+  }
+
   // --- 清理 ---
 
   function cleanup() {
@@ -216,6 +262,7 @@ export function useGenerationCards({
     maybeFinishGenerating,
     // 工厂
     createCard,
+    restoreCard,
     // 工具
     makeId,
     cleanup,

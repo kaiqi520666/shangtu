@@ -1,9 +1,17 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
-import { ratioOptions, resolutionMap, resolveQuality } from "@/constants/generator.js";
+import {
+  createDefaultGenerationSettings,
+  ratioOptions,
+  resolutionMap,
+  resolveQuality,
+} from "@/constants/generator.js";
 import { outfitPreviewSlides, scenePresets } from "@/constants/outfit.js";
 import { listOutfitModels } from "@/api/outfit.js";
 import { useCardActions } from "@/composables/useCardActions.js";
-import { useGenerationCards } from "@/composables/useGenerationCards.js";
+import {
+  createBatchFinishedHandler,
+  useGenerationCards,
+} from "@/composables/useGenerationCards.js";
 import { useGenerationRunner } from "@/composables/useGenerationRunner.js";
 import { useToast } from "@/composables/useToast.js";
 
@@ -12,16 +20,14 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
 
   const cards = useGenerationCards({
     getLogPrefix: (card) => card.strategyTitle || card.typeId || "",
-    onBatchFinished({ total, failed }) {
-      genLogs.value.push("全部服饰穿搭任务已结束");
-      if (failed === 0) {
-        toast.success("服饰穿搭图已全部生成");
-      } else if (failed === total) {
-        toast.error("穿搭图生成失败，请稍后重试");
-      } else {
-        toast.info(`部分穿搭图生成失败（${failed} 张）`);
-      }
-    },
+    onBatchFinished: createBatchFinishedHandler({
+      getGenLogs: () => genLogs,
+      toast,
+      doneLog: "全部服饰穿搭任务已结束",
+      successText: "服饰穿搭图已全部生成",
+      allFailedText: "穿搭图生成失败，请稍后重试",
+      partialFailedText: (failed) => `部分穿搭图生成失败（${failed} 张）`,
+    }),
   });
 
   const {
@@ -31,6 +37,7 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
     generatedCount,
     jobTotal,
     startPollingCard,
+    restoreCard: restoreGenerationCard,
     makeId,
   } = cards;
 
@@ -42,13 +49,7 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
   const selectedScenes = ref(["street"]);
   const sceneDescription = ref("");
 
-  const settings = reactive({
-    platform: "亚马逊",
-    language: "中文",
-    ratio: "3:4",
-    quality: "1K",
-    productInput: "",
-  });
+  const settings = reactive(createDefaultGenerationSettings({ ratio: "3:4" }));
 
   const runner = useGenerationRunner({
     scenario: "outfit",
@@ -67,22 +68,9 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
     },
     restoreCard(item) {
       const scene = findScene(item.type_id);
-      return reactive({
-        id: item.task_id,
-        taskId: item.task_id,
-        typeId: item.type_id || "",
-        dataUrl: item.result_url || "",
-        resultUrl: item.result_url || "",
-        selected: true,
-        status: item.status || "pending",
+      return restoreGenerationCard(item, {
         strategyTitle: item.title || scene.label,
         strategyContent: scene.description,
-        errorMessage: item.error_message || "",
-        sortOrder: item.sort_order || 0,
-        batchRunId: "",
-        creditRefunded: !!item.credit_refunded,
-        userPrompt: item.user_prompt || "",
-        settingsSnapshot: item.settings_snapshot || null,
       });
     },
   });
