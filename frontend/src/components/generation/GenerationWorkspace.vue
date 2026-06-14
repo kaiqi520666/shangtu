@@ -112,6 +112,19 @@ const emit = defineEmits([
         </div>
 
         <div class="flex items-center gap-3">
+          <template v-if="outputCards.length > 0">
+            <slot name="toolbar-extra"></slot>
+            <div class="flex items-center gap-2">
+              <button type="button" class="text-xs font-semibold text-slate-500 hover:text-primary" @click="emit('select-all-cards', true)">全选</button>
+              <span class="text-xs text-slate-300">/</span>
+              <button type="button" class="text-xs font-semibold text-slate-500 hover:text-slate-700" @click="emit('select-all-cards', false)">全不选</button>
+            </div>
+            <button type="button" class="flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-1.5 text-xs font-bold text-white shadow-md transition-all hover:bg-secondary" @click="emit('batch-download')">
+              <Download class="h-3.5 w-3.5 stroke-[2.5]" />
+              批量下载 ({{ selectedCardsCount }}张)
+            </button>
+            <div class="h-4 w-px bg-slate-200"></div>
+          </template>
           <button
             type="button"
             class="flex items-center gap-1.5 rounded-lg border border-primary/30 bg-white px-3 py-1.5 text-xs font-semibold text-primary transition-all hover:bg-primary/5"
@@ -130,19 +143,6 @@ const emit = defineEmits([
             <Clock3 class="h-3.5 w-3.5" />
             生成记录
           </button>
-          <template v-if="outputCards.length > 0">
-            <div class="h-4 w-px bg-slate-200"></div>
-            <slot name="toolbar-extra"></slot>
-            <div class="flex items-center gap-2">
-              <button type="button" class="text-xs font-semibold text-slate-500 hover:text-primary" @click="emit('select-all-cards', true)">全选</button>
-              <span class="text-xs text-slate-300">/</span>
-              <button type="button" class="text-xs font-semibold text-slate-500 hover:text-slate-700" @click="emit('select-all-cards', false)">全不选</button>
-            </div>
-            <button type="button" class="flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-1.5 text-xs font-bold text-white shadow-md transition-all hover:bg-secondary" @click="emit('batch-download')">
-              <Download class="h-3.5 w-3.5 stroke-[2.5]" />
-              批量下载 ({{ selectedCardsCount }}张)
-            </button>
-          </template>
         </div>
       </div>
     </template>
