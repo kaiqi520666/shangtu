@@ -396,6 +396,7 @@ async def get_task(
         {
             "status": status,
             "result_url": result_url,
+            "size": task.size,
             "prompt": task.prompt,
             "system_prompt_snapshot": task.system_prompt_snapshot,
             "task_prompt_snapshot": task.task_prompt_snapshot,

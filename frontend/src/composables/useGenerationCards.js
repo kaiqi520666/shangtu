@@ -17,6 +17,35 @@ function makeId() {
   return `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function parseTaskSize(size) {
+  if (typeof size !== "string" || !size.includes("/")) return null;
+  const [ratio, quality] = size.split("/");
+  if (!ratio && !quality) return null;
+  return {
+    ...(ratio ? { ratio } : {}),
+    ...(quality ? { quality } : {}),
+  };
+}
+
+function resolveSettingsSnapshot(rawSnapshot, size, existingSnapshot = null) {
+  const snapshot =
+    rawSnapshot && typeof rawSnapshot === "object" && !Array.isArray(rawSnapshot)
+      ? rawSnapshot
+      : null;
+  const sizeSnapshot = parseTaskSize(size);
+  const existing =
+    existingSnapshot && typeof existingSnapshot === "object" && !Array.isArray(existingSnapshot)
+      ? existingSnapshot
+      : null;
+
+  if (!existing && !sizeSnapshot && !snapshot) return null;
+  return {
+    ...(existing || {}),
+    ...(sizeSnapshot || {}),
+    ...(snapshot || {}),
+  };
+}
+
 export function createBatchFinishedHandler({
   genLogs,
   getGenLogs,
@@ -110,8 +139,13 @@ export function useGenerationCards({
       if (typeof data.user_prompt === "string") {
         card.userPrompt = data.user_prompt;
       }
-      if (data.settings_snapshot && typeof data.settings_snapshot === "object") {
-        card.settingsSnapshot = data.settings_snapshot;
+      const nextSettingsSnapshot = resolveSettingsSnapshot(
+        data.settings_snapshot,
+        data.size,
+        card.settingsSnapshot,
+      );
+      if (nextSettingsSnapshot) {
+        card.settingsSnapshot = nextSettingsSnapshot;
       }
 
       if (status === "done" && resultUrl) {
@@ -236,7 +270,10 @@ export function useGenerationCards({
       batchRunId: "",
       creditRefunded: !!item.credit_refunded,
       userPrompt: extra.userPrompt ?? item.user_prompt ?? "",
-      settingsSnapshot: item.settings_snapshot || null,
+      settingsSnapshot: resolveSettingsSnapshot(
+        extra.settingsSnapshot ?? item.settings_snapshot,
+        item.size,
+      ),
     });
   }
 
