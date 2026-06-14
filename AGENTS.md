@@ -168,9 +168,12 @@ frontend/src/
 - `task_prompt_snapshot`
 - `user_prompt`
 - `prompt_template_refs_json`
+- `settings_snapshot_json`
 - `archived`
 
-单图重新生成会新建一条 `ImageTask`，并把旧任务的 `replaced_by_task_id` 指向新任务；工作台恢复只显示当前版本，旧图保留在资产库/历史数据里。
+`settings_snapshot_json` 是单张图生成时的参数事实来源，至少保存当时的 `scenario/platform/language/ratio/quality` 等；右侧卡片展示图片参数时应优先读单图快照，不要读当前左侧表单设置。
+
+单图重新生成会新建一条 `ImageTask`，继承旧图的提示词模板快照和 `settings_snapshot_json`，并把旧任务的 `replaced_by_task_id` 指向新任务；工作台恢复只显示当前版本，旧图保留在资产库/历史数据里。
 
 场景目前后端已支持：
 
@@ -423,11 +426,10 @@ VITE_API_BASE_URL=
 
 ## 已知技术债
 
-- 没有 Alembic，开发期依赖 `Base.metadata.create_all`，旧库字段需要手动迁移。提示词快照字段旧库需补：`ALTER TABLE image_tasks ADD COLUMN IF NOT EXISTS system_prompt_snapshot TEXT, ADD COLUMN IF NOT EXISTS task_prompt_snapshot TEXT, ADD COLUMN IF NOT EXISTS user_prompt TEXT, ADD COLUMN IF NOT EXISTS prompt_template_refs_json TEXT;` 重新生成保留历史需补：`ALTER TABLE image_tasks ADD COLUMN IF NOT EXISTS replaced_by_task_id VARCHAR(36);`
+- 没有 Alembic，开发期依赖 `Base.metadata.create_all`，旧库字段需要手动迁移。提示词快照字段旧库需补：`ALTER TABLE image_tasks ADD COLUMN IF NOT EXISTS system_prompt_snapshot TEXT, ADD COLUMN IF NOT EXISTS task_prompt_snapshot TEXT, ADD COLUMN IF NOT EXISTS user_prompt TEXT, ADD COLUMN IF NOT EXISTS prompt_template_refs_json TEXT;` 重新生成保留历史需补：`ALTER TABLE image_tasks ADD COLUMN IF NOT EXISTS replaced_by_task_id VARCHAR(36);` 单图参数快照需补：`ALTER TABLE image_tasks ADD COLUMN IF NOT EXISTS settings_snapshot_json TEXT;`
 - 商品详情图和服饰穿搭还没有完全接入真实生图任务闭环。
 - 资产库删除目前只删 DB 记录，不删 OSS 文件。
 - 用户额度前端展示还没有完全从后端实时读取。
-- `useAuth` 仍直接读写 `localStorage`，没有完全 Pinia 化。
 - 资产库 / 详情图还需要更多端到端验证。
 
 ## 给新 Agent 的建议

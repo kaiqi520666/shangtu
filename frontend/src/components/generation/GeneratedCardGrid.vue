@@ -1,6 +1,7 @@
 <script setup>
 import { Check, Download, LoaderCircle, Pencil, Trash2, TriangleAlert } from 'lucide-vue-next'
 import { useToast } from '@/composables/useToast.js'
+import { formatImageLabel } from '@/constants/generator.js'
 
 defineProps({
   cards: {
@@ -48,6 +49,20 @@ function handleDownload(card) {
     return
   }
   emit('download-card', card)
+}
+
+function getCardMetaText(card, fallbackPlatform, fallbackLanguage, fallbackImageLabel) {
+  const snapshot = card.settingsSnapshot || {}
+  const platformText = snapshot.platform || fallbackPlatform
+  const languageText = snapshot.language || fallbackLanguage
+  const imageText =
+    snapshot.ratio || snapshot.quality
+      ? formatImageLabel({
+          ratio: snapshot.ratio,
+          quality: snapshot.quality,
+        })
+      : fallbackImageLabel
+  return [platformText, languageText, imageText].filter(Boolean).join(' ')
 }
 </script>
 
@@ -129,7 +144,9 @@ function handleDownload(card) {
           <p class="text-[11px] font-medium text-emerald-600">本次失败未消耗额度</p>
         </div>
         <div class="flex items-center justify-between">
-          <span class="text-xs font-medium text-slate-500">{{ platform }} {{ language }} {{ imageLabel }}</span>
+          <span class="text-xs font-medium text-slate-500">
+            {{ getCardMetaText(card, platform, language, imageLabel) }}
+          </span>
           <button
             v-if="card.status === 'done' && card.dataUrl"
             type="button"

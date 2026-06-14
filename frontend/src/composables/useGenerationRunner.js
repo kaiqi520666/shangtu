@@ -196,6 +196,7 @@ export function useGenerationRunner({
     createCard,
     buildPrompt,
     buildUserPrompt,
+    buildSettingsSnapshot,
     initialLogs = [],
     repeatLog = "",
     getCreateLog,
@@ -238,16 +239,18 @@ export function useGenerationRunner({
 
     const createdCards = queue.map((item, index) => {
       const sortOrder = baseSortOrder + index;
+      const settingsSnapshot = buildSettingsSnapshot?.(item, { index, sortOrder }) || null;
       return {
-        card: createCard({ item, index, sortOrder, batchRunId }),
+        card: createCard({ item, index, sortOrder, batchRunId, settingsSnapshot }),
         item,
+        settingsSnapshot,
       };
     });
 
     outputCards.value = [...createdCards.map((created) => created.card), ...outputCards.value];
 
     let successfullyEnqueued = 0;
-    for (const { card, item } of createdCards) {
+    for (const { card, item, settingsSnapshot } of createdCards) {
       const prompt = buildPrompt?.(item, card) || "";
       const userPrompt = buildUserPrompt?.(item, card) || null;
       if (userPrompt) {
@@ -260,6 +263,7 @@ export function useGenerationRunner({
           image_urls: imageUrls,
           ratio,
           resolution,
+          settings_snapshot: settingsSnapshot,
           job_id: jobId,
           type_id: card.typeId,
           title: card.strategyTitle,

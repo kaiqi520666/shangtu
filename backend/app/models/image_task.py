@@ -31,6 +31,7 @@ class ImageTask(Base):
     task_prompt_snapshot: Mapped[str | None] = mapped_column(Text, nullable=True)
     user_prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
     prompt_template_refs_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    settings_snapshot_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     archived: Mapped[bool] = mapped_column(Boolean, default=False)
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)

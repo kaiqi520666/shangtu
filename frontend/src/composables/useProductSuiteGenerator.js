@@ -88,6 +88,7 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
         batchRunId: "",
         creditRefunded: !!item.credit_refunded,
         userPrompt: item.user_prompt || "",
+        settingsSnapshot: item.settings_snapshot || null,
       });
     },
   });
@@ -278,7 +279,14 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
       snapshotPayload,
       initialLogs: ["商品套图生成任务初始化...", "读取商品图片、平台规范与套图结构..."],
       repeatLog: `新一批套图开始生成，共 ${queue.length} 张`,
-      createCard({ item, sortOrder, batchRunId }) {
+      buildSettingsSnapshot: () => ({
+        scenario: "product_suite",
+        platform: settings.platform,
+        language: settings.language,
+        ratio: settings.ratio,
+        quality: settings.quality,
+      }),
+      createCard({ item, sortOrder, batchRunId, settingsSnapshot }) {
         return reactive({
           id: makeId(),
           taskId: "",
@@ -293,6 +301,7 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
           sortOrder,
           batchRunId,
           creditRefunded: false,
+          settingsSnapshot,
         });
       },
       getCreateLog: (item) => `正在生成 [${item.name}] 第 ${item.index} 张...`,

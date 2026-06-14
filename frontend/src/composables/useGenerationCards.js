@@ -84,6 +84,9 @@ export function useGenerationCards({
       if (typeof data.user_prompt === "string") {
         card.userPrompt = data.user_prompt;
       }
+      if (data.settings_snapshot && typeof data.settings_snapshot === "object") {
+        card.settingsSnapshot = data.settings_snapshot;
+      }
 
       if (status === "done" && resultUrl) {
         // 防御：重新生成场景下，如果返回的 resultUrl 跟旧图一样，说明后端还没拿到新图
@@ -164,7 +167,14 @@ export function useGenerationCards({
   /**
    * 创建一张 reactive 卡片对象
    */
-  function createCard({ typeId, strategyTitle, strategyContent, sortOrder, batchRunId }) {
+  function createCard({
+    typeId,
+    strategyTitle,
+    strategyContent,
+    sortOrder,
+    batchRunId,
+    settingsSnapshot,
+  }) {
     return reactive({
       id: makeId(),
       taskId: "",
@@ -180,6 +190,7 @@ export function useGenerationCards({
       batchRunId: batchRunId || "",
       creditRefunded: false,
       userPrompt: "",
+      settingsSnapshot: settingsSnapshot || null,
     });
   }
 

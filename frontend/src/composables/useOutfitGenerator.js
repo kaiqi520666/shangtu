@@ -82,6 +82,7 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
         batchRunId: "",
         creditRefunded: !!item.credit_refunded,
         userPrompt: item.user_prompt || "",
+        settingsSnapshot: item.settings_snapshot || null,
       });
     },
   });
@@ -279,7 +280,14 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
       snapshotPayload,
       initialLogs: ["服饰穿搭生成任务初始化...", "读取服装图片、模特形象与拍摄场景..."],
       repeatLog: `新一批穿搭图开始生成，共 ${queue.length} 张`,
-      createCard({ item, sortOrder, batchRunId }) {
+      buildSettingsSnapshot: () => ({
+        scenario: "outfit",
+        platform: settings.platform,
+        language: settings.language,
+        ratio: settings.ratio,
+        quality: settings.quality,
+      }),
+      createCard({ item, sortOrder, batchRunId, settingsSnapshot }) {
         return reactive({
           id: makeId(),
           taskId: "",
@@ -294,6 +302,7 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
           sortOrder,
           batchRunId,
           creditRefunded: false,
+          settingsSnapshot,
         });
       },
       getCreateLog: (item) => `正在生成 [${item.title}] 穿搭图...`,

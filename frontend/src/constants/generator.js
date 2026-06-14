@@ -152,6 +152,17 @@ export function resolveQuality(ratio, requestedQuality) {
   return supported[0]
 }
 
+export function formatImageLabel({ ratio = '1:1', quality = '1K' } = {}) {
+  const ratioOption = ratioOptions.find((option) => option.value === ratio) || ratioOptions[0]
+  const effectiveQuality = resolveQuality(ratioOption.value, quality) || quality
+  const dims = resolutionMap[ratioOption.value]?.[effectiveQuality]
+  if (!dims) {
+    return `${effectiveQuality} / ${ratioOption.label}`
+  }
+  const [width, height] = dims
+  return `${effectiveQuality} / ${ratioOption.label} / ${width}x${height}`
+}
+
 export const availableModules = [
   { id: 'first-screen', name: '首屏主视觉', desc: '极简大图与大字报，第一眼传递核心卖点价值。', strategy: '大标题聚焦，高饱和度背板突显商品核心形态。' },
   { id: 'core-selling', name: '核心卖点图', desc: '突出商品三大硬核优势，多点对照打消疑虑。', strategy: '三栏目清单排版，配图层级鲜明。' },

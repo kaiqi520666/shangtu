@@ -80,6 +80,7 @@ export function useFreeImageGenerator({ onJobCreated } = {}) {
         batchRunId: "",
         creditRefunded: !!item.credit_refunded,
         userPrompt: item.user_prompt || item.prompt || "",
+        settingsSnapshot: item.settings_snapshot || null,
       });
     },
   });
@@ -245,7 +246,14 @@ export function useFreeImageGenerator({ onJobCreated } = {}) {
       repeatLog: "新一张自由生图开始生成",
       buildPrompt: (item) => item.prompt,
       buildUserPrompt: (item) => item.prompt,
-      createCard({ item, sortOrder, batchRunId }) {
+      buildSettingsSnapshot: () => ({
+        scenario: "free_image",
+        platform: "自由生图",
+        language: "",
+        ratio: settings.ratio,
+        quality: settings.quality,
+      }),
+      createCard({ item, sortOrder, batchRunId, settingsSnapshot }) {
         return reactive({
           id: makeId(),
           taskId: "",
@@ -261,6 +269,7 @@ export function useFreeImageGenerator({ onJobCreated } = {}) {
           batchRunId,
           creditRefunded: false,
           userPrompt: item.prompt,
+          settingsSnapshot,
         });
       },
       getCreateLog: (item) => `正在生成 [${item.title}]...`,

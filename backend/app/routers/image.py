@@ -37,6 +37,7 @@ class GenerateRequest(BaseModel):
     image_urls: list[str] = Field(default_factory=list)
     ratio: str = "1:1"
     resolution: str = "1K"
+    settings_snapshot: dict | None = None
     job_id: str | None = None
     type_id: str | None = None
     title: str | None = None
@@ -59,6 +60,21 @@ class ProductImageStrategyRequest(BaseModel):
 
 class FreeImageOptimizeRequest(BaseModel):
     prompt: str
+
+
+def _dump_json_or_none(value) -> str | None:
+    if value is None:
+        return None
+    return json.dumps(value, ensure_ascii=False)
+
+
+def _parse_json_or_none(raw: str | None):
+    if not raw:
+        return None
+    try:
+        return json.loads(raw)
+    except (TypeError, ValueError):
+        return None
 
 
 @router.post("/upload", response_model=Response)
@@ -230,6 +246,7 @@ async def create_task(
         task_prompt_snapshot=task_prompt_snapshot,
         user_prompt=user_prompt,
         prompt_template_refs_json=prompt_template_refs_json,
+        settings_snapshot_json=_dump_json_or_none(req.settings_snapshot),
     )
     db.add(task)
     try:
@@ -378,6 +395,7 @@ async def get_task(
                 if task.prompt_template_refs_json
                 else []
             ),
+            "settings_snapshot": _parse_json_or_none(task.settings_snapshot_json),
             "created_at": to_utc_iso(task.created_at),
             "error_message": error_message,
             "progress": progress,
@@ -573,6 +591,7 @@ async def regenerate_task(
         task_prompt_snapshot=task.task_prompt_snapshot,
         user_prompt=new_user_prompt,
         prompt_template_refs_json=task.prompt_template_refs_json,
+        settings_snapshot_json=task.settings_snapshot_json,
         credit_refunded=False,
     )
     task.replaced_by_task_id = new_task_id

@@ -96,6 +96,7 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
         batchRunId: "",
         creditRefunded: !!item.credit_refunded,
         userPrompt: item.user_prompt || "",
+        settingsSnapshot: item.settings_snapshot || null,
       });
     },
   });
@@ -368,7 +369,14 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
       snapshotPayload,
       initialLogs: ["商品详情图生成任务初始化...", "读取商品图片、模块策略与详情页结构..."],
       repeatLog: `新一批详情图开始生成，共 ${queue.length} 张`,
-      createCard({ item, sortOrder, batchRunId }) {
+      buildSettingsSnapshot: () => ({
+        scenario: "product_image",
+        platform: settings.platform,
+        language: settings.language,
+        ratio: settings.ratio,
+        quality: settings.quality,
+      }),
+      createCard({ item, sortOrder, batchRunId, settingsSnapshot }) {
         return reactive({
           id: makeId(),
           taskId: "",
@@ -383,6 +391,7 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
           sortOrder,
           batchRunId,
           creditRefunded: false,
+          settingsSnapshot,
         });
       },
       buildUserPrompt: buildUserPromptForItem,

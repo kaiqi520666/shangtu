@@ -217,6 +217,7 @@ async def get_job(
             "task_prompt_snapshot": task.task_prompt_snapshot,
             "user_prompt": task.user_prompt,
             "prompt_template_refs": _parse_json(task.prompt_template_refs_json),
+            "settings_snapshot": _parse_json(task.settings_snapshot_json),
         }
         for task in tasks_result.scalars().all()
     ]
