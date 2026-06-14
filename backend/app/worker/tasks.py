@@ -8,8 +8,8 @@ from typing import Any
 import httpx
 from dotenv import load_dotenv
 from sqlalchemy import select, update
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+from app.core.database import SessionLocal
 from app.core.oss import ALLOWED_IMAGE_TYPES, upload_image_bytes
 
 load_dotenv()
@@ -20,14 +20,6 @@ TOAPIS_KEY = os.getenv("TOAPIS_KEY")
 # 主动剥离代理环境变量，防止 Windows 走代理失败
 for _proxy_key in ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"):
     os.environ.pop(_proxy_key, None)
-
-PRODUCT_IMAGE_SYSTEM_PROMPT = (
-    "你是专业电商商品图生成助手。必须以用户提供的参考商品图为主体，"
-    "保持商品的款式、颜色、材质、结构和核心外观一致；"
-    "只允许根据用户要求调整背景、构图、光影、场景和信息排版。"
-    "不要虚构品牌 Logo、认证、参数、价格、销量或无法从图片与用户文字确认的信息。"
-    "若需要添加文字，必须使用用户指定语言，文字简洁清晰，适合电商平台展示。"
-)
 
 DEFAULT_GENERATED_CONTENT_TYPE = "image/png"
 
@@ -53,9 +45,6 @@ TOAPIS_SIZE_TABLE: dict[str, dict[str, tuple[int, int]]] = {
 
 TOAPIS_STATUS_DONE = {"completed", "succeeded", "success"}
 TOAPIS_STATUS_FAILED = {"failed", "error", "cancelled", "canceled"}
-
-engine = create_async_engine(os.getenv("DATABASE_URL"))
-SessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
 
 async def update_task_in_db(
@@ -130,17 +119,11 @@ def build_create_payload(
     ratio: str,
     resolution: str,
     image_urls: list[str] | None = None,
-    prepend_reference_prompt: bool = True,
 ) -> dict:
     reference_urls = [url for url in (image_urls or []) if url]
-    full_prompt = (
-        f"{PRODUCT_IMAGE_SYSTEM_PROMPT}\n\n{prompt}"
-        if reference_urls and prepend_reference_prompt
-        else prompt
-    )
     payload: dict[str, Any] = {
         "model": "gpt-image-2",
-        "prompt": full_prompt,
+        "prompt": prompt,
         "n": 1,
         "size": ratio,
         "resolution": resolution,
@@ -341,7 +324,6 @@ async def generate_image(
     prompt: str,
     ratio: str = "1:1",
     resolution: str = "1K",
-    prepend_reference_prompt: bool = True,
     image_urls: list[str] | None = None,
 ):
     redis = ctx["redis"]
@@ -370,7 +352,6 @@ async def generate_image(
             ratio=ratio,
             resolution=resolution,
             image_urls=image_urls,
-            prepend_reference_prompt=prepend_reference_prompt,
         )
 
         transport = httpx.AsyncHTTPTransport(proxy=None)

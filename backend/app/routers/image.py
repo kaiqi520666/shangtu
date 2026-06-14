@@ -208,14 +208,12 @@ async def create_task(
     system_prompt_snapshot = None
     task_prompt_snapshot = None
     prompt_template_refs_json = None
-    prepend_reference_prompt = True
 
     if job is not None and job.scenario == "free_image":
         if not req.prompt.strip():
             return fail("请输入提示词")
         final_prompt = req.prompt
         user_prompt = req.prompt
-        prepend_reference_prompt = False
 
     if job is not None and job.scenario in {"product_suite", "product_image", "outfit"}:
         try:
@@ -233,7 +231,6 @@ async def create_task(
         system_prompt_snapshot = built_prompt.system_prompt_snapshot
         task_prompt_snapshot = built_prompt.task_prompt_snapshot
         prompt_template_refs_json = built_prompt.prompt_template_refs_json
-        prepend_reference_prompt = False
 
     # 扣积分 + 建任务同一事务，避免一致性漂移
     current_user.credits -= CREDITS_PER_IMAGE
@@ -270,7 +267,6 @@ async def create_task(
             final_prompt,
             req.ratio,
             req.resolution,
-            prepend_reference_prompt,
             reference_image_urls,
         )
     except Exception:
@@ -566,7 +562,6 @@ async def regenerate_task(
     if source_job and source_job.scenario == "free_image":
         new_user_prompt = requested_user_prompt or edit_instruction
         new_prompt = new_user_prompt
-        prepend_reference_prompt = False
     elif has_prompt_snapshot or task.user_prompt:
         new_user_prompt = requested_user_prompt or (
             f"{task.user_prompt}\n\n【用户修改要求】{edit_instruction}"
@@ -578,11 +573,9 @@ async def regenerate_task(
             task_prompt=task.task_prompt_snapshot,
             user_prompt=new_user_prompt,
         )
-        prepend_reference_prompt = not has_prompt_snapshot
     else:
         new_user_prompt = None
         new_prompt = task.prompt + "\n\n【用户修改要求】" + edit_instruction
-        prepend_reference_prompt = True
 
     new_task_id = str(uuid.uuid4())
 
@@ -631,7 +624,6 @@ async def regenerate_task(
             new_prompt,
             ratio,
             resolution,
-            prepend_reference_prompt,
             [old_result_url],  # 使用当前已生成图作为参考图
         )
     except Exception:

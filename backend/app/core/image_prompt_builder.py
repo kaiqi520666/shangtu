@@ -177,15 +177,11 @@ async def build_image_generate_prompt(
         title=title,
     )
 
-    final_parts = [
-        "【系统提示词】",
-        system_prompt,
-        "【任务提示词】",
-        task_prompt,
-        "【用户提示词】",
-        effective_user_prompt,
-    ]
-    final_prompt = "\n".join(part for part in final_parts if part)
+    final_prompt = compose_image_prompt(
+        system_prompt=system_prompt,
+        task_prompt=task_prompt,
+        user_prompt=effective_user_prompt,
+    )
 
     return ImagePromptBuildResult(
         final_prompt=final_prompt,
