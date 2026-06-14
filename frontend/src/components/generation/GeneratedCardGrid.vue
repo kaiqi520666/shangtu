@@ -51,6 +51,10 @@ function handleDownload(card) {
   emit('download-card', card)
 }
 
+function canDownload(card) {
+  return card.status === 'done' && Boolean(card.dataUrl)
+}
+
 function getCardMetaText(card, fallbackPlatform, fallbackLanguage, fallbackImageLabel) {
   const snapshot = card.settingsSnapshot || {}
   const platformText = snapshot.platform || fallbackPlatform
@@ -148,18 +152,10 @@ function getCardMetaText(card, fallbackPlatform, fallbackLanguage, fallbackImage
             {{ getCardMetaText(card, platform, language, imageLabel) }}
           </span>
           <button
-            v-if="card.status === 'done' && card.dataUrl"
+            v-if="card.status !== 'pending' && card.status !== 'processing'"
             type="button"
-            class="flex items-center gap-1 text-xs font-bold text-primary hover:text-secondary"
-            @click="handleDownload(card)"
-          >
-            下载单张
-            <Download class="h-3 w-3" />
-          </button>
-          <button
-            v-else-if="isFailed(card)"
-            type="button"
-            class="flex cursor-not-allowed items-center gap-1 text-xs font-semibold text-slate-300"
+            class="flex items-center gap-1 text-xs"
+            :class="canDownload(card) ? 'font-bold text-primary hover:text-secondary' : 'cursor-not-allowed font-semibold text-slate-300'"
             @click.stop="handleDownload(card)"
           >
             下载单张

@@ -1,17 +1,17 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Trash2 } from 'lucide-vue-next'
-import AppDrawer from '@/components/ui/AppDrawer.vue'
-import AppModal from '@/components/ui/AppModal.vue'
 import ImageEditModal from '@/components/generation/ImageEditModal.vue'
+import GenerationHistoryDrawer from '@/components/generation/GenerationHistoryDrawer.vue'
+import GenerationPreviewModal from '@/components/generation/GenerationPreviewModal.vue'
+import GenerationWorkspace from '@/components/generation/GenerationWorkspace.vue'
 import GeneratorLayout from '@/components/layout/GeneratorLayout.vue'
 import ProductImageSettingsPanel from '@/components/product-image/ProductImageSettingsPanel.vue'
-import ProductImageWorkspace from '@/components/product-image/ProductImageWorkspace.vue'
 import StrategyReviewPanel from '@/components/product-image/StrategyReviewPanel.vue'
 import { useProductImageGenerator } from '@/composables/useProductImageGenerator.js'
 import { useConfirm } from '@/composables/useConfirm.js'
 import { useToast } from '@/composables/useToast.js'
+import { productDetailPreviewSlides } from '@/constants/generator.js'
 import { deleteGenerationJob } from '@/api/generation.js'
 import { deleteImageTask, regenerateImageTask } from '@/api/image.js'
 
@@ -29,30 +29,6 @@ const generator = useProductImageGenerator({
 const editModalOpen = ref(false)
 const editCard = ref(null)
 const editSubmitting = ref(false)
-
-const STATUS_LABEL = {
-  draft: '草稿',
-  generating: '生成中',
-  done: '已完成',
-  partial_failed: '部分失败',
-  failed: '失败',
-  timeout: '超时',
-}
-
-const sortedHistory = computed(() => generator.historyTasks.value)
-
-function getStatusLabel(job) {
-  const key = job.display_status || job.status || 'draft'
-  return STATUS_LABEL[key] || key
-}
-
-function formatTime(value) {
-  if (!value) return ''
-  const d = new Date(value)
-  if (Number.isNaN(d.getTime())) return ''
-  const pad = (n) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
 
 async function openHistory() {
   generator.showHistoryDrawer.value = true
@@ -281,7 +257,7 @@ watch(
       @generate="generator.triggerStrategyGeneration"
     />
 
-    <ProductImageWorkspace
+    <GenerationWorkspace
       :settings="generator.settings"
       :current-task-title="generator.currentTaskTitle.value"
       :output-cards="generator.outputCards.value"
@@ -293,6 +269,12 @@ watch(
       :selected-cards-count="generator.selectedCardsCount.value"
       :selected-image-label="generator.selectedImageLabel.value"
       :get-module-name="generator.getModuleName"
+      title-badge="本次详情图任务"
+      empty-title="商品详情图"
+      empty-subtitle="上传商品图，生成策略后输出多张电商详情页模块图。"
+      :empty-slides="productDetailPreviewSlides"
+      loading-title="AI 商品详情图生成中"
+      progress-text="正在生成商品详情图"
       @update:current-task-title="generator.updateCurrentJobTitle"
       @select-all-cards="generator.toggleSelectAllCards"
       @batch-download="generator.batchDownload"
@@ -305,65 +287,22 @@ watch(
       @open-history="openHistory"
     />
 
-    <AppDrawer
+    <GenerationHistoryDrawer
       :open="generator.showHistoryDrawer.value"
-      title="生成记录"
-      subtitle="选择历史任务可恢复到当前工作区"
+      :jobs="generator.historyTasks.value"
+      :loading="generator.historyLoading.value"
+      :current-job-id="generator.currentJobId.value"
       @close="generator.showHistoryDrawer.value = false"
-    >
-      <div v-if="generator.historyLoading.value" class="flex items-center justify-center py-8 text-xs text-slate-400">
-        正在加载...
-      </div>
-      <div v-else-if="sortedHistory.length === 0" class="flex flex-col items-center justify-center gap-2 py-12 text-center text-xs text-slate-400">
-        <span>暂无生成记录</span>
-        <span>点击「+ 新建任务」开始你的第一次生成</span>
-      </div>
-      <ul v-else class="space-y-2">
-        <li
-          v-for="job in sortedHistory"
-          :key="job.job_id"
-          class="group cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs transition-all hover:border-primary/40 hover:bg-primary/5"
-          :class="{ 'border-primary/60 bg-primary/5': job.job_id === generator.currentJobId.value }"
-          @click="pickHistory(job.job_id)"
-        >
-          <div class="flex items-center justify-between gap-2">
-            <span class="truncate font-bold text-slate-800">{{ job.title }}</span>
-            <div class="flex shrink-0 items-center gap-1.5">
-              <button
-                type="button"
-                class="rounded p-0.5 text-slate-300 opacity-0 transition-all hover:bg-rose-50 hover:text-rose-500 group-hover:opacity-100"
-                title="删除任务"
-                @click.stop="handleDeleteJob(job)"
-              >
-                <Trash2 class="h-3.5 w-3.5" />
-              </button>
-              <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
-                {{ getStatusLabel(job) }}
-              </span>
-            </div>
-          </div>
-          <div class="mt-1.5 flex items-center justify-between text-[11px] text-slate-500">
-            <span>{{ formatTime(job.created_at) }}</span>
-            <span>
-              共 {{ job.total }} 张
-              <span v-if="job.completed > 0" class="text-primary">· {{ job.completed }} 完成</span>
-              <span v-if="job.failed > 0" class="text-rose-500">· {{ job.failed }} 失败</span>
-            </span>
-          </div>
-        </li>
-      </ul>
-    </AppDrawer>
+      @pick="pickHistory"
+      @delete="handleDeleteJob"
+    />
 
-    <AppModal
-      :open="Boolean(generator.zoomCard.value)"
+    <GenerationPreviewModal
+      :card="generator.zoomCard.value"
       title="商品详情图大图预览"
-      panel-class="w-full max-w-4xl"
+      alt="商品详情图预览"
       @close="generator.zoomCard.value = null"
-    >
-      <div v-if="generator.zoomCard.value" class="bg-slate-100 p-6">
-        <img :src="generator.zoomCard.value.dataUrl" class="mx-auto max-h-[75vh] rounded-xl object-contain shadow-lg" alt="商品详情图预览" />
-      </div>
-    </AppModal>
+    />
 
     <ImageEditModal
       :open="editModalOpen"
