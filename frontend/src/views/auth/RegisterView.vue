@@ -23,10 +23,11 @@ async function handleRegister(payload) {
     }
 
     auth.login({
-      username: payload.username,
-      email: payload.email,
+      username: result.data?.username || payload.username,
+      email: result.data?.email || payload.email,
       token: result.data?.token,
       userId: result.data?.user_id,
+      credits: result.data?.credits,
     });
     toast.success("注册成功");
     router.push("/generator");

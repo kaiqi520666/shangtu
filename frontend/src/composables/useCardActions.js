@@ -1,15 +1,7 @@
 import { computed, ref } from "vue";
 import JSZip from "jszip";
 import { getImageDownloadUrl } from "@/api/image.js";
-
-function getToken() {
-  try {
-    const raw = window.localStorage.getItem("nodepass_auth_user");
-    return raw ? JSON.parse(raw)?.token : "";
-  } catch {
-    return "";
-  }
-}
+import { useAuthStore } from "@/stores/auth.js";
 
 /**
  * 通用卡片操作：选择、下载（单张 / 批量 zip）、缩放。
@@ -23,6 +15,7 @@ function getToken() {
  */
 export function useCardActions({ outputCards, currentTaskTitle, getCardName, toast }) {
   const zoomCard = ref(null);
+  const authStore = useAuthStore();
 
   const selectedCards = computed(() => outputCards.value.filter((card) => card.selected));
   const selectedCardsCount = computed(() => selectedCards.value.length);
@@ -60,7 +53,7 @@ export function useCardActions({ outputCards, currentTaskTitle, getCardName, toa
   async function downloadAsZip(cards) {
     toast.info(`正在打包 ${cards.length} 张图片...`);
     const zip = new JSZip();
-    const token = getToken();
+    const token = authStore.token;
 
     const results = await Promise.allSettled(
       cards.map(async (card, index) => {
@@ -105,7 +98,7 @@ export function useCardActions({ outputCards, currentTaskTitle, getCardName, toa
     }
     try {
       const url = getImageDownloadUrl(card.taskId);
-      const token = getToken();
+      const token = authStore.token;
       const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const blob = await res.blob();

@@ -1,0 +1,82 @@
+import { computed, ref } from "vue";
+import { defineStore } from "pinia";
+
+const STORAGE_KEY = "nodepass_auth_user";
+
+function normalizeUser(payload, currentUser = null) {
+  if (!payload) return null;
+  const email = payload.email || currentUser?.email || "";
+  const username = payload.username || currentUser?.username || email?.split("@")[0] || "";
+  const token = payload.token || currentUser?.token || "";
+  const userId = payload.userId ?? payload.user_id ?? currentUser?.userId ?? null;
+  const credits = Number.isFinite(Number(payload.credits))
+    ? Number(payload.credits)
+    : Number(currentUser?.credits || 0);
+
+  return {
+    email,
+    username,
+    token,
+    userId,
+    credits,
+    plan: payload.plan || currentUser?.plan || "SaaS Pro",
+  };
+}
+
+export const useAuthStore = defineStore(
+  "auth",
+  () => {
+    const user = ref(null);
+
+    const token = computed(() => user.value?.token || "");
+    const credits = computed(() => Number(user.value?.credits || 0));
+    const isAuthenticated = computed(() => Boolean(token.value));
+    const isLoggedIn = computed(() => Boolean(user.value?.email));
+
+    function setAuthUser(payload) {
+      user.value = normalizeUser(payload, user.value);
+    }
+
+    function login(payload) {
+      setAuthUser(payload);
+    }
+
+    function logout() {
+      user.value = null;
+    }
+
+    function updateCredits(value) {
+      if (!user.value) return;
+      user.value = {
+        ...user.value,
+        credits: Number(value || 0),
+      };
+    }
+
+    function getToken() {
+      return token.value;
+    }
+
+    return {
+      user,
+      token,
+      credits,
+      isAuthenticated,
+      isLoggedIn,
+      setAuthUser,
+      login,
+      logout,
+      updateCredits,
+      getToken,
+    };
+  },
+  {
+    persist: {
+      key: STORAGE_KEY,
+      serializer: {
+        serialize: (state) => JSON.stringify(state.user),
+        deserialize: (raw) => ({ user: raw ? JSON.parse(raw) : null }),
+      },
+    },
+  },
+);

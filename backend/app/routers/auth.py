@@ -22,6 +22,16 @@ class LoginRequest(BaseModel):
     password: str
 
 
+def _auth_payload(user: User) -> dict:
+    return {
+        "token": create_token(user.id),
+        "user_id": user.id,
+        "username": user.username,
+        "email": user.email,
+        "credits": user.credits,
+    }
+
+
 @router.post("/register", response_model=Response)
 async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.email == req.email))
@@ -36,7 +46,7 @@ async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
     db.add(user)
     await db.commit()
     await db.refresh(user)
-    return success({"token": create_token(user.id), "user_id": user.id})
+    return success(_auth_payload(user))
 
 
 @router.post("/login", response_model=Response)
@@ -45,4 +55,4 @@ async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
     user = result.scalar_one_or_none()
     if not user or not verify_password(req.password, user.password_hash):
         return fail("邮箱或密码错误")
-    return success({"token": create_token(user.id), "user_id": user.id})
+    return success(_auth_payload(user))

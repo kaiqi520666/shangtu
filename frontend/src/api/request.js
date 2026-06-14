@@ -1,5 +1,6 @@
 // src/api/request.js
 import axios from "axios";
+import { useAuthStore } from "@/stores/auth.js";
 
 const request = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || "/api",
@@ -7,7 +8,8 @@ const request = axios.create({
 });
 
 request.interceptors.request.use((config) => {
-  const token = getAuthToken();
+  const authStore = useAuthStore();
+  const token = authStore.token;
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -22,12 +24,3 @@ request.interceptors.response.use(
 );
 
 export default request;
-
-function getAuthToken() {
-  try {
-    const raw = window.localStorage.getItem("nodepass_auth_user");
-    return raw ? JSON.parse(raw)?.token : "";
-  } catch {
-    return "";
-  }
-}

@@ -1,5 +1,8 @@
 <script setup>
 import UserMenu from '@/components/layout/UserMenu.vue'
+import { useAuthStore } from '@/stores/auth.js'
+
+const authStore = useAuthStore()
 </script>
 
 <template>
@@ -21,7 +24,7 @@ import UserMenu from '@/components/layout/UserMenu.vue'
       <div class="flex items-center gap-2 rounded-full border border-slate-200 bg-slate-100 px-3 py-1.5">
         <span class="h-2 w-2 animate-pulse rounded-full bg-primary"></span>
         <span class="text-xs text-slate-500">额度剩余</span>
-        <span class="text-xs font-bold text-primary">1,280 点</span>
+        <span class="text-xs font-bold text-primary">{{ authStore.credits }} 点</span>
       </div>
       <div class="h-6 w-px bg-slate-200"></div>
       <UserMenu />

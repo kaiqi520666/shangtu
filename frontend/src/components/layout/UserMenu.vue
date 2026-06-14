@@ -10,6 +10,7 @@ const open = ref(false)
 const root = ref(null)
 
 const email = computed(() => auth.user.value?.email || 'user@example.com')
+const credits = computed(() => auth.credits.value || 0)
 const initials = computed(() => {
   const source = email.value.split('@')[0] || 'VIP'
   return source.slice(0, 2).toUpperCase()
@@ -65,7 +66,7 @@ onBeforeUnmount(() => {
       <div class="p-2">
         <button type="button" class="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-medium text-slate-600 hover:bg-slate-50">
           <WalletCards class="h-4 w-4 text-primary" />
-          额度剩余：1,280 点
+          额度剩余：{{ credits }} 点
         </button>
         <button type="button" class="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-medium text-slate-600 hover:bg-slate-50">
           <Settings class="h-4 w-4 text-slate-400" />

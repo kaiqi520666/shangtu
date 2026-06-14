@@ -31,9 +31,11 @@ async function handleLogin(payload) {
     }
 
     auth.login({
-      email: payload.email,
+      email: result.data?.email || payload.email,
+      username: result.data?.username,
       token: result.data?.token,
       userId: result.data?.user_id,
+      credits: result.data?.credits,
     })
     toast.success('登录成功')
     router.push('/generator')
