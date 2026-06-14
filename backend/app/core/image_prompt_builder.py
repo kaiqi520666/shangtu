@@ -181,23 +181,6 @@ async def build_image_generate_prompt(
     )
 
 
-async def build_product_suite_image_prompt(
-    db: AsyncSession,
-    *,
-    job: GenerationJob,
-    type_id: str | None,
-    title: str | None,
-    user_prompt: str | None,
-) -> ImagePromptBuildResult:
-    return await build_image_generate_prompt(
-        db,
-        job=job,
-        type_id=type_id,
-        title=title,
-        user_prompt=user_prompt,
-    )
-
-
 async def build_ai_write_prompt(
     db: AsyncSession,
     *,

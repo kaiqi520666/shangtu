@@ -68,6 +68,26 @@ async def _get_user_credits(db: AsyncSession, user_id: int) -> int:
     return int(result.scalar_one_or_none() or 0)
 
 
+def _redis_str(value) -> str | None:
+    if value is None:
+        return None
+    return value.decode() if isinstance(value, bytes) else str(value)
+
+
+def _parse_redis_result_url(value) -> str | None:
+    raw = _redis_str(value)
+    if not raw:
+        return None
+    try:
+        parsed = json.loads(raw)
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(parsed, dict):
+        return None
+    url = parsed.get("url")
+    return url if isinstance(url, str) and url else None
+
+
 @router.post("/upload", response_model=Response)
 async def upload_image(
     file: UploadFile = File(...),
@@ -309,10 +329,16 @@ async def get_task(
     redis_pool = getattr(request.app.state, "redis_pool", None)
     if redis_pool is not None:
         try:
-            live_status = await redis_pool.get(f"task:{task_id}:status")
+            async with redis_pool.pipeline() as pipe:
+                pipe.get(f"task:{task_id}:status")
+                pipe.get(f"task:{task_id}:error")
+                pipe.get(f"task:{task_id}:progress")
+                pipe.get(f"task:{task_id}:result")
+                live_status, live_error, live_progress, live_result = await pipe.execute()
+
             live_status_str: str | None = None
             if live_status:
-                live_status_str = live_status.decode() if isinstance(live_status, bytes) else live_status
+                live_status_str = _redis_str(live_status)
                 # 防止 Redis 残留的旧 done 覆盖 DB 的 pending/processing
                 if task.status in ("pending", "processing"):
                     if live_status_str != "done":
@@ -321,44 +347,25 @@ async def get_task(
                 else:
                     status = live_status_str
 
-            live_error = await redis_pool.get(f"task:{task_id}:error")
             if live_error:
-                error_message = live_error.decode() if isinstance(live_error, bytes) else live_error
-            live_progress = await redis_pool.get(f"task:{task_id}:progress")
+                error_message = _redis_str(live_error)
             if live_progress:
-                raw = live_progress.decode() if isinstance(live_progress, bytes) else live_progress
                 try:
-                    progress = max(0, min(100, int(raw)))
+                    progress = max(0, min(100, int(_redis_str(live_progress))))
                 except (TypeError, ValueError):
                     pass
 
             # 读取 Redis result —— 无论 DB result_url 是否有值都要尝试
             # 重新生成场景下 DB result_url 是旧图，需要用 Redis 的新 result 覆盖
-            live_result = await redis_pool.get(f"task:{task_id}:result")
-            if live_result:
-                raw = live_result.decode() if isinstance(live_result, bytes) else live_result
-                try:
-                    parsed = json.loads(raw)
-                    redis_result_url = parsed.get("url") or None
-                    if redis_result_url:
-                        result_url = redis_result_url
-                except (TypeError, ValueError):
-                    pass
+            redis_result_url = _parse_redis_result_url(live_result)
+            if redis_result_url:
+                result_url = redis_result_url
 
             # 如果 Redis 报告 done 且 DB 还是 pending/processing，需要验证有新 result
             if live_status_str == "done" and task.status in ("pending", "processing"):
                 # 只有拿到了本轮新 result 才认可 done
-                if live_result:
-                    try:
-                        parsed = json.loads(
-                            live_result.decode() if isinstance(live_result, bytes) else live_result
-                        )
-                        if parsed.get("url"):
-                            status = "done"
-                        else:
-                            status = "processing"
-                    except (TypeError, ValueError):
-                        status = "processing"
+                if redis_result_url:
+                    status = "done"
                 else:
                     status = "processing"
         except Exception:
