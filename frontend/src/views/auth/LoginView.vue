@@ -48,12 +48,12 @@ async function handleLogin(payload) {
 <template>
   <div class="grid min-h-screen bg-slate-50 lg:grid-cols-[1fr_480px]">
     <section class="hidden bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 p-10 text-white lg:flex lg:flex-col lg:justify-between">
-      <div class="text-lg font-bold">NodePass AI</div>
+      <div class="text-lg font-bold">商图 AI</div>
       <div>
         <p class="max-w-xl text-4xl font-bold leading-tight">批量生成适配多平台的商品主图。</p>
         <p class="mt-4 max-w-lg text-sm leading-6 text-slate-300">用邮箱登录后进入工作台，上传商品图、选择平台和尺寸，一次生成完整电商视觉素材。</p>
       </div>
-      <div class="text-xs text-slate-400">NodePass AI Generator</div>
+      <div class="text-xs text-slate-400">商图 AI Generator</div>
     </section>
     <section class="flex items-center justify-center bg-white px-6 py-12">
       <AuthForm mode="login" @submit="handleLogin" />

@@ -42,16 +42,16 @@ async function handleRegister(payload) {
     <section
       class="hidden bg-linear-to-br from-slate-950 via-slate-900 to-emerald-950 p-10 text-white lg:flex lg:flex-col lg:justify-between"
     >
-      <div class="text-lg font-bold">NodePass AI</div>
+      <div class="text-lg font-bold">商图 AI</div>
       <div>
         <p class="max-w-xl text-4xl font-bold leading-tight">
           创建账号，开始搭建你的商品主图流水线。
         </p>
         <p class="mt-4 max-w-lg text-sm leading-6 text-slate-300">
-          注册后即可进入生成工作台。当前为前端表单演示，后续可接入真实邮箱注册接口。
+          注册后即可进入生成工作台，上传商品图并批量生成适配多平台的电商视觉素材。
         </p>
       </div>
-      <div class="text-xs text-slate-400">NodePass AI Generator</div>
+      <div class="text-xs text-slate-400">商图 AI Generator</div>
     </section>
     <section class="flex items-center justify-center bg-white px-6 py-12">
       <AuthForm mode="register" @submit="handleRegister" />

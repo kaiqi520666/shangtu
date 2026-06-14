@@ -23,7 +23,7 @@ const message = ref('')
 
 const isRegister = computed(() => props.mode === 'register')
 const title = computed(() => (isRegister.value ? '创建账号' : '欢迎回来'))
-const subtitle = computed(() => (isRegister.value ? '使用邮箱和密码注册 NodePass AI' : '登录后继续批量生成商品主图'))
+const subtitle = computed(() => (isRegister.value ? '使用邮箱和密码注册商图 AI' : '登录后继续批量生成商品主图'))
 const buttonText = computed(() => (isRegister.value ? '注册' : '登录'))
 
 async function handleSubmit() {

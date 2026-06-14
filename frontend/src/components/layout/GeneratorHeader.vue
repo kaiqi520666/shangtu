@@ -9,11 +9,11 @@ const authStore = useAuthStore()
   <header class="z-30 flex h-16 items-center justify-between border-b border-slate-200 bg-white/90 px-6 shadow-sm backdrop-blur-md">
     <div class="flex items-center gap-3">
       <div class="flex h-10 w-10 items-center justify-center rounded-xl border border-primary/10 bg-white shadow-sm">
-        <img src="/logo.png" class="h-8 w-8 object-contain" alt="NodePass AI Logo" />
+        <img src="/logo.png" class="h-8 w-8 object-contain" alt="商图 AI Logo" />
       </div>
       <div>
         <h1 class="flex items-center gap-2 text-base font-bold text-slate-800">
-          NodePass AI
+          商图 AI
           <span class="rounded border border-primary/20 bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">SaaS Pro</span>
         </h1>
         <p class="text-xs text-slate-500">商品主图 AI 批量智能生成系统</p>
