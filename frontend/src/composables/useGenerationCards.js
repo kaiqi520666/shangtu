@@ -48,7 +48,6 @@ function resolveSettingsSnapshot(rawSnapshot, size, existingSnapshot = null) {
 
 export function createBatchFinishedHandler({
   genLogs,
-  getGenLogs,
   toast,
   doneLog,
   successText,
@@ -56,8 +55,7 @@ export function createBatchFinishedHandler({
   partialFailedText,
 }) {
   return ({ total, failed }) => {
-    const logs = genLogs || getGenLogs?.();
-    logs?.value?.push(doneLog);
+    genLogs?.value?.push(doneLog);
     if (failed === 0) {
       toast.success(successText);
     } else if (failed === total) {
@@ -87,9 +85,10 @@ export function useGenerationCards({
   onCardFailed,
   onBatchFinished,
   getLogPrefix,
+  genLogs: genLogsRef,
 } = {}) {
   const outputCards = ref([]);
-  const genLogs = ref([]);
+  const genLogs = genLogsRef || ref([]);
   const generating = ref(false);
   const generatedCount = ref(0);
   const jobTotal = ref(0);

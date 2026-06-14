@@ -48,6 +48,18 @@ const {
     target.strategyContent = prompt
   },
 })
+
+function closeHistoryDrawer() {
+  generator.showHistoryDrawer.value = false
+}
+
+function openPreview(card) {
+  generator.zoomCard.value = card
+}
+
+function closePreview() {
+  generator.zoomCard.value = null
+}
 </script>
 
 <template>
@@ -95,7 +107,7 @@ const {
       @toggle-card="generator.toggleCardSelection"
       @download-card="generator.downloadSingleImage"
       @edit-card="openEditModal"
-      @zoom-card="(card) => { generator.zoomCard.value = card }"
+      @zoom-card="openPreview"
       @delete-card="handleDeleteCardDirect"
       @create-new-task="handleCreateNewTask"
       @open-history="openHistory"
@@ -107,7 +119,7 @@ const {
       :loading="generator.historyLoading.value"
       :current-job-id="generator.currentJobId.value"
       empty-hint="输入提示词后点击「生成图片」开始第一次自由生图"
-      @close="generator.showHistoryDrawer.value = false"
+      @close="closeHistoryDrawer"
       @pick="pickHistory"
       @delete="handleDeleteJob"
     />
@@ -116,7 +128,7 @@ const {
       :card="generator.zoomCard.value"
       title="自由生图大图预览"
       alt="自由生图预览"
-      @close="generator.zoomCard.value = null"
+      @close="closePreview"
     />
 
     <ImageEditModal

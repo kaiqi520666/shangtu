@@ -46,6 +46,18 @@ const {
   toast,
   confirm,
 })
+
+function closeHistoryDrawer() {
+  outfit.showHistoryDrawer.value = false
+}
+
+function openPreview(card) {
+  outfit.zoomCard.value = card
+}
+
+function closePreview() {
+  outfit.zoomCard.value = null
+}
 </script>
 
 <template>
@@ -96,7 +108,7 @@ const {
       @toggle-card="outfit.toggleCardSelection"
       @download-card="outfit.downloadSingleImage"
       @edit-card="openEditModal"
-      @zoom-card="(card) => { outfit.zoomCard.value = card }"
+      @zoom-card="openPreview"
       @delete-card="handleDeleteCardDirect"
       @create-new-task="handleCreateNewTask"
       @open-history="openHistory"
@@ -107,7 +119,7 @@ const {
       :jobs="outfit.historyTasks.value"
       :loading="outfit.historyLoading.value"
       :current-job-id="outfit.currentJobId.value"
-      @close="outfit.showHistoryDrawer.value = false"
+      @close="closeHistoryDrawer"
       @pick="pickHistory"
       @delete="handleDeleteJob"
     />
@@ -116,7 +128,7 @@ const {
       :card="outfit.zoomCard.value"
       title="服饰穿搭大图预览"
       alt="服饰穿搭预览"
-      @close="outfit.zoomCard.value = null"
+      @close="closePreview"
     />
 
     <ImageEditModal

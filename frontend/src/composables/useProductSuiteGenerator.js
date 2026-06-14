@@ -25,12 +25,14 @@ function createDefaultSuiteStructure() {
 
 export function useProductSuiteGenerator({ onJobCreated } = {}) {
   const toast = useToast();
+  const genLogs = ref([]);
 
   // --- 通用卡片状态 + 轮询引擎 ---
   const cards = useGenerationCards({
+    genLogs,
     getLogPrefix: (card) => card.strategyTitle || card.typeId || "",
     onBatchFinished: createBatchFinishedHandler({
-      getGenLogs: () => genLogs,
+      genLogs,
       toast,
       doneLog: "全部商品套图任务已结束",
       successText: "商品套图已全部生成",
@@ -41,7 +43,6 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
 
   const {
     outputCards,
-    genLogs,
     generating,
     generatedCount,
     jobTotal,

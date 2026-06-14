@@ -47,6 +47,18 @@ const {
   toast,
   confirm,
 })
+
+function closeHistoryDrawer() {
+  suite.showHistoryDrawer.value = false
+}
+
+function openPreview(card) {
+  suite.zoomCard.value = card
+}
+
+function closePreview() {
+  suite.zoomCard.value = null
+}
 </script>
 
 <template>
@@ -96,7 +108,7 @@ const {
       @toggle-card="suite.toggleCardSelection"
       @download-card="suite.downloadSingleImage"
       @edit-card="openEditModal"
-      @zoom-card="(card) => { suite.zoomCard.value = card }"
+      @zoom-card="openPreview"
       @delete-card="handleDeleteCardDirect"
       @create-new-task="handleCreateNewTask"
       @open-history="openHistory"
@@ -107,7 +119,7 @@ const {
       :jobs="suite.historyTasks.value"
       :loading="suite.historyLoading.value"
       :current-job-id="suite.currentJobId.value"
-      @close="suite.showHistoryDrawer.value = false"
+      @close="closeHistoryDrawer"
       @pick="pickHistory"
       @delete="handleDeleteJob"
     />
@@ -116,7 +128,7 @@ const {
       :card="suite.zoomCard.value"
       title="商品套图大图预览"
       alt="商品套图预览"
-      @close="suite.zoomCard.value = null"
+      @close="closePreview"
     />
 
     <ImageEditModal

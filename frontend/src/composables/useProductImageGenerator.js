@@ -30,11 +30,13 @@ function createDefaultSelectedModules() {
 
 export function useProductImageGenerator({ onJobCreated } = {}) {
   const toast = useToast();
+  const genLogs = ref([]);
 
   const cards = useGenerationCards({
+    genLogs,
     getLogPrefix: (card) => card.strategyTitle || card.typeId || "",
     onBatchFinished: createBatchFinishedHandler({
-      getGenLogs: () => genLogs,
+      genLogs,
       toast,
       doneLog: "全部商品详情图任务已结束",
       successText: "商品详情图已全部生成",
@@ -45,7 +47,6 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
 
   const {
     outputCards,
-    genLogs,
     generating,
     generatedCount,
     jobTotal,

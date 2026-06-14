@@ -17,11 +17,13 @@ function makePromptTitle(prompt) {
 
 export function useFreeImageGenerator({ onJobCreated } = {}) {
   const toast = useToast();
+  const genLogs = ref([]);
 
   const cards = useGenerationCards({
+    genLogs,
     getLogPrefix: (card) => card.strategyTitle || "自由生图",
     onBatchFinished: createBatchFinishedHandler({
-      getGenLogs: () => genLogs,
+      genLogs,
       toast,
       doneLog: "自由生图任务已结束",
       successText: "自由生图已生成",
@@ -32,7 +34,6 @@ export function useFreeImageGenerator({ onJobCreated } = {}) {
 
   const {
     outputCards,
-    genLogs,
     generating,
     generatedCount,
     jobTotal,

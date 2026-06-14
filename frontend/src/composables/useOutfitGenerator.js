@@ -17,11 +17,13 @@ import { useToast } from "@/composables/useToast.js";
 
 export function useOutfitGenerator({ onJobCreated } = {}) {
   const toast = useToast();
+  const genLogs = ref([]);
 
   const cards = useGenerationCards({
+    genLogs,
     getLogPrefix: (card) => card.strategyTitle || card.typeId || "",
     onBatchFinished: createBatchFinishedHandler({
-      getGenLogs: () => genLogs,
+      genLogs,
       toast,
       doneLog: "全部服饰穿搭任务已结束",
       successText: "服饰穿搭图已全部生成",
@@ -32,7 +34,6 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
 
   const {
     outputCards,
-    genLogs,
     generating,
     generatedCount,
     jobTotal,

@@ -48,6 +48,18 @@ const {
   toast,
   confirm,
 })
+
+function closeHistoryDrawer() {
+  generator.showHistoryDrawer.value = false
+}
+
+function openPreview(card) {
+  generator.zoomCard.value = card
+}
+
+function closePreview() {
+  generator.zoomCard.value = null
+}
 </script>
 
 <template>
@@ -112,7 +124,7 @@ const {
       @toggle-card="generator.toggleCardSelection"
       @download-card="generator.downloadSingleImage"
       @edit-card="openEditModal"
-      @zoom-card="(card) => { generator.zoomCard.value = card }"
+      @zoom-card="openPreview"
       @delete-card="handleDeleteCardDirect"
       @create-new-task="handleCreateNewTask"
       @open-history="openHistory"
@@ -123,7 +135,7 @@ const {
       :jobs="generator.historyTasks.value"
       :loading="generator.historyLoading.value"
       :current-job-id="generator.currentJobId.value"
-      @close="generator.showHistoryDrawer.value = false"
+      @close="closeHistoryDrawer"
       @pick="pickHistory"
       @delete="handleDeleteJob"
     />
@@ -132,7 +144,7 @@ const {
       :card="generator.zoomCard.value"
       title="商品详情图大图预览"
       alt="商品详情图预览"
-      @close="generator.zoomCard.value = null"
+      @close="closePreview"
     />
 
     <ImageEditModal
