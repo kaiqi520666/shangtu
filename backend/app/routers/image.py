@@ -77,6 +77,11 @@ def _parse_json_or_none(raw: str | None):
         return None
 
 
+async def _get_user_credits(db: AsyncSession, user_id: int) -> int:
+    result = await db.execute(select(User.credits).where(User.id == user_id))
+    return int(result.scalar_one_or_none() or 0)
+
+
 @router.post("/upload", response_model=Response)
 async def upload_image(
     file: UploadFile = File(...),
@@ -279,7 +284,10 @@ async def create_task(
             await db.commit()
         except Exception:
             await db.rollback()
-        return fail("任务入队失败，请稍后重试")
+        return fail(
+            "任务入队失败，请稍后重试",
+            data={"task_id": task_id, "credits": current_user.credits},
+        )
 
     if job is not None and job.status != "generating":
         try:
@@ -292,7 +300,7 @@ async def create_task(
         except Exception:
             await db.rollback()
 
-    return success({"task_id": task_id})
+    return success({"task_id": task_id, "credits": current_user.credits})
 
 
 @router.get("/task/{task_id}", response_model=Response)
@@ -382,6 +390,8 @@ async def get_task(
     if status == "done":
         progress = 100
 
+    latest_credits = await _get_user_credits(db, current_user.id)
+
     return success(
         {
             "status": status,
@@ -399,6 +409,7 @@ async def get_task(
             "created_at": to_utc_iso(task.created_at),
             "error_message": error_message,
             "progress": progress,
+            "credits": latest_credits,
         }
     )
 
@@ -635,6 +646,19 @@ async def regenerate_task(
             await db.commit()
         except Exception:
             await db.rollback()
-        return fail("任务入队失败，请稍后重试")
+        return fail(
+            "任务入队失败，请稍后重试",
+            data={
+                "task_id": new_task_id,
+                "source_task_id": task_id,
+                "credits": current_user.credits,
+            },
+        )
 
-    return success({"task_id": new_task_id, "source_task_id": task_id})
+    return success(
+        {
+            "task_id": new_task_id,
+            "source_task_id": task_id,
+            "credits": current_user.credits,
+        }
+    )

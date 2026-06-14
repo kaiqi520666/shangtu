@@ -17,7 +17,15 @@ request.interceptors.request.use((config) => {
 });
 
 request.interceptors.response.use(
-  (response) => response.data,
+  (response) => {
+    const payload = response.data;
+    const credits = payload?.data?.credits;
+    if (credits !== undefined && credits !== null) {
+      const authStore = useAuthStore();
+      authStore.updateCredits(credits);
+    }
+    return payload;
+  },
   (error) => {
     return Promise.reject(error);
   },
