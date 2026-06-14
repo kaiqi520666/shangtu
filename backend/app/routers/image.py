@@ -21,6 +21,7 @@ from app.core.image_prompt_builder import (
     build_product_image_strategy_template_prompt,
     compose_image_prompt,
 )
+from app.core.json_utils import dump_json_or_none, parse_json_or_none
 from app.core.oss import OssConfigError, upload_image_bytes
 from app.core.time import to_utc_iso, utc_now
 from app.models import GenerationJob, ImageTask, User
@@ -60,21 +61,6 @@ class ProductImageStrategyRequest(BaseModel):
 
 class FreeImageOptimizeRequest(BaseModel):
     prompt: str
-
-
-def _dump_json_or_none(value) -> str | None:
-    if value is None:
-        return None
-    return json.dumps(value, ensure_ascii=False)
-
-
-def _parse_json_or_none(raw: str | None):
-    if not raw:
-        return None
-    try:
-        return json.loads(raw)
-    except (TypeError, ValueError):
-        return None
 
 
 async def _get_user_credits(db: AsyncSession, user_id: int) -> int:
@@ -248,7 +234,7 @@ async def create_task(
         task_prompt_snapshot=task_prompt_snapshot,
         user_prompt=user_prompt,
         prompt_template_refs_json=prompt_template_refs_json,
-        settings_snapshot_json=_dump_json_or_none(req.settings_snapshot),
+        settings_snapshot_json=dump_json_or_none(req.settings_snapshot),
     )
     db.add(task)
     try:
@@ -397,12 +383,8 @@ async def get_task(
             "system_prompt_snapshot": task.system_prompt_snapshot,
             "task_prompt_snapshot": task.task_prompt_snapshot,
             "user_prompt": task.user_prompt,
-            "prompt_template_refs": (
-                json.loads(task.prompt_template_refs_json)
-                if task.prompt_template_refs_json
-                else []
-            ),
-            "settings_snapshot": _parse_json_or_none(task.settings_snapshot_json),
+            "prompt_template_refs": parse_json_or_none(task.prompt_template_refs_json) or [],
+            "settings_snapshot": parse_json_or_none(task.settings_snapshot_json),
             "created_at": to_utc_iso(task.created_at),
             "error_message": error_message,
             "progress": progress,

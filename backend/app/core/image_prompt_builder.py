@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-import json
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.json_utils import dump_json, parse_json_object
 from app.core.prompt_templates import get_prompt_templates
 from app.models import GenerationJob
 
@@ -38,18 +38,8 @@ def compose_image_prompt(
     return "\n".join(part for part in final_parts if part)
 
 
-def _parse_json_object(raw: str | None) -> dict:
-    if not raw:
-        return {}
-    try:
-        parsed = json.loads(raw)
-    except (TypeError, ValueError):
-        return {}
-    return parsed if isinstance(parsed, dict) else {}
-
-
 def _template_refs(templates) -> str:
-    return json.dumps(
+    return dump_json(
         [
             {
                 "id": template.id,
@@ -62,8 +52,7 @@ def _template_refs(templates) -> str:
                 "version": template.version,
             }
             for template in templates
-        ],
-        ensure_ascii=False,
+        ]
     )
 
 
@@ -145,7 +134,7 @@ async def build_image_generate_prompt(
         raise ValueError("图片生成缺少图种类型")
 
     type_id = type_id.strip()
-    settings = _parse_json_object(job.settings_json)
+    settings = parse_json_object(job.settings_json)
     platform = str(settings.get("platform") or "").strip() or None
 
     lookup = await get_prompt_templates(

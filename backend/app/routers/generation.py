@@ -1,4 +1,3 @@
-import json
 import uuid
 from typing import Any
 
@@ -8,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_user, get_db
+from app.core.json_utils import dump_json, parse_json_or_none
 from app.core.time import to_utc_iso, utc_now
 from app.models import GenerationJob, ImageTask, User
 from app.schemas.response import Response, fail, success
@@ -54,15 +54,6 @@ class UpdateJobRequest(BaseModel):
     source_images: list[Any] | None = None
     input_text: str | None = None
     structure: list[Any] | None = None
-
-
-def _parse_json(raw: str | None):
-    if not raw:
-        return None
-    try:
-        return json.loads(raw)
-    except (TypeError, ValueError):
-        return None
 
 
 def _default_title(scenario: str) -> str:
@@ -217,8 +208,8 @@ async def get_job(
             "system_prompt_snapshot": task.system_prompt_snapshot,
             "task_prompt_snapshot": task.task_prompt_snapshot,
             "user_prompt": task.user_prompt,
-            "prompt_template_refs": _parse_json(task.prompt_template_refs_json),
-            "settings_snapshot": _parse_json(task.settings_snapshot_json),
+            "prompt_template_refs": parse_json_or_none(task.prompt_template_refs_json),
+            "settings_snapshot": parse_json_or_none(task.settings_snapshot_json),
         }
         for task in tasks_result.scalars().all()
     ]
@@ -236,19 +227,15 @@ async def get_job(
             "display_status": _compute_display_status(
                 job.status, total, completed, failed
             ),
-            "settings": _parse_json(job.settings_json),
-            "source_images": _parse_json(job.source_images_json),
+            "settings": parse_json_or_none(job.settings_json),
+            "source_images": parse_json_or_none(job.source_images_json),
             "input_text": job.input_text,
-            "structure": _parse_json(job.structure_json),
+            "structure": parse_json_or_none(job.structure_json),
             "items": items,
             "created_at": to_utc_iso(job.created_at),
             "updated_at": to_utc_iso(job.updated_at),
         }
     )
-
-
-def _dump_json(value) -> str:
-    return json.dumps(value, ensure_ascii=False)
 
 
 @router.patch("/jobs/{job_id}", response_model=Response)
@@ -274,13 +261,13 @@ async def update_job(
             return fail("任务标题长度需在 1-100 字之间")
         job.title = title
     if req.settings is not None:
-        job.settings_json = _dump_json(req.settings)
+        job.settings_json = dump_json(req.settings)
     if req.source_images is not None:
-        job.source_images_json = _dump_json(req.source_images)
+        job.source_images_json = dump_json(req.source_images)
     if req.input_text is not None:
         job.input_text = req.input_text
     if req.structure is not None:
-        job.structure_json = _dump_json(req.structure)
+        job.structure_json = dump_json(req.structure)
 
     job.updated_at = utc_now()
 
