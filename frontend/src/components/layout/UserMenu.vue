@@ -2,22 +2,22 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ChevronDown, LogOut, Settings, UserRound, WalletCards } from 'lucide-vue-next'
-import { useAuth } from '@/composables/useAuth.js'
+import { useAuthStore } from '@/stores/auth.js'
 
 const router = useRouter()
-const auth = useAuth()
+const authStore = useAuthStore()
 const open = ref(false)
 const root = ref(null)
 
-const email = computed(() => auth.user.value?.email || 'user@example.com')
-const credits = computed(() => auth.credits.value || 0)
+const email = computed(() => authStore.user?.email || 'user@example.com')
+const credits = computed(() => authStore.credits || 0)
 const initials = computed(() => {
   const source = email.value.split('@')[0] || 'VIP'
   return source.slice(0, 2).toUpperCase()
 })
 
 function handleLogout() {
-  auth.logout()
+  authStore.logout()
   open.value = false
   router.push({ path: '/login', query: { loggedOut: '1' } })
 }

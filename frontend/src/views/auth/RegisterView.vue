@@ -2,11 +2,11 @@
 import { useRouter } from "vue-router";
 import { register } from "@/api/auth.js";
 import AuthForm from "@/components/auth/AuthForm.vue";
-import { useAuth } from "@/composables/useAuth.js";
 import { useToast } from "@/composables/useToast.js";
+import { useAuthStore } from "@/stores/auth.js";
 
 const router = useRouter();
-const auth = useAuth();
+const authStore = useAuthStore();
 const toast = useToast();
 
 async function handleRegister(payload) {
@@ -22,7 +22,7 @@ async function handleRegister(payload) {
       return;
     }
 
-    auth.login({
+    authStore.login({
       username: result.data?.username || payload.username,
       email: result.data?.email || payload.email,
       token: result.data?.token,

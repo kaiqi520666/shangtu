@@ -3,12 +3,12 @@ import { onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { login } from '@/api/auth.js'
 import AuthForm from '@/components/auth/AuthForm.vue'
-import { useAuth } from '@/composables/useAuth.js'
 import { useToast } from '@/composables/useToast.js'
+import { useAuthStore } from '@/stores/auth.js'
 
 const router = useRouter()
 const route = useRoute()
-const auth = useAuth()
+const authStore = useAuthStore()
 const toast = useToast()
 
 onMounted(() => {
@@ -30,7 +30,7 @@ async function handleLogin(payload) {
       return
     }
 
-    auth.login({
+    authStore.login({
       email: result.data?.email || payload.email,
       username: result.data?.username,
       token: result.data?.token,
@@ -38,7 +38,7 @@ async function handleLogin(payload) {
       credits: result.data?.credits,
     })
     toast.success('登录成功')
-    router.push('/generator')
+    router.push(typeof route.query.redirect === 'string' ? route.query.redirect : '/generator')
   } catch (error) {
     toast.error(error.response?.data?.message || '登录失败，请稍后重试')
   }

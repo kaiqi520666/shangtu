@@ -1,5 +1,7 @@
 // src/router/index.js
 import { createRouter, createWebHistory } from "vue-router";
+import { getCurrentUser } from "@/api/auth.js";
+import { useAuthStore } from "@/stores/auth.js";
 import HomeView from "../views/HomeView.vue";
 
 const router = createRouter({
@@ -50,6 +52,51 @@ const router = createRouter({
       component: () => import("../views/generator/assets/AssetLibraryView.vue"),
     },
   ],
+});
+
+let profileSynced = false;
+
+router.beforeEach(async (to) => {
+  const authStore = useAuthStore();
+  const requiresAuth = to.path.startsWith("/generator");
+  if (requiresAuth && !authStore.isAuthenticated) {
+    return {
+      path: "/login",
+      query: { redirect: to.fullPath },
+    };
+  }
+  if (requiresAuth && !profileSynced) {
+    try {
+      const result = await getCurrentUser();
+      if (result.code === 0) {
+        authStore.setAuthUser({
+          ...result.data,
+          token: authStore.token,
+        });
+        profileSynced = true;
+      } else {
+        authStore.logout();
+        return {
+          path: "/login",
+          query: { redirect: to.fullPath },
+        };
+      }
+    } catch {
+      authStore.logout();
+      return {
+        path: "/login",
+        query: { redirect: to.fullPath },
+      };
+    }
+  }
+  if (
+    (to.path === "/login" || to.path === "/register") &&
+    authStore.isAuthenticated &&
+    to.query.loggedOut !== "1"
+  ) {
+    return "/generator";
+  }
+  return true;
 });
 
 export default router;

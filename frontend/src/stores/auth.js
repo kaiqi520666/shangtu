@@ -53,10 +53,6 @@ export const useAuthStore = defineStore(
       };
     }
 
-    function getToken() {
-      return token.value;
-    }
-
     return {
       user,
       token,
@@ -67,7 +63,6 @@ export const useAuthStore = defineStore(
       login,
       logout,
       updateCredits,
-      getToken,
     };
   },
   {
