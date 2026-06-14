@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { CheckCircle2, ImagePlus, LoaderCircle, Trash2, X } from 'lucide-vue-next'
 import { uploadImage } from '@/api/image.js'
+import AppModal from '@/components/ui/AppModal.vue'
 
 const props = defineProps({
   images: {
@@ -46,6 +47,7 @@ const emit = defineEmits(['update:images', 'update:mainIndex', 'notify'])
 
 const fileInput = ref(null)
 const dragOver = ref(false)
+const previewImage = ref(null)
 const placeholderCount = computed(() => Math.max(0, props.maxCount - props.images.length - 1))
 
 function triggerFileInput() {
@@ -153,12 +155,18 @@ function removeImage(index) {
 function clearImages() {
   emit('update:images', [])
   emit('update:mainIndex', 0)
+  previewImage.value = null
 }
 
 function getPreview(img) {
   if (!img) return ''
   if (typeof img === 'string') return img
   return img.previewUrl || img.url || ''
+}
+
+function openPreview(img) {
+  if (!getPreview(img)) return
+  previewImage.value = img
 }
 </script>
 
@@ -179,7 +187,8 @@ function getPreview(img) {
       <div
         v-for="(img, index) in images"
         :key="img?.id || `${getPreview(img)}-${index}`"
-        class="group relative flex aspect-square items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50 p-1 shadow-inner"
+        class="group relative flex aspect-square cursor-zoom-in items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50 p-1 shadow-inner"
+        @click="openPreview(img)"
       >
         <img :src="getPreview(img)" class="max-h-full max-w-full rounded-lg object-contain transition-transform duration-300 group-hover:scale-105" :alt="altText" />
 
@@ -197,7 +206,7 @@ function getPreview(img) {
             class="rounded border border-slate-100 bg-white p-1.5 text-xs text-slate-800 shadow transition-colors hover:bg-slate-100"
             :class="index === mainIndex ? 'border-primary text-primary' : ''"
             title="设为渲染主图"
-            @click="emit('update:mainIndex', index)"
+            @click.stop="emit('update:mainIndex', index)"
           >
             <CheckCircle2 class="h-3.5 w-3.5" />
           </button>
@@ -205,7 +214,7 @@ function getPreview(img) {
             type="button"
             class="rounded border border-slate-100 bg-white p-1.5 text-rose-500 shadow transition-colors hover:bg-rose-50"
             title="删除"
-            @click="removeImage(index)"
+            @click.stop="removeImage(index)"
           >
             <Trash2 class="h-3.5 w-3.5" />
           </button>
@@ -235,5 +244,20 @@ function getPreview(img) {
         <X class="m-auto mt-[40%] h-4 w-4 text-slate-200" />
       </div>
     </div>
+
+    <AppModal
+      :open="Boolean(previewImage)"
+      :title="title"
+      panel-class="w-full max-w-4xl"
+      @close="previewImage = null"
+    >
+      <div v-if="previewImage" class="bg-slate-100 p-6">
+        <img
+          :src="getPreview(previewImage)"
+          class="mx-auto max-h-[75vh] rounded-xl object-contain shadow-lg"
+          :alt="altText"
+        />
+      </div>
+    </AppModal>
   </section>
 </template>
