@@ -14,4 +14,4 @@ class WorkerSettings:
         os.getenv("REDIS_URL", "redis://localhost:6379")
     )
     job_timeout = 1500
-    max_jobs = 5
+    max_jobs = int(os.getenv("ARQ_MAX_JOBS", "5"))
