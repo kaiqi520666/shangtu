@@ -10,7 +10,7 @@ from app.schemas.response import Response, fail, success
 
 router = APIRouter(prefix="/asset", tags=["资产库"])
 
-SCENARIO_FILTER = {"product_suite", "product_image", "outfit"}
+SCENARIO_FILTER = {"product_suite", "product_image", "outfit", "free_image"}
 PAGE_SIZE_MAX = 50
 
 

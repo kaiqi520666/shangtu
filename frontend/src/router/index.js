@@ -40,6 +40,11 @@ const router = createRouter({
       component: () => import("../views/generator/outfit/OutfitView.vue"),
     },
     {
+      path: "/generator/free-image/:jobId?",
+      name: "free-image",
+      component: () => import("../views/generator/free-image/FreeImageView.vue"),
+    },
+    {
       path: "/generator/assets",
       name: "assets",
       component: () => import("../views/generator/assets/AssetLibraryView.vue"),

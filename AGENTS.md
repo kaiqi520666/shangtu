@@ -120,6 +120,7 @@ frontend/src/
 - `POST /image/upload`
 - `POST /image/analyze`
 - `POST /image/generate`
+- `POST /image/free-image/optimize`
 - `GET /image/task/{task_id}`
 - `GET /image/task/{task_id}/download`
 - `DELETE /image/task/{task_id}`
@@ -176,8 +177,10 @@ frontend/src/
 - `product_suite`
 - `product_image`
 - `outfit`
+- `free_image`
 
 `/image/generate` 允许上述场景的 job，参考图统一使用 `image_urls` 数组。Worker 不关心场景，只处理 prompt、尺寸、参考图和任务 ID。
+`free_image` 是自由生图场景：不接入 `prompt_templates`，不拼任何系统提示词；生图最终 prompt 严格等于用户输入框内容，参考图只通过 `image_urls` 传给模型。
 
 ### PromptTemplate
 

@@ -132,6 +132,22 @@ def build_product_prompt(platform: str) -> str:
 5.具体参数："""
 
 
+def build_free_image_optimize_prompt(prompt: str) -> str:
+    return f"""你是 AI 生图提示词优化助手。
+请把用户输入改写成更清晰、更具体、更适合图像生成模型执行的提示词。
+
+要求：
+1. 保留用户原意，不要改变主体、物种、商品类型、人物身份或核心动作。
+2. 可以补充画面构图、镜头、光线、背景、材质、风格、清晰度等视觉描述。
+3. 不要添加用户没有要求的品牌 Logo、文字、水印、价格、促销、认证、销量、具体参数。
+4. 不要输出解释，不要输出 Markdown，不要输出标题。
+5. 只输出优化后的提示词本身。
+6. 如果用户输入已经足够清楚，只做轻微润色。
+
+用户原始提示词：
+{prompt}"""
+
+
 def build_product_image_strategy_prompt(
     *,
     platform: str,
@@ -211,6 +227,49 @@ async def analyze_product_image(
                     {
                         "type": "text",
                         "text": prompt or build_product_prompt(platform),
+                    },
+                ],
+            }
+        ],
+    }
+
+    async with httpx.AsyncClient(timeout=60) as client:
+        response = await client.post(
+            get_dashscope_endpoint(),
+            headers={"Authorization": f"Bearer {get_dashscope_api_key()}"},
+            json=payload,
+        )
+
+    if response.status_code >= 400:
+        raise RuntimeError(f"DashScope请求失败: {response.status_code} {response.text[:300]}")
+
+    result = response.json()
+    try:
+        content = result["choices"][0]["message"]["content"]
+    except (KeyError, IndexError, TypeError) as exc:
+        raise RuntimeError("DashScope响应格式异常") from exc
+
+    if not content or not content.strip():
+        raise RuntimeError("DashScope未返回有效内容")
+
+    return content.strip()
+
+
+async def optimize_free_image_prompt(prompt: str) -> str:
+    normalized_prompt = prompt.strip()
+    if not normalized_prompt:
+        raise ValueError("请输入需要优化的提示词")
+
+    payload = {
+        "model": DASHSCOPE_MODEL,
+        "enable_thinking": False,
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": build_free_image_optimize_prompt(normalized_prompt[:4000]),
                     },
                 ],
             }

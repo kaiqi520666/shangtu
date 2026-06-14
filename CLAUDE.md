@@ -62,7 +62,8 @@ shangtu/
 
 - `POST /image/upload`：multipart 上传 OSS（≤10MB，jpg/png/webp/gif），返回 `url` + `object_key`
 - `POST /image/analyze`：DashScope `qwen3.6-flash` 多模态分析商品图，输出标准化产品名/卖点/适用人群/场景/参数
-- `POST /image/generate`：扣 1 积分 + 建 `ImageTask(pending)` 同事务；接受 `{prompt, user_prompt?, image_urls=[], ratio="1:1", resolution="1K", job_id?, type_id?, title?, sort_order=0}`，落库 `size = "{ratio}/{resolution}"` 仅作审计标记；入队失败退回积分 + 任务标 `failed` 且 `credit_refunded=True`；带 `job_id` 时校验归属 + scenario；`product_suite / product_image / outfit` 会用 `prompt_templates` 的 `image_generate` 模板拼接最终 prompt，并写入 `system_prompt_snapshot / task_prompt_snapshot / user_prompt / prompt_template_refs_json`；入队成功后把 `GenerationJob.status` 置 `generating`；返回 `task_id`
+- `POST /image/generate`：扣 1 积分 + 建 `ImageTask(pending)` 同事务；接受 `{prompt, user_prompt?, image_urls=[], ratio="1:1", resolution="1K", job_id?, type_id?, title?, sort_order=0}`，落库 `size = "{ratio}/{resolution}"` 仅作审计标记；入队失败退回积分 + 任务标 `failed` 且 `credit_refunded=True`；带 `job_id` 时校验归属 + scenario；`product_suite / product_image / outfit` 会用 `prompt_templates` 的 `image_generate` 模板拼接最终 prompt，并写入 `system_prompt_snapshot / task_prompt_snapshot / user_prompt / prompt_template_refs_json`；`free_image` 不接模板、不拼系统提示词，最终 prompt 严格等于用户输入；入队成功后把 `GenerationJob.status` 置 `generating`；返回 `task_id`
+- `POST /image/free-image/optimize`：自由生图的 AI 优化接口，输入 `{prompt}`，调用 DashScope `qwen3.6-flash` 把用户提示词润色成更适合生图的纯 prompt，返回 `{prompt}`；该优化结果只覆盖前端输入框，不作为系统提示词注入生图模型。
 - `GET /image/task/{task_id}`：优先读 Redis（`task:{id}:status` / `:error` / `:result` / `:progress`），回退 DB；`status=done` 但 `result_url` 缺失时降级为 `processing`，让前端继续轮询；响应字段 `{status, result_url, prompt, created_at, error_message, progress}`，`error_message` 是 worker 已归一化后的中文友好文案
 - `GET /image/tasks`：当前用户历史任务（按 `created_at` desc）
 
@@ -81,7 +82,7 @@ shangtu/
 
 #### 父任务 `/generation`（需登录）
 
-- `POST /generation/jobs`：scenario 当前支持 `product_suite / product_image / outfit`，自动生成对应标题前缀，落 `generation_jobs(status=draft)`，返回 `{job_id, scenario, title, status, created_at}`
+- `POST /generation/jobs`：scenario 当前支持 `product_suite / product_image / outfit / free_image`，自动生成对应标题前缀，落 `generation_jobs(status=draft)`，返回 `{job_id, scenario, title, status, created_at}`
 - `GET /generation/jobs?scenario=...`：返回当前用户该场景的父任务列表（按 `created_at desc`），每条带 `total/completed/failed`（按未归档、未被 `replaced_by_task_id` 替换的 `image_tasks.job_id` 聚合，`done` 计 completed，`failed/timeout` 计 failed）
 - `GET /generation/jobs/{job_id}`：返回父任务设置 + 子任务清单 `items[]`（只返回未归档、未被 `replaced_by_task_id` 替换的当前版本，含 `task_id/type_id/title/sort_order/status/progress/result_url/error_message/credit_refunded`，按 `sort_order asc, created_at asc`），`settings/source_images/structure` 为反序列化后的 JSON
 - `PATCH /generation/jobs/{job_id}`：保存/恢复工作台快照。可选字段 `{title, settings, source_images, input_text, structure}`，传哪个改哪个；`settings/source_images/structure` 由后端 `json.dumps(..., ensure_ascii=False)` 写入对应 JSON 列；`title` 校验 1-100 字；只能改自己的 job；返回 `{job_id, scenario, title, status, updated_at}`
@@ -130,7 +131,7 @@ CREATE INDEX ix_prompt_templates_lookup
 
 #### 路由与认证
 
-- `/`、`/login`、`/register`、`/generator`（重定向 `product-suite`）、`/generator/{product-suite|product-image|outfit}`
+- `/`、`/login`、`/register`、`/generator`（重定向 `product-suite`）、`/generator/{product-suite|product-image|outfit|free-image}`
 - 登录/注册页已对接 `/auth/login`、`/auth/register`，登录态写 `localStorage.nodepass_auth_user`
 - `useAuth` 封装登录/登出/读 token；axios 拦截器自动注 `Authorization: Bearer`
 

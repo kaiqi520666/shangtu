@@ -27,6 +27,10 @@ export function generateProductImageStrategy({
   );
 }
 
+export function optimizeFreeImagePrompt(prompt) {
+  return request.post("/image/free-image/optimize", { prompt }, { timeout: 120000 });
+}
+
 export function generateImage({
   prompt,
   user_prompt = null,

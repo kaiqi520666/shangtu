@@ -8,6 +8,7 @@ const SCENARIO_OPTIONS = [
   { value: "product_suite", label: "商品套图" },
   { value: "product_image", label: "商品详情图" },
   { value: "outfit", label: "服饰穿搭" },
+  { value: "free_image", label: "自由生图" },
 ];
 
 export function useAssetLibrary() {

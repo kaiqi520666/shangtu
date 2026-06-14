@@ -13,6 +13,7 @@ from app.core.image_analyzer import (
     DashScopeConfigError,
     analyze_product_image,
     generate_product_image_strategy,
+    optimize_free_image_prompt,
 )
 from app.core.image_prompt_builder import (
     build_ai_write_prompt,
@@ -54,6 +55,10 @@ class ProductImageStrategyRequest(BaseModel):
     language: str = "中文"
     product_input: str
     module_ids: list[str]
+
+
+class FreeImageOptimizeRequest(BaseModel):
+    prompt: str
 
 
 @router.post("/upload", response_model=Response)
@@ -137,6 +142,21 @@ async def product_image_strategy(
     return success(strategy)
 
 
+@router.post("/free-image/optimize", response_model=Response)
+async def free_image_optimize(
+    req: FreeImageOptimizeRequest,
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        content = await optimize_free_image_prompt(req.prompt)
+    except (ValueError, DashScopeConfigError, RuntimeError) as e:
+        return fail(str(e))
+    except Exception:
+        return fail("提示词优化失败")
+
+    return success({"prompt": content})
+
+
 @router.post("/generate", response_model=Response)
 async def create_task(
     req: GenerateRequest,
@@ -158,7 +178,7 @@ async def create_task(
         job = job_result.scalar_one_or_none()
         if not job:
             return fail("任务不存在")
-        if job.scenario not in {"product_suite", "product_image", "outfit"}:
+        if job.scenario not in {"product_suite", "product_image", "outfit", "free_image"}:
             return fail("任务类型不匹配")
 
     task_id = str(uuid.uuid4())
@@ -168,6 +188,13 @@ async def create_task(
     task_prompt_snapshot = None
     prompt_template_refs_json = None
     prepend_reference_prompt = True
+
+    if job is not None and job.scenario == "free_image":
+        if not req.prompt.strip():
+            return fail("请输入提示词")
+        final_prompt = req.prompt
+        user_prompt = req.prompt
+        prepend_reference_prompt = False
 
     if job is not None and job.scenario in {"product_suite", "product_image", "outfit"}:
         try:
@@ -495,7 +522,22 @@ async def regenerate_task(
         or task.task_prompt_snapshot
         or task.prompt_template_refs_json
     )
-    if has_prompt_snapshot or task.user_prompt:
+    if task.job_id:
+        job_result = await db.execute(
+            select(GenerationJob).where(
+                GenerationJob.id == task.job_id,
+                GenerationJob.user_id == current_user.id,
+            )
+        )
+        source_job = job_result.scalar_one_or_none()
+    else:
+        source_job = None
+
+    if source_job and source_job.scenario == "free_image":
+        new_user_prompt = requested_user_prompt or edit_instruction
+        new_prompt = new_user_prompt
+        prepend_reference_prompt = False
+    elif has_prompt_snapshot or task.user_prompt:
         new_user_prompt = requested_user_prompt or (
             f"{task.user_prompt}\n\n【用户修改要求】{edit_instruction}"
             if task.user_prompt
@@ -506,10 +548,11 @@ async def regenerate_task(
             task_prompt=task.task_prompt_snapshot,
             user_prompt=new_user_prompt,
         )
+        prepend_reference_prompt = not has_prompt_snapshot
     else:
         new_user_prompt = None
         new_prompt = task.prompt + "\n\n【用户修改要求】" + edit_instruction
-    prepend_reference_prompt = not has_prompt_snapshot
+        prepend_reference_prompt = True
 
     new_task_id = str(uuid.uuid4())
 

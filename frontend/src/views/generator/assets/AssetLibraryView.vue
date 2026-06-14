@@ -35,6 +35,7 @@ const SCENARIO_LABEL_MAP = {
   product_suite: '商品套图',
   product_image: '商品详情图',
   outfit: '服饰穿搭',
+  free_image: '自由生图',
 }
 
 function getScenarioLabel(card) {
