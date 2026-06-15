@@ -68,9 +68,18 @@ docker compose up -d
 # 浏览器访问 http://localhost:8090 测试登录/上传/生图（端口由 .env 的 FRONTEND_PORT 决定）
 docker compose down
 
-# 登录并推送（backend 和 worker 用同一镜像，推一次即可）
+# 登录
 docker login
-docker compose push backend frontend
+
+# 如果你在 Apple Silicon (arm64) 等非 amd64 机器上构建，
+# 普通 docker compose build/push 只会生成本机架构的镜像，
+# 1Panel 服务器（通常是 linux/amd64）拉取会报
+# "no matching manifest for linux/amd64"。
+# 用 buildx 构建并推送多架构镜像（amd64 + arm64）：
+docker buildx build --platform linux/amd64,linux/arm64 \
+  -t kaiqi520666/shangtu-backend:latest --push ./backend
+docker buildx build --platform linux/amd64,linux/arm64 \
+  -t kaiqi520666/shangtu-frontend:latest --push ./frontend
 ```
 
 ### 第二步：1Panel 服务器准备
@@ -119,8 +128,11 @@ docker exec -it <backend容器名> python scripts/upload_outfit_models.py
 ### 后续更新流程
 
 ```bash
-# 本地
-cd deploy && docker compose build && docker compose push backend frontend
+# 本地（多架构构建+推送，见上面第一步）
+docker buildx build --platform linux/amd64,linux/arm64 \
+  -t kaiqi520666/shangtu-backend:latest --push ./backend
+docker buildx build --platform linux/amd64,linux/arm64 \
+  -t kaiqi520666/shangtu-frontend:latest --push ./frontend
 
 # 1Panel：编排页面点「重新拉取镜像」，或在服务器上执行
 docker compose pull && docker compose up -d
