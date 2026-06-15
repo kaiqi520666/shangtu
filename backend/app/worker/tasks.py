@@ -270,7 +270,7 @@ def normalize_provider_error(message: str | None) -> str:
 
 
 async def refund_task_credit(task_id: str) -> bool:
-    """幂等退款：未退过则把对应用户 credits +1 并把 task.credit_refunded 置 True，已退过直接 no-op。返回是否本次执行了退款。"""
+    """幂等退款：按任务实际扣费退回积分，已退过直接 no-op。返回是否本次执行了退款。"""
     from app.models import ImageTask, User
 
     async with SessionLocal() as session:
@@ -278,18 +278,20 @@ async def refund_task_credit(task_id: str) -> bool:
             task_row = await session.execute(
                 select(
                     ImageTask.user_id,
+                    ImageTask.credit_cost,
                     ImageTask.credit_refunded,
                 ).where(ImageTask.id == task_id).with_for_update()
             )
             row = task_row.first()
             if not row:
                 return False
-            user_id, refunded = row
+            user_id, credit_cost, refunded = row
             if refunded:
                 return False
+            refund_amount = max(1, int(credit_cost or 1))
             await session.execute(
                 update(User).where(User.id == user_id).values(
-                    credits=User.credits + 1
+                    credits=User.credits + refund_amount
                 )
             )
             await session.execute(

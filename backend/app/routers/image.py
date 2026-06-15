@@ -8,6 +8,11 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.credits import (
+    get_image_credit_cost,
+    get_image_credit_costs,
+    normalize_image_resolution,
+)
 from app.core.deps import get_current_user, get_db
 from app.core.image_analyzer import (
     DashScopeConfigError,
@@ -28,8 +33,6 @@ from app.models import GenerationJob, ImageTask, User
 from app.schemas.response import Response, fail, success
 
 router = APIRouter(prefix="/image", tags=["生图"])
-
-CREDITS_PER_IMAGE = 1
 
 
 class GenerateRequest(BaseModel):
@@ -66,6 +69,33 @@ class FreeImageOptimizeRequest(BaseModel):
 async def _get_user_credits(db: AsyncSession, user_id: int) -> int:
     result = await db.execute(select(User.credits).where(User.id == user_id))
     return int(result.scalar_one_or_none() or 0)
+
+
+def _insufficient_credits_message(required: int, available: int) -> str:
+    return f"积分不足，本次需要 {required} 点，当前剩余 {max(0, available)} 点"
+
+
+async def _deduct_user_credits(db: AsyncSession, user_id: int, cost: int) -> int | None:
+    result = await db.execute(
+        update(User)
+        .where(User.id == user_id, User.credits >= cost)
+        .values(credits=User.credits - cost)
+        .returning(User.credits)
+        .execution_options(synchronize_session=False)
+    )
+    value = result.scalar_one_or_none()
+    return int(value) if value is not None else None
+
+
+async def _refund_user_credits(db: AsyncSession, user_id: int, cost: int) -> int:
+    result = await db.execute(
+        update(User)
+        .where(User.id == user_id)
+        .values(credits=User.credits + cost)
+        .returning(User.credits)
+        .execution_options(synchronize_session=False)
+    )
+    return int(result.scalar_one())
 
 
 def _redis_str(value) -> str | None:
@@ -184,6 +214,15 @@ async def free_image_optimize(
     return success({"prompt": content})
 
 
+@router.get("/credit-costs", response_model=Response)
+async def image_credit_costs(current_user: User = Depends(get_current_user)):
+    try:
+        costs = get_image_credit_costs()
+    except ValueError as exc:
+        return fail(str(exc))
+    return success({"costs": costs})
+
+
 @router.post("/generate", response_model=Response)
 async def create_task(
     req: GenerateRequest,
@@ -191,8 +230,13 @@ async def create_task(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    if current_user.credits < CREDITS_PER_IMAGE:
-        return fail("积分不足")
+    try:
+        credit_cost = get_image_credit_cost(req.resolution)
+    except ValueError as exc:
+        return fail(str(exc))
+    normalized_resolution = normalize_image_resolution(req.resolution)
+    if current_user.credits < credit_cost:
+        return fail(_insufficient_credits_message(credit_cost, current_user.credits))
 
     job: GenerationJob | None = None
     if req.job_id:
@@ -238,13 +282,18 @@ async def create_task(
         task_prompt_snapshot = built_prompt.task_prompt_snapshot
         prompt_template_refs_json = built_prompt.prompt_template_refs_json
 
-    # 扣积分 + 建任务同一事务，避免一致性漂移
-    current_user.credits -= CREDITS_PER_IMAGE
+    # 原子扣积分 + 建任务同一事务，避免并发超扣和一致性漂移
+    remaining_credits = await _deduct_user_credits(db, current_user.id, credit_cost)
+    if remaining_credits is None:
+        await db.rollback()
+        latest_credits = await _get_user_credits(db, current_user.id)
+        return fail(_insufficient_credits_message(credit_cost, latest_credits))
+
     task = ImageTask(
         id=task_id,
         user_id=current_user.id,
         prompt=final_prompt,
-        size=f"{req.ratio}/{req.resolution}",
+        size=f"{req.ratio}/{normalized_resolution}",
         status="pending",
         job_id=req.job_id,
         type_id=req.type_id,
@@ -255,6 +304,7 @@ async def create_task(
         user_prompt=user_prompt,
         prompt_template_refs_json=prompt_template_refs_json,
         settings_snapshot_json=dump_json_or_none(req.settings_snapshot),
+        credit_cost=credit_cost,
     )
     db.add(task)
     try:
@@ -272,12 +322,14 @@ async def create_task(
             task_id,
             final_prompt,
             req.ratio,
-            req.resolution,
+            normalized_resolution,
             reference_image_urls,
         )
     except Exception:
         try:
-            current_user.credits += CREDITS_PER_IMAGE
+            refunded_credits = await _refund_user_credits(
+                db, current_user.id, credit_cost
+            )
             await db.execute(
                 update(ImageTask)
                 .where(ImageTask.id == task_id)
@@ -286,9 +338,14 @@ async def create_task(
             await db.commit()
         except Exception:
             await db.rollback()
+            refunded_credits = remaining_credits
         return fail(
             "任务入队失败，请稍后重试",
-            data={"task_id": task_id, "credits": current_user.credits},
+            data={
+                "task_id": task_id,
+                "credits": refunded_credits,
+                "credit_cost": credit_cost,
+            },
         )
 
     if job is not None and job.status != "generating":
@@ -302,7 +359,13 @@ async def create_task(
         except Exception:
             await db.rollback()
 
-    return success({"task_id": task_id, "credits": current_user.credits})
+    return success(
+        {
+            "task_id": task_id,
+            "credits": remaining_credits,
+            "credit_cost": credit_cost,
+        }
+    )
 
 
 @router.get("/task/{task_id}", response_model=Response)
@@ -395,6 +458,7 @@ async def get_task(
             "created_at": to_utc_iso(task.created_at),
             "error_message": error_message,
             "progress": progress,
+            "credit_cost": task.credit_cost,
             "credits": latest_credits,
         }
     )
@@ -520,13 +584,17 @@ async def regenerate_task(
     if not task.result_url:
         return fail("该图片尚未生成完成，无法重新生成")
 
-    if current_user.credits < CREDITS_PER_IMAGE:
-        return fail("积分不足")
-
     # 解析原 size -> ratio/resolution
     parts = task.size.split("/") if task.size else ["1:1", "1K"]
     ratio = parts[0] if len(parts) > 0 else "1:1"
     resolution = parts[1] if len(parts) > 1 else "1K"
+    try:
+        credit_cost = get_image_credit_cost(resolution)
+    except ValueError as exc:
+        return fail(str(exc))
+    normalized_resolution = normalize_image_resolution(resolution)
+    if current_user.credits < credit_cost:
+        return fail(_insufficient_credits_message(credit_cost, current_user.credits))
 
     # 保留旧 result_url 供前端继续展示
     old_result_url = task.result_url
@@ -568,8 +636,13 @@ async def regenerate_task(
 
     new_task_id = str(uuid.uuid4())
 
-    # 扣积分 + 新建重生任务 + 标记旧任务被替换，放在同一事务
-    current_user.credits -= CREDITS_PER_IMAGE
+    # 原子扣积分 + 新建重生任务 + 标记旧任务被替换，放在同一事务
+    remaining_credits = await _deduct_user_credits(db, current_user.id, credit_cost)
+    if remaining_credits is None:
+        await db.rollback()
+        latest_credits = await _get_user_credits(db, current_user.id)
+        return fail(_insufficient_credits_message(credit_cost, latest_credits))
+
     new_task = ImageTask(
         id=new_task_id,
         user_id=current_user.id,
@@ -578,7 +651,7 @@ async def regenerate_task(
         title=task.title,
         sort_order=task.sort_order,
         prompt=new_prompt,
-        size=task.size,
+        size=f"{ratio}/{normalized_resolution}",
         status="pending",
         edit_instruction=edit_instruction or None,
         system_prompt_snapshot=task.system_prompt_snapshot,
@@ -586,6 +659,7 @@ async def regenerate_task(
         user_prompt=new_user_prompt,
         prompt_template_refs_json=task.prompt_template_refs_json,
         settings_snapshot_json=task.settings_snapshot_json,
+        credit_cost=credit_cost,
         credit_refunded=False,
     )
     task.replaced_by_task_id = new_task_id
@@ -612,13 +686,15 @@ async def regenerate_task(
             new_task_id,
             new_prompt,
             ratio,
-            resolution,
+            normalized_resolution,
             [old_result_url],  # 使用当前已生成图作为参考图
         )
     except Exception:
         # 入队失败：退积分 + 标记新任务 failed + 恢复旧任务在工作台可见
         try:
-            current_user.credits += CREDITS_PER_IMAGE
+            refunded_credits = await _refund_user_credits(
+                db, current_user.id, credit_cost
+            )
             task.replaced_by_task_id = None
             new_task.status = "failed"
             new_task.error_message = "任务入队失败"
@@ -628,12 +704,14 @@ async def regenerate_task(
             await db.commit()
         except Exception:
             await db.rollback()
+            refunded_credits = remaining_credits
         return fail(
             "任务入队失败，请稍后重试",
             data={
                 "task_id": new_task_id,
                 "source_task_id": task_id,
-                "credits": current_user.credits,
+                "credits": refunded_credits,
+                "credit_cost": credit_cost,
             },
         )
 
@@ -641,6 +719,7 @@ async def regenerate_task(
         {
             "task_id": new_task_id,
             "source_task_id": task_id,
-            "credits": current_user.credits,
+            "credits": remaining_credits,
+            "credit_cost": credit_cost,
         }
     )

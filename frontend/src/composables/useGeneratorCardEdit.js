@@ -1,5 +1,6 @@
 import { ref } from "vue";
 import { deleteImageTask, regenerateImageTask } from "@/api/image.js";
+import { ensureEnoughImageCredits } from "@/composables/useImageCreditCosts.js";
 
 export function useGeneratorCardEdit({
   generator,
@@ -36,6 +37,13 @@ export function useGeneratorCardEdit({
       toast.error("该图片缺少任务 ID，无法重新生成");
       return;
     }
+    const hasEnoughCredits = await ensureEnoughImageCredits({
+      quality: card.settingsSnapshot?.quality || "1K",
+      count: 1,
+      toast,
+      actionText: "重新生成",
+    });
+    if (!hasEnoughCredits) return;
 
     editSubmitting.value = true;
     try {

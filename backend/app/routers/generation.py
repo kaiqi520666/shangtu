@@ -201,6 +201,7 @@ async def get_job(
             "result_url": task.result_url,
             "size": task.size,
             "error_message": task.error_message,
+            "credit_cost": task.credit_cost,
             "credit_refunded": bool(task.credit_refunded),
             "replaced_by_task_id": task.replaced_by_task_id,
             "prompt": task.prompt,

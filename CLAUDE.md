@@ -62,7 +62,8 @@ shangtu/
 
 - `POST /image/upload`：multipart 上传 OSS（≤10MB，jpg/png/webp/gif），返回 `url` + `object_key`
 - `POST /image/analyze`：DashScope `qwen3.6-flash` 多模态分析商品图，输出标准化产品名/卖点/适用人群/场景/参数
-- `POST /image/generate`：扣 1 积分 + 建 `ImageTask(pending)` 同事务；接受 `{prompt, user_prompt?, image_urls=[], ratio="1:1", resolution="1K", settings_snapshot?, job_id?, type_id?, title?, sort_order=0}`，落库 `size = "{ratio}/{resolution}"` 仅作审计标记，并把单图生成时的 `platform/language/ratio/quality/scenario` 等写入 `settings_snapshot_json`；入队失败退回积分 + 任务标 `failed` 且 `credit_refunded=True`；带 `job_id` 时校验归属 + scenario；`product_suite / product_image / outfit` 会用 `prompt_templates` 的 `image_generate` 模板拼接最终 prompt，并写入 `system_prompt_snapshot / task_prompt_snapshot / user_prompt / prompt_template_refs_json`；`free_image` 不接模板、不拼系统提示词，最终 prompt 严格等于用户输入；入队成功后把 `GenerationJob.status` 置 `generating`；返回 `{task_id, credits}`
+- `GET /image/credit-costs`：返回后端当前生图积分价格 `{costs: {"1K": 1, "2K": 2, "4K": 4}}`，价格来自后端 `.env` 的 `IMAGE_CREDIT_COST_*`，前端只用于提前提示，真实扣费以后端为准
+- `POST /image/generate`：按 `resolution` 计算积分成本（默认 `1K=1 / 2K=2 / 4K=4`，可由 `.env` 覆盖），用原子 SQL 扣分 + 建 `ImageTask(pending)` 同事务，任务落库 `credit_cost` 作为当次扣费快照；接受 `{prompt, user_prompt?, image_urls=[], ratio="1:1", resolution="1K", settings_snapshot?, job_id?, type_id?, title?, sort_order=0}`，落库 `size = "{ratio}/{resolution}"` 仅作审计标记，并把单图生成时的 `platform/language/ratio/quality/scenario` 等写入 `settings_snapshot_json`；入队失败按 `credit_cost` 退回积分 + 任务标 `failed` 且 `credit_refunded=True`；带 `job_id` 时校验归属 + scenario；`product_suite / product_image / outfit` 会用 `prompt_templates` 的 `image_generate` 模板拼接最终 prompt，并写入 `system_prompt_snapshot / task_prompt_snapshot / user_prompt / prompt_template_refs_json`；`free_image` 不接模板、不拼系统提示词，最终 prompt 严格等于用户输入；入队成功后把 `GenerationJob.status` 置 `generating`；返回 `{task_id, credits, credit_cost}`
 - `POST /image/free-image/optimize`：自由生图的 AI 优化接口，输入 `{prompt}`，调用 DashScope `qwen3.6-flash` 把用户提示词润色成更适合生图的纯 prompt，返回 `{prompt}`；该优化结果只覆盖前端输入框，不作为系统提示词注入生图模型。
 - `GET /image/task/{task_id}`：优先读 Redis（`task:{id}:status` / `:error` / `:result` / `:progress`），回退 DB；`status=done` 但 `result_url` 缺失时降级为 `processing`，让前端继续轮询；响应字段 `{status, result_url, prompt, settings_snapshot, created_at, error_message, progress, credits}`，`credits` 每次从 DB 读取最新值，失败退款后前端可同步更新；`error_message` 是 worker 已归一化后的中文友好文案
 - `GET /image/tasks`：当前用户历史任务（按 `created_at` desc）
@@ -74,7 +75,7 @@ shangtu/
 - 状态机：`pending → processing → done/failed/timeout`；ToAPIS `queued/in_progress` 映射 `processing`，`completed→done`，`failed→failed`
 - 失败分类（写 Redis `task:{id}:error` + DB `error_message`）：`TOAPIS_KEY` 缺失 / 不支持的尺寸组合 / 创建失败 / 轮询超时 / 任务失败 / completed 无 URL / 下载失败 / OSS 上传失败
 - **错误归一化**：`_mark_failed/_mark_timeout` 内部走 `normalize_provider_error`，把上游英文 JSON（如 `image_unsafe`、`upstream API failed`、`rate limit`、`timeout`）映射为中文友好文案，原始错误只 print 到日志；含中文的本地错误（如 `OSS 上传失败:` / `TOAPIS_KEY 未配置`）原样保留，但永远不向用户暴露原生英文 JSON
-- **失败退积分**：`_mark_failed/_mark_timeout` 都会调 `refund_task_credit(task_id)`，幂等（行级锁 + `image_tasks.credit_refunded` 标志位），重复处理只退一次；done 路径不退；`/image/generate` 入队失败退分时也置 `credit_refunded=True`
+- **失败退积分**：`_mark_failed/_mark_timeout` 都会调 `refund_task_credit(task_id)`，按 `image_tasks.credit_cost` 退回当次实际扣费，幂等（行级锁 + `image_tasks.credit_refunded` 标志位），重复处理只退一次；done 路径不退；`/image/generate` 入队失败退分时也置 `credit_refunded=True`
 - 进度同步：ToAPIS 返回 `progress` 时写入 Redis `task:{id}:progress` + DB `image_tasks.progress`，完成后强制 100
 - 写入顺序：先 DB 再 Redis 终态，避免 `done` 但 `result_url` 空的竞态
 - `image_urls` 存在时会作为参考图数组传给 ToAPIS；ToAPIS payload 的 `size` 字段是比例字符串（`"9:16"`），不是像素 `"720x1280"`
@@ -183,6 +184,11 @@ DASHSCOPE_API_KEY=
 # ToAPIS 生图（gpt-image-2 异步任务）
 TOAPIS_KEY=
 TOAPIS_URL=                   # 可选，默认 https://toapis.com
+
+# 生图积分价格（后端真实扣费来源）
+IMAGE_CREDIT_COST_1K=1
+IMAGE_CREDIT_COST_2K=2
+IMAGE_CREDIT_COST_4K=4
 ```
 
 前端只读 `VITE_API_BASE_URL`（默认 `/api`，由 vite 代理到 `127.0.0.1:8000`）。
@@ -229,7 +235,7 @@ npm run dev
 
 ## 已知技术债
 
-- 缺正式迁移工具（Alembic 待引入），靠 `Base.metadata.create_all`：旧库需手动补列 `ALTER TABLE image_tasks ADD COLUMN error_message TEXT, ADD COLUMN progress INTEGER DEFAULT 0, ADD COLUMN provider VARCHAR(32) DEFAULT 'toapis', ADD COLUMN provider_task_id VARCHAR(128);`（之前还需 `ALTER COLUMN prompt TYPE TEXT`）；新增父任务后还需补 `ALTER TABLE image_tasks ADD COLUMN job_id VARCHAR(36), ADD COLUMN type_id VARCHAR(50), ADD COLUMN title VARCHAR(100), ADD COLUMN sort_order INTEGER DEFAULT 0;`；提示词快照字段还需补 `ALTER TABLE image_tasks ADD COLUMN IF NOT EXISTS system_prompt_snapshot TEXT, ADD COLUMN IF NOT EXISTS task_prompt_snapshot TEXT, ADD COLUMN IF NOT EXISTS user_prompt TEXT, ADD COLUMN IF NOT EXISTS prompt_template_refs_json TEXT;`；重新生成保留历史需补 `ALTER TABLE image_tasks ADD COLUMN IF NOT EXISTS replaced_by_task_id VARCHAR(36);`；单图参数快照需补 `ALTER TABLE image_tasks ADD COLUMN IF NOT EXISTS settings_snapshot_json TEXT;`；新表 `generation_jobs` / `prompt_templates` 由 `create_all` 自动建
+- 缺正式迁移工具（Alembic 待引入），靠 `Base.metadata.create_all`：旧库需手动补列 `ALTER TABLE image_tasks ADD COLUMN error_message TEXT, ADD COLUMN progress INTEGER DEFAULT 0, ADD COLUMN provider VARCHAR(32) DEFAULT 'toapis', ADD COLUMN provider_task_id VARCHAR(128);`（之前还需 `ALTER COLUMN prompt TYPE TEXT`）；新增父任务后还需补 `ALTER TABLE image_tasks ADD COLUMN job_id VARCHAR(36), ADD COLUMN type_id VARCHAR(50), ADD COLUMN title VARCHAR(100), ADD COLUMN sort_order INTEGER DEFAULT 0;`；提示词快照字段还需补 `ALTER TABLE image_tasks ADD COLUMN IF NOT EXISTS system_prompt_snapshot TEXT, ADD COLUMN IF NOT EXISTS task_prompt_snapshot TEXT, ADD COLUMN IF NOT EXISTS user_prompt TEXT, ADD COLUMN IF NOT EXISTS prompt_template_refs_json TEXT;`；重新生成保留历史需补 `ALTER TABLE image_tasks ADD COLUMN IF NOT EXISTS replaced_by_task_id VARCHAR(36);`；单图参数快照需补 `ALTER TABLE image_tasks ADD COLUMN IF NOT EXISTS settings_snapshot_json TEXT;`；按分辨率计费需补 `ALTER TABLE image_tasks ADD COLUMN IF NOT EXISTS credit_cost INTEGER NOT NULL DEFAULT 1;`；新表 `generation_jobs` / `prompt_templates` 由 `create_all` 自动建
 - 详情图 / 穿搭工作台的"AI 帮写"和"批量生成"仍 Mock，待对接 `/image/analyze` 和 `/image/generate`
 - DashScope 模型 `qwen3.6-flash` 通过 `enable_thinking=false` 关闭思考模式；切模型时记得复核该参数兼容性
 

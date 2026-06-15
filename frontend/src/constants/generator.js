@@ -53,6 +53,12 @@ export const qualityOptions = [
   { value: '4K', title: '4K', subtitle: '更精细' },
 ]
 
+export const defaultImageCreditCosts = {
+  '1K': 1,
+  '2K': 2,
+  '4K': 4,
+}
+
 export const productDetailPreviewSlides = [
   {
     caption: '从商品图片到高转化详情图，一次生成多类电商视觉模块。',
@@ -150,6 +156,23 @@ export function resolveQuality(ratio, requestedQuality) {
   if (supported.includes('2K')) return '2K'
   if (supported.includes('1K')) return '1K'
   return supported[0]
+}
+
+export function normalizeImageQuality(quality) {
+  return String(quality || '').replace(/\s+/g, '').toUpperCase()
+}
+
+export function getImageCreditCost(quality, costs = defaultImageCreditCosts) {
+  const normalized = normalizeImageQuality(quality)
+  const cost = Number(costs?.[normalized] ?? defaultImageCreditCosts[normalized])
+  return Number.isFinite(cost) && cost > 0 ? cost : null
+}
+
+export function getImageBatchCreditCost({ quality = '1K', count = 1, costs } = {}) {
+  const unitCost = getImageCreditCost(quality, costs)
+  const imageCount = Math.max(0, Number(count || 0))
+  if (!unitCost || !Number.isFinite(imageCount)) return null
+  return unitCost * imageCount
 }
 
 export function formatImageLabel({ ratio = '1:1', quality = '1K' } = {}) {

@@ -1,5 +1,6 @@
 import { ref } from "vue";
 import { generateImage } from "@/api/image.js";
+import { ensureEnoughImageCredits } from "@/composables/useImageCreditCosts.js";
 import {
   createGenerationJob,
   getGenerationJob,
@@ -206,6 +207,14 @@ export function useGenerationRunner({
     creatingBatch.value = true;
 
     try {
+      const hasEnoughCredits = await ensureEnoughImageCredits({
+        quality: resolution,
+        count: queue.length,
+        toast,
+        actionText: "本次生成",
+      });
+      if (!hasEnoughCredits) return false;
+
       const jobId = await ensureCurrentJob();
       if (!jobId) return false;
 
