@@ -65,7 +65,7 @@ docker compose build
 
 # 本地起一遍验证（可选）
 docker compose up -d
-# 浏览器访问 http://localhost:8080 测试登录/上传/生图
+# 浏览器访问 http://localhost:8090 测试登录/上传/生图（端口由 .env 的 FRONTEND_PORT 决定）
 docker compose down
 
 # 登录并推送（backend 和 worker 用同一镜像，推一次即可）
@@ -93,11 +93,11 @@ docker compose push backend frontend
 - 路径：选择上传的目录 `/opt/1panel/apps/shangtu`
 - 创建后点 **启动**，会自动 `docker compose pull` 拉取镜像并启动 5 个容器（db / redis / backend / worker / frontend）
 
-`frontend` 容器监听服务器的 `8080` 端口（整站含 `/api` 反代）。
+`frontend` 容器监听服务器的 `FRONTEND_PORT`（`.env` 里配置，默认 `8090`，整站含 `/api` 反代）。如果该端口在服务器上被其它项目占用，改 `.env` 里的 `FRONTEND_PORT` 即可。
 
 ### 第四步：绑定域名 / HTTPS（可选）
 
-1Panel **网站 → 创建网站 → 反向代理**，代理地址填 `http://127.0.0.1:8080`，再用 1Panel 自带的 Let's Encrypt 申请证书。
+1Panel **网站 → 创建网站 → 反向代理**，代理地址填 `http://127.0.0.1:8090`（按实际 `FRONTEND_PORT` 调整），再用 1Panel 自带的 Let's Encrypt 申请证书。
 
 ### 第五步：首次初始化数据
 

@@ -54,6 +54,6 @@ services:
     image: kaiqi520666/shangtu-frontend:latest
     restart: unless-stopped
     ports:
-      - "8080:80"
+      - "${FRONTEND_PORT:-8090}:80"
     depends_on:
       - backend
