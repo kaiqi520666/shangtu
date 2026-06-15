@@ -205,6 +205,15 @@ npm run dev
 
 ---
 
+## Docker 部署
+
+- `backend/Dockerfile`：Python 3.12 + uv（清华源）打包后端，同一镜像通过覆盖 `command` 同时用于 API（`uvicorn`）和 worker（`arq app.worker.settings.WorkerSettings`）
+- `frontend/Dockerfile`：多阶段构建（node:22 → nginx:alpine），`frontend/nginx.conf` 把 `/api/` 反代到 `backend:8000` 并去掉 `/api` 前缀（与 vite 开发代理行为一致），`client_max_body_size 20m` 适配图片上传
+- `deploy/docker-compose.yml`：完整编排 `db(postgres:16) / redis:7 / backend / worker / frontend`，PostgreSQL 和 Redis 数据通过 `./data/postgres`、`./data/redis` 落盘持久化；镜像命名 `kaiqi520666/shangtu-backend` / `kaiqi520666/shangtu-frontend`
+- `deploy/.env.example`：部署所需环境变量模板（`POSTGRES_*` + 后端 `.env` 里的 `SECRET_KEY/OSS_*/DASHSCOPE_*/TOAPIS_*`），复制为 `deploy/.env` 后填真实值，不提交 git
+
+---
+
 ## 代码风格速参
 
 - **后端**：FastAPI 路由统一返回 `Response`；DB 走异步 Session；扣积分/写表用同一事务；新增模型在 `app/models/__init__.py` 导出
