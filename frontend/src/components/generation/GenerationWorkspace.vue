@@ -21,7 +21,19 @@ defineProps({
     type: Boolean,
     default: false,
   },
+  creatingBatch: {
+    type: Boolean,
+    default: false,
+  },
   generatedCount: {
+    type: Number,
+    default: 0,
+  },
+  runningCount: {
+    type: Number,
+    default: 0,
+  },
+  failedCount: {
     type: Number,
     default: 0,
   },
@@ -98,7 +110,7 @@ const emit = defineEmits([
 </script>
 
 <template>
-  <GeneratorWorkspaceShell :content-class="outputCards.length > 0 || generating ? 'p-6' : 'p-0'">
+  <GeneratorWorkspaceShell :content-class="outputCards.length > 0 || generating || creatingBatch ? 'p-6' : 'p-0'">
     <template #header>
       <div class="z-10 flex h-14 shrink-0 items-center justify-between border-b border-slate-200 bg-white/80 px-6 shadow-sm backdrop-blur-sm">
         <div class="flex items-center gap-3">
@@ -148,7 +160,7 @@ const emit = defineEmits([
     </template>
 
     <template #default>
-      <div v-if="generating && outputCards.length === 0" class="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white/95 p-8">
+      <div v-if="creatingBatch && outputCards.length === 0" class="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white/95 p-8">
         <div class="w-full max-w-md space-y-6 text-center">
           <div class="relative mx-auto flex h-24 w-24 items-center justify-center">
             <div class="absolute inset-0 animate-ping rounded-full bg-primary/10"></div>
@@ -178,7 +190,7 @@ const emit = defineEmits([
       </div>
 
       <GeneratorPreviewShowcase
-        v-if="outputCards.length === 0 && !generating"
+        v-if="outputCards.length === 0 && !generating && !creatingBatch"
         :title="emptyTitle"
         :subtitle="emptySubtitle"
         :slides="emptySlides"
@@ -188,7 +200,16 @@ const emit = defineEmits([
         <div v-if="generating" class="flex items-center justify-between rounded-xl border border-primary/20 bg-primary/5 px-4 py-2 text-xs">
           <div class="flex items-center gap-2 text-slate-700">
             <RefreshCw class="h-3.5 w-3.5 animate-spin text-primary" />
-            <span>{{ progressText }}，已完成 <span class="font-bold text-primary">{{ generatedCount }} / {{ jobTotal || totalCount }}</span></span>
+            <span>
+              {{ progressText }}，进行中
+              <span class="font-bold text-primary">{{ runningCount }}</span>
+              张，已完成
+              <span class="font-bold text-primary">{{ generatedCount }}</span>
+              / {{ jobTotal || totalCount }}
+              <template v-if="failedCount > 0">
+                ，失败 <span class="font-bold text-rose-500">{{ failedCount }}</span> 张
+              </template>
+            </span>
           </div>
           <span class="font-mono text-slate-400">{{ pollHint }}</span>
         </div>
@@ -206,7 +227,7 @@ const emit = defineEmits([
         />
       </div>
 
-      <div v-if="outputCards.length === 0 && !generating && emptySlides.length === 0" class="flex h-full items-center justify-center text-slate-300">
+      <div v-if="outputCards.length === 0 && !generating && !creatingBatch && emptySlides.length === 0" class="flex h-full items-center justify-center text-slate-300">
         <ImageIcon class="h-8 w-8" />
       </div>
     </template>

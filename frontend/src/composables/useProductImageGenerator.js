@@ -47,8 +47,12 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
 
   const {
     outputCards,
+    creatingBatch,
+    hasRunningTasks,
     generating,
     generatedCount,
+    runningCount,
+    failedCount,
     jobTotal,
     startPollingCard,
     createCard: createGenerationCard,
@@ -137,8 +141,16 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
     () =>
       hasGenerationSource.value &&
       selectedModules.value.length > 0 &&
-      !generating.value &&
+      !creatingBatch.value &&
       !strategyLoading.value,
+  );
+  const canGenerateStrategy = computed(
+    () =>
+      hasGenerationSource.value &&
+      selectedModules.value.length > 0 &&
+      !strategyLoading.value &&
+      !creatingBatch.value &&
+      !hasRunningTasks.value,
   );
   const selectedImageLabel = computed(() => {
     syncQualityForRatio();
@@ -230,6 +242,14 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
 
   async function triggerStrategyGeneration() {
     const mainImg = uploadedImages.value[mainImageIndex.value];
+    if (hasRunningTasks.value) {
+      toast.info("当前任务正在生成中，请稍后再生成模块策略");
+      return;
+    }
+    if (creatingBatch.value) {
+      toast.info("正在创建图片任务，请稍候");
+      return;
+    }
     if (!hasGenerationSource.value) {
       toast.info("请先上传产品图并填写商品卖点与要求");
       return;
@@ -499,12 +519,17 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
     moduleContents,
     settings,
     generating,
+    creatingBatch,
+    hasRunningTasks,
     generatedCount,
+    runningCount,
+    failedCount,
     jobTotal,
     genLogs,
     outputCards,
     zoomCard,
     canGenerate,
+    canGenerateStrategy,
     strategyLoading,
     strategyPanelVisible,
     selectedCards,

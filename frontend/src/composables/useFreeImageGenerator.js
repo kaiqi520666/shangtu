@@ -34,8 +34,12 @@ export function useFreeImageGenerator({ onJobCreated } = {}) {
 
   const {
     outputCards,
+    creatingBatch,
+    hasRunningTasks,
     generating,
     generatedCount,
+    runningCount,
+    failedCount,
     jobTotal,
     startPollingCard,
     createCard: createGenerationCard,
@@ -116,7 +120,7 @@ export function useFreeImageGenerator({ onJobCreated } = {}) {
   );
   const canOptimize = computed(() => hasPrompt.value && !optimizing.value);
   const canGenerate = computed(
-    () => hasPrompt.value && !hasUploadingReference.value && !generating.value,
+    () => hasPrompt.value && !hasUploadingReference.value && !creatingBatch.value,
   );
   const selectedImageLabel = computed(() => {
     syncQualityForRatio();
@@ -290,7 +294,11 @@ export function useFreeImageGenerator({ onJobCreated } = {}) {
     historyLoading,
     jobLoading,
     generating,
+    creatingBatch,
+    hasRunningTasks,
     generatedCount,
+    runningCount,
+    failedCount,
     jobTotal,
     genLogs,
     outputCards,

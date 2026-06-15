@@ -1,4 +1,4 @@
-import { ref, reactive } from "vue";
+import { computed, ref, reactive } from "vue";
 import { getImageTask } from "@/api/image.js";
 
 const POLL_INTERVAL_MS = 5000;
@@ -89,13 +89,26 @@ export function useGenerationCards({
 } = {}) {
   const outputCards = ref([]);
   const genLogs = genLogsRef || ref([]);
-  const generating = ref(false);
-  const generatedCount = ref(0);
-  const jobTotal = ref(0);
+  const creatingBatch = ref(false);
+  const runningCount = computed(
+    () => outputCards.value.filter((card) => !TERMINAL_STATUSES.has(card.status)).length,
+  );
+  const generatedCount = computed(
+    () => outputCards.value.filter((card) => card.status === "done").length,
+  );
+  const failedCount = computed(
+    () =>
+      outputCards.value.filter((card) => card.status === "failed" || card.status === "timeout")
+        .length,
+  );
+  const jobTotal = computed(() => outputCards.value.length);
+  const hasRunningTasks = computed(() => runningCount.value > 0);
+  const generating = hasRunningTasks;
   const activeBatchRunId = ref("");
 
   const pollTimers = new Map();
   const pollInFlight = new Set();
+  const pendingBatchIds = new Set();
 
   function logPrefix(card) {
     if (getLogPrefix) return getLogPrefix(card);
@@ -163,7 +176,6 @@ export function useGenerationCards({
           card.dataUrl = resultUrl;
           card.previousResultUrl = "";
           card.status = "done";
-          generatedCount.value += 1;
           genLogs.value.push(`[${logPrefix(card)}] 已完成`);
           genLogs.value.push(`已完成 ${generatedCount.value}/${jobTotal.value}`);
           onCardDone?.(card);
@@ -181,7 +193,7 @@ export function useGenerationCards({
         card.status = status === "done" ? "processing" : status;
       }
 
-      maybeFinishGenerating();
+      maybeFinishBatch(card.batchRunId);
     } catch {
       // 单次轮询异常不停止该任务，等下一次 tick
     } finally {
@@ -203,21 +215,36 @@ export function useGenerationCards({
     }
     pollTimers.clear();
     pollInFlight.clear();
+    pendingBatchIds.clear();
   }
 
-  function maybeFinishGenerating() {
-    if (!generating.value) return;
-    const batchId = activeBatchRunId.value;
-    const batchCards = batchId
-      ? outputCards.value.filter((card) => card.batchRunId === batchId)
-      : outputCards.value;
+  function trackBatch(batchRunId) {
+    if (!batchRunId) return;
+    pendingBatchIds.add(batchRunId);
+  }
+
+  function maybeFinishBatch(batchRunId, { silent = false } = {}) {
+    if (!batchRunId || !pendingBatchIds.has(batchRunId)) return;
+    const batchCards = outputCards.value.filter((card) => card.batchRunId === batchRunId);
     if (batchCards.length === 0) return;
     const allTerminal = batchCards.every((card) => TERMINAL_STATUSES.has(card.status));
     if (allTerminal) {
-      generating.value = false;
+      pendingBatchIds.delete(batchRunId);
       const doneCount = batchCards.filter((card) => card.status === "done").length;
       const failedCount = batchCards.length - doneCount;
-      onBatchFinished?.({ total: batchCards.length, done: doneCount, failed: failedCount });
+      if (!silent) {
+        onBatchFinished?.({ total: batchCards.length, done: doneCount, failed: failedCount });
+      }
+    }
+  }
+
+  function maybeFinishGenerating(batchRunId, options) {
+    if (batchRunId) {
+      maybeFinishBatch(batchRunId, options);
+      return;
+    }
+    for (const pendingBatchId of [...pendingBatchIds]) {
+      maybeFinishBatch(pendingBatchId, options);
     }
   }
 
@@ -287,8 +314,12 @@ export function useGenerationCards({
     // 状态
     outputCards,
     genLogs,
+    creatingBatch,
+    hasRunningTasks,
     generating,
     generatedCount,
+    runningCount,
+    failedCount,
     jobTotal,
     activeBatchRunId,
     // 轮询
@@ -296,6 +327,8 @@ export function useGenerationCards({
     pollCardOnce,
     stopPollingCard,
     clearAllPollTimers,
+    trackBatch,
+    maybeFinishBatch,
     maybeFinishGenerating,
     // 工厂
     createCard,

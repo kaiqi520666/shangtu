@@ -28,12 +28,12 @@ export function useGenerationRunner({
   const {
     outputCards,
     genLogs,
+    creatingBatch,
     generating,
-    generatedCount,
-    jobTotal,
     activeBatchRunId,
     startPollingCard,
     clearAllPollTimers,
+    trackBatch,
     maybeFinishGenerating,
     makeId,
     TERMINAL_STATUSES,
@@ -99,9 +99,7 @@ export function useGenerationRunner({
     resetSceneState?.();
     outputCards.value = [];
     genLogs.value = [];
-    generating.value = false;
-    generatedCount.value = 0;
-    jobTotal.value = 0;
+    creatingBatch.value = false;
     activeBatchRunId.value = "";
     currentJobId.value = "";
     currentTaskTitle.value = "";
@@ -155,23 +153,20 @@ export function useGenerationRunner({
       outputCards.value = restoredCards;
 
       const pendingCards = restoredCards.filter((card) => !TERMINAL_STATUSES.has(card.status));
-      const doneCount = restoredCards.filter((card) => card.status === "done").length;
-      generatedCount.value = doneCount;
-      jobTotal.value = restoredCards.length;
       genLogs.value = restoredCards.length
         ? [`已恢复任务「${currentTaskTitle.value}」，共 ${restoredCards.length} 张`]
         : [];
 
       if (pendingCards.length > 0) {
-        generating.value = true;
         const resumeBatchId = makeId();
         activeBatchRunId.value = resumeBatchId;
+        trackBatch(resumeBatchId);
         pendingCards.forEach((card) => {
           card.batchRunId = resumeBatchId;
           startPollingCard(card);
         });
       } else {
-        generating.value = false;
+        activeBatchRunId.value = "";
       }
       return true;
     } catch (error) {
@@ -203,10 +198,17 @@ export function useGenerationRunner({
     getFailLogName,
     allFailedMessage = "所有图片任务都创建失败，请稍后重试",
   }) {
-    const jobId = await ensureCurrentJob();
-    if (!jobId) return false;
+    if (creatingBatch.value) {
+      toast.info("正在创建图片任务，请稍候");
+      return false;
+    }
+
+    creatingBatch.value = true;
 
     try {
+      const jobId = await ensureCurrentJob();
+      if (!jobId) return false;
+
       const saveRes = await updateGenerationJob(jobId, {
         title: currentTaskTitle.value,
         ...snapshotPayload,
@@ -215,98 +217,99 @@ export function useGenerationRunner({
         toast.error(saveRes.message || "保存任务配置失败，请稍后重试");
         return false;
       }
-    } catch (error) {
-      const status = error.response?.status;
-      if (status === 401) {
-        toast.error("登录已过期，请重新登录");
-      } else {
-        toast.error(error.response?.data?.message || "保存任务配置失败，请稍后重试");
+
+      const baseSortOrder = outputCards.value.length;
+      const batchRunId = makeId();
+      activeBatchRunId.value = batchRunId;
+      trackBatch(batchRunId);
+      if (genLogs.value.length === 0) {
+        genLogs.value.push(...initialLogs);
+      } else if (repeatLog) {
+        genLogs.value.push(repeatLog);
       }
-      return false;
-    }
 
-    generating.value = true;
-    generatedCount.value = 0;
-    jobTotal.value = queue.length;
-    const baseSortOrder = outputCards.value.length;
-    const batchRunId = makeId();
-    activeBatchRunId.value = batchRunId;
-    if (genLogs.value.length === 0) {
-      genLogs.value.push(...initialLogs);
-    } else if (repeatLog) {
-      genLogs.value.push(repeatLog);
-    }
+      const createdCards = queue.map((item, index) => {
+        const sortOrder = baseSortOrder + index;
+        const settingsSnapshot = buildSettingsSnapshot?.(item, { index, sortOrder }) || null;
+        return {
+          card: createCard({ item, index, sortOrder, batchRunId, settingsSnapshot }),
+          item,
+          settingsSnapshot,
+        };
+      });
 
-    const createdCards = queue.map((item, index) => {
-      const sortOrder = baseSortOrder + index;
-      const settingsSnapshot = buildSettingsSnapshot?.(item, { index, sortOrder }) || null;
-      return {
-        card: createCard({ item, index, sortOrder, batchRunId, settingsSnapshot }),
-        item,
-        settingsSnapshot,
-      };
-    });
+      outputCards.value = [...createdCards.map((created) => created.card), ...outputCards.value];
 
-    outputCards.value = [...createdCards.map((created) => created.card), ...outputCards.value];
-
-    let successfullyEnqueued = 0;
-    for (const { card, item, settingsSnapshot } of createdCards) {
-      const prompt = buildPrompt?.(item, card) || "";
-      const userPrompt = buildUserPrompt?.(item, card) || null;
-      if (userPrompt) {
-        card.userPrompt = userPrompt;
-      }
-      try {
-        const result = await generateImage({
-          prompt,
-          user_prompt: userPrompt,
-          image_urls: imageUrls,
-          ratio,
-          resolution,
-          settings_snapshot: settingsSnapshot,
-          job_id: jobId,
-          type_id: card.typeId,
-          title: card.strategyTitle,
-          sort_order: card.sortOrder,
-        });
-        if (result.code !== 0) {
-          card.status = "failed";
-          card.errorMessage = result.message || "任务创建失败";
-          genLogs.value.push(
-            `[${getFailLogName?.(item, card) || card.strategyTitle}] 创建失败：${card.errorMessage}`,
-          );
-          continue;
+      let successfullyEnqueued = 0;
+      for (const { card, item, settingsSnapshot } of createdCards) {
+        const prompt = buildPrompt?.(item, card) || "";
+        const userPrompt = buildUserPrompt?.(item, card) || null;
+        if (userPrompt) {
+          card.userPrompt = userPrompt;
         }
-        card.taskId = result.data.task_id;
-        genLogs.value.push(getCreateLog?.(item, card) || `正在生成 [${card.strategyTitle}]...`);
-        startPollingCard(card);
-        successfullyEnqueued += 1;
-      } catch (error) {
+        try {
+          const result = await generateImage({
+            prompt,
+            user_prompt: userPrompt,
+            image_urls: imageUrls,
+            ratio,
+            resolution,
+            settings_snapshot: settingsSnapshot,
+            job_id: jobId,
+            type_id: card.typeId,
+            title: card.strategyTitle,
+            sort_order: card.sortOrder,
+          });
+          if (result.code !== 0) {
+            card.status = "failed";
+            card.errorMessage = result.message || "任务创建失败";
+            genLogs.value.push(
+              `[${getFailLogName?.(item, card) || card.strategyTitle}] 创建失败：${card.errorMessage}`,
+            );
+            continue;
+          }
+          card.taskId = result.data.task_id;
+          genLogs.value.push(getCreateLog?.(item, card) || `正在生成 [${card.strategyTitle}]...`);
+          startPollingCard(card);
+          successfullyEnqueued += 1;
+        } catch (error) {
+          const status = error.response?.status;
+          const message =
+            status === 401
+              ? "登录已过期，请重新登录"
+              : error.response?.data?.message || "任务创建失败";
+          card.status = "failed";
+          card.errorMessage = message;
+          genLogs.value.push(
+            `[${getFailLogName?.(item, card) || card.strategyTitle}] 创建失败：${message}`,
+          );
+        }
+      }
+
+      genLogs.value.push(`已创建 ${successfullyEnqueued} 个图片任务`);
+      if (successfullyEnqueued === 0) {
+        maybeFinishGenerating(batchRunId, { silent: true });
+        toast.error(allFailedMessage);
+        return false;
+      }
+
+      maybeFinishGenerating(batchRunId);
+      return true;
+    } catch (error) {
+      if (error?.response) {
         const status = error.response?.status;
-        const message =
-          status === 401
-            ? "登录已过期，请重新登录"
-            : error.response?.data?.message || "任务创建失败";
-        card.status = "failed";
-        card.errorMessage = message;
-        genLogs.value.push(
-          `[${getFailLogName?.(item, card) || card.strategyTitle}] 创建失败：${message}`,
-        );
+        if (status === 401) {
+          toast.error("登录已过期，请重新登录");
+        } else {
+          toast.error(error.response?.data?.message || "保存任务配置失败，请稍后重试");
+        }
+      } else {
+        toast.error("任务创建失败，请稍后重试");
       }
-    }
-
-    genLogs.value.push(`已创建 ${successfullyEnqueued} 个图片任务`);
-    if (successfullyEnqueued === 0) {
-      maybeFinishGenerating();
-      if (generating.value) {
-        generating.value = false;
-      }
-      jobTotal.value = 0;
-      toast.error(allFailedMessage);
       return false;
+    } finally {
+      creatingBatch.value = false;
     }
-
-    return true;
   }
 
   function cleanup() {

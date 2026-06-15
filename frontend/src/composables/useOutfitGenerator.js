@@ -34,8 +34,12 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
 
   const {
     outputCards,
+    creatingBatch,
+    hasRunningTasks,
     generating,
     generatedCount,
+    runningCount,
+    failedCount,
     jobTotal,
     startPollingCard,
     createCard: createGenerationCard,
@@ -119,7 +123,7 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
       garmentImages.value.length > 0 &&
       Boolean(selectedModel.value?.image) &&
       selectedScenes.value.length > 0 &&
-      !generating.value,
+      !creatingBatch.value,
   );
   const selectedImageLabel = computed(() => {
     syncQualityForRatio();
@@ -410,7 +414,11 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
     jobLoading,
     settings,
     generating,
+    creatingBatch,
+    hasRunningTasks,
     generatedCount,
+    runningCount,
+    failedCount,
     jobTotal,
     genLogs,
     outputCards,

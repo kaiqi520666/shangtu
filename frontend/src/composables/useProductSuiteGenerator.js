@@ -43,8 +43,12 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
 
   const {
     outputCards,
+    creatingBatch,
+    hasRunningTasks,
     generating,
     generatedCount,
+    runningCount,
+    failedCount,
     jobTotal,
     startPollingCard,
     createCard: createGenerationCard,
@@ -126,7 +130,7 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
     () => uploadedImages.value.length > 0 && settings.productInput.trim().length > 0,
   );
   const canGenerate = computed(
-    () => hasGenerationSource.value && totalCount.value > 0 && !generating.value,
+    () => hasGenerationSource.value && totalCount.value > 0 && !creatingBatch.value,
   );
   const selectedImageLabel = computed(() => {
     syncQualityForRatio();
@@ -330,7 +334,11 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
     mainImageIndex,
     aiLoading,
     generating,
+    creatingBatch,
+    hasRunningTasks,
     generatedCount,
+    runningCount,
+    failedCount,
     jobTotal,
     genLogs,
     outputCards,

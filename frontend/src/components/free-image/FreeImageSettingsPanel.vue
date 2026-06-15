@@ -37,6 +37,14 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  creatingBatch: {
+    type: Boolean,
+    default: false,
+  },
+  hasRunningTasks: {
+    type: Boolean,
+    default: false,
+  },
   generating: {
     type: Boolean,
     default: false,
@@ -71,8 +79,8 @@ const emit = defineEmits([
 const primaryText = computed(() => {
   if (!props.settings.prompt.trim()) return "请输入提示词";
   if (props.referenceImages.some((img) => img?.uploading)) return "参考图上传中...";
-  if (props.generating)
-    return `AI 正在生成... (${props.generatedCount}/${props.jobTotal || props.totalCount})`;
+  if (props.creatingBatch) return "正在创建任务...";
+  if (props.hasRunningTasks) return "追加生成";
   return "生成图片";
 });
 
@@ -193,7 +201,7 @@ function selectQuality(quality) {
         @primary="emit('generate')"
       >
         <template #primary-icon>
-          <LoaderCircle v-if="generating" class="h-4 w-4 animate-spin" />
+          <LoaderCircle v-if="creatingBatch" class="h-4 w-4 animate-spin" />
           <ImagePlus v-else class="h-4 w-4" />
         </template>
       </GeneratorActionFooter>

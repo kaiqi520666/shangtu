@@ -32,6 +32,14 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  creatingBatch: {
+    type: Boolean,
+    default: false,
+  },
+  hasRunningTasks: {
+    type: Boolean,
+    default: false,
+  },
   generating: {
     type: Boolean,
     default: false,
@@ -71,7 +79,8 @@ const primaryText = computed(() => {
   if (props.uploadedImages.length === 0) return '请先上传商品图片'
   if (!props.settings.productInput.trim()) return '请填写商品卖点与要求'
   if (props.totalCount === 0) return '请至少选择一个套图类型'
-  if (props.generating) return `AI 正在生成套图... (${props.generatedCount}/${props.jobTotal || props.totalCount})`
+  if (props.creatingBatch) return '正在创建任务...'
+  if (props.hasRunningTasks) return `追加生成套图（${props.totalCount}张）`
   return `一键生成爆款套图（${props.totalCount}张）`
 })
 </script>
@@ -111,7 +120,7 @@ const primaryText = computed(() => {
         @primary="emit('generate')"
       >
         <template #primary-icon>
-          <LoaderCircle v-if="generating" class="h-4 w-4 animate-spin" />
+          <LoaderCircle v-if="creatingBatch" class="h-4 w-4 animate-spin" />
           <PackageCheck v-else class="h-4 w-4" />
         </template>
       </GeneratorActionFooter>

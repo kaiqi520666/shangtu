@@ -58,6 +58,14 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  creatingBatch: {
+    type: Boolean,
+    default: false,
+  },
+  hasRunningTasks: {
+    type: Boolean,
+    default: false,
+  },
   canGenerate: {
     type: Boolean,
     default: false,
@@ -77,7 +85,11 @@ const emit = defineEmits([
   'generate-images',
 ])
 
-const primaryText = computed(() => (props.loading ? '正在生成...' : '生成图片'))
+const primaryText = computed(() => {
+  if (props.creatingBatch) return '正在创建任务...'
+  if (props.hasRunningTasks) return '追加生成'
+  return '生成图片'
+})
 </script>
 
 <template>
@@ -129,7 +141,7 @@ const primaryText = computed(() => (props.loading ? '正在生成...' : '生成�
         @primary="emit('generate-images')"
       >
         <template #primary-icon>
-          <LoaderCircle v-if="loading" class="h-4 w-4 animate-spin" />
+          <LoaderCircle v-if="creatingBatch" class="h-4 w-4 animate-spin" />
           <WandSparkles v-else class="h-4 w-4" />
         </template>
       </GeneratorActionFooter>

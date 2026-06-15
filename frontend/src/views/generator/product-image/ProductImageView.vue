@@ -87,6 +87,9 @@ function closePreview() {
       :selected-modules="generator.selectedModules.value"
       :ai-loading="generator.aiLoading.value"
       :can-generate="generator.canGenerate.value"
+      :can-generate-strategy="generator.canGenerateStrategy.value"
+      :creating-batch="generator.creatingBatch.value"
+      :has-running-tasks="generator.hasRunningTasks.value"
       :generating="generator.generating.value"
       :strategy-loading="generator.strategyLoading.value"
       :generated-count="generator.generatedCount.value"
@@ -97,7 +100,8 @@ function closePreview() {
       @update:main-image-index="generator.mainImageIndex.value = $event"
       @update:selected-modules="generator.selectedModules.value = $event"
       @notify="generator.showNotice"
-      @generate="generator.triggerStrategyGeneration"
+      @generate="generator.generateProductImages"
+      @generate-strategy="generator.triggerStrategyGeneration"
     />
 
     <GenerationWorkspace
@@ -105,7 +109,10 @@ function closePreview() {
       :current-task-title="generator.currentTaskTitle.value"
       :output-cards="generator.outputCards.value"
       :generating="generator.generating.value"
+      :creating-batch="generator.creatingBatch.value"
       :generated-count="generator.generatedCount.value"
+      :running-count="generator.runningCount.value"
+      :failed-count="generator.failedCount.value"
       :total-count="generator.totalCount.value"
       :job-total="generator.jobTotal.value"
       :gen-logs="generator.genLogs.value"
