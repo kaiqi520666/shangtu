@@ -1,5 +1,6 @@
 <script setup>
-import { formatMoney, formatTime } from "../adminFormatters.js";
+import { formatMoney, formatTime, orderStatusOptions } from "@/constants/admin.js";
+import AppSelect from "@/components/ui/AppSelect.vue";
 import AdminPagination from "./AdminPagination.vue";
 
 defineProps({
@@ -16,12 +17,9 @@ const emit = defineEmits(["apply-filter", "change-page"]);
   <section class="space-y-4">
     <div class="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
       <input v-model="state.keyword" type="text" class="min-w-72 rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none" placeholder="搜索邮箱或订单号" @keyup.enter="emit('apply-filter')" />
-      <select v-model="state.status" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs" @change="emit('apply-filter')">
-        <option value="">全部状态</option>
-        <option value="pending">待支付</option>
-        <option value="paid">已支付</option>
-        <option value="failed">失败</option>
-      </select>
+      <div class="w-36">
+        <AppSelect v-model="state.status" :options="orderStatusOptions" @update:model-value="emit('apply-filter')" />
+      </div>
       <button type="button" class="rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white" @click="emit('apply-filter')">查询</button>
       <span class="ml-auto text-xs text-slate-400">共 {{ state.total }} 个订单</span>
     </div>

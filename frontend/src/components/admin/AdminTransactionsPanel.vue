@@ -1,5 +1,6 @@
 <script setup>
-import { formatTime, transactionTypeLabel } from "../adminFormatters.js";
+import { formatTime, transactionTypeLabel, transactionTypeOptions } from "@/constants/admin.js";
+import AppSelect from "@/components/ui/AppSelect.vue";
 import AdminPagination from "./AdminPagination.vue";
 
 defineProps({
@@ -22,17 +23,9 @@ const emit = defineEmits(["apply-filter", "change-page"]);
         placeholder="搜索邮箱或备注"
         @keyup.enter="emit('apply-filter')"
       />
-      <select
-        v-model="state.type"
-        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs"
-        @change="emit('apply-filter')"
-      >
-        <option value="">全部类型</option>
-        <option value="recharge">充值</option>
-        <option value="consume">消费</option>
-        <option value="refund">退款</option>
-        <option value="admin_adjust">后台调整</option>
-      </select>
+      <div class="w-36">
+        <AppSelect v-model="state.type" :options="transactionTypeOptions" @update:model-value="emit('apply-filter')" />
+      </div>
       <button type="button" class="rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white" @click="emit('apply-filter')">
         查询
       </button>

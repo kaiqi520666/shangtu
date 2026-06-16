@@ -1,6 +1,13 @@
 <script setup>
 import { LoaderCircle, Search } from "lucide-vue-next";
-import { formatTime, roleLabel, statusLabel } from "../adminFormatters.js";
+import {
+  formatTime,
+  roleLabel,
+  statusLabel,
+  userRoleOptions,
+  userStatusOptions,
+} from "@/constants/admin.js";
+import AppSelect from "@/components/ui/AppSelect.vue";
 import AdminPagination from "./AdminPagination.vue";
 
 defineProps({
@@ -32,16 +39,12 @@ const emit = defineEmits([
           @keyup.enter="emit('apply-filter')"
         />
       </div>
-      <select v-model="state.role" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs" @change="emit('apply-filter')">
-        <option value="">全部角色</option>
-        <option value="user">普通用户</option>
-        <option value="super_admin">超级管理员</option>
-      </select>
-      <select v-model="state.status" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs" @change="emit('apply-filter')">
-        <option value="">全部状态</option>
-        <option value="active">正常</option>
-        <option value="disabled">已禁用</option>
-      </select>
+      <div class="w-36">
+        <AppSelect v-model="state.role" :options="userRoleOptions" @update:model-value="emit('apply-filter')" />
+      </div>
+      <div class="w-36">
+        <AppSelect v-model="state.status" :options="userStatusOptions" @update:model-value="emit('apply-filter')" />
+      </div>
       <button type="button" class="rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white" @click="emit('apply-filter')">
         查询
       </button>

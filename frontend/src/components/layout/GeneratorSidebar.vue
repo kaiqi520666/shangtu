@@ -18,12 +18,13 @@ const adminNav = {
   name: '管理后台',
   desc: '用户、订单、积分流水和平台运营管理',
   icon: ShieldCheck,
-  to: '/admin',
+  to: '/admin/overview',
+  activeBase: '/admin',
 }
 
 function isNavActive(nav) {
   const currentPath = route.path.replace(/\/+$/, '') || '/'
-  const navPath = nav.to.replace(/\/+$/, '') || '/'
+  const navPath = (nav.activeBase || nav.to).replace(/\/+$/, '') || '/'
 
   return currentPath === navPath || currentPath.startsWith(`${navPath}/`)
 }

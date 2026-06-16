@@ -1,5 +1,5 @@
 <script setup>
-import { totalPages } from "../adminFormatters.js";
+import { totalPages } from "@/constants/admin.js";
 
 const props = defineProps({
   state: {
