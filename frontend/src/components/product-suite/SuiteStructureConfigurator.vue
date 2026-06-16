@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue'
-import { BadgeCheck, Check, Image, Layers3, ListChecks, Minus, Plus, Search } from 'lucide-vue-next'
+import { BadgeCheck, Image, Layers3, ListChecks, Minus, Plus, Search } from 'lucide-vue-next'
+import AppCheckbox from '@/components/ui/AppCheckbox.vue'
 
 const props = defineProps({
   structure: {
@@ -77,14 +78,7 @@ function changeCount(index, step) {
         :class="item.enabled ? 'border-primary/25 bg-primary/5' : 'border-slate-200 bg-white'"
       >
         <div class="flex items-center gap-3">
-          <button
-            type="button"
-            class="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-colors"
-            :class="item.enabled ? 'border-primary bg-primary text-white' : 'border-slate-300 bg-white text-transparent hover:border-primary/40'"
-            @click="toggleItem(index)"
-          >
-            <Check class="h-3 w-3 stroke-[3]" />
-          </button>
+          <AppCheckbox :model-value="item.enabled" @change="toggleItem(index)" />
 
           <span
             class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"

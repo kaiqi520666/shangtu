@@ -1,5 +1,5 @@
 <script setup>
-import { Check } from 'lucide-vue-next'
+import AppCheckbox from '@/components/ui/AppCheckbox.vue'
 
 const props = defineProps({
   modules: {
@@ -42,11 +42,10 @@ function toggleAll(enabled) {
     </div>
 
     <div class="grid grid-cols-2 gap-2 pb-6">
-      <button
+      <article
         v-for="module in modules"
         :key="module.id"
-        type="button"
-        class="flex h-20 flex-col justify-between rounded-xl border p-2.5 text-left shadow-sm transition-all duration-200"
+        class="flex h-20 cursor-pointer flex-col justify-between rounded-xl border p-2.5 text-left shadow-sm transition-all duration-200"
         :class="
           selected.includes(module.id)
             ? 'border-primary/40 bg-primary/10 text-slate-950 ring-1 ring-primary/10'
@@ -56,17 +55,16 @@ function toggleAll(enabled) {
       >
         <div class="flex items-center justify-between gap-2">
           <span class="truncate text-xs font-bold" :class="selected.includes(module.id) ? 'text-primary' : 'text-slate-700'">{{ module.name }}</span>
-          <span
-            class="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border"
-            :class="selected.includes(module.id) ? 'border-primary bg-primary text-white' : 'border-slate-300 bg-white'"
-          >
-            <Check v-if="selected.includes(module.id)" class="h-2.5 w-2.5 stroke-[3]" />
-          </span>
+          <AppCheckbox
+            :model-value="selected.includes(module.id)"
+            size="sm"
+            @change="toggleModule(module.id)"
+          />
         </div>
         <p class="mt-1 line-clamp-2 text-xs leading-normal" :class="selected.includes(module.id) ? 'text-primary' : 'text-slate-400'">
           {{ module.desc }}
         </p>
-      </button>
+      </article>
     </div>
   </section>
 </template>

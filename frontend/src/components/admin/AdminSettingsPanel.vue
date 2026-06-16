@@ -1,4 +1,6 @@
 <script setup>
+import AppCheckbox from "@/components/ui/AppCheckbox.vue";
+
 defineProps({
   state: {
     type: Object,
@@ -55,10 +57,9 @@ const paymentConfigLabels = {
             <input v-model.number="pkg.credits" type="number" min="1" class="rounded-lg border border-slate-200 px-2.5 py-2 text-xs outline-none focus:border-primary" placeholder="积分" />
             <input v-model.number="pkg.amount_cents" type="number" min="1" class="rounded-lg border border-slate-200 px-2.5 py-2 text-xs outline-none focus:border-primary" placeholder="金额(分)" />
             <input v-model="pkg.badge" type="text" class="rounded-lg border border-slate-200 px-2.5 py-2 text-xs outline-none focus:border-primary" placeholder="标签" />
-            <label class="flex items-center justify-center gap-1.5 text-xs font-bold text-slate-600">
-              <input v-model="pkg.enabled" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-primary" />
-              启用
-            </label>
+            <div class="flex items-center justify-center">
+              <AppCheckbox v-model="pkg.enabled" label="启用" />
+            </div>
             <button type="button" class="rounded-lg border border-rose-200 px-2.5 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50" @click="emit('remove-package', index)">
               删除
             </button>
