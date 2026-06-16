@@ -23,6 +23,14 @@ router = APIRouter(prefix="/billing", tags=["积分充值"])
 
 DEFAULT_RECHARGE_PACKAGES: list[dict[str, Any]] = [
     {
+        "id": "p_001",
+        "name": "测试包",
+        "credits": 1,
+        "amount_cents": 1,
+        "badge": "测试",
+        "enabled": True,
+    },
+    {
         "id": "p_100",
         "name": "体验包",
         "credits": 100,
