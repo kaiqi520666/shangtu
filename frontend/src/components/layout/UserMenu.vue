@@ -2,10 +2,12 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ChevronDown, LogOut, Settings, UserRound, WalletCards } from 'lucide-vue-next'
+import { useRechargeModal } from '@/composables/useRechargeModal.js'
 import { useAuthStore } from '@/stores/auth.js'
 
 const router = useRouter()
 const authStore = useAuthStore()
+const { openRechargeModal } = useRechargeModal()
 const open = ref(false)
 const root = ref(null)
 
@@ -20,6 +22,11 @@ function handleLogout() {
   authStore.logout()
   open.value = false
   router.push({ path: '/login', query: { loggedOut: '1' } })
+}
+
+function handleRecharge() {
+  open.value = false
+  openRechargeModal()
 }
 
 function handleClickOutside(event) {
@@ -64,9 +71,9 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="p-2">
-        <button type="button" class="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-medium text-slate-600 hover:bg-slate-50">
+        <button type="button" class="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-medium text-slate-600 hover:bg-slate-50" @click="handleRecharge">
           <WalletCards class="h-4 w-4 text-primary" />
-          额度剩余：{{ credits }} 点
+          积分充值 · 当前 {{ credits }} 点
         </button>
         <button type="button" class="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-medium text-slate-600 hover:bg-slate-50">
           <Settings class="h-4 w-4 text-slate-400" />

@@ -1,8 +1,10 @@
 <script setup>
 import UserMenu from '@/components/layout/UserMenu.vue'
+import { useRechargeModal } from '@/composables/useRechargeModal.js'
 import { useAuthStore } from '@/stores/auth.js'
 
 const authStore = useAuthStore()
+const { openRechargeModal } = useRechargeModal()
 </script>
 
 <template>
@@ -25,6 +27,9 @@ const authStore = useAuthStore()
         <span class="h-2 w-2 animate-pulse rounded-full bg-primary"></span>
         <span class="text-xs text-slate-500">额度剩余</span>
         <span class="text-xs font-bold text-primary">{{ authStore.credits }} 点</span>
+        <button type="button" class="rounded-full bg-primary px-2 py-0.5 text-xs font-bold text-white transition-colors hover:bg-primary/90" @click="openRechargeModal">
+          充值
+        </button>
       </div>
       <div class="h-6 w-px bg-slate-200"></div>
       <UserMenu />

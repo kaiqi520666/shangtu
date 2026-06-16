@@ -68,6 +68,15 @@ shangtu/
 - `GET /image/task/{task_id}`：优先读 Redis（`task:{id}:status` / `:error` / `:result` / `:progress`），回退 DB；`status=done` 但 `result_url` 缺失时降级为 `processing`，让前端继续轮询；响应字段 `{status, result_url, prompt, settings_snapshot, created_at, error_message, progress, credits}`，`credits` 每次从 DB 读取最新值，失败退款后前端可同步更新；`error_message` 是 worker 已归一化后的中文友好文案
 - `GET /image/tasks`：当前用户历史任务（按 `created_at` desc）
 
+#### 积分充值 `/billing`
+
+- `GET /billing/packages`：返回 `.env` 的 `CREDIT_RECHARGE_PACKAGES_JSON` 启用套餐和当前 `image_credit_costs`，前端充值弹窗只读该接口展示价格
+- `POST /billing/orders`：创建本地 `credit_orders(pending)`，套餐金额/积分写入快照，再调 ZPAY `mapi.php` 创建微信支付订单，返回 `pay_url/qrcode/img`
+- `GET /billing/orders/{order_id}`：当前用户查询自己的充值订单，`paid` 时响应带最新 `credits`，前端轮询后同步 Pinia 余额
+- `GET /billing/zpay/notify`：ZPAY 异步通知入口，验签、校验 `pid/trade_status/money/out_trade_no`，事务 + 行锁幂等把订单置 `paid`、给用户加积分、写 `credit_transactions`，成功只返回纯字符串 `success`
+- `GET /billing/zpay/return`：浏览器支付后跳转入口，仅负责重定向回前端页面，不作为到账依据
+- 本地联调用 `backend/scripts/simulate_zpay_notify.py <out_trade_no>` 生成合法 ZPAY 回调请求，验证到账和重复回调幂等
+
 #### 异步生图 Worker（`app/worker/tasks.py`）
 
 - `generate_image(ctx, task_id, prompt, ratio, resolution, image_url=None)`：调 ToAPIS 异步任务流（`POST /v1/images/generations` 创建 → 5 秒一次轮询 `GET /v1/images/generations/{provider_task_id}`，最长等 20 分钟）→ completed 后从 `data[0].url` 下载结果图 → `upload_image_bytes(..., source="generated")` 转存到我们 OSS → 落库 `result_url` 是 OSS URL（不保存 ToAPIS 临时链接）
@@ -189,6 +198,14 @@ TOAPIS_URL=                   # 可选，默认 https://toapis.com
 IMAGE_CREDIT_COST_1K=1
 IMAGE_CREDIT_COST_2K=2
 IMAGE_CREDIT_COST_4K=4
+
+# ZPAY 微信支付充值
+ZPAY_PID=
+ZPAY_KEY=
+ZPAY_GATEWAY=https://zpayz.cn
+ZPAY_NOTIFY_URL=http://127.0.0.1:8000/billing/zpay/notify
+ZPAY_RETURN_URL=http://127.0.0.1:8000/billing/zpay/return
+CREDIT_RECHARGE_PACKAGES_JSON=[{"id":"p_100","name":"体验包","credits":100,"amount_cents":990,"badge":"","enabled":true}]
 ```
 
 前端只读 `VITE_API_BASE_URL`（默认 `/api`，由 vite 代理到 `127.0.0.1:8000`）。
@@ -235,7 +252,7 @@ npm run dev
 
 ## 已知技术债
 
-- 缺正式迁移工具（Alembic 待引入），靠 `Base.metadata.create_all`：旧库需手动补列 `ALTER TABLE image_tasks ADD COLUMN error_message TEXT, ADD COLUMN progress INTEGER DEFAULT 0, ADD COLUMN provider VARCHAR(32) DEFAULT 'toapis', ADD COLUMN provider_task_id VARCHAR(128);`（之前还需 `ALTER COLUMN prompt TYPE TEXT`）；新增父任务后还需补 `ALTER TABLE image_tasks ADD COLUMN job_id VARCHAR(36), ADD COLUMN type_id VARCHAR(50), ADD COLUMN title VARCHAR(100), ADD COLUMN sort_order INTEGER DEFAULT 0;`；提示词快照字段还需补 `ALTER TABLE image_tasks ADD COLUMN IF NOT EXISTS system_prompt_snapshot TEXT, ADD COLUMN IF NOT EXISTS task_prompt_snapshot TEXT, ADD COLUMN IF NOT EXISTS user_prompt TEXT, ADD COLUMN IF NOT EXISTS prompt_template_refs_json TEXT;`；重新生成保留历史需补 `ALTER TABLE image_tasks ADD COLUMN IF NOT EXISTS replaced_by_task_id VARCHAR(36);`；单图参数快照需补 `ALTER TABLE image_tasks ADD COLUMN IF NOT EXISTS settings_snapshot_json TEXT;`；按分辨率计费需补 `ALTER TABLE image_tasks ADD COLUMN IF NOT EXISTS credit_cost INTEGER NOT NULL DEFAULT 1;`；新表 `generation_jobs` / `prompt_templates` 由 `create_all` 自动建
+- 缺正式迁移工具（Alembic 待引入），靠 `Base.metadata.create_all`：旧库需手动补列 `ALTER TABLE image_tasks ADD COLUMN error_message TEXT, ADD COLUMN progress INTEGER DEFAULT 0, ADD COLUMN provider VARCHAR(32) DEFAULT 'toapis', ADD COLUMN provider_task_id VARCHAR(128);`（之前还需 `ALTER COLUMN prompt TYPE TEXT`）；新增父任务后还需补 `ALTER TABLE image_tasks ADD COLUMN job_id VARCHAR(36), ADD COLUMN type_id VARCHAR(50), ADD COLUMN title VARCHAR(100), ADD COLUMN sort_order INTEGER DEFAULT 0;`；提示词快照字段还需补 `ALTER TABLE image_tasks ADD COLUMN IF NOT EXISTS system_prompt_snapshot TEXT, ADD COLUMN IF NOT EXISTS task_prompt_snapshot TEXT, ADD COLUMN IF NOT EXISTS user_prompt TEXT, ADD COLUMN IF NOT EXISTS prompt_template_refs_json TEXT;`；重新生成保留历史需补 `ALTER TABLE image_tasks ADD COLUMN IF NOT EXISTS replaced_by_task_id VARCHAR(36);`；单图参数快照需补 `ALTER TABLE image_tasks ADD COLUMN IF NOT EXISTS settings_snapshot_json TEXT;`；按分辨率计费需补 `ALTER TABLE image_tasks ADD COLUMN IF NOT EXISTS credit_cost INTEGER NOT NULL DEFAULT 1;`；新表 `generation_jobs` / `prompt_templates` / `credit_orders` / `credit_transactions` 由 `create_all` 自动建
 - 详情图 / 穿搭工作台的"AI 帮写"和"批量生成"仍 Mock，待对接 `/image/analyze` 和 `/image/generate`
 - DashScope 模型 `qwen3.6-flash` 通过 `enable_thinking=false` 关闭思考模式；切模型时记得复核该参数兼容性
 
