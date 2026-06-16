@@ -1,5 +1,6 @@
 <script setup>
-import { Check, Download, LoaderCircle, Pencil, Trash2, TriangleAlert } from 'lucide-vue-next'
+import { Download, LoaderCircle, Pencil, Trash2, TriangleAlert } from 'lucide-vue-next'
+import AppCheckbox from '@/components/ui/AppCheckbox.vue'
 import { useToast } from '@/composables/useToast.js'
 import { formatImageLabel } from '@/constants/generator.js'
 
@@ -79,14 +80,10 @@ function getCardMetaText(card, fallbackPlatform, fallbackLanguage, fallbackImage
       :class="card.selected ? 'border-primary ring-2 ring-primary/10' : 'border-slate-200'"
     >
       <div class="absolute left-2.5 top-2.5 z-10 flex items-center gap-2">
-        <button
-          type="button"
-          class="flex h-5 w-5 items-center justify-center rounded-md border shadow-sm transition-all"
-          :class="card.selected ? 'border-primary bg-primary text-white' : 'border-slate-300 bg-white/90 text-transparent backdrop-blur-sm hover:border-slate-400'"
-          @click="emit('toggle-card', card.id)"
-        >
-          <Check class="h-3 w-3 stroke-[3]" />
-        </button>
+        <AppCheckbox
+          :model-value="card.selected"
+          @change="emit('toggle-card', card.id)"
+        />
         <span class="rounded-full border border-slate-200 bg-white/90 px-2 py-0.5 text-xs font-bold text-slate-700 shadow-sm backdrop-blur-sm">
           {{ getModuleName(card.typeId) }}
         </span>

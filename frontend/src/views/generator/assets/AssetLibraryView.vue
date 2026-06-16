@@ -2,6 +2,7 @@
 import { onMounted } from 'vue'
 import { Download, ImageOff, LoaderCircle, Trash2 } from 'lucide-vue-next'
 import AppModal from '@/components/ui/AppModal.vue'
+import AppCheckbox from '@/components/ui/AppCheckbox.vue'
 import AssetCardGrid from '@/components/assets/AssetCardGrid.vue'
 import GeneratorLayout from '@/components/layout/GeneratorLayout.vue'
 import { useAssetLibrary } from '@/composables/useAssetLibrary.js'
@@ -46,8 +47,8 @@ function isAllSelected() {
   return assets.value.length > 0 && assets.value.every((c) => c.selected)
 }
 
-function handleToggleAll() {
-  toggleSelectAllCards(!isAllSelected())
+function handleToggleAll(checked) {
+  toggleSelectAllCards(checked)
 }
 
 async function handleBatchDelete() {
@@ -119,16 +120,13 @@ onMounted(() => {
         </div>
         <div class="flex items-center gap-3">
           <!-- 全选 -->
-          <label class="flex cursor-pointer items-center gap-1.5 text-xs text-slate-600">
-            <input
-              type="checkbox"
-              class="h-3.5 w-3.5 rounded border-slate-300 text-primary focus:ring-primary/30"
-              :checked="isAllSelected()"
-              :disabled="assets.length === 0"
-              @change="handleToggleAll"
-            />
-            全选
-          </label>
+          <AppCheckbox
+            :model-value="isAllSelected()"
+            label="全选"
+            size="sm"
+            :disabled="assets.length === 0"
+            @change="handleToggleAll"
+          />
           <!-- 批量下载 -->
           <button
             type="button"
