@@ -1,3 +1,4 @@
+from app.models.admin_audit_log import AdminAuditLog
 from app.models.credit_order import CreditOrder
 from app.models.credit_transaction import CreditTransaction
 from app.models.generation_job import GenerationJob
@@ -7,6 +8,7 @@ from app.models.prompt_template import PromptTemplate
 from app.models.user import User
 
 __all__ = [
+    "AdminAuditLog",
     "CreditOrder",
     "CreditTransaction",
     "GenerationJob",

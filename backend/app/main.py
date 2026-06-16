@@ -7,7 +7,8 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 
 from app.core.database import Base, engine
-from app.routers import asset, auth, billing, generation, image, outfit
+from app.core.schema_migrations import ensure_runtime_schema
+from app.routers import admin, asset, auth, billing, generation, image, outfit
 import app.models
 
 load_dotenv()
@@ -17,6 +18,7 @@ load_dotenv()
 async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    await ensure_runtime_schema(engine)
 
     app.state.redis_pool = await create_pool(
         RedisSettings.from_dsn(os.getenv("REDIS_URL", "redis://localhost:6379"))
@@ -28,6 +30,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="ShangTu API", lifespan=lifespan)
 
+app.include_router(admin.router)
 app.include_router(auth.router)
 app.include_router(billing.router)
 app.include_router(image.router)

@@ -28,6 +28,8 @@ def _user_payload(user: User) -> dict:
         "username": user.username,
         "email": user.email,
         "credits": user.credits,
+        "role": user.role,
+        "status": user.status,
     }
 
 
@@ -61,6 +63,8 @@ async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
     user = result.scalar_one_or_none()
     if not user or not verify_password(req.password, user.password_hash):
         return fail("邮箱或密码错误")
+    if user.status != "active":
+        return fail("账号已被禁用，请联系管理员")
     return success(_auth_payload(user))
 
 

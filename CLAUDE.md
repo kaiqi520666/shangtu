@@ -55,8 +55,18 @@ shangtu/
 
 #### 认证 `/auth`
 
-- `POST /auth/register` / `POST /auth/login`：返回 JWT（30 天有效）+ user_id
-- HTTPBearer + JWT，`get_current_user` 依赖注入
+- `POST /auth/register` / `POST /auth/login`：返回 JWT（30 天有效）+ user_id，并带 `role/status/credits`
+- HTTPBearer + JWT，`get_current_user` 依赖注入；`users.status != active` 会拒绝旧 token 和登录态
+
+#### 管理后台 `/admin`
+
+- 权限只有两种：`user` / `super_admin`；只有 `role=super_admin` 且 `status=active` 能访问 `/admin/*`
+- `GET /admin/overview`：用户数、充值金额、总积分余额、今日任务和失败任务等概览
+- `GET /admin/users`：用户列表，支持分页、关键词、角色和状态筛选
+- `PATCH /admin/users/{user_id}`：启用/禁用用户、设置/取消超级管理员；不能禁用自己，不能移除最后一个可用超级管理员
+- `POST /admin/users/{user_id}/credits/adjust`：后台手动加减积分，必须备注，写 `credit_transactions(type=admin_adjust)` 和 `admin_audit_logs`
+- `GET /admin/credit-orders` / `GET /admin/credit-transactions`：充值订单和积分流水只读列表
+- 初始超级管理员通过 SQL 设置：`UPDATE users SET role='super_admin' WHERE email='你的邮箱';`
 
 #### 图像 `/image`（需登录）
 
@@ -74,7 +84,7 @@ shangtu/
 - `POST /billing/orders`：创建本地 `credit_orders(pending)`，套餐金额/积分写入快照，再调 ZPAY `mapi.php` 创建微信支付订单，返回 `pay_url/qrcode/img`
 - `GET /billing/orders/{order_id}`：当前用户查询自己的充值订单，`paid` 时响应带最新 `credits`，前端轮询后同步 Pinia 余额
 - `GET /billing/zpay/notify`：ZPAY 异步通知入口，验签、校验 `pid/trade_status/money/out_trade_no`，事务 + 行锁幂等把订单置 `paid`、给用户加积分、写 `credit_transactions`，成功只返回纯字符串 `success`
-- `GET /billing/zpay/return`：浏览器支付后跳转入口，仅负责重定向回前端页面，不作为到账依据
+- `GET /billing/zpay/return`：浏览器支付后跳转入口，仅展示“支付结果处理中”提示，不作为到账依据
 - 本地联调用 `backend/scripts/simulate_zpay_notify.py <out_trade_no>` 生成合法 ZPAY 回调请求，验证到账和重复回调幂等
 
 #### 异步生图 Worker（`app/worker/tasks.py`）
@@ -252,7 +262,7 @@ npm run dev
 
 ## 已知技术债
 
-- 缺正式迁移工具（Alembic 待引入），靠 `Base.metadata.create_all`：旧库需手动补列 `ALTER TABLE image_tasks ADD COLUMN error_message TEXT, ADD COLUMN progress INTEGER DEFAULT 0, ADD COLUMN provider VARCHAR(32) DEFAULT 'toapis', ADD COLUMN provider_task_id VARCHAR(128);`（之前还需 `ALTER COLUMN prompt TYPE TEXT`）；新增父任务后还需补 `ALTER TABLE image_tasks ADD COLUMN job_id VARCHAR(36), ADD COLUMN type_id VARCHAR(50), ADD COLUMN title VARCHAR(100), ADD COLUMN sort_order INTEGER DEFAULT 0;`；提示词快照字段还需补 `ALTER TABLE image_tasks ADD COLUMN IF NOT EXISTS system_prompt_snapshot TEXT, ADD COLUMN IF NOT EXISTS task_prompt_snapshot TEXT, ADD COLUMN IF NOT EXISTS user_prompt TEXT, ADD COLUMN IF NOT EXISTS prompt_template_refs_json TEXT;`；重新生成保留历史需补 `ALTER TABLE image_tasks ADD COLUMN IF NOT EXISTS replaced_by_task_id VARCHAR(36);`；单图参数快照需补 `ALTER TABLE image_tasks ADD COLUMN IF NOT EXISTS settings_snapshot_json TEXT;`；按分辨率计费需补 `ALTER TABLE image_tasks ADD COLUMN IF NOT EXISTS credit_cost INTEGER NOT NULL DEFAULT 1;`；新表 `generation_jobs` / `prompt_templates` / `credit_orders` / `credit_transactions` 由 `create_all` 自动建
+- 缺正式迁移工具（Alembic 待引入），靠 `Base.metadata.create_all`：旧库需手动补列 `ALTER TABLE image_tasks ADD COLUMN error_message TEXT, ADD COLUMN progress INTEGER DEFAULT 0, ADD COLUMN provider VARCHAR(32) DEFAULT 'toapis', ADD COLUMN provider_task_id VARCHAR(128);`（之前还需 `ALTER COLUMN prompt TYPE TEXT`）；新增父任务后还需补 `ALTER TABLE image_tasks ADD COLUMN job_id VARCHAR(36), ADD COLUMN type_id VARCHAR(50), ADD COLUMN title VARCHAR(100), ADD COLUMN sort_order INTEGER DEFAULT 0;`；提示词快照字段还需补 `ALTER TABLE image_tasks ADD COLUMN IF NOT EXISTS system_prompt_snapshot TEXT, ADD COLUMN IF NOT EXISTS task_prompt_snapshot TEXT, ADD COLUMN IF NOT EXISTS user_prompt TEXT, ADD COLUMN IF NOT EXISTS prompt_template_refs_json TEXT;`；重新生成保留历史需补 `ALTER TABLE image_tasks ADD COLUMN IF NOT EXISTS replaced_by_task_id VARCHAR(36);`；单图参数快照需补 `ALTER TABLE image_tasks ADD COLUMN IF NOT EXISTS settings_snapshot_json TEXT;`；按分辨率计费需补 `ALTER TABLE image_tasks ADD COLUMN IF NOT EXISTS credit_cost INTEGER NOT NULL DEFAULT 1;`；`users.role/status/disabled_at` 启动时由 `ensure_runtime_schema()` 自动补齐；新表 `generation_jobs` / `prompt_templates` / `credit_orders` / `credit_transactions` / `admin_audit_logs` 由 `create_all` 自动建
 - 详情图 / 穿搭工作台的"AI 帮写"和"批量生成"仍 Mock，待对接 `/image/analyze` 和 `/image/generate`
 - DashScope 模型 `qwen3.6-flash` 通过 `enable_thinking=false` 关闭思考模式；切模型时记得复核该参数兼容性
 

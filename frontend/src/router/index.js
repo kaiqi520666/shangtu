@@ -51,6 +51,11 @@ const router = createRouter({
       name: "assets",
       component: () => import("../views/generator/assets/AssetLibraryView.vue"),
     },
+    {
+      path: "/admin",
+      name: "admin",
+      component: () => import("../views/admin/AdminView.vue"),
+    },
   ],
 });
 
@@ -58,7 +63,7 @@ let profileSynced = false;
 
 router.beforeEach(async (to) => {
   const authStore = useAuthStore();
-  const requiresAuth = to.path.startsWith("/generator");
+  const requiresAuth = to.path.startsWith("/generator") || to.path.startsWith("/admin");
   if (requiresAuth && !authStore.isAuthenticated) {
     return {
       path: "/login",
@@ -88,6 +93,9 @@ router.beforeEach(async (to) => {
         query: { redirect: to.fullPath },
       };
     }
+  }
+  if (to.path.startsWith("/admin") && !authStore.isSuperAdmin) {
+    return "/generator/product-suite";
   }
   if (
     (to.path === "/login" || to.path === "/register") &&

@@ -12,6 +12,8 @@ function normalizeUser(payload, currentUser = null) {
   const credits = Number.isFinite(Number(payload.credits))
     ? Number(payload.credits)
     : Number(currentUser?.credits || 0);
+  const role = payload.role || currentUser?.role || "user";
+  const status = payload.status || currentUser?.status || "active";
 
   return {
     email,
@@ -19,6 +21,8 @@ function normalizeUser(payload, currentUser = null) {
     token,
     userId,
     credits,
+    role,
+    status,
     plan: payload.plan || currentUser?.plan || "SaaS Pro",
   };
 }
@@ -30,8 +34,11 @@ export const useAuthStore = defineStore(
 
     const token = computed(() => user.value?.token || "");
     const credits = computed(() => Number(user.value?.credits || 0));
+    const role = computed(() => user.value?.role || "user");
+    const status = computed(() => user.value?.status || "active");
     const isAuthenticated = computed(() => Boolean(token.value));
     const isLoggedIn = computed(() => Boolean(user.value?.email));
+    const isSuperAdmin = computed(() => role.value === "super_admin" && status.value === "active");
 
     function setAuthUser(payload) {
       user.value = normalizeUser(payload, user.value);
@@ -57,8 +64,11 @@ export const useAuthStore = defineStore(
       user,
       token,
       credits,
+      role,
+      status,
       isAuthenticated,
       isLoggedIn,
+      isSuperAdmin,
       setAuthUser,
       login,
       logout,

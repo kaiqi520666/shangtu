@@ -50,16 +50,21 @@ backend/app/
 │   ├── auth.py              # JWT / 密码
 │   ├── database.py          # async engine / session
 │   ├── deps.py              # get_current_user / get_db
+│   ├── schema_migrations.py # MVP 期旧库启动补字段
 │   ├── image_analyzer.py    # DashScope AI 读图
 │   ├── prompt_templates.py  # 提示词模板查询服务
 │   ├── oss.py               # OSS 上传
 │   └── time.py              # UTC 时间工具 utc_now / to_utc_iso
 ├── models/
 │   ├── user.py
+│   ├── admin_audit_log.py
 │   ├── image_task.py
 │   ├── generation_job.py
+│   ├── credit_order.py
+│   ├── credit_transaction.py
 │   └── prompt_template.py
 ├── routers/
+│   ├── admin.py             # 超级管理员后台
 │   ├── auth.py
 │   ├── image.py             # 上传 / AI读图 / 生图任务 / 单图删除重生下载
 │   ├── generation.py        # 父任务 job CRUD / 工作台快照
@@ -117,6 +122,12 @@ frontend/src/
 
 - `POST /auth/register`
 - `POST /auth/login`
+- `GET /admin/overview`
+- `GET /admin/users`
+- `PATCH /admin/users/{user_id}`
+- `POST /admin/users/{user_id}/credits/adjust`
+- `GET /admin/credit-orders`
+- `GET /admin/credit-transactions`
 - `POST /image/upload`
 - `POST /image/analyze`
 - `POST /image/generate`
@@ -132,6 +143,25 @@ frontend/src/
 - `DELETE /generation/jobs/{job_id}`
 - `GET /asset/list`
 - `DELETE /asset/batch`
+
+### GenerationJob / ImageTask
+
+### 用户权限 / 管理后台
+
+`users` 现在有两种角色：
+
+- `user`
+- `super_admin`
+
+`users.status` 为 `active / disabled`。禁用用户不能登录，已有 token 也会被 `get_current_user` 拒绝。初始超级管理员通过 SQL 设置：
+
+```sql
+UPDATE users SET role='super_admin' WHERE email='你的邮箱';
+```
+
+管理后台接口统一走 `/admin/*`，只有 `role='super_admin' AND status='active'` 可访问。后台手动加减积分写 `credit_transactions(type='admin_adjust')`，同时写 `admin_audit_logs`。
+
+前端 `/admin` 复用 `GeneratorLayout`，左侧导航在“资产库”下方用分割线隔开“管理后台”，仅超级管理员可见。
 
 ### GenerationJob / ImageTask
 
