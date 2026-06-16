@@ -4,8 +4,12 @@ import {
   adjustAdminUserCredits,
   getAdminCreditOrders,
   getAdminCreditTransactions,
+  getAdminAuditLogs,
+  getAdminImageTasks,
+  getAdminSettings,
   getAdminOverview,
   getAdminUsers,
+  updateAdminSettings,
   updateAdminUser,
 } from "@/api/admin.js";
 import { formatMoney, roleLabel, totalPages } from "@/constants/admin.js";
@@ -17,6 +21,15 @@ const overviewLoading = ref(false);
 const usersState = reactive(createPageState({ role: "", status: "" }));
 const ordersState = reactive(createPageState({ status: "" }));
 const transactionsState = reactive(createPageState({ type: "" }));
+const imageTasksState = reactive(createPageState({ status: "", scenario: "" }));
+const auditLogsState = reactive(createPageState({ action: "" }));
+const settingsState = reactive({
+  imageCreditCosts: { "1K": 1, "2K": 2, "4K": 4 },
+  rechargePackages: [],
+  paymentConfig: {},
+  loading: false,
+  saving: false,
+});
 const adjustModalOpen = ref(false);
 const adjustTarget = ref(null);
 const adjustSaving = ref(false);
@@ -124,6 +137,69 @@ export function useAdminDashboard() {
     }
   }
 
+  async function loadImageTasks() {
+    imageTasksState.loading = true;
+    try {
+      const result = await getAdminImageTasks({
+        page: imageTasksState.page,
+        page_size: imageTasksState.pageSize,
+        keyword: imageTasksState.keyword || undefined,
+        status: imageTasksState.status || undefined,
+        scenario: imageTasksState.scenario || undefined,
+      });
+      if (result.code !== 0) {
+        toast.error(result.message || "加载生图任务失败");
+        return;
+      }
+      imageTasksState.items = result.data?.items || [];
+      imageTasksState.total = result.data?.total || 0;
+    } catch {
+      toast.error("加载生图任务失败");
+    } finally {
+      imageTasksState.loading = false;
+    }
+  }
+
+  async function loadAuditLogs() {
+    auditLogsState.loading = true;
+    try {
+      const result = await getAdminAuditLogs({
+        page: auditLogsState.page,
+        page_size: auditLogsState.pageSize,
+        keyword: auditLogsState.keyword || undefined,
+        action: auditLogsState.action || undefined,
+      });
+      if (result.code !== 0) {
+        toast.error(result.message || "加载审计日志失败");
+        return;
+      }
+      auditLogsState.items = result.data?.items || [];
+      auditLogsState.total = result.data?.total || 0;
+    } catch {
+      toast.error("加载审计日志失败");
+    } finally {
+      auditLogsState.loading = false;
+    }
+  }
+
+  async function loadSettings() {
+    settingsState.loading = true;
+    try {
+      const result = await getAdminSettings();
+      if (result.code !== 0) {
+        toast.error(result.message || "加载系统配置失败");
+        return;
+      }
+      settingsState.imageCreditCosts = { ...(result.data?.image_credit_costs || {}) };
+      settingsState.rechargePackages = (result.data?.recharge_packages || []).map((item) => ({ ...item }));
+      settingsState.paymentConfig = result.data?.payment_config || {};
+    } catch {
+      toast.error("加载系统配置失败");
+    } finally {
+      settingsState.loading = false;
+    }
+  }
+
   function applyUsersFilter() {
     usersState.page = 1;
     loadUsers();
@@ -137,6 +213,64 @@ export function useAdminDashboard() {
   function applyTransactionsFilter() {
     transactionsState.page = 1;
     loadTransactions();
+  }
+
+  function applyImageTasksFilter() {
+    imageTasksState.page = 1;
+    loadImageTasks();
+  }
+
+  function applyAuditLogsFilter() {
+    auditLogsState.page = 1;
+    loadAuditLogs();
+  }
+
+  function addRechargePackage() {
+    settingsState.rechargePackages.push({
+      id: `p_${Date.now()}`,
+      name: "新套餐",
+      credits: 100,
+      amount_cents: 990,
+      badge: "",
+      enabled: true,
+    });
+  }
+
+  function removeRechargePackage(index) {
+    settingsState.rechargePackages.splice(index, 1);
+  }
+
+  async function saveSettings() {
+    settingsState.saving = true;
+    try {
+      const payload = {
+        image_credit_costs: {
+          "1K": Number(settingsState.imageCreditCosts["1K"]),
+          "2K": Number(settingsState.imageCreditCosts["2K"]),
+          "4K": Number(settingsState.imageCreditCosts["4K"]),
+        },
+        recharge_packages: settingsState.rechargePackages.map((item) => ({
+          id: String(item.id || "").trim(),
+          name: String(item.name || "").trim(),
+          credits: Number(item.credits),
+          amount_cents: Number(item.amount_cents),
+          badge: String(item.badge || "").trim(),
+          enabled: Boolean(item.enabled),
+        })),
+      };
+      const result = await updateAdminSettings(payload);
+      if (result.code !== 0) {
+        toast.error(result.message || "保存系统配置失败");
+        return;
+      }
+      toast.success("系统配置已保存");
+      await loadSettings();
+      await loadAuditLogs();
+    } catch {
+      toast.error("保存系统配置失败");
+    } finally {
+      settingsState.saving = false;
+    }
   }
 
   async function changeUserRole(user) {
@@ -233,6 +367,9 @@ export function useAdminDashboard() {
     usersState,
     ordersState,
     transactionsState,
+    imageTasksState,
+    auditLogsState,
+    settingsState,
     adjustModalOpen,
     adjustTarget,
     adjustSaving,
@@ -241,9 +378,17 @@ export function useAdminDashboard() {
     loadUsers,
     loadOrders,
     loadTransactions,
+    loadImageTasks,
+    loadAuditLogs,
+    loadSettings,
     applyUsersFilter,
     applyOrdersFilter,
     applyTransactionsFilter,
+    applyImageTasksFilter,
+    applyAuditLogsFilter,
+    addRechargePackage,
+    removeRechargePackage,
+    saveSettings,
     changeUserRole,
     changeUserStatus,
     openAdjustModal,

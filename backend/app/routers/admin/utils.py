@@ -3,8 +3,16 @@ import json
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.json_utils import parse_json_or_none
 from app.core.time import to_utc_iso
-from app.models import AdminAuditLog, CreditOrder, CreditTransaction, User
+from app.models import (
+    AdminAuditLog,
+    CreditOrder,
+    CreditTransaction,
+    GenerationJob,
+    ImageTask,
+    User,
+)
 
 
 def user_payload(user: User) -> dict:
@@ -50,6 +58,47 @@ def transaction_payload(tx: CreditTransaction, user: User | None = None) -> dict
         "balance_after": tx.balance_after,
         "note": tx.note,
         "created_at": to_utc_iso(tx.created_at),
+    }
+
+
+def image_task_payload(
+    task: ImageTask,
+    user: User | None = None,
+    job: GenerationJob | None = None,
+) -> dict:
+    return {
+        "id": task.id,
+        "user_id": task.user_id,
+        "user_email": user.email if user else None,
+        "job_id": task.job_id,
+        "job_title": job.title if job else None,
+        "scenario": job.scenario if job else None,
+        "type_id": task.type_id,
+        "title": task.title,
+        "size": task.size,
+        "status": task.status,
+        "progress": task.progress,
+        "provider": task.provider,
+        "provider_task_id": task.provider_task_id,
+        "credit_cost": task.credit_cost,
+        "credit_refunded": task.credit_refunded,
+        "result_url": task.result_url,
+        "error_message": task.error_message,
+        "archived": task.archived,
+        "created_at": to_utc_iso(task.created_at),
+    }
+
+
+def audit_log_payload(log: AdminAuditLog, actor: User | None = None) -> dict:
+    return {
+        "id": log.id,
+        "actor_user_id": log.actor_user_id,
+        "actor_email": actor.email if actor else None,
+        "action": log.action,
+        "target_type": log.target_type,
+        "target_id": log.target_id,
+        "detail": parse_json_or_none(log.detail_json) or {},
+        "created_at": to_utc_iso(log.created_at),
     }
 
 

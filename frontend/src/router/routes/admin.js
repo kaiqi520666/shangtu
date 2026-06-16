@@ -25,6 +25,21 @@ export const adminRoutes = [
         name: "admin-transactions",
         component: () => import("@/views/admin/AdminTransactionsView.vue"),
       },
+      {
+        path: "image-tasks",
+        name: "admin-image-tasks",
+        component: () => import("@/views/admin/AdminImageTasksView.vue"),
+      },
+      {
+        path: "settings",
+        name: "admin-settings",
+        component: () => import("@/views/admin/AdminSettingsView.vue"),
+      },
+      {
+        path: "audit-logs",
+        name: "admin-audit-logs",
+        component: () => import("@/views/admin/AdminAuditLogsView.vue"),
+      },
     ],
   },
 ];

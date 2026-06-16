@@ -20,7 +20,7 @@ function refreshCurrentView() {
       <header class="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-3">
         <div>
           <h1 class="text-base font-bold text-slate-800">管理后台</h1>
-          <p class="text-xs text-slate-400">用户、充值订单和积分流水管理</p>
+          <p class="text-xs text-slate-400">用户、订单、任务、配置和审计管理</p>
         </div>
         <button
           type="button"

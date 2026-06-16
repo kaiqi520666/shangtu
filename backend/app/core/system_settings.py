@@ -1,0 +1,169 @@
+import json
+import os
+from typing import Any
+
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.credits import (
+    DEFAULT_IMAGE_CREDIT_COSTS,
+    get_image_credit_costs,
+    normalize_image_resolution,
+)
+from app.core.json_utils import dump_json, parse_json_or_none
+from app.models import SystemSetting
+
+SETTING_IMAGE_CREDIT_COSTS = "image_credit_costs"
+SETTING_RECHARGE_PACKAGES = "credit_recharge_packages"
+
+DEFAULT_RECHARGE_PACKAGES: list[dict[str, Any]] = [
+    {
+        "id": "p_001",
+        "name": "测试包",
+        "credits": 1,
+        "amount_cents": 1,
+        "badge": "测试",
+        "enabled": True,
+    },
+    {
+        "id": "p_100",
+        "name": "体验包",
+        "credits": 100,
+        "amount_cents": 990,
+        "badge": "",
+        "enabled": True,
+    },
+    {
+        "id": "p_500",
+        "name": "标准包",
+        "credits": 500,
+        "amount_cents": 3990,
+        "badge": "推荐",
+        "enabled": True,
+    },
+    {
+        "id": "p_1000",
+        "name": "进阶包",
+        "credits": 1000,
+        "amount_cents": 6990,
+        "badge": "高性价比",
+        "enabled": True,
+    },
+]
+
+
+def normalize_image_credit_costs(raw: dict[str, Any]) -> dict[str, int]:
+    costs: dict[str, int] = {}
+    for resolution in DEFAULT_IMAGE_CREDIT_COSTS:
+        value = raw.get(resolution)
+        if value is None:
+            value = raw.get(resolution.lower())
+        try:
+            cost = int(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{resolution} 扣费必须是正整数") from exc
+        if cost < 1:
+            raise ValueError(f"{resolution} 扣费必须大于等于 1")
+        costs[resolution] = cost
+    return costs
+
+
+def normalize_recharge_package(raw: dict[str, Any]) -> dict[str, Any]:
+    package_id = str(raw.get("id") or "").strip()
+    name = str(raw.get("name") or "").strip()
+    credits = int(raw.get("credits") or 0)
+    amount_cents = int(raw.get("amount_cents") or 0)
+    enabled = bool(raw.get("enabled", True))
+    badge = str(raw.get("badge") or "").strip()
+    if not package_id:
+        raise ValueError("充值套餐缺少 id")
+    if not name:
+        raise ValueError(f"充值套餐 {package_id} 缺少 name")
+    if credits < 1:
+        raise ValueError(f"充值套餐 {package_id} credits 必须大于 0")
+    if amount_cents < 1:
+        raise ValueError(f"充值套餐 {package_id} amount_cents 必须大于 0")
+    return {
+        "id": package_id,
+        "name": name,
+        "credits": credits,
+        "amount_cents": amount_cents,
+        "badge": badge,
+        "enabled": enabled,
+    }
+
+
+def normalize_recharge_packages(
+    raw: list[dict[str, Any]],
+    include_disabled: bool = True,
+) -> list[dict[str, Any]]:
+    packages = [normalize_recharge_package(item) for item in raw if isinstance(item, dict)]
+    ids = [item["id"] for item in packages]
+    if len(ids) != len(set(ids)):
+        raise ValueError("充值套餐 id 不能重复")
+    if include_disabled:
+        return packages
+    return [item for item in packages if item["enabled"]]
+
+
+def get_env_recharge_packages(include_disabled: bool = False) -> list[dict[str, Any]]:
+    raw = os.getenv("CREDIT_RECHARGE_PACKAGES_JSON")
+    try:
+        payload = json.loads(raw) if raw else DEFAULT_RECHARGE_PACKAGES
+    except ValueError as exc:
+        raise ValueError("CREDIT_RECHARGE_PACKAGES_JSON 不是有效 JSON") from exc
+    if not isinstance(payload, list):
+        raise ValueError("CREDIT_RECHARGE_PACKAGES_JSON 必须是数组")
+    return normalize_recharge_packages(payload, include_disabled=include_disabled)
+
+
+async def get_setting(db: AsyncSession, key: str) -> SystemSetting | None:
+    return await db.get(SystemSetting, key)
+
+
+async def get_effective_image_credit_costs(db: AsyncSession) -> dict[str, int]:
+    setting = await get_setting(db, SETTING_IMAGE_CREDIT_COSTS)
+    if setting:
+        parsed = parse_json_or_none(setting.value_json)
+        if not isinstance(parsed, dict):
+            raise ValueError("数据库中的生图扣费配置不是有效对象")
+        return normalize_image_credit_costs(parsed)
+    return get_image_credit_costs()
+
+
+async def get_effective_image_credit_cost(db: AsyncSession, resolution: str | None) -> int:
+    normalized = normalize_image_resolution(resolution)
+    costs = await get_effective_image_credit_costs(db)
+    if normalized not in costs:
+        supported = " / ".join(DEFAULT_IMAGE_CREDIT_COSTS.keys())
+        raise ValueError(f"不支持的清晰度：{resolution}，请选择 {supported}")
+    return costs[normalized]
+
+
+async def get_effective_recharge_packages(
+    db: AsyncSession,
+    include_disabled: bool = False,
+) -> list[dict[str, Any]]:
+    setting = await get_setting(db, SETTING_RECHARGE_PACKAGES)
+    if setting:
+        parsed = parse_json_or_none(setting.value_json)
+        if not isinstance(parsed, list):
+            raise ValueError("数据库中的充值套餐配置不是有效数组")
+        return normalize_recharge_packages(parsed, include_disabled=include_disabled)
+    return get_env_recharge_packages(include_disabled=include_disabled)
+
+
+async def upsert_setting(
+    db: AsyncSession,
+    key: str,
+    value: Any,
+    actor_user_id: int,
+    description: str | None = None,
+) -> SystemSetting:
+    row = await get_setting(db, key)
+    if not row:
+        row = SystemSetting(key=key, value_json=dump_json(value))
+    row.value_json = dump_json(value)
+    row.description = description
+    row.updated_by_user_id = actor_user_id
+    db.add(row)
+    return row

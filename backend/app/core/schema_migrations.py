@@ -15,3 +15,17 @@ async def ensure_runtime_schema(engine: AsyncEngine) -> None:
                 """
             )
         )
+        await conn.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS system_settings (
+                    key VARCHAR(100) PRIMARY KEY,
+                    value_json TEXT NOT NULL,
+                    description VARCHAR(255),
+                    updated_by_user_id INTEGER,
+                    created_at TIMESTAMPTZ NOT NULL,
+                    updated_at TIMESTAMPTZ NOT NULL
+                )
+                """
+            )
+        )

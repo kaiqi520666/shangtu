@@ -1,5 +1,4 @@
 import hashlib
-import json
 import os
 import uuid
 from decimal import Decimal, ROUND_HALF_UP
@@ -12,95 +11,20 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.credits import get_image_credit_costs
 from app.core.deps import get_current_user, get_db
 from app.core.json_utils import dump_json
+from app.core.system_settings import (
+    get_effective_image_credit_costs,
+    get_effective_recharge_packages,
+)
 from app.core.time import to_utc_iso, utc_now
 from app.models import CreditOrder, CreditTransaction, User
 from app.schemas.response import Response, fail, success
 
 router = APIRouter(prefix="/billing", tags=["积分充值"])
 
-DEFAULT_RECHARGE_PACKAGES: list[dict[str, Any]] = [
-    {
-        "id": "p_001",
-        "name": "测试包",
-        "credits": 1,
-        "amount_cents": 1,
-        "badge": "测试",
-        "enabled": True,
-    },
-    {
-        "id": "p_100",
-        "name": "体验包",
-        "credits": 100,
-        "amount_cents": 990,
-        "badge": "",
-        "enabled": True,
-    },
-    {
-        "id": "p_500",
-        "name": "标准包",
-        "credits": 500,
-        "amount_cents": 3990,
-        "badge": "推荐",
-        "enabled": True,
-    },
-    {
-        "id": "p_1000",
-        "name": "进阶包",
-        "credits": 1000,
-        "amount_cents": 6990,
-        "badge": "高性价比",
-        "enabled": True,
-    },
-]
-
-
 class CreateOrderRequest(BaseModel):
     package_id: str
-
-
-def _normalize_package(raw: dict[str, Any]) -> dict[str, Any]:
-    package_id = str(raw.get("id") or "").strip()
-    name = str(raw.get("name") or "").strip()
-    credits = int(raw.get("credits") or 0)
-    amount_cents = int(raw.get("amount_cents") or 0)
-    enabled = bool(raw.get("enabled", True))
-    badge = str(raw.get("badge") or "").strip()
-    if not package_id:
-        raise ValueError("充值套餐缺少 id")
-    if not name:
-        raise ValueError(f"充值套餐 {package_id} 缺少 name")
-    if credits < 1:
-        raise ValueError(f"充值套餐 {package_id} credits 必须大于 0")
-    if amount_cents < 1:
-        raise ValueError(f"充值套餐 {package_id} amount_cents 必须大于 0")
-    return {
-        "id": package_id,
-        "name": name,
-        "credits": credits,
-        "amount_cents": amount_cents,
-        "badge": badge,
-        "enabled": enabled,
-    }
-
-
-def get_recharge_packages(include_disabled: bool = False) -> list[dict[str, Any]]:
-    raw = os.getenv("CREDIT_RECHARGE_PACKAGES_JSON")
-    try:
-        payload = json.loads(raw) if raw else DEFAULT_RECHARGE_PACKAGES
-    except ValueError as exc:
-        raise ValueError("CREDIT_RECHARGE_PACKAGES_JSON 不是有效 JSON") from exc
-    if not isinstance(payload, list):
-        raise ValueError("CREDIT_RECHARGE_PACKAGES_JSON 必须是数组")
-    packages = [_normalize_package(item) for item in payload if isinstance(item, dict)]
-    ids = [item["id"] for item in packages]
-    if len(ids) != len(set(ids)):
-        raise ValueError("充值套餐 id 不能重复")
-    if include_disabled:
-        return packages
-    return [item for item in packages if item["enabled"]]
 
 
 def _format_amount(amount_cents: int) -> str:
@@ -205,10 +129,13 @@ def _make_out_trade_no() -> str:
 
 
 @router.get("/packages", response_model=Response)
-async def list_packages(current_user: User = Depends(get_current_user)):
+async def list_packages(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     try:
-        packages = get_recharge_packages()
-        image_credit_costs = get_image_credit_costs()
+        packages = await get_effective_recharge_packages(db)
+        image_credit_costs = await get_effective_image_credit_costs(db)
     except ValueError as exc:
         return fail(str(exc))
     return success(
@@ -228,7 +155,7 @@ async def create_order(
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        packages = get_recharge_packages()
+        packages = await get_effective_recharge_packages(db)
         package = next((item for item in packages if item["id"] == req.package_id), None)
         if not package:
             return fail("充值套餐不存在或已下架")

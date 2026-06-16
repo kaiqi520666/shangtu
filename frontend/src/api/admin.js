@@ -23,3 +23,19 @@ export function getAdminCreditOrders(params = {}) {
 export function getAdminCreditTransactions(params = {}) {
   return request.get("/admin/credit-transactions", { params, timeout: 15000 });
 }
+
+export function getAdminImageTasks(params = {}) {
+  return request.get("/admin/image-tasks", { params, timeout: 15000 });
+}
+
+export function getAdminSettings() {
+  return request.get("/admin/settings", { timeout: 15000 });
+}
+
+export function updateAdminSettings(payload) {
+  return request.put("/admin/settings", payload, { timeout: 15000 });
+}
+
+export function getAdminAuditLogs(params = {}) {
+  return request.get("/admin/audit-logs", { params, timeout: 15000 });
+}

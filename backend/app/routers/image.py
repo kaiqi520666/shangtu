@@ -8,11 +8,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.credits import (
-    get_image_credit_cost,
-    get_image_credit_costs,
-    normalize_image_resolution,
-)
+from app.core.credits import normalize_image_resolution
 from app.core.deps import get_current_user, get_db
 from app.core.image_analyzer import (
     DashScopeConfigError,
@@ -28,6 +24,10 @@ from app.core.image_prompt_builder import (
 )
 from app.core.json_utils import dump_json_or_none, parse_json_or_none
 from app.core.oss import OssConfigError, upload_image_bytes
+from app.core.system_settings import (
+    get_effective_image_credit_cost,
+    get_effective_image_credit_costs,
+)
 from app.core.time import to_utc_iso, utc_now
 from app.models import GenerationJob, ImageTask, User
 from app.schemas.response import Response, fail, success
@@ -215,9 +215,12 @@ async def free_image_optimize(
 
 
 @router.get("/credit-costs", response_model=Response)
-async def image_credit_costs(current_user: User = Depends(get_current_user)):
+async def image_credit_costs(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     try:
-        costs = get_image_credit_costs()
+        costs = await get_effective_image_credit_costs(db)
     except ValueError as exc:
         return fail(str(exc))
     return success({"costs": costs})
@@ -231,7 +234,7 @@ async def create_task(
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        credit_cost = get_image_credit_cost(req.resolution)
+        credit_cost = await get_effective_image_credit_cost(db, req.resolution)
     except ValueError as exc:
         return fail(str(exc))
     normalized_resolution = normalize_image_resolution(req.resolution)
@@ -589,7 +592,7 @@ async def regenerate_task(
     ratio = parts[0] if len(parts) > 0 else "1:1"
     resolution = parts[1] if len(parts) > 1 else "1K"
     try:
-        credit_cost = get_image_credit_cost(resolution)
+        credit_cost = await get_effective_image_credit_cost(db, resolution)
     except ValueError as exc:
         return fail(str(exc))
     normalized_resolution = normalize_image_resolution(resolution)
