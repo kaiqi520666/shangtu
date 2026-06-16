@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref } from "vue";
-import { Check, ImagePlus, LoaderCircle, Trash2 } from "lucide-vue-next";
+import { ImagePlus, LoaderCircle, Trash2 } from "lucide-vue-next";
+import AppCheckbox from "@/components/ui/AppCheckbox.vue";
 
 defineProps({
   models: {
@@ -143,12 +144,16 @@ function selectModel(model) {
               :src="model.image"
               class="h-full w-full object-cover transition-transform group-hover:scale-105"
             />
-            <span
+            <div
               v-if="selectedId === model.id"
-              class="absolute left-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded bg-primary text-white"
+              class="pointer-events-none absolute left-1.5 top-1.5"
             >
-              <Check class="h-3 w-3 stroke-[3]" />
-            </span>
+              <AppCheckbox
+                :model-value="true"
+                readonly
+                size="sm"
+              />
+            </div>
             <button
               v-if="model.canDelete"
               type="button"
