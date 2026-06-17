@@ -4,22 +4,17 @@ import {
   updateAdminOutfitModel,
   uploadAdminOutfitModel,
 } from "@/api/admin.js";
-import { totalPages } from "@/constants/admin.js";
+import { createAdminPageState, useAdminPageLoader } from "@/composables/admin/useAdminPageState.js";
 import { useConfirm } from "@/composables/useConfirm.js";
 import { useToast } from "@/composables/useToast.js";
 
 export function useAdminOutfitModels() {
   const confirm = useConfirm();
   const toast = useToast();
-  const state = reactive({
-    items: [],
-    total: 0,
-    page: 1,
-    pageSize: 20,
-    keyword: "",
+  const { loadPage, applyFilter: applyPageFilter, changePage: changeAdminPage } = useAdminPageLoader(toast);
+  const state = reactive(createAdminPageState({
     active: "",
-    loading: false,
-  });
+  }));
   const editorOpen = ref(false);
   const editorSaving = ref(false);
   const uploadSaving = ref(false);
@@ -32,37 +27,22 @@ export function useAdminOutfitModels() {
   });
 
   async function loadModels() {
-    state.loading = true;
-    try {
-      const result = await getAdminOutfitModels({
-        page: state.page,
-        page_size: state.pageSize,
-        keyword: state.keyword || undefined,
+    await loadPage(
+      state,
+      getAdminOutfitModels,
+      {
         active: state.active || undefined,
-      });
-      if (result.code !== 0) {
-        toast.error(result.message || "加载系统模特失败");
-        return;
-      }
-      state.items = result.data?.items || [];
-      state.total = result.data?.total || 0;
-    } catch {
-      toast.error("加载系统模特失败");
-    } finally {
-      state.loading = false;
-    }
+      },
+      "加载系统模特失败",
+    );
   }
 
   function applyFilter() {
-    state.page = 1;
-    loadModels();
+    applyPageFilter(state, loadModels);
   }
 
   function changePage(direction) {
-    const nextPage = state.page + direction;
-    if (nextPage < 1 || nextPage > totalPages(state)) return;
-    state.page = nextPage;
-    loadModels();
+    changeAdminPage(state, loadModels, direction);
   }
 
   function openEditModal(model) {

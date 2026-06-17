@@ -12,17 +12,18 @@ import {
   updateAdminSettings,
   updateAdminUser,
 } from "@/api/admin.js";
-import { formatMoney, roleLabel, totalPages } from "@/constants/admin.js";
+import { formatMoney, roleLabel } from "@/constants/admin.js";
+import { createAdminPageState, useAdminPageLoader } from "@/composables/admin/useAdminPageState.js";
 import { useConfirm } from "@/composables/useConfirm.js";
 import { useToast } from "@/composables/useToast.js";
 
 const overview = ref(null);
 const overviewLoading = ref(false);
-const usersState = reactive(createPageState({ role: "", status: "" }));
-const ordersState = reactive(createPageState({ status: "" }));
-const transactionsState = reactive(createPageState({ type: "" }));
-const imageTasksState = reactive(createPageState({ status: "", scenario: "" }));
-const auditLogsState = reactive(createPageState({ action: "" }));
+const usersState = reactive(createAdminPageState({ role: "", status: "" }));
+const ordersState = reactive(createAdminPageState({ status: "" }));
+const transactionsState = reactive(createAdminPageState({ type: "" }));
+const imageTasksState = reactive(createAdminPageState({ status: "", scenario: "" }));
+const auditLogsState = reactive(createAdminPageState({ action: "" }));
 const settingsState = reactive({
   imageCreditCosts: { "1K": 1, "2K": 2, "4K": 4 },
   rechargePackages: [],
@@ -49,6 +50,7 @@ const overviewCards = computed(() => {
 export function useAdminDashboard() {
   const confirm = useConfirm();
   const toast = useToast();
+  const { loadPage, applyFilter, changePage } = useAdminPageLoader(toast);
 
   async function loadOverview() {
     overviewLoading.value = true;
@@ -63,28 +65,6 @@ export function useAdminDashboard() {
       toast.error("加载概览失败");
     } finally {
       overviewLoading.value = false;
-    }
-  }
-
-  async function loadPage(state, apiFn, filters, errorMessage) {
-    state.loading = true;
-    try {
-      const result = await apiFn({
-        page: state.page,
-        page_size: state.pageSize,
-        keyword: state.keyword || undefined,
-        ...filters,
-      });
-      if (result.code !== 0) {
-        toast.error(result.message || errorMessage);
-        return;
-      }
-      state.items = result.data?.items || [];
-      state.total = result.data?.total || 0;
-    } catch {
-      toast.error(errorMessage);
-    } finally {
-      state.loading = false;
     }
   }
 
@@ -164,28 +144,23 @@ export function useAdminDashboard() {
   }
 
   function applyUsersFilter() {
-    usersState.page = 1;
-    loadUsers();
+    applyFilter(usersState, loadUsers);
   }
 
   function applyOrdersFilter() {
-    ordersState.page = 1;
-    loadOrders();
+    applyFilter(ordersState, loadOrders);
   }
 
   function applyTransactionsFilter() {
-    transactionsState.page = 1;
-    loadTransactions();
+    applyFilter(transactionsState, loadTransactions);
   }
 
   function applyImageTasksFilter() {
-    imageTasksState.page = 1;
-    loadImageTasks();
+    applyFilter(imageTasksState, loadImageTasks);
   }
 
   function applyAuditLogsFilter() {
-    auditLogsState.page = 1;
-    loadAuditLogs();
+    applyFilter(auditLogsState, loadAuditLogs);
   }
 
   function addRechargePackage() {
@@ -316,13 +291,6 @@ export function useAdminDashboard() {
     }
   }
 
-  function changePage(state, loader, direction) {
-    const nextPage = state.page + direction;
-    if (nextPage < 1 || nextPage > totalPages(state)) return;
-    state.page = nextPage;
-    loader();
-  }
-
   return {
     overviewCards,
     overviewLoading,
@@ -356,17 +324,5 @@ export function useAdminDashboard() {
     closeAdjustModal,
     submitAdjustCredits,
     changePage,
-  };
-}
-
-function createPageState(extra = {}) {
-  return {
-    items: [],
-    total: 0,
-    page: 1,
-    pageSize: 20,
-    keyword: "",
-    loading: false,
-    ...extra,
   };
 }

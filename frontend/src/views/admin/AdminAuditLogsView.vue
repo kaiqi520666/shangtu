@@ -1,7 +1,7 @@
 <script setup>
 import { onMounted } from "vue";
 import AdminAuditLogsPanel from "@/components/admin/AdminAuditLogsPanel.vue";
-import { useAdminDashboard } from "@/composables/useAdminDashboard.js";
+import { useAdminDashboard } from "@/composables/admin/useAdminDashboard.js";
 
 const { auditLogsState, loadAuditLogs, applyAuditLogsFilter, changePage } = useAdminDashboard();
 

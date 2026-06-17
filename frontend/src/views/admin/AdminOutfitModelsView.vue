@@ -2,7 +2,7 @@
 import { onMounted } from "vue";
 import AdminOutfitModelsPanel from "@/components/admin/AdminOutfitModelsPanel.vue";
 import OutfitModelEditorModal from "@/components/admin/OutfitModelEditorModal.vue";
-import { useAdminOutfitModels } from "./composables/useAdminOutfitModels.js";
+import { useAdminOutfitModels } from "@/composables/admin/useAdminOutfitModels.js";
 
 const {
   state,

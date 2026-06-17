@@ -2,7 +2,7 @@
 import { onMounted } from "vue";
 import AdminPromptTemplatesPanel from "@/components/admin/AdminPromptTemplatesPanel.vue";
 import PromptTemplateEditorModal from "@/components/admin/PromptTemplateEditorModal.vue";
-import { useAdminPromptTemplates } from "./composables/useAdminPromptTemplates.js";
+import { useAdminPromptTemplates } from "@/composables/admin/useAdminPromptTemplates.js";
 
 const {
   state,

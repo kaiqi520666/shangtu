@@ -4,7 +4,7 @@ import {
   getAdminPromptTemplates,
   updateAdminPromptTemplate,
 } from "@/api/admin.js";
-import { totalPages } from "@/constants/admin.js";
+import { createAdminPageState, useAdminPageLoader } from "@/composables/admin/useAdminPageState.js";
 import { useToast } from "@/composables/useToast.js";
 
 const emptyForm = {
@@ -22,57 +22,37 @@ const emptyForm = {
 
 export function useAdminPromptTemplates() {
   const toast = useToast();
-  const state = reactive({
-    items: [],
-    total: 0,
-    page: 1,
-    pageSize: 20,
-    keyword: "",
+  const { loadPage, applyFilter: applyPageFilter, changePage: changeAdminPage } = useAdminPageLoader(toast);
+  const state = reactive(createAdminPageState({
     scenario: "",
     purpose: "",
     model: "",
     active: "",
-    loading: false,
-  });
+  }));
   const editorOpen = ref(false);
   const editorSaving = ref(false);
   const form = reactive({ ...emptyForm });
 
   async function loadTemplates() {
-    state.loading = true;
-    try {
-      const result = await getAdminPromptTemplates({
-        page: state.page,
-        page_size: state.pageSize,
-        keyword: state.keyword || undefined,
+    await loadPage(
+      state,
+      getAdminPromptTemplates,
+      {
         scenario: state.scenario || undefined,
         purpose: state.purpose || undefined,
         model: state.model || undefined,
         active: state.active || undefined,
-      });
-      if (result.code !== 0) {
-        toast.error(result.message || "加载提示词模板失败");
-        return;
-      }
-      state.items = result.data?.items || [];
-      state.total = result.data?.total || 0;
-    } catch {
-      toast.error("加载提示词模板失败");
-    } finally {
-      state.loading = false;
-    }
+      },
+      "加载提示词模板失败",
+    );
   }
 
   function applyFilter() {
-    state.page = 1;
-    loadTemplates();
+    applyPageFilter(state, loadTemplates);
   }
 
   function changePage(direction) {
-    const nextPage = state.page + direction;
-    if (nextPage < 1 || nextPage > totalPages(state)) return;
-    state.page = nextPage;
-    loadTemplates();
+    changeAdminPage(state, loadTemplates, direction);
   }
 
   function openCreateModal() {

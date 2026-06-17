@@ -1,7 +1,7 @@
 <script setup>
 import { onMounted } from "vue";
 import AdminOverviewPanel from "@/components/admin/AdminOverviewPanel.vue";
-import { useAdminDashboard } from "@/composables/useAdminDashboard.js";
+import { useAdminDashboard } from "@/composables/admin/useAdminDashboard.js";
 
 const { overviewCards, overviewLoading, loadOverview } = useAdminDashboard();
 

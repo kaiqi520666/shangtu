@@ -1,7 +1,7 @@
 <script setup>
 import { onMounted } from "vue";
 import AdminImageTasksPanel from "@/components/admin/AdminImageTasksPanel.vue";
-import { useAdminDashboard } from "@/composables/useAdminDashboard.js";
+import { useAdminDashboard } from "@/composables/admin/useAdminDashboard.js";
 
 const { imageTasksState, loadImageTasks, applyImageTasksFilter, changePage } = useAdminDashboard();
 
