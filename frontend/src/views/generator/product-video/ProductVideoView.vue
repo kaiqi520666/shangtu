@@ -20,7 +20,7 @@ const settings = reactive({
 const uploadedImages = ref([]);
 const mainImageIndex = ref(0);
 const creditCosts = ref({ ...defaultVideoCreditCosts });
-const currentTaskTitle = ref("商品视频任务");
+const currentTaskTitle = ref("");
 const outputCards = ref([]);
 const genLogs = ref([]);
 
