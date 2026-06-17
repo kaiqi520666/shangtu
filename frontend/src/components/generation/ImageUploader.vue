@@ -41,6 +41,10 @@ const props = defineProps({
     type: String,
     default: "最多只能上传 3 张商品图",
   },
+  showPlaceholders: {
+    type: Boolean,
+    default: true,
+  },
 });
 
 const emit = defineEmits(["update:images", "update:mainIndex", "notify"]);
@@ -48,7 +52,10 @@ const emit = defineEmits(["update:images", "update:mainIndex", "notify"]);
 const fileInput = ref(null);
 const dragOver = ref(false);
 const previewImage = ref(null);
-const placeholderCount = computed(() => Math.max(0, props.maxCount - props.images.length - 1));
+const placeholderCount = computed(() => {
+  if (!props.showPlaceholders) return 0;
+  return Math.max(0, props.maxCount - props.images.length - 1);
+});
 
 function triggerFileInput() {
   fileInput.value?.click();

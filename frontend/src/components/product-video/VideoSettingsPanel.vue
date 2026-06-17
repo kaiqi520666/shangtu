@@ -81,6 +81,7 @@ const uploadLimitMessage = computed(() => {
   if (selectedType.value.inputMode === "first_last_frame") return "首尾帧模式只能上传 2 张图片";
   return "首帧模式只能上传 1 张图片";
 });
+const showUploadPlaceholders = computed(() => selectedType.value.inputMode === "first_last_frame");
 const estimatedCredits = computed(() =>
   getVideoCreditCost({
     resolution: props.settings.resolution,
@@ -140,6 +141,7 @@ function notifyPending(featureName) {
       alt-text="商品视频素材"
       main-badge-text="素材"
       :limit-message="uploadLimitMessage"
+      :show-placeholders="showUploadPlaceholders"
       @update:images="emit('update:uploadedImages', $event)"
       @update:main-index="emit('update:mainImageIndex', $event)"
       @notify="emit('notify', $event)"
