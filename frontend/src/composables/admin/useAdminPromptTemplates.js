@@ -80,7 +80,7 @@ export function useAdminPromptTemplates() {
     editorOpen.value = false;
   }
 
-  async function saveTemplate(formPayload = form) {
+  async function saveTemplate(formPayload) {
     const payload = {
       scenario: formPayload.scenario || null,
       purpose: formPayload.purpose,
@@ -99,9 +99,8 @@ export function useAdminPromptTemplates() {
 
     editorSaving.value = true;
     try {
-      const templateId = formPayload.id || form.id;
-      const result = templateId
-        ? await updateAdminPromptTemplate(templateId, payload)
+      const result = formPayload.id
+        ? await updateAdminPromptTemplate(formPayload.id, payload)
         : await createAdminPromptTemplate(payload);
       if (result.code !== 0) {
         toast.error(result.message || "保存提示词模板失败");

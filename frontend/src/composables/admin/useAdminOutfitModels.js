@@ -85,7 +85,7 @@ export function useAdminOutfitModels() {
     }
   }
 
-  async function saveModel(formPayload = form) {
+  async function saveModel(formPayload) {
     const modelName = String(formPayload.name || "").trim();
     if (!modelName) {
       toast.error("请填写模特名称");
@@ -93,7 +93,7 @@ export function useAdminOutfitModels() {
     }
     editorSaving.value = true;
     try {
-      const result = await updateAdminOutfitModel(formPayload.id || form.id, {
+      const result = await updateAdminOutfitModel(formPayload.id, {
         name: modelName,
         sort_order: Number(formPayload.sort_order || 0),
         active: Boolean(formPayload.active),
