@@ -74,7 +74,7 @@ export const auditActionOptions = [
   { label: "更新提示词", value: "update_prompt_template" },
   { label: "新增系统模特", value: "create_outfit_model" },
   { label: "更新系统模特", value: "update_outfit_model" },
-  { label: "停用系统模特", value: "delete_outfit_model" },
+  { label: "删除系统模特", value: "delete_outfit_model" },
 ];
 
 export const activeStatusOptions = [
@@ -120,6 +120,11 @@ export function statusLabel(status) {
 export function transactionTypeLabel(type) {
   const match = transactionTypeOptions.find((option) => option.value === type);
   return match?.label || type || "-";
+}
+
+export function orderStatusLabel(status) {
+  const match = orderStatusOptions.find((option) => option.value === status);
+  return match?.label || status || "-";
 }
 
 export function imageTaskStatusLabel(status) {

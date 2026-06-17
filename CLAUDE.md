@@ -265,6 +265,7 @@ npm run dev
 - 缺正式迁移工具（Alembic 待引入），靠 `Base.metadata.create_all`：旧库需手动补列 `ALTER TABLE image_tasks ADD COLUMN error_message TEXT, ADD COLUMN progress INTEGER DEFAULT 0, ADD COLUMN provider VARCHAR(32) DEFAULT 'toapis', ADD COLUMN provider_task_id VARCHAR(128);`（之前还需 `ALTER COLUMN prompt TYPE TEXT`）；新增父任务后还需补 `ALTER TABLE image_tasks ADD COLUMN job_id VARCHAR(36), ADD COLUMN type_id VARCHAR(50), ADD COLUMN title VARCHAR(100), ADD COLUMN sort_order INTEGER DEFAULT 0;`；提示词快照字段还需补 `ALTER TABLE image_tasks ADD COLUMN IF NOT EXISTS system_prompt_snapshot TEXT, ADD COLUMN IF NOT EXISTS task_prompt_snapshot TEXT, ADD COLUMN IF NOT EXISTS user_prompt TEXT, ADD COLUMN IF NOT EXISTS prompt_template_refs_json TEXT;`；重新生成保留历史需补 `ALTER TABLE image_tasks ADD COLUMN IF NOT EXISTS replaced_by_task_id VARCHAR(36);`；单图参数快照需补 `ALTER TABLE image_tasks ADD COLUMN IF NOT EXISTS settings_snapshot_json TEXT;`；按分辨率计费需补 `ALTER TABLE image_tasks ADD COLUMN IF NOT EXISTS credit_cost INTEGER NOT NULL DEFAULT 1;`；`users.role/status/disabled_at` 启动时由 `ensure_runtime_schema()` 自动补齐；新表 `generation_jobs` / `prompt_templates` / `credit_orders` / `credit_transactions` / `admin_audit_logs` 由 `create_all` 自动建
 - 详情图 / 穿搭工作台的"AI 帮写"和"批量生成"仍 Mock，待对接 `/image/analyze` 和 `/image/generate`
 - DashScope 模型 `qwen3.6-flash` 通过 `enable_thinking=false` 关闭思考模式；切模型时记得复核该参数兼容性
+- 系统模特 `DELETE /admin/outfit-models/{id}` 物理删除 DB 记录但不清理 OSS 图片，`system/outfit-models/` 下的孤立文件需要后续人工或脚本定期清理
 
 ---
 

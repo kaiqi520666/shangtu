@@ -70,7 +70,3 @@ export function uploadAdminOutfitModel({ file, name, sortOrder }) {
 export function updateAdminOutfitModel(modelId, payload) {
   return request.patch(`/admin/outfit-models/${modelId}`, payload, { timeout: 15000 });
 }
-
-export function deleteAdminOutfitModel(modelId) {
-  return request.delete(`/admin/outfit-models/${modelId}`, { timeout: 15000 });
-}

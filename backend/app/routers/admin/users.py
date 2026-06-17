@@ -52,7 +52,8 @@ async def update_user(
     current_admin: User = Depends(get_current_super_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    target = await db.get(User, user_id)
+    result = await db.execute(select(User).where(User.id == user_id).with_for_update())
+    target = result.scalar_one_or_none()
     if not target:
         return fail("用户不存在")
     old_role = target.role
@@ -126,7 +127,7 @@ async def adjust_user_credits(
         type="admin_adjust",
         credits_delta=req.amount,
         balance_after=target.credits,
-        note=req.note.strip(),
+        note=req.note,
     )
     db.add(tx)
     db.add(
@@ -139,7 +140,7 @@ async def adjust_user_credits(
                 "amount": req.amount,
                 "old_credits": old_credits,
                 "new_credits": target.credits,
-                "note": req.note.strip(),
+                "note": req.note,
             },
         )
     )

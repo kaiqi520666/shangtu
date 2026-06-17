@@ -1,5 +1,5 @@
 <script setup>
-import { formatMoney, formatTime, orderStatusOptions } from "@/constants/admin.js";
+import { formatMoney, formatTime, orderStatusLabel, orderStatusOptions } from "@/constants/admin.js";
 import AppSelect from "@/components/ui/AppSelect.vue";
 import AdminPagination from "./AdminPagination.vue";
 
@@ -54,7 +54,7 @@ const emit = defineEmits(["apply-filter", "change-page"]);
               <p class="mt-0.5 text-primary">{{ order.credits }} 点</p>
             </td>
             <td class="px-4 py-3 font-bold text-slate-800">{{ formatMoney(order.amount_cents) }}</td>
-            <td class="px-4 py-3 text-slate-600">{{ order.status }}</td>
+            <td class="px-4 py-3 text-slate-600">{{ orderStatusLabel(order.status) }}</td>
             <td class="px-4 py-3 text-slate-500">{{ formatTime(order.paid_at || order.created_at) }}</td>
           </tr>
         </tbody>

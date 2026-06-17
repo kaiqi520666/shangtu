@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 RoleValue = Literal["user", "super_admin"]
 StatusValue = Literal["active", "disabled"]
@@ -14,6 +14,14 @@ class UpdateUserRequest(BaseModel):
 class AdjustCreditsRequest(BaseModel):
     amount: int = Field(..., ge=-1000000, le=1000000)
     note: str = Field(..., min_length=1, max_length=255)
+
+    @field_validator("note")
+    @classmethod
+    def note_not_blank(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("备注不能为空")
+        return cleaned
 
 
 class RechargePackageConfig(BaseModel):

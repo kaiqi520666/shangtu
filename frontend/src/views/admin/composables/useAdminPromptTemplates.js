@@ -137,19 +137,27 @@ export function useAdminPromptTemplates() {
   }
 
   async function toggleTemplate(template) {
-    Object.assign(form, {
-      id: template.id,
-      scenario: template.scenario || "",
-      purpose: template.purpose || "image_generate",
-      platform: template.platform || "",
-      type_id: template.type_id || "",
-      model: template.model || "gpt-image-2",
-      name: template.name || "",
-      content: template.content || "",
-      version: template.version || 1,
-      active: !template.active,
-    });
-    await saveTemplate();
+    try {
+      const result = await updateAdminPromptTemplate(template.id, {
+        scenario: template.scenario || null,
+        purpose: template.purpose,
+        platform: template.platform || null,
+        type_id: template.type_id || null,
+        model: template.model,
+        name: template.name,
+        content: template.content,
+        version: Number(template.version || 1),
+        active: !template.active,
+      });
+      if (result.code !== 0) {
+        toast.error(result.message || "更新提示词模板失败");
+        return;
+      }
+      toast.success(template.active ? "提示词模板已停用" : "提示词模板已启用");
+      await loadTemplates();
+    } catch {
+      toast.error("更新提示词模板失败");
+    }
   }
 
   return {

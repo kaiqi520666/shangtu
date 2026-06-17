@@ -147,8 +147,8 @@ async def delete_system_outfit_model(
     if not model:
         return fail("系统模特不存在")
 
-    model.active = False
-    model.updated_at = utc_now()
+    # 物理删除 DB 记录，不删 OSS 文件。当前前端未开放此入口，统一用 PATCH active=false 停用。
+    await db.delete(model)
     db.add(
         audit_log(
             current_admin,

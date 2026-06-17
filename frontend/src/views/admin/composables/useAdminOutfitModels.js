@@ -1,6 +1,5 @@
 import { reactive, ref } from "vue";
 import {
-  deleteAdminOutfitModel,
   getAdminOutfitModels,
   updateAdminOutfitModel,
   uploadAdminOutfitModel,
@@ -146,13 +145,17 @@ export function useAdminOutfitModels() {
   }
 
   async function toggleModel(model) {
-    const result = await updateAdminOutfitModel(model.id, { active: !model.active });
-    if (result.code !== 0) {
-      toast.error(result.message || "更新系统模特失败");
-      return;
+    try {
+      const result = await updateAdminOutfitModel(model.id, { active: !model.active });
+      if (result.code !== 0) {
+        toast.error(result.message || "更新系统模特失败");
+        return;
+      }
+      toast.success(model.active ? "系统模特已停用" : "系统模特已启用");
+      await loadModels();
+    } catch {
+      toast.error("更新系统模特失败");
     }
-    toast.success(model.active ? "系统模特已停用" : "系统模特已启用");
-    await loadModels();
   }
 
   async function deleteModel(model) {
@@ -164,13 +167,17 @@ export function useAdminOutfitModels() {
       tone: "danger",
     });
     if (!ok) return;
-    const result = await deleteAdminOutfitModel(model.id);
-    if (result.code !== 0) {
-      toast.error(result.message || "停用系统模特失败");
-      return;
+    try {
+      const result = await updateAdminOutfitModel(model.id, { active: false });
+      if (result.code !== 0) {
+        toast.error(result.message || "停用系统模特失败");
+        return;
+      }
+      toast.success("系统模特已停用");
+      await loadModels();
+    } catch {
+      toast.error("停用系统模特失败");
     }
-    toast.success("系统模特已停用");
-    await loadModels();
   }
 
   return {
