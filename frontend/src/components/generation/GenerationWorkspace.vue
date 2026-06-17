@@ -77,6 +77,10 @@ defineProps({
     type: Array,
     default: () => [],
   },
+  emptyMediaType: {
+    type: String,
+    default: 'image',
+  },
   loadingTitle: {
     type: String,
     default: 'AI 图片生成中',
@@ -194,6 +198,7 @@ const emit = defineEmits([
         :title="emptyTitle"
         :subtitle="emptySubtitle"
         :slides="emptySlides"
+        :media-type="emptyMediaType"
       />
 
       <div v-else-if="outputCards.length > 0" class="space-y-4">
