@@ -3,7 +3,7 @@ import { reactive, ref } from "vue";
 import GeneratorLayout from "@/components/layout/GeneratorLayout.vue";
 import VideoGenerationWorkspace from "@/components/product-video/VideoGenerationWorkspace.vue";
 import VideoSettingsPanel from "@/components/product-video/VideoSettingsPanel.vue";
-import { defaultVideoCreditCosts, getVideoDemoType, videoDemoTypes } from "@/constants/productVideo.js";
+import { defaultVideoCreditCosts, videoDemoTypes } from "@/constants/productVideo.js";
 import { useToast } from "@/composables/useToast.js";
 
 const toast = useToast();
@@ -23,16 +23,6 @@ const creditCosts = ref({ ...defaultVideoCreditCosts });
 
 function updateSettings(nextSettings) {
   Object.assign(settings, nextSettings);
-}
-
-function selectVideoType(typeId) {
-  const nextType = getVideoDemoType(typeId);
-  Object.assign(settings, {
-    videoType: typeId,
-    inputMode: nextType.inputMode,
-  });
-  uploadedImages.value = [];
-  mainImageIndex.value = 0;
 }
 
 function showNotice(message) {
@@ -59,9 +49,6 @@ function handleGenerate() {
     />
 
     <VideoGenerationWorkspace
-      :settings="settings"
-      :credit-costs="creditCosts"
-      @select-type="selectVideoType"
       @notify="showNotice"
     />
   </GeneratorLayout>

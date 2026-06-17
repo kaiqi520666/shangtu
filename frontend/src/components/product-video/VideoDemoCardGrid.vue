@@ -3,15 +3,6 @@ import { ref } from "vue";
 import { Play, Volume2 } from "lucide-vue-next";
 import { videoDemoTypes } from "@/constants/productVideo.js";
 
-const props = defineProps({
-  activeType: {
-    type: String,
-    required: true,
-  },
-});
-
-const emit = defineEmits(["select"]);
-
 const playingType = ref("");
 
 function togglePlay(typeId) {
@@ -25,11 +16,10 @@ function togglePlay(typeId) {
       v-for="item in videoDemoTypes"
       :key="item.typeId"
       class="group cursor-pointer"
-      @click="emit('select', item.typeId)"
+      @click="togglePlay(item.typeId)"
     >
       <div
-        class="relative aspect-[9/16] overflow-hidden rounded-2xl border bg-slate-100 shadow-sm transition-all"
-        :class="activeType === item.typeId ? 'border-primary ring-2 ring-primary/20' : 'border-slate-200 group-hover:-translate-y-1 group-hover:shadow-md'"
+        class="relative aspect-[9/16] overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 shadow-sm transition-all group-hover:-translate-y-1 group-hover:shadow-md"
       >
         <video
           v-if="playingType === item.typeId"
@@ -52,12 +42,6 @@ function togglePlay(typeId) {
           <Play v-if="playingType !== item.typeId" class="h-4 w-4 fill-current" />
           <Volume2 v-else class="h-4 w-4" />
         </button>
-        <span
-          v-if="activeType === item.typeId"
-          class="absolute right-3 top-3 rounded-full bg-primary px-2.5 py-1 text-xs font-black text-white shadow"
-        >
-          当前选择
-        </span>
       </div>
       <div class="mt-3 text-center">
         <h3 class="text-base font-black text-slate-900">{{ item.title }}</h3>
