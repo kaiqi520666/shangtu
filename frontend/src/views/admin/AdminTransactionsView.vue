@@ -1,9 +1,9 @@
 <script setup>
 import { onMounted } from "vue";
 import AdminTransactionsPanel from "@/components/admin/AdminTransactionsPanel.vue";
-import { useAdminDashboard } from "@/composables/admin/useAdminDashboard.js";
+import { useAdminTransactions } from "@/composables/admin/useAdminTransactions.js";
 
-const { transactionsState, loadTransactions, applyTransactionsFilter, changePage } = useAdminDashboard();
+const { transactionsState, loadTransactions, applyTransactionsFilter, changePage } = useAdminTransactions();
 
 onMounted(() => {
   loadTransactions();

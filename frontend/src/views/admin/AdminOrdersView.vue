@@ -1,9 +1,9 @@
 <script setup>
 import { onMounted } from "vue";
 import AdminOrdersPanel from "@/components/admin/AdminOrdersPanel.vue";
-import { useAdminDashboard } from "@/composables/admin/useAdminDashboard.js";
+import { useAdminOrders } from "@/composables/admin/useAdminOrders.js";
 
-const { ordersState, loadOrders, applyOrdersFilter, changePage } = useAdminDashboard();
+const { ordersState, loadOrders, applyOrdersFilter, changePage } = useAdminOrders();
 
 onMounted(() => {
   loadOrders();

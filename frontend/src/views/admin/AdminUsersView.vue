@@ -2,7 +2,7 @@
 import { onMounted } from "vue";
 import AdjustCreditsModal from "@/components/admin/AdjustCreditsModal.vue";
 import AdminUsersPanel from "@/components/admin/AdminUsersPanel.vue";
-import { useAdminDashboard } from "@/composables/admin/useAdminDashboard.js";
+import { useAdminUsers } from "@/composables/admin/useAdminUsers.js";
 
 const {
   usersState,
@@ -17,7 +17,7 @@ const {
   closeAdjustModal,
   submitAdjustCredits,
   changePage,
-} = useAdminDashboard();
+} = useAdminUsers();
 
 onMounted(() => {
   loadUsers();

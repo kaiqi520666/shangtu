@@ -1,7 +1,7 @@
 <script setup>
 import { onMounted } from "vue";
 import AdminSettingsPanel from "@/components/admin/AdminSettingsPanel.vue";
-import { useAdminDashboard } from "@/composables/admin/useAdminDashboard.js";
+import { useAdminSettings } from "@/composables/admin/useAdminSettings.js";
 
 const {
   settingsState,
@@ -9,7 +9,7 @@ const {
   saveSettings,
   addRechargePackage,
   removeRechargePackage,
-} = useAdminDashboard();
+} = useAdminSettings();
 
 onMounted(() => {
   loadSettings();
