@@ -1,11 +1,12 @@
 <script setup>
-import { HelpCircle, Image, Images, PackageCheck, ShieldCheck, Sparkles, WandSparkles } from 'lucide-vue-next'
+import { Clapperboard, HelpCircle, Image, Images, PackageCheck, ShieldCheck, Sparkles, WandSparkles } from 'lucide-vue-next'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth.js'
 
 const mainNavs = [
   { name: '商品套图', desc: '白底图、场景图、卖点图、细节图一键成套', icon: PackageCheck, to: '/generator/product-suite' },
   { name: '商品详情图', desc: 'AI 批量详情图排版生成模块', icon: Image, to: '/generator/product-image' },
+  { name: '商品视频', desc: '商品图一键生成电商短视频素材', icon: Clapperboard, to: '/generator/product-video' },
   { name: '服饰穿搭', desc: '真人模特试衣与穿搭场景生成模块', icon: WandSparkles, to: '/generator/outfit' },
   { name: '自由生图', desc: '输入提示词，自由生成或参考图片改图', icon: Sparkles, to: '/generator/free-image' },
   { name: '资产库', desc: '管理所有已生成的图片资源', icon: Images, to: '/generator/assets' },

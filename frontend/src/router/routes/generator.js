@@ -14,6 +14,11 @@ export const generatorRoutes = [
     component: () => import("@/views/generator/product-image/ProductImageView.vue"),
   },
   {
+    path: "/generator/product-video/:jobId?",
+    name: "product-video",
+    component: () => import("@/views/generator/product-video/ProductVideoView.vue"),
+  },
+  {
     path: "/generator/outfit/:jobId?",
     name: "outfit",
     component: () => import("@/views/generator/outfit/OutfitView.vue"),
