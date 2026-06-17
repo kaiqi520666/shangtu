@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from "vue";
+import { ref } from "vue";
 import { Play, Volume2 } from "lucide-vue-next";
 import { videoDemoTypes } from "@/constants/productVideo.js";
 
@@ -13,11 +13,6 @@ const props = defineProps({
 const emit = defineEmits(["select"]);
 
 const playingType = ref("");
-const orderedTypes = computed(() => {
-  const active = videoDemoTypes.find((item) => item.typeId === props.activeType);
-  const rest = videoDemoTypes.filter((item) => item.typeId !== props.activeType);
-  return active ? [active, ...rest] : videoDemoTypes;
-});
 
 function togglePlay(typeId) {
   playingType.value = playingType.value === typeId ? "" : typeId;
@@ -27,7 +22,7 @@ function togglePlay(typeId) {
 <template>
   <div class="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
     <article
-      v-for="item in orderedTypes"
+      v-for="item in videoDemoTypes"
       :key="item.typeId"
       class="group cursor-pointer"
       @click="emit('select', item.typeId)"

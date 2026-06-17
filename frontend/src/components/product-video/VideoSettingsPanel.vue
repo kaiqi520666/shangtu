@@ -54,12 +54,32 @@ const uploadAddText = computed(() => {
   if (selectedType.value.inputMode === "first_last_frame") {
     return props.uploadedImages.length === 0 ? "添加开始图" : "添加结束图";
   }
-  return "添加素材";
+  if (selectedType.value.inputMode === "reference_images") return "添加参考图";
+  return "添加首帧图";
+});
+const uploadHintText = computed(() => {
+  if (selectedType.value.inputMode === "reference_images") return "支持 1-9 张";
+  if (selectedType.value.inputMode === "first_last_frame") return "必须上传 2 张";
+  return "必须上传 1 张";
 });
 const uploadRoleText = computed(() => {
   if (selectedType.value.inputMode === "first_frame") return "当前将作为视频开头画面生成";
   if (selectedType.value.inputMode === "first_last_frame") return "当前将生成从开始图到结束图的变化视频";
   return "当前将参考多张图片生成视频";
+});
+const uploadRequirementText = computed(() => {
+  if (selectedType.value.inputMode === "first_frame") {
+    return "上传 1 张商品或人物首帧图，系统会从这张画面开始生成视频。";
+  }
+  if (selectedType.value.inputMode === "first_last_frame") {
+    return "上传 2 张图片：第一张作为开始画面，第二张作为结束画面。";
+  }
+  return "至少上传 1 张产品参考图，最多 9 张；图片越完整，产品还原越稳定。";
+});
+const uploadLimitMessage = computed(() => {
+  if (selectedType.value.inputMode === "reference_images") return "参考图最多只能上传 9 张";
+  if (selectedType.value.inputMode === "first_last_frame") return "首尾帧模式只能上传 2 张图片";
+  return "首帧模式只能上传 1 张图片";
 });
 const estimatedCredits = computed(() =>
   getVideoCreditCost({
@@ -75,7 +95,11 @@ const generateDisabled = computed(() => {
 });
 const generateText = computed(() => {
   if (props.uploadedImages.some((img) => img?.uploading)) return "素材上传中...";
-  if (generateDisabled.value) return selectedType.value.inputMode === "first_last_frame" ? "请上传开始图和结束图" : "请先上传素材";
+  if (generateDisabled.value) {
+    if (selectedType.value.inputMode === "first_last_frame") return "请上传开始图和结束图";
+    if (selectedType.value.inputMode === "reference_images") return "请至少上传 1 张参考图";
+    return "请上传 1 张首帧图";
+  }
   return `生成视频 · ${estimatedCredits.value || "-"} 积分`;
 });
 
@@ -112,18 +136,19 @@ function notifyPending(featureName) {
       :title="selectedType.uploadTitle"
       :max-count="maxUploadCount"
       :add-text="uploadAddText"
-      :hint-text="selectedType.uploadHint"
+      :hint-text="uploadHintText"
       alt-text="商品视频素材"
       main-badge-text="素材"
-      :limit-message="`最多只能上传 ${maxUploadCount} 张素材`"
+      :limit-message="uploadLimitMessage"
       @update:images="emit('update:uploadedImages', $event)"
       @update:main-index="emit('update:mainImageIndex', $event)"
       @notify="emit('notify', $event)"
     />
 
     <section class="space-y-4 border-b border-slate-100 p-5">
-      <div class="rounded-xl border border-primary/15 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary">
-        {{ uploadRoleText }}
+      <div class="space-y-1.5 rounded-xl border border-primary/15 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary">
+        <p>{{ uploadRoleText }}</p>
+        <p class="font-medium leading-relaxed text-primary/80">{{ uploadRequirementText }}</p>
       </div>
 
       <div>
