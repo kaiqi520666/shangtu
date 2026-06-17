@@ -9,7 +9,6 @@ const {
   adjustModalOpen,
   adjustTarget,
   adjustSaving,
-  adjustForm,
   loadUsers,
   applyUsersFilter,
   changeUserRole,
@@ -37,7 +36,6 @@ onMounted(() => {
   <AdjustCreditsModal
     :open="adjustModalOpen"
     :target="adjustTarget"
-    :form="adjustForm"
     :saving="adjustSaving"
     @close="closeAdjustModal"
     @submit="submitAdjustCredits"

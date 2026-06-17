@@ -1,15 +1,12 @@
 <script setup>
+import { reactive, ref, watch } from "vue";
 import { activeStatusLabel, activeStatusOptions, formatTime } from "@/constants/admin.js";
 import AppCheckbox from "@/components/ui/AppCheckbox.vue";
 import AppSelect from "@/components/ui/AppSelect.vue";
 import AdminPagination from "./AdminPagination.vue";
 
-defineProps({
+const props = defineProps({
   state: {
-    type: Object,
-    required: true,
-  },
-  uploadForm: {
     type: Object,
     required: true,
   },
@@ -17,9 +14,51 @@ defineProps({
     type: Boolean,
     default: false,
   },
+  uploadResetKey: {
+    type: Number,
+    default: 0,
+  },
 });
 
-const emit = defineEmits(["apply-filter", "change-page", "file-change", "upload", "edit", "toggle", "delete"]);
+const emit = defineEmits(["apply-filter", "change-page", "upload", "edit", "toggle", "delete"]);
+
+const fileInput = ref(null);
+const uploadDraft = reactive({
+  name: "",
+  sort_order: 0,
+  file: null,
+});
+
+watch(
+  () => props.uploadResetKey,
+  () => {
+    resetUploadForm();
+  },
+);
+
+function handleFileChange(file) {
+  uploadDraft.file = file;
+  if (!uploadDraft.name && file?.name) {
+    uploadDraft.name = file.name.replace(/\.[^.]+$/, "");
+  }
+}
+
+function resetUploadForm() {
+  uploadDraft.name = "";
+  uploadDraft.sort_order = 0;
+  uploadDraft.file = null;
+  if (fileInput.value) {
+    fileInput.value.value = "";
+  }
+}
+
+function submitUpload() {
+  emit("upload", {
+    name: uploadDraft.name,
+    sortOrder: uploadDraft.sort_order,
+    file: uploadDraft.file,
+  });
+}
 </script>
 
 <template>
@@ -32,10 +71,10 @@ const emit = defineEmits(["apply-filter", "change-page", "file-change", "upload"
         </div>
       </div>
       <div class="grid gap-3 md:grid-cols-[1fr_1fr_0.6fr_auto]">
-        <input v-model="uploadForm.name" type="text" class="rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-primary" placeholder="模特名称" />
-        <input type="file" accept="image/*" class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-2.5 file:py-1 file:text-xs file:font-bold file:text-slate-600" @change="emit('file-change', $event.target.files?.[0] || null)" />
-        <input v-model.number="uploadForm.sort_order" type="number" class="rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-primary" placeholder="排序" />
-        <button type="button" class="rounded-lg bg-primary px-4 py-2 text-xs font-bold text-white disabled:opacity-50" :disabled="uploadSaving" @click="emit('upload')">
+        <input v-model="uploadDraft.name" type="text" class="rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-primary" placeholder="模特名称" />
+        <input ref="fileInput" type="file" accept="image/*" class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-2.5 file:py-1 file:text-xs file:font-bold file:text-slate-600" @change="handleFileChange($event.target.files?.[0] || null)" />
+        <input v-model.number="uploadDraft.sort_order" type="number" class="rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-primary" placeholder="排序" />
+        <button type="button" class="rounded-lg bg-primary px-4 py-2 text-xs font-bold text-white disabled:opacity-50" :disabled="uploadSaving" @click="submitUpload">
           {{ uploadSaving ? '上传中...' : '上传' }}
         </button>
       </div>

@@ -33,10 +33,6 @@ const settingsState = reactive({
 const adjustModalOpen = ref(false);
 const adjustTarget = ref(null);
 const adjustSaving = ref(false);
-const adjustForm = reactive({
-  amount: "",
-  note: "",
-});
 
 const overviewCards = computed(() => {
   const data = overview.value || {};
@@ -70,116 +66,83 @@ export function useAdminDashboard() {
     }
   }
 
-  async function loadUsers() {
-    usersState.loading = true;
+  async function loadPage(state, apiFn, filters, errorMessage) {
+    state.loading = true;
     try {
-      const result = await getAdminUsers({
-        page: usersState.page,
-        page_size: usersState.pageSize,
-        keyword: usersState.keyword || undefined,
-        role: usersState.role || undefined,
-        status: usersState.status || undefined,
+      const result = await apiFn({
+        page: state.page,
+        page_size: state.pageSize,
+        keyword: state.keyword || undefined,
+        ...filters,
       });
       if (result.code !== 0) {
-        toast.error(result.message || "加载用户失败");
+        toast.error(result.message || errorMessage);
         return;
       }
-      usersState.items = result.data?.items || [];
-      usersState.total = result.data?.total || 0;
+      state.items = result.data?.items || [];
+      state.total = result.data?.total || 0;
     } catch {
-      toast.error("加载用户失败");
+      toast.error(errorMessage);
     } finally {
-      usersState.loading = false;
+      state.loading = false;
     }
+  }
+
+  async function loadUsers() {
+    await loadPage(
+      usersState,
+      getAdminUsers,
+      {
+        role: usersState.role || undefined,
+        status: usersState.status || undefined,
+      },
+      "加载用户失败",
+    );
   }
 
   async function loadOrders() {
-    ordersState.loading = true;
-    try {
-      const result = await getAdminCreditOrders({
-        page: ordersState.page,
-        page_size: ordersState.pageSize,
-        keyword: ordersState.keyword || undefined,
+    await loadPage(
+      ordersState,
+      getAdminCreditOrders,
+      {
         status: ordersState.status || undefined,
-      });
-      if (result.code !== 0) {
-        toast.error(result.message || "加载订单失败");
-        return;
-      }
-      ordersState.items = result.data?.items || [];
-      ordersState.total = result.data?.total || 0;
-    } catch {
-      toast.error("加载订单失败");
-    } finally {
-      ordersState.loading = false;
-    }
+      },
+      "加载订单失败",
+    );
   }
 
   async function loadTransactions() {
-    transactionsState.loading = true;
-    try {
-      const result = await getAdminCreditTransactions({
-        page: transactionsState.page,
-        page_size: transactionsState.pageSize,
-        keyword: transactionsState.keyword || undefined,
+    await loadPage(
+      transactionsState,
+      getAdminCreditTransactions,
+      {
         type: transactionsState.type || undefined,
-      });
-      if (result.code !== 0) {
-        toast.error(result.message || "加载流水失败");
-        return;
-      }
-      transactionsState.items = result.data?.items || [];
-      transactionsState.total = result.data?.total || 0;
-    } catch {
-      toast.error("加载流水失败");
-    } finally {
-      transactionsState.loading = false;
-    }
+      },
+      "加载流水失败",
+    );
   }
 
   async function loadImageTasks() {
-    imageTasksState.loading = true;
-    try {
-      const result = await getAdminImageTasks({
-        page: imageTasksState.page,
-        page_size: imageTasksState.pageSize,
-        keyword: imageTasksState.keyword || undefined,
+    await loadPage(
+      imageTasksState,
+      getAdminImageTasks,
+      {
         status: imageTasksState.status || undefined,
         scenario: imageTasksState.scenario || undefined,
-      });
-      if (result.code !== 0) {
-        toast.error(result.message || "加载生图任务失败");
-        return;
-      }
-      imageTasksState.items = result.data?.items || [];
-      imageTasksState.total = result.data?.total || 0;
-    } catch {
-      toast.error("加载生图任务失败");
-    } finally {
-      imageTasksState.loading = false;
-    }
+      },
+      "加载生图任务失败",
+    );
   }
 
   async function loadAuditLogs() {
-    auditLogsState.loading = true;
-    try {
-      const result = await getAdminAuditLogs({
-        page: auditLogsState.page,
-        page_size: auditLogsState.pageSize,
-        keyword: auditLogsState.keyword || undefined,
+    await loadPage(
+      auditLogsState,
+      getAdminAuditLogs,
+      {
         action: auditLogsState.action || undefined,
-      });
-      if (result.code !== 0) {
-        toast.error(result.message || "加载审计日志失败");
-        return;
-      }
-      auditLogsState.items = result.data?.items || [];
-      auditLogsState.total = result.data?.total || 0;
-    } catch {
-      toast.error("加载审计日志失败");
-    } finally {
-      auditLogsState.loading = false;
-    }
+      },
+      "加载审计日志失败",
+    );
   }
 
   async function loadSettings() {
@@ -313,8 +276,6 @@ export function useAdminDashboard() {
 
   function openAdjustModal(user) {
     adjustTarget.value = user;
-    adjustForm.amount = "";
-    adjustForm.note = "";
     adjustModalOpen.value = true;
   }
 
@@ -322,13 +283,14 @@ export function useAdminDashboard() {
     adjustModalOpen.value = false;
   }
 
-  async function submitAdjustCredits() {
-    const amount = Number(adjustForm.amount);
+  async function submitAdjustCredits(payload) {
+    const amount = Number(payload?.amount);
     if (!Number.isInteger(amount) || amount === 0) {
       toast.error("请输入非 0 整数积分");
       return;
     }
-    if (!adjustForm.note.trim()) {
+    const note = String(payload?.note || "").trim();
+    if (!note) {
       toast.error("请填写调整备注");
       return;
     }
@@ -336,7 +298,7 @@ export function useAdminDashboard() {
     try {
       const result = await adjustAdminUserCredits(adjustTarget.value.id, {
         amount,
-        note: adjustForm.note.trim(),
+        note,
       });
       if (result.code !== 0) {
         toast.error(result.message || "调整积分失败");
@@ -373,7 +335,6 @@ export function useAdminDashboard() {
     adjustModalOpen,
     adjustTarget,
     adjustSaving,
-    adjustForm,
     loadOverview,
     loadUsers,
     loadOrders,

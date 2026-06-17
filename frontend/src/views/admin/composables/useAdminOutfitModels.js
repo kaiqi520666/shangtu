@@ -23,16 +23,12 @@ export function useAdminOutfitModels() {
   const editorOpen = ref(false);
   const editorSaving = ref(false);
   const uploadSaving = ref(false);
+  const uploadResetKey = ref(0);
   const form = reactive({
     id: "",
     name: "",
     sort_order: 0,
     active: true,
-  });
-  const uploadForm = reactive({
-    name: "",
-    sort_order: 0,
-    file: null,
   });
 
   async function loadModels() {
@@ -83,33 +79,24 @@ export function useAdminOutfitModels() {
     editorOpen.value = false;
   }
 
-  function setUploadFile(file) {
-    uploadForm.file = file;
-    if (!uploadForm.name && file?.name) {
-      uploadForm.name = file.name.replace(/\.[^.]+$/, "");
-    }
-  }
-
-  async function uploadModel() {
-    if (!uploadForm.file) {
+  async function uploadModel(payload) {
+    if (!payload?.file) {
       toast.error("请选择模特图片");
       return;
     }
     uploadSaving.value = true;
     try {
       const result = await uploadAdminOutfitModel({
-        file: uploadForm.file,
-        name: uploadForm.name.trim(),
-        sortOrder: uploadForm.sort_order,
+        file: payload.file,
+        name: String(payload.name || "").trim(),
+        sortOrder: payload.sortOrder,
       });
       if (result.code !== 0) {
         toast.error(result.message || "上传系统模特失败");
         return;
       }
       toast.success("系统模特已上传");
-      uploadForm.name = "";
-      uploadForm.sort_order = 0;
-      uploadForm.file = null;
+      uploadResetKey.value += 1;
       await loadModels();
     } catch {
       toast.error("上传系统模特失败");
@@ -118,17 +105,18 @@ export function useAdminOutfitModels() {
     }
   }
 
-  async function saveModel() {
-    if (!form.name.trim()) {
+  async function saveModel(formPayload = form) {
+    const modelName = String(formPayload.name || "").trim();
+    if (!modelName) {
       toast.error("请填写模特名称");
       return;
     }
     editorSaving.value = true;
     try {
-      const result = await updateAdminOutfitModel(form.id, {
-        name: form.name.trim(),
-        sort_order: Number(form.sort_order || 0),
-        active: Boolean(form.active),
+      const result = await updateAdminOutfitModel(formPayload.id || form.id, {
+        name: modelName,
+        sort_order: Number(formPayload.sort_order || 0),
+        active: Boolean(formPayload.active),
       });
       if (result.code !== 0) {
         toast.error(result.message || "保存系统模特失败");
@@ -183,16 +171,15 @@ export function useAdminOutfitModels() {
   return {
     state,
     form,
-    uploadForm,
     editorOpen,
     editorSaving,
     uploadSaving,
+    uploadResetKey,
     loadModels,
     applyFilter,
     changePage,
     openEditModal,
     closeEditor,
-    setUploadFile,
     uploadModel,
     saveModel,
     toggleModel,

@@ -100,17 +100,17 @@ export function useAdminPromptTemplates() {
     editorOpen.value = false;
   }
 
-  async function saveTemplate() {
+  async function saveTemplate(formPayload = form) {
     const payload = {
-      scenario: form.scenario || null,
-      purpose: form.purpose,
-      platform: form.platform || null,
-      type_id: form.type_id || null,
-      model: String(form.model || "").trim(),
-      name: String(form.name || "").trim(),
-      content: String(form.content || "").trim(),
-      version: Number(form.version || 1),
-      active: Boolean(form.active),
+      scenario: formPayload.scenario || null,
+      purpose: formPayload.purpose,
+      platform: formPayload.platform || null,
+      type_id: formPayload.type_id || null,
+      model: String(formPayload.model || "").trim(),
+      name: String(formPayload.name || "").trim(),
+      content: String(formPayload.content || "").trim(),
+      version: Number(formPayload.version || 1),
+      active: Boolean(formPayload.active),
     };
     if (!payload.name || !payload.content || !payload.purpose || !payload.model) {
       toast.error("请填写名称、用途、模型和提示词内容");
@@ -119,8 +119,9 @@ export function useAdminPromptTemplates() {
 
     editorSaving.value = true;
     try {
-      const result = form.id
-        ? await updateAdminPromptTemplate(form.id, payload)
+      const templateId = formPayload.id || form.id;
+      const result = templateId
+        ? await updateAdminPromptTemplate(templateId, payload)
         : await createAdminPromptTemplate(payload);
       if (result.code !== 0) {
         toast.error(result.message || "保存提示词模板失败");

@@ -7,16 +7,15 @@ import { useAdminOutfitModels } from "./composables/useAdminOutfitModels.js";
 const {
   state,
   form,
-  uploadForm,
   editorOpen,
   editorSaving,
   uploadSaving,
+  uploadResetKey,
   loadModels,
   applyFilter,
   changePage,
   openEditModal,
   closeEditor,
-  setUploadFile,
   uploadModel,
   saveModel,
   toggleModel,
@@ -31,11 +30,10 @@ onMounted(() => {
 <template>
   <AdminOutfitModelsPanel
     :state="state"
-    :upload-form="uploadForm"
     :upload-saving="uploadSaving"
+    :upload-reset-key="uploadResetKey"
     @apply-filter="applyFilter"
     @change-page="changePage"
-    @file-change="setUploadFile"
     @upload="uploadModel"
     @edit="openEditModal"
     @toggle="toggleModel"
