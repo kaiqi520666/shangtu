@@ -39,3 +39,38 @@ export function updateAdminSettings(payload) {
 export function getAdminAuditLogs(params = {}) {
   return request.get("/admin/audit-logs", { params, timeout: 15000 });
 }
+
+export function getAdminPromptTemplates(params = {}) {
+  return request.get("/admin/prompt-templates", { params, timeout: 15000 });
+}
+
+export function createAdminPromptTemplate(payload) {
+  return request.post("/admin/prompt-templates", payload, { timeout: 15000 });
+}
+
+export function updateAdminPromptTemplate(templateId, payload) {
+  return request.patch(`/admin/prompt-templates/${templateId}`, payload, { timeout: 15000 });
+}
+
+export function getAdminOutfitModels(params = {}) {
+  return request.get("/admin/outfit-models", { params, timeout: 15000 });
+}
+
+export function uploadAdminOutfitModel({ file, name, sortOrder }) {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("name", name || "");
+  formData.append("sort_order", String(Number(sortOrder || 0)));
+  return request.post("/admin/outfit-models/upload", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+    timeout: 60000,
+  });
+}
+
+export function updateAdminOutfitModel(modelId, payload) {
+  return request.patch(`/admin/outfit-models/${modelId}`, payload, { timeout: 15000 });
+}
+
+export function deleteAdminOutfitModel(modelId) {
+  return request.delete(`/admin/outfit-models/${modelId}`, { timeout: 15000 });
+}

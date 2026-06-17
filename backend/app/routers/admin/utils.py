@@ -11,6 +11,8 @@ from app.models import (
     CreditTransaction,
     GenerationJob,
     ImageTask,
+    OutfitModel,
+    PromptTemplate,
     User,
 )
 
@@ -86,6 +88,36 @@ def image_task_payload(
         "error_message": task.error_message,
         "archived": task.archived,
         "created_at": to_utc_iso(task.created_at),
+    }
+
+
+def prompt_template_payload(template: PromptTemplate) -> dict:
+    return {
+        "id": template.id,
+        "scenario": template.scenario,
+        "purpose": template.purpose,
+        "platform": template.platform,
+        "type_id": template.type_id,
+        "model": template.model,
+        "name": template.name,
+        "content": template.content,
+        "version": template.version,
+        "active": template.active,
+        "created_at": to_utc_iso(template.created_at),
+        "updated_at": to_utc_iso(template.updated_at),
+    }
+
+
+def outfit_model_payload(model: OutfitModel) -> dict:
+    return {
+        "id": model.id,
+        "name": model.name,
+        "image_url": model.image_url,
+        "object_key": model.object_key,
+        "sort_order": model.sort_order,
+        "active": model.active,
+        "created_at": to_utc_iso(model.created_at),
+        "updated_at": to_utc_iso(model.updated_at),
     }
 
 

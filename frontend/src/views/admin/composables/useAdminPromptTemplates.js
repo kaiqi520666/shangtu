@@ -1,0 +1,169 @@
+import { reactive, ref } from "vue";
+import {
+  createAdminPromptTemplate,
+  getAdminPromptTemplates,
+  updateAdminPromptTemplate,
+} from "@/api/admin.js";
+import { totalPages } from "@/constants/admin.js";
+import { useToast } from "@/composables/useToast.js";
+
+const emptyForm = {
+  id: "",
+  scenario: "",
+  purpose: "image_generate",
+  platform: "",
+  type_id: "",
+  model: "gpt-image-2",
+  name: "",
+  content: "",
+  version: 1,
+  active: true,
+};
+
+export function useAdminPromptTemplates() {
+  const toast = useToast();
+  const state = reactive({
+    items: [],
+    total: 0,
+    page: 1,
+    pageSize: 20,
+    keyword: "",
+    scenario: "",
+    purpose: "",
+    model: "",
+    active: "",
+    loading: false,
+  });
+  const editorOpen = ref(false);
+  const editorSaving = ref(false);
+  const form = reactive({ ...emptyForm });
+
+  async function loadTemplates() {
+    state.loading = true;
+    try {
+      const result = await getAdminPromptTemplates({
+        page: state.page,
+        page_size: state.pageSize,
+        keyword: state.keyword || undefined,
+        scenario: state.scenario || undefined,
+        purpose: state.purpose || undefined,
+        model: state.model || undefined,
+        active: state.active || undefined,
+      });
+      if (result.code !== 0) {
+        toast.error(result.message || "加载提示词模板失败");
+        return;
+      }
+      state.items = result.data?.items || [];
+      state.total = result.data?.total || 0;
+    } catch {
+      toast.error("加载提示词模板失败");
+    } finally {
+      state.loading = false;
+    }
+  }
+
+  function applyFilter() {
+    state.page = 1;
+    loadTemplates();
+  }
+
+  function changePage(direction) {
+    const nextPage = state.page + direction;
+    if (nextPage < 1 || nextPage > totalPages(state)) return;
+    state.page = nextPage;
+    loadTemplates();
+  }
+
+  function openCreateModal() {
+    Object.assign(form, { ...emptyForm });
+    editorOpen.value = true;
+  }
+
+  function openEditModal(template) {
+    Object.assign(form, {
+      id: template.id,
+      scenario: template.scenario || "",
+      purpose: template.purpose || "image_generate",
+      platform: template.platform || "",
+      type_id: template.type_id || "",
+      model: template.model || "gpt-image-2",
+      name: template.name || "",
+      content: template.content || "",
+      version: template.version || 1,
+      active: Boolean(template.active),
+    });
+    editorOpen.value = true;
+  }
+
+  function closeEditor() {
+    editorOpen.value = false;
+  }
+
+  async function saveTemplate() {
+    const payload = {
+      scenario: form.scenario || null,
+      purpose: form.purpose,
+      platform: form.platform || null,
+      type_id: form.type_id || null,
+      model: String(form.model || "").trim(),
+      name: String(form.name || "").trim(),
+      content: String(form.content || "").trim(),
+      version: Number(form.version || 1),
+      active: Boolean(form.active),
+    };
+    if (!payload.name || !payload.content || !payload.purpose || !payload.model) {
+      toast.error("请填写名称、用途、模型和提示词内容");
+      return;
+    }
+
+    editorSaving.value = true;
+    try {
+      const result = form.id
+        ? await updateAdminPromptTemplate(form.id, payload)
+        : await createAdminPromptTemplate(payload);
+      if (result.code !== 0) {
+        toast.error(result.message || "保存提示词模板失败");
+        return;
+      }
+      toast.success("提示词模板已保存");
+      editorOpen.value = false;
+      await loadTemplates();
+    } catch {
+      toast.error("保存提示词模板失败");
+    } finally {
+      editorSaving.value = false;
+    }
+  }
+
+  async function toggleTemplate(template) {
+    Object.assign(form, {
+      id: template.id,
+      scenario: template.scenario || "",
+      purpose: template.purpose || "image_generate",
+      platform: template.platform || "",
+      type_id: template.type_id || "",
+      model: template.model || "gpt-image-2",
+      name: template.name || "",
+      content: template.content || "",
+      version: template.version || 1,
+      active: !template.active,
+    });
+    await saveTemplate();
+  }
+
+  return {
+    state,
+    form,
+    editorOpen,
+    editorSaving,
+    loadTemplates,
+    applyFilter,
+    changePage,
+    openCreateModal,
+    openEditModal,
+    closeEditor,
+    saveTemplate,
+    toggleTemplate,
+  };
+}

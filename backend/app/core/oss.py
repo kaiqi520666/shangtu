@@ -48,6 +48,8 @@ def get_oss_config() -> dict[str, str]:
 def build_image_object_key(user_id: int, content_type: str, source: str = "uploads") -> str:
     extension = ALLOWED_IMAGE_TYPES[content_type]
     now = utc_now()
+    if source.startswith("system/"):
+        return f"{source}/{now:%Y/%m}/{uuid.uuid4().hex}.{extension}"
     return f"{source}/{user_id}/{now:%Y/%m}/{uuid.uuid4().hex}.{extension}"
 
 

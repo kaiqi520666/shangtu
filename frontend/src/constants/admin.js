@@ -5,6 +5,8 @@ export const adminTabs = [
   { key: "transactions", label: "流水", to: "/admin/transactions" },
   { key: "imageTasks", label: "生图任务", to: "/admin/image-tasks" },
   { key: "settings", label: "系统配置", to: "/admin/settings" },
+  { key: "promptTemplates", label: "提示词", to: "/admin/prompt-templates" },
+  { key: "outfitModels", label: "模特库", to: "/admin/outfit-models" },
   { key: "auditLogs", label: "审计日志", to: "/admin/audit-logs" },
 ];
 
@@ -52,11 +54,46 @@ export const scenarioOptions = [
   { label: "自由生图", value: "free_image" },
 ];
 
+export const promptScenarioOptions = [
+  { label: "全部场景", value: "" },
+  { label: "通用", value: "__global__" },
+  ...scenarioOptions.filter((option) => option.value),
+];
+
+export const promptEditorScenarioOptions = [
+  { label: "通用", value: "" },
+  ...scenarioOptions.filter((option) => option.value),
+];
+
 export const auditActionOptions = [
   { label: "全部操作", value: "" },
   { label: "更新用户", value: "update_user" },
   { label: "调整积分", value: "adjust_credits" },
   { label: "更新配置", value: "update_settings" },
+  { label: "新增提示词", value: "create_prompt_template" },
+  { label: "更新提示词", value: "update_prompt_template" },
+  { label: "新增系统模特", value: "create_outfit_model" },
+  { label: "更新系统模特", value: "update_outfit_model" },
+  { label: "停用系统模特", value: "delete_outfit_model" },
+];
+
+export const activeStatusOptions = [
+  { label: "全部状态", value: "" },
+  { label: "启用", value: "true" },
+  { label: "停用", value: "false" },
+];
+
+export const promptPurposeOptions = [
+  { label: "全部用途", value: "" },
+  { label: "生图", value: "image_generate" },
+  { label: "AI帮写", value: "ai_write" },
+  { label: "详情策略", value: "strategy" },
+];
+
+export const promptModelOptions = [
+  { label: "全部模型", value: "" },
+  { label: "gpt-image-2", value: "gpt-image-2" },
+  { label: "qwen3.6-flash", value: "qwen3.6-flash" },
 ];
 
 export function formatMoney(amountCents) {
@@ -91,8 +128,18 @@ export function imageTaskStatusLabel(status) {
 }
 
 export function scenarioLabel(scenario) {
+  if (!scenario) return "通用";
   const match = scenarioOptions.find((option) => option.value === scenario);
   return match?.label || scenario || "-";
+}
+
+export function promptPurposeLabel(purpose) {
+  const match = promptPurposeOptions.find((option) => option.value === purpose);
+  return match?.label || purpose || "-";
+}
+
+export function activeStatusLabel(active) {
+  return active ? "启用" : "停用";
 }
 
 export function auditActionLabel(action) {

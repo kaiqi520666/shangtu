@@ -36,6 +36,16 @@ export const adminRoutes = [
         component: () => import("@/views/admin/AdminSettingsView.vue"),
       },
       {
+        path: "prompt-templates",
+        name: "admin-prompt-templates",
+        component: () => import("@/views/admin/AdminPromptTemplatesView.vue"),
+      },
+      {
+        path: "outfit-models",
+        name: "admin-outfit-models",
+        component: () => import("@/views/admin/AdminOutfitModelsView.vue"),
+      },
+      {
         path: "audit-logs",
         name: "admin-audit-logs",
         component: () => import("@/views/admin/AdminAuditLogsView.vue"),
