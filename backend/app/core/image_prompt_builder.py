@@ -294,13 +294,14 @@ async def build_ai_write_prompt(
     *,
     scenario: str | None,
     platform: str | None,
+    type_id: str | None = None,
 ) -> str:
     lookup = await get_prompt_templates(
         db,
         scenario=scenario,
         purpose="ai_write",
         platform=platform,
-        type_id=None,
+        type_id=type_id,
         model=QWEN_TEXT_MODEL,
     )
     content = lookup.content.strip()

@@ -54,14 +54,20 @@ class GenerateRequest(BaseModel):
     sort_order: int = 0
 
 
+class ImageLabelItem(BaseModel):
+    url: str
+    label: str = ""
+
+
 class AnalyzeImageRequest(BaseModel):
-    image_url: str
+    images: list[ImageLabelItem]
     platform: str = ""
     scenario: str | None = None
+    type_id: str | None = None
 
 
 class ProductImageStrategyRequest(BaseModel):
-    image_url: str
+    images: list[ImageLabelItem]
     platform: str = ""
     language: str = "中文"
     product_input: str
@@ -132,9 +138,10 @@ async def analyze_image(
             db,
             scenario=req.scenario or "product_suite",
             platform=req.platform,
+            type_id=req.type_id,
         )
         content = await analyze_product_image(
-            image_url=req.image_url,
+            images=[item.model_dump() for item in req.images],
             platform=req.platform,
             prompt=template_prompt or None,
         )
@@ -158,7 +165,7 @@ async def product_image_strategy(
             platform=req.platform,
         )
         strategy = await generate_product_image_strategy(
-            image_url=req.image_url,
+            images=[item.model_dump() for item in req.images],
             platform=req.platform,
             language=req.language,
             product_input=req.product_input,

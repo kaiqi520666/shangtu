@@ -9,12 +9,12 @@ export function uploadImage(file) {
   });
 }
 
-export function analyzeImage({ image_url, platform = "", scenario = null }) {
-  return request.post("/image/analyze", { image_url, platform, scenario }, { timeout: 120000 });
+export function analyzeImage({ images = [], platform = "", scenario = null, type_id = null }) {
+  return request.post("/image/analyze", { images, platform, scenario, type_id }, { timeout: 120000 });
 }
 
 export function generateProductImageStrategy({
-  image_url,
+  images = [],
   platform = "",
   language = "中文",
   product_input,
@@ -22,7 +22,7 @@ export function generateProductImageStrategy({
 }) {
   return request.post(
     "/image/product-image/strategy",
-    { image_url, platform, language, product_input, module_ids },
+    { images, platform, language, product_input, module_ids },
     { timeout: 120000 },
   );
 }

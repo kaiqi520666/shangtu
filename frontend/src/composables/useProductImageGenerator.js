@@ -13,6 +13,7 @@ import {
 } from "@/composables/useGenerationCards.js";
 import { useGenerationRunner } from "@/composables/useGenerationRunner.js";
 import { useToast } from "@/composables/useToast.js";
+import { buildProductAnalyzeImages, hasUploadingImages } from "@/utils/analyzeImages.js";
 import { analyzeImage, generateProductImageStrategy } from "@/api/image.js";
 
 const DEFAULT_SELECTED_MODULES = [
@@ -198,21 +199,21 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
   }
 
   async function generateSellingPointsWithAI() {
-    const mainImg = uploadedImages.value[mainImageIndex.value];
-    if (!mainImg || !mainImg.url) {
+    const images = buildProductAnalyzeImages(uploadedImages.value, mainImageIndex.value);
+    if (images.length === 0) {
       toast.info("请先上传商品图，等待图片上传完成后再让 AI 帮写");
       return "";
     }
 
-    if (mainImg.uploading) {
-      toast.info("主图还在上传中，请稍候");
+    if (hasUploadingImages(uploadedImages.value)) {
+      toast.info("商品图还在上传中，请稍候");
       return "";
     }
 
     aiLoading.value = true;
     try {
       const result = await analyzeImage({
-        image_url: mainImg.url,
+        images,
         platform: settings.platform,
         scenario: "product_image",
       });
@@ -242,6 +243,7 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
 
   async function triggerStrategyGeneration() {
     const mainImg = uploadedImages.value[mainImageIndex.value];
+    const images = buildProductAnalyzeImages(uploadedImages.value, mainImageIndex.value);
     if (hasRunningTasks.value) {
       toast.info("当前任务正在生成中，请稍后再生成模块策略");
       return;
@@ -258,8 +260,8 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
       toast.info("主图还未上传完成，请稍候再试");
       return;
     }
-    if (mainImg.uploading) {
-      toast.info("主图还在上传中，请稍候");
+    if (hasUploadingImages(uploadedImages.value)) {
+      toast.info("商品图还在上传中，请稍候");
       return;
     }
     if (selectedModules.value.length === 0) {
@@ -273,7 +275,7 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
 
     try {
       const result = await generateProductImageStrategy({
-        image_url: mainImg.url,
+        images,
         platform: settings.platform,
         language: settings.language,
         product_input: settings.productInput,

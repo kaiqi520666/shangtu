@@ -13,6 +13,7 @@ import {
 } from "@/composables/useGenerationCards.js";
 import { useCardActions } from "@/composables/useCardActions.js";
 import { useGenerationRunner } from "@/composables/useGenerationRunner.js";
+import { buildProductAnalyzeImages, hasUploadingImages } from "@/utils/analyzeImages.js";
 import { analyzeImage } from "@/api/image.js";
 
 function createDefaultSuiteStructure() {
@@ -169,21 +170,21 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
   // --- AI 卖点分析 ---
 
   async function generateSellingPointsWithAI() {
-    const mainImg = uploadedImages.value[mainImageIndex.value];
-    if (!mainImg || !mainImg.url) {
+    const images = buildProductAnalyzeImages(uploadedImages.value, mainImageIndex.value);
+    if (images.length === 0) {
       toast.info("请先上传商品图，等待图片上传完成后再让 AI 帮写");
       return "";
     }
 
-    if (mainImg.uploading) {
-      toast.info("主图还在上传中，请稍候");
+    if (hasUploadingImages(uploadedImages.value)) {
+      toast.info("商品图还在上传中，请稍候");
       return "";
     }
 
     aiLoading.value = true;
     try {
       const result = await analyzeImage({
-        image_url: mainImg.url,
+        images,
         platform: settings.platform,
         scenario: "product_suite",
       });

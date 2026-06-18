@@ -132,6 +132,27 @@ def build_product_prompt(platform: str) -> str:
 5.具体参数："""
 
 
+MULTI_IMAGE_ANALYSIS_RULE = (
+    "如果看到多张图片，优先以标注为主图、开始画面或首帧图的图片作为核心分析对象，"
+    "其余图片作为细节、角度、配件或场景的辅助参考。"
+)
+
+
+def build_multimodal_image_content(images: list[dict]) -> list[dict]:
+    if not images:
+        raise ValueError("至少需要一张图片")
+
+    content: list[dict] = []
+    for index, item in enumerate(images, start=1):
+        url = str(item.get("url") or "").strip()
+        if not url.startswith(("http://", "https://")):
+            raise ValueError("图片地址必须是可访问的HTTP地址")
+        label = str(item.get("label") or "").strip() or f"图片{index}"
+        content.append({"type": "text", "text": f"【{label}】"})
+        content.append({"type": "image_url", "image_url": {"url": url}})
+    return content
+
+
 def build_free_image_optimize_prompt(prompt: str) -> str:
     return f"""你是 AI 生图提示词优化助手。
 请把用户输入改写成更清晰、更具体、更适合图像生成模型执行的提示词。
@@ -206,12 +227,20 @@ JSON 格式：
 
 async def analyze_product_image(
     *,
-    image_url: str,
+    images: list[dict],
     platform: str = "",
     prompt: str | None = None,
 ) -> str:
-    if not image_url.startswith(("http://", "https://")):
-        raise ValueError("image_url必须是可访问的HTTP地址")
+    final_prompt = "\n\n".join(
+        part
+        for part in [
+            prompt or build_product_prompt(platform),
+            MULTI_IMAGE_ANALYSIS_RULE,
+        ]
+        if part
+    )
+    content = build_multimodal_image_content(images)
+    content.append({"type": "text", "text": final_prompt})
 
     payload = {
         "model": DASHSCOPE_MODEL,
@@ -219,16 +248,7 @@ async def analyze_product_image(
         "messages": [
             {
                 "role": "user",
-                "content": [
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": image_url},
-                    },
-                    {
-                        "type": "text",
-                        "text": prompt or build_product_prompt(platform),
-                    },
-                ],
+                "content": content,
             }
         ],
     }
@@ -395,16 +415,13 @@ def _normalize_strategy_response(parsed: dict, selected_modules: list[dict]) -> 
 
 async def generate_product_image_strategy(
     *,
-    image_url: str,
+    images: list[dict],
     platform: str = "",
     language: str = "中文",
     product_input: str = "",
     module_ids: list[str],
     template_prompt: str | None = None,
 ) -> dict:
-    if not image_url.startswith(("http://", "https://")):
-        raise ValueError("image_url必须是可访问的HTTP地址")
-
     normalized_input = product_input.strip()
     if not normalized_input:
         raise ValueError("请先填写商品卖点与要求")
@@ -417,6 +434,13 @@ async def generate_product_image_strategy(
         modules=selected_modules,
         template_prompt=template_prompt,
     )
+    content = build_multimodal_image_content(images)
+    content.append(
+        {
+            "type": "text",
+            "text": "\n\n".join([prompt, MULTI_IMAGE_ANALYSIS_RULE]),
+        }
+    )
 
     payload = {
         "model": DASHSCOPE_MODEL,
@@ -424,16 +448,7 @@ async def generate_product_image_strategy(
         "messages": [
             {
                 "role": "user",
-                "content": [
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": image_url},
-                    },
-                    {
-                        "type": "text",
-                        "text": prompt,
-                    },
-                ],
+                "content": content,
             }
         ],
     }
