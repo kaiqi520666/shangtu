@@ -183,15 +183,7 @@ async def build_image_generate_prompt(
         for template in type_templates
         if template.content and template.content.strip()
     )
-    product_requirement = (user_prompt or "").strip()
-    if default_user_prompt and product_requirement:
-        effective_user_prompt = (
-            f"{default_user_prompt}\n\n"
-            "【商品卖点与视频要求】\n"
-            f"{product_requirement}"
-        )
-    else:
-        effective_user_prompt = product_requirement or default_user_prompt
+    effective_user_prompt = (user_prompt or "").strip() or default_user_prompt
     if not effective_user_prompt:
         raise ValueError("未找到当前图种的默认提示词，请检查提示词模板配置")
     task_prompt = _format_task_prompt(
@@ -254,7 +246,15 @@ async def build_video_generate_prompt(
         for template in type_templates
         if template.content and template.content.strip()
     )
-    effective_user_prompt = (user_prompt or "").strip() or default_user_prompt
+    product_requirement = (user_prompt or "").strip()
+    if default_user_prompt and product_requirement:
+        effective_user_prompt = (
+            f"{default_user_prompt}\n\n"
+            "【商品卖点与视频要求】\n"
+            f"{product_requirement}"
+        )
+    else:
+        effective_user_prompt = product_requirement or default_user_prompt
     if not effective_user_prompt:
         raise ValueError("未找到当前视频方向的默认提示词，请检查提示词模板配置")
 
