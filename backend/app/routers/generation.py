@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_user, get_db
 from app.core.json_utils import dump_json, parse_json_or_none
+from app.core.prompt_snapshot import parse_prompt_snapshot
 from app.core.time import to_utc_iso, utc_now
 from app.models import GenerationJob, ImageTask, User, VideoTask
 from app.schemas.response import Response, fail, success
@@ -82,11 +83,7 @@ def _image_task_payload(task: ImageTask) -> dict:
         "credit_refunded": bool(task.credit_refunded),
         "replaced_by_task_id": task.replaced_by_task_id,
         "prompt": task.prompt,
-        "edit_instruction": task.edit_instruction,
-        "system_prompt_snapshot": task.system_prompt_snapshot,
-        "task_prompt_snapshot": task.task_prompt_snapshot,
-        "user_prompt": task.user_prompt,
-        "prompt_template_refs": parse_json_or_none(task.prompt_template_refs_json),
+        "prompt_snapshot": parse_prompt_snapshot(task.prompt_snapshot_json),
         "settings_snapshot": parse_json_or_none(task.settings_snapshot_json),
     }
 

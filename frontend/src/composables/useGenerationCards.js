@@ -46,6 +46,11 @@ function resolveSettingsSnapshot(rawSnapshot, size, existingSnapshot = null) {
   };
 }
 
+function getPromptSnapshotUser(item) {
+  const snapshot = item?.prompt_snapshot;
+  return snapshot && typeof snapshot.user === "string" ? snapshot.user : "";
+}
+
 export function createBatchFinishedHandler({
   genLogs,
   toast,
@@ -162,8 +167,9 @@ export function useGenerationCards({
       if (typeof data.credit_cost === "number") {
         card.creditCost = data.credit_cost;
       }
-      if (typeof data.user_prompt === "string") {
-        card.userPrompt = data.user_prompt;
+      const promptSnapshotUser = getPromptSnapshotUser(data);
+      if (promptSnapshotUser) {
+        card.userPrompt = promptSnapshotUser;
       }
       const nextSettingsSnapshot = resolveSettingsSnapshot(
         data.settings_snapshot,
@@ -316,7 +322,7 @@ export function useGenerationCards({
       sortOrder: item.sort_order || 0,
       batchRunId: "",
       creditRefunded: !!item.credit_refunded,
-      userPrompt: extra.userPrompt ?? item.user_prompt ?? "",
+      userPrompt: extra.userPrompt ?? getPromptSnapshotUser(item),
       settingsSnapshot: resolveSettingsSnapshot(
         extra.settingsSnapshot ?? item.settings_snapshot,
         item.size,

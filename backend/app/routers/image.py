@@ -20,10 +20,14 @@ from app.core.image_prompt_builder import (
     build_ai_write_prompt,
     build_image_generate_prompt,
     build_product_image_strategy_template_prompt,
-    compose_image_prompt,
 )
 from app.core.json_utils import dump_json_or_none, parse_json_or_none
 from app.core.oss import OssConfigError, upload_image_bytes
+from app.core.prompt_snapshot import (
+    build_prompt_snapshot,
+    dump_prompt_snapshot,
+    parse_prompt_snapshot,
+)
 from app.core.system_settings import (
     get_effective_image_credit_cost,
     get_effective_image_credit_costs,
@@ -39,6 +43,13 @@ from app.models import GenerationJob, ImageTask, User
 from app.schemas.response import Response, fail, success
 
 router = APIRouter(prefix="/image", tags=["生图"])
+
+IMAGE_PROMPT_STRATEGIES = {
+    "product_suite": {"use_template": True},
+    "product_image": {"use_template": True},
+    "outfit": {"use_template": True},
+    "free_image": {"use_template": False},
+}
 
 
 class GenerateRequest(BaseModel):
@@ -96,6 +107,51 @@ def _parse_redis_result_url(value) -> str | None:
         return None
     url = parsed.get("url")
     return url if isinstance(url, str) and url else None
+
+
+async def _build_image_task_prompt(
+    *,
+    db: AsyncSession,
+    job: GenerationJob | None,
+    req: GenerateRequest,
+) -> tuple[str, dict]:
+    if job is None:
+        final_prompt = req.prompt
+        return final_prompt, build_prompt_snapshot(
+            user=req.user_prompt or req.prompt,
+            final=final_prompt,
+        )
+
+    strategy = IMAGE_PROMPT_STRATEGIES[job.scenario]
+    if not strategy["use_template"]:
+        if not req.prompt.strip():
+            raise ValueError("请输入提示词")
+        final_prompt = req.prompt
+        return final_prompt, build_prompt_snapshot(user=req.prompt, final=final_prompt)
+
+    built_prompt = await build_image_generate_prompt(
+        db,
+        job=job,
+        type_id=req.type_id,
+        title=req.title,
+        user_prompt=req.user_prompt or req.prompt,
+    )
+    return built_prompt.final_prompt, built_prompt.prompt_snapshot
+
+
+def _compose_prompt_from_snapshot(prompt_snapshot: dict, user_prompt: str) -> str:
+    return "\n".join(
+        part
+        for part in [
+            "【系统提示词】",
+            prompt_snapshot["system"].strip(),
+            "【任务提示词】",
+            prompt_snapshot["task"].strip(),
+            "【用户提示词】",
+            user_prompt.strip(),
+        ]
+        if part
+    )
 
 
 @router.post("/upload", response_model=Response)
@@ -233,38 +289,18 @@ async def create_task(
         job = job_result.scalar_one_or_none()
         if not job:
             return fail("任务不存在")
-        if job.scenario not in {"product_suite", "product_image", "outfit", "free_image"}:
+        if job.scenario not in IMAGE_PROMPT_STRATEGIES:
             return fail("任务类型不匹配")
 
     task_id = str(uuid.uuid4())
-    final_prompt = req.prompt
-    user_prompt = req.user_prompt
-    system_prompt_snapshot = None
-    task_prompt_snapshot = None
-    prompt_template_refs_json = None
-
-    if job is not None and job.scenario == "free_image":
-        if not req.prompt.strip():
-            return fail("请输入提示词")
-        final_prompt = req.prompt
-        user_prompt = req.prompt
-
-    if job is not None and job.scenario in {"product_suite", "product_image", "outfit"}:
-        try:
-            built_prompt = await build_image_generate_prompt(
-                db,
-                job=job,
-                type_id=req.type_id,
-                title=req.title,
-                user_prompt=req.user_prompt or req.prompt,
-            )
-        except ValueError as exc:
-            return fail(str(exc))
-        final_prompt = built_prompt.final_prompt
-        user_prompt = built_prompt.user_prompt
-        system_prompt_snapshot = built_prompt.system_prompt_snapshot
-        task_prompt_snapshot = built_prompt.task_prompt_snapshot
-        prompt_template_refs_json = built_prompt.prompt_template_refs_json
+    try:
+        final_prompt, prompt_snapshot = await _build_image_task_prompt(
+            db=db,
+            job=job,
+            req=req,
+        )
+    except ValueError as exc:
+        return fail(str(exc))
 
     # 原子扣积分 + 建任务同一事务，避免并发超扣和一致性漂移
     remaining_credits = await _deduct_user_credits(db, current_user.id, credit_cost)
@@ -283,10 +319,7 @@ async def create_task(
         type_id=req.type_id,
         title=req.title,
         sort_order=req.sort_order,
-        system_prompt_snapshot=system_prompt_snapshot,
-        task_prompt_snapshot=task_prompt_snapshot,
-        user_prompt=user_prompt,
-        prompt_template_refs_json=prompt_template_refs_json,
+        prompt_snapshot_json=dump_prompt_snapshot(prompt_snapshot),
         settings_snapshot_json=dump_json_or_none(req.settings_snapshot),
         credit_cost=credit_cost,
     )
@@ -434,10 +467,7 @@ async def get_task(
             "result_url": result_url,
             "size": task.size,
             "prompt": task.prompt,
-            "system_prompt_snapshot": task.system_prompt_snapshot,
-            "task_prompt_snapshot": task.task_prompt_snapshot,
-            "user_prompt": task.user_prompt,
-            "prompt_template_refs": parse_json_or_none(task.prompt_template_refs_json) or [],
+            "prompt_snapshot": parse_prompt_snapshot(task.prompt_snapshot_json),
             "settings_snapshot": parse_json_or_none(task.settings_snapshot_json),
             "created_at": to_utc_iso(task.created_at),
             "error_message": error_message,
@@ -587,12 +617,7 @@ async def regenerate_task(
     # 保留旧 result_url 供前端继续展示
     old_result_url = task.result_url
 
-    # 构造新 prompt。新模板任务优先编辑 user_prompt；旧历史任务仍兼容追加修改要求。
-    has_prompt_snapshot = bool(
-        task.system_prompt_snapshot
-        or task.task_prompt_snapshot
-        or task.prompt_template_refs_json
-    )
+    prompt_snapshot = parse_prompt_snapshot(task.prompt_snapshot_json)
     if task.job_id:
         job_result = await db.execute(
             select(GenerationJob).where(
@@ -604,23 +629,26 @@ async def regenerate_task(
     else:
         source_job = None
 
-    if source_job and source_job.scenario == "free_image":
+    if source_job and not IMAGE_PROMPT_STRATEGIES[source_job.scenario]["use_template"]:
         new_user_prompt = requested_user_prompt or edit_instruction
         new_prompt = new_user_prompt
-    elif has_prompt_snapshot or task.user_prompt:
+        next_prompt_snapshot = build_prompt_snapshot(user=new_user_prompt, final=new_prompt)
+    else:
+        base_user_prompt = prompt_snapshot["user"]
         new_user_prompt = requested_user_prompt or (
-            f"{task.user_prompt}\n\n【用户修改要求】{edit_instruction}"
-            if task.user_prompt
+            f"{base_user_prompt}\n\n【用户修改要求】{edit_instruction}"
+            if base_user_prompt
             else edit_instruction
         )
-        new_prompt = compose_image_prompt(
-            system_prompt=task.system_prompt_snapshot,
-            task_prompt=task.task_prompt_snapshot,
-            user_prompt=new_user_prompt,
+        next_prompt_snapshot = build_prompt_snapshot(
+            system=prompt_snapshot["system"],
+            task=prompt_snapshot["task"],
+            user=new_user_prompt,
+            final="",
+            template_refs=prompt_snapshot["template_refs"],
         )
-    else:
-        new_user_prompt = None
-        new_prompt = task.prompt + "\n\n【用户修改要求】" + edit_instruction
+        new_prompt = _compose_prompt_from_snapshot(next_prompt_snapshot, new_user_prompt)
+        next_prompt_snapshot["final"] = new_prompt
 
     new_task_id = str(uuid.uuid4())
 
@@ -641,11 +669,7 @@ async def regenerate_task(
         prompt=new_prompt,
         size=f"{ratio}/{normalized_resolution}",
         status="pending",
-        edit_instruction=edit_instruction or None,
-        system_prompt_snapshot=task.system_prompt_snapshot,
-        task_prompt_snapshot=task.task_prompt_snapshot,
-        user_prompt=new_user_prompt,
-        prompt_template_refs_json=task.prompt_template_refs_json,
+        prompt_snapshot_json=dump_prompt_snapshot(next_prompt_snapshot),
         settings_snapshot_json=task.settings_snapshot_json,
         credit_cost=credit_cost,
         credit_refunded=False,

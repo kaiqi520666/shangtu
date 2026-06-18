@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.json_utils import dump_json, parse_json_object
+from app.core.prompt_snapshot import build_prompt_snapshot
 from app.core.prompt_templates import get_prompt_templates
 from app.models import GenerationJob
 
@@ -16,10 +17,7 @@ QWEN_TEXT_MODEL = "qwen3.6-flash"
 @dataclass(slots=True)
 class ImagePromptBuildResult:
     final_prompt: str
-    system_prompt_snapshot: str
-    task_prompt_snapshot: str
-    user_prompt: str
-    prompt_template_refs_json: str
+    prompt_snapshot: dict
 
 
 @dataclass(slots=True)
@@ -65,22 +63,24 @@ def compose_video_prompt(
     return "\n".join(part for part in final_parts if part)
 
 
-def _template_refs(templates) -> str:
-    return dump_json(
-        [
-            {
-                "id": template.id,
-                "name": template.name,
-                "scenario": template.scenario,
-                "purpose": template.purpose,
-                "platform": template.platform,
-                "type_id": template.type_id,
-                "model": template.model,
-                "version": template.version,
-            }
-            for template in templates
-        ]
-    )
+def _template_refs(templates) -> list[dict]:
+    return [
+        {
+            "id": template.id,
+            "name": template.name,
+            "scenario": template.scenario,
+            "purpose": template.purpose,
+            "platform": template.platform,
+            "type_id": template.type_id,
+            "model": template.model,
+            "version": template.version,
+        }
+        for template in templates
+    ]
+
+
+def _template_refs_json(templates) -> str:
+    return dump_json(_template_refs(templates))
 
 
 def _format_task_prompt(
@@ -201,10 +201,13 @@ async def build_image_generate_prompt(
 
     return ImagePromptBuildResult(
         final_prompt=final_prompt,
-        system_prompt_snapshot=system_prompt,
-        task_prompt_snapshot=task_prompt,
-        user_prompt=effective_user_prompt,
-        prompt_template_refs_json=_template_refs(lookup.templates),
+        prompt_snapshot=build_prompt_snapshot(
+            system=system_prompt,
+            task=task_prompt,
+            user=effective_user_prompt,
+            final=final_prompt,
+            template_refs=_template_refs(lookup.templates),
+        ),
     )
 
 
@@ -285,7 +288,7 @@ async def build_video_generate_prompt(
         system_prompt_snapshot=system_prompt,
         task_prompt_snapshot=task_prompt,
         user_prompt=effective_user_prompt,
-        prompt_template_refs_json=_template_refs(lookup.templates),
+        prompt_template_refs_json=_template_refs_json(lookup.templates),
     )
 
 

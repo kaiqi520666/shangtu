@@ -46,15 +46,16 @@ async def ensure_runtime_schema(engine: AsyncEngine) -> None:
                 ADD COLUMN IF NOT EXISTS provider_task_id VARCHAR(128),
                 ADD COLUMN IF NOT EXISTS credit_cost INTEGER NOT NULL DEFAULT 1,
                 ADD COLUMN IF NOT EXISTS credit_refunded BOOLEAN NOT NULL DEFAULT FALSE,
-                ADD COLUMN IF NOT EXISTS edit_instruction TEXT,
-                ADD COLUMN IF NOT EXISTS system_prompt_snapshot TEXT,
-                ADD COLUMN IF NOT EXISTS task_prompt_snapshot TEXT,
-                ADD COLUMN IF NOT EXISTS user_prompt TEXT,
-                ADD COLUMN IF NOT EXISTS prompt_template_refs_json TEXT,
+                ADD COLUMN IF NOT EXISTS prompt_snapshot_json TEXT,
                 ADD COLUMN IF NOT EXISTS settings_snapshot_json TEXT,
                 ADD COLUMN IF NOT EXISTS archived BOOLEAN DEFAULT FALSE,
                 ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ,
-                ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ
+                ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ,
+                DROP COLUMN IF EXISTS edit_instruction,
+                DROP COLUMN IF EXISTS system_prompt_snapshot,
+                DROP COLUMN IF EXISTS task_prompt_snapshot,
+                DROP COLUMN IF EXISTS user_prompt,
+                DROP COLUMN IF EXISTS prompt_template_refs_json
                 """
             )
         )

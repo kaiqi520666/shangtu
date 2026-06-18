@@ -77,11 +77,12 @@ export function useFreeImageGenerator({ onJobCreated } = {}) {
       restoreFreeImageJobData(data);
     },
     restoreCard(item) {
+      const promptSnapshotUser = item.prompt_snapshot?.user || item.prompt || "";
       return restoreGenerationCard(item, {
         typeId: item.type_id || "free",
-        strategyTitle: item.title || makePromptTitle(item.user_prompt || item.prompt),
-        strategyContent: item.user_prompt || item.prompt || "",
-        userPrompt: item.user_prompt || item.prompt || "",
+        strategyTitle: item.title || makePromptTitle(promptSnapshotUser),
+        strategyContent: promptSnapshotUser,
+        userPrompt: promptSnapshotUser,
       });
     },
   });
