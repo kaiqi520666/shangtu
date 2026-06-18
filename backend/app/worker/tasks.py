@@ -360,7 +360,25 @@ async def _set_video_progress(redis, task_id: str, value: int) -> None:
     )
 
 
-def normalize_provider_error(message: str | None) -> str:
+PROVIDER_ERROR_COPY = {
+    "image": {
+        "default": "生图失败，请调整提示词后重试。",
+        "unsafe": "生成内容触发平台安全策略，请尝试减少敏感词、夸张功效、品牌/认证/人物相关描述后重新生成。",
+        "rate_limit": "生图服务繁忙，请稍后再试。",
+        "timeout": "生图任务超时，请稍后重试。",
+        "upstream": "上游生图服务暂时失败，请稍后重试。",
+    },
+    "video": {
+        "default": "视频生成失败，请调整提示词或参考图后重试。",
+        "unsafe": "视频内容触发平台安全策略，请减少敏感词、夸张功效、品牌/认证/人物相关描述后重新生成。",
+        "rate_limit": "视频生成服务繁忙，请稍后再试。",
+        "timeout": "视频生成任务超时，请稍后重试。",
+        "upstream": "上游视频生成服务暂时失败，请稍后重试。",
+    },
+}
+
+
+def normalize_provider_error(message: str | None, media_type: str = "image") -> str:
     """把上游 / 第三方原始错误归一化为对用户友好的中文文案；技术原文交给日志。
 
     规则：
@@ -368,37 +386,21 @@ def normalize_provider_error(message: str | None) -> str:
     2. 不命中关键词、但消息包含中文 → 直接保留（属于我们自己写的中文错误，如 "OSS 上传失败: xxx"）
     3. 都不命中 → 兜底文案，避免把上游英文 JSON 暴露给用户
     """
+    copy = PROVIDER_ERROR_COPY.get(media_type) or PROVIDER_ERROR_COPY["image"]
     if not message:
-        return "生图失败，请调整提示词后重试。"
+        return copy["default"]
     lower = message.lower()
     if "image_unsafe" in lower or "unsafe" in lower:
-        return "生成内容触发平台安全策略，请尝试减少敏感词、夸张功效、品牌/认证/人物相关描述后重新生成。"
+        return copy["unsafe"]
     if "rate limit" in lower or "too many requests" in lower or "429" in lower:
-        return "生图服务繁忙，请稍后再试。"
+        return copy["rate_limit"]
     if "timeout" in lower or "timed out" in lower or "超时" in message:
-        return "生图任务超时，请稍后重试。"
+        return copy["timeout"]
     if "upstream api failed" in lower or "upstream" in lower:
-        return "上游生图服务暂时失败，请稍后重试。"
+        return copy["upstream"]
     if any("一" <= ch <= "鿿" for ch in message):
         return message
-    return "生图失败，请调整提示词后重试。"
-
-
-def normalize_video_provider_error(message: str | None) -> str:
-    if not message:
-        return "视频生成失败，请调整提示词或参考图后重试。"
-    lower = message.lower()
-    if "unsafe" in lower:
-        return "视频内容触发平台安全策略，请减少敏感词、夸张功效、品牌/认证/人物相关描述后重新生成。"
-    if "rate limit" in lower or "too many requests" in lower or "429" in lower:
-        return "视频生成服务繁忙，请稍后再试。"
-    if "timeout" in lower or "timed out" in lower or "超时" in message:
-        return "视频生成任务超时，请稍后重试。"
-    if "upstream api failed" in lower or "upstream" in lower:
-        return "上游视频生成服务暂时失败，请稍后重试。"
-    if any("一" <= ch <= "鿿" for ch in message):
-        return message
-    return "视频生成失败，请调整提示词或参考图后重试。"
+    return copy["default"]
 
 
 async def refund_task_credit(task_id: str) -> bool:
@@ -487,7 +489,7 @@ async def _mark_timeout(redis, task_id: str, raw_message: str) -> None:
 
 async def _mark_video_failed(redis, task_id: str, raw_message: str) -> None:
     print(f"[video task {task_id}] failed (raw): {raw_message}")
-    friendly = normalize_video_provider_error(raw_message)
+    friendly = normalize_provider_error(raw_message, media_type="video")
     await update_video_task_in_db(task_id, status="failed", error_message=friendly)
     await refund_video_task_credit(task_id)
     await redis.set(f"video_task:{task_id}:error", friendly, ex=3600)
@@ -496,7 +498,7 @@ async def _mark_video_failed(redis, task_id: str, raw_message: str) -> None:
 
 async def _mark_video_timeout(redis, task_id: str, raw_message: str) -> None:
     print(f"[video task {task_id}] timeout (raw): {raw_message}")
-    friendly = normalize_video_provider_error(raw_message)
+    friendly = normalize_provider_error(raw_message, media_type="video")
     await update_video_task_in_db(task_id, status="timeout", error_message=friendly)
     await refund_video_task_credit(task_id)
     await redis.set(f"video_task:{task_id}:error", friendly, ex=3600)

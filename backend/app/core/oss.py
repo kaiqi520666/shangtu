@@ -48,11 +48,11 @@ class OssConfigError(RuntimeError):
 
 def get_oss_config() -> dict[str, str]:
     config = {
-        "access_key_id": os.getenv("OSS_ACCESS_KEY_ID") or os.getenv("ALIYUN_OSS_ACCESS_KEY_ID"),
-        "access_key_secret": os.getenv("OSS_ACCESS_KEY_SECRET") or os.getenv("ALIYUN_OSS_ACCESS_KEY_SECRET"),
-        "endpoint": os.getenv("OSS_ENDPOINT") or os.getenv("ALIYUN_OSS_ENDPOINT"),
-        "bucket_name": os.getenv("OSS_BUCKET_NAME") or os.getenv("OSS_BUCKET") or os.getenv("ALIYUN_OSS_BUCKET"),
-        "public_base_url": os.getenv("OSS_PUBLIC_BASE_URL") or os.getenv("ALIYUN_OSS_PUBLIC_BASE_URL"),
+        "access_key_id": os.getenv("OSS_ACCESS_KEY_ID"),
+        "access_key_secret": os.getenv("OSS_ACCESS_KEY_SECRET"),
+        "endpoint": os.getenv("OSS_ENDPOINT"),
+        "bucket_name": os.getenv("OSS_BUCKET_NAME"),
+        "public_base_url": os.getenv("OSS_PUBLIC_BASE_URL"),
     }
     missing = [key for key, value in config.items() if key != "public_base_url" and not value]
     if missing:

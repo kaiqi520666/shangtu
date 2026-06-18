@@ -32,6 +32,35 @@ async def ensure_runtime_schema(engine: AsyncEngine) -> None:
         await conn.execute(
             text(
                 """
+                ALTER TABLE image_tasks
+                ALTER COLUMN prompt TYPE TEXT,
+                ADD COLUMN IF NOT EXISTS user_id INTEGER,
+                ADD COLUMN IF NOT EXISTS job_id VARCHAR(36),
+                ADD COLUMN IF NOT EXISTS replaced_by_task_id VARCHAR(36),
+                ADD COLUMN IF NOT EXISTS type_id VARCHAR(50),
+                ADD COLUMN IF NOT EXISTS title VARCHAR(100),
+                ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+                ADD COLUMN IF NOT EXISTS error_message TEXT,
+                ADD COLUMN IF NOT EXISTS progress INTEGER DEFAULT 0,
+                ADD COLUMN IF NOT EXISTS provider VARCHAR(32) DEFAULT 'toapis',
+                ADD COLUMN IF NOT EXISTS provider_task_id VARCHAR(128),
+                ADD COLUMN IF NOT EXISTS credit_cost INTEGER NOT NULL DEFAULT 1,
+                ADD COLUMN IF NOT EXISTS credit_refunded BOOLEAN NOT NULL DEFAULT FALSE,
+                ADD COLUMN IF NOT EXISTS edit_instruction TEXT,
+                ADD COLUMN IF NOT EXISTS system_prompt_snapshot TEXT,
+                ADD COLUMN IF NOT EXISTS task_prompt_snapshot TEXT,
+                ADD COLUMN IF NOT EXISTS user_prompt TEXT,
+                ADD COLUMN IF NOT EXISTS prompt_template_refs_json TEXT,
+                ADD COLUMN IF NOT EXISTS settings_snapshot_json TEXT,
+                ADD COLUMN IF NOT EXISTS archived BOOLEAN DEFAULT FALSE,
+                ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ,
+                ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ
+                """
+            )
+        )
+        await conn.execute(
+            text(
+                """
                 CREATE TABLE IF NOT EXISTS video_tasks (
                     id VARCHAR(36) PRIMARY KEY,
                     user_id INTEGER NOT NULL,
