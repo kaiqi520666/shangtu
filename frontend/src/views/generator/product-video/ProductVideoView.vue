@@ -85,7 +85,6 @@ function closeHistoryDrawer() {
       empty-title="商品视频示例"
       empty-subtitle="这里仅用于预览不同电商视频风格，左侧选择的视频方向才会影响生成设置。"
       :empty-slides="videoDemoTypes"
-      empty-media-type="video"
       media-type="video"
       media-unit="个"
       loading-title="AI 商品视频生成中"
