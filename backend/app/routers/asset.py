@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, literal, select, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_user, get_db
@@ -14,74 +14,53 @@ SCENARIO_FILTER = {"product_suite", "product_image", "outfit", "free_image", "pr
 PAGE_SIZE_MAX = 50
 
 
-async def _query_image_assets(
-    db: AsyncSession,
-    *,
-    user_id: int,
-    scenario: str | None,
-) -> list[dict]:
+def _image_asset_select(user_id: int, scenario: str | None):
     if scenario == "product_video":
-        return []
+        return None
     stmt = (
-        select(ImageTask, GenerationJob)
+        select(
+            ImageTask.id.label("task_id"),
+            literal("image").label("media_type"),
+            ImageTask.result_url.label("result_url"),
+            ImageTask.title.label("title"),
+            ImageTask.type_id.label("type_id"),
+            func.coalesce(GenerationJob.scenario, literal("")).label("scenario"),
+            func.coalesce(GenerationJob.title, literal("")).label("job_title"),
+            ImageTask.created_at.label("created_at"),
+        )
         .outerjoin(GenerationJob, GenerationJob.id == ImageTask.job_id)
         .where(
             ImageTask.user_id == user_id,
             ImageTask.status == "done",
-            ImageTask.archived == False,  # noqa: E712
+            ImageTask.archived.is_(False),
         )
     )
     if scenario:
         stmt = stmt.where(ImageTask.job_id.isnot(None), GenerationJob.scenario == scenario)
-    result = await db.execute(stmt)
-    return [
-        {
-            "task_id": task.id,
-            "media_type": "image",
-            "result_url": task.result_url,
-            "title": task.title or "",
-            "type_id": task.type_id or "",
-            "scenario": job.scenario if job else "",
-            "job_title": job.title if job else "",
-            "created_at": to_utc_iso(task.created_at),
-            "_created_at": task.created_at,
-        }
-        for task, job in result.all()
-    ]
+    return stmt
 
 
-async def _query_video_assets(
-    db: AsyncSession,
-    *,
-    user_id: int,
-    scenario: str | None,
-) -> list[dict]:
+def _video_asset_select(user_id: int, scenario: str | None):
     if scenario and scenario != "product_video":
-        return []
-    stmt = (
-        select(VideoTask, GenerationJob)
+        return None
+    return (
+        select(
+            VideoTask.id.label("task_id"),
+            literal("video").label("media_type"),
+            VideoTask.result_url.label("result_url"),
+            VideoTask.title.label("title"),
+            VideoTask.type_id.label("type_id"),
+            func.coalesce(GenerationJob.scenario, literal("product_video")).label("scenario"),
+            func.coalesce(GenerationJob.title, literal("")).label("job_title"),
+            VideoTask.created_at.label("created_at"),
+        )
         .outerjoin(GenerationJob, GenerationJob.id == VideoTask.job_id)
         .where(
             VideoTask.user_id == user_id,
             VideoTask.status == "done",
-            VideoTask.archived == False,  # noqa: E712
+            VideoTask.archived.is_(False),
         )
     )
-    result = await db.execute(stmt)
-    return [
-        {
-            "task_id": task.id,
-            "media_type": "video",
-            "result_url": task.result_url,
-            "title": task.title or "",
-            "type_id": task.type_id or "",
-            "scenario": job.scenario if job else "product_video",
-            "job_title": job.title if job else "",
-            "created_at": to_utc_iso(task.created_at),
-            "_created_at": task.created_at,
-        }
-        for task, job in result.all()
-    ]
 
 
 @router.get("/list", response_model=Response)
@@ -96,15 +75,44 @@ async def list_assets(
         if scenario not in SCENARIO_FILTER:
             return fail(f"不支持的场景类型：{scenario}")
 
-    image_items = await _query_image_assets(db, user_id=current_user.id, scenario=scenario)
-    video_items = await _query_video_assets(db, user_id=current_user.id, scenario=scenario)
-    all_items = [*image_items, *video_items]
-    all_items.sort(key=lambda item: item["_created_at"], reverse=True)
-    total = len(all_items)
     start = (page - 1) * page_size
-    items = all_items[start:start + page_size]
-    for item in items:
-        item.pop("_created_at", None)
+    selects = [
+        stmt
+        for stmt in (
+            _image_asset_select(current_user.id, scenario),
+            _video_asset_select(current_user.id, scenario),
+        )
+        if stmt is not None
+    ]
+    if not selects:
+        return success({
+            "items": [],
+            "total": 0,
+            "page": page,
+            "page_size": page_size,
+        })
+
+    asset_rows = (union_all(*selects) if len(selects) > 1 else selects[0]).subquery()
+    total = int((await db.execute(select(func.count()).select_from(asset_rows))).scalar_one() or 0)
+    result = await db.execute(
+        select(asset_rows)
+        .order_by(asset_rows.c.created_at.desc())
+        .offset(start)
+        .limit(page_size)
+    )
+    items = [
+        {
+            "task_id": row["task_id"],
+            "media_type": row["media_type"],
+            "result_url": row["result_url"],
+            "title": row["title"] or "",
+            "type_id": row["type_id"] or "",
+            "scenario": row["scenario"] or "",
+            "job_title": row["job_title"] or "",
+            "created_at": to_utc_iso(row["created_at"]),
+        }
+        for row in result.mappings().all()
+    ]
 
     return success({
         "items": items,
