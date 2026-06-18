@@ -377,6 +377,13 @@ PROVIDER_ERROR_COPY = {
     },
 }
 
+PROVIDER_ERROR_RULES = [
+    ("unsafe", ("image_unsafe", "unsafe")),
+    ("rate_limit", ("rate limit", "too many requests", "429")),
+    ("timeout", ("timeout", "timed out")),
+    ("upstream", ("upstream api failed", "upstream")),
+]
+
 
 def normalize_provider_error(message: str | None, media_type: str = "image") -> str:
     """把上游 / 第三方原始错误归一化为对用户友好的中文文案；技术原文交给日志。
@@ -390,14 +397,11 @@ def normalize_provider_error(message: str | None, media_type: str = "image") -> 
     if not message:
         return copy["default"]
     lower = message.lower()
-    if "image_unsafe" in lower or "unsafe" in lower:
-        return copy["unsafe"]
-    if "rate limit" in lower or "too many requests" in lower or "429" in lower:
-        return copy["rate_limit"]
-    if "timeout" in lower or "timed out" in lower or "超时" in message:
+    for error_type, keywords in PROVIDER_ERROR_RULES:
+        if any(keyword in lower for keyword in keywords):
+            return copy[error_type]
+    if "超时" in message:
         return copy["timeout"]
-    if "upstream api failed" in lower or "upstream" in lower:
-        return copy["upstream"]
     if any("一" <= ch <= "鿿" for ch in message):
         return message
     return copy["default"]
