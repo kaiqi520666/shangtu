@@ -1,6 +1,5 @@
 import { onBeforeUnmount, reactive, ref } from "vue";
 import { deleteVideoTask, generateVideo, getVideoCreditCosts, getVideoDownloadUrl, getVideoTask } from "@/api/video.js";
-import { updateGenerationJob } from "@/api/generation.js";
 import {
   createBatchFinishedHandler,
   useGenerationCards,
@@ -98,12 +97,7 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
     generatedCount,
     failedCount,
     jobTotal,
-    activeBatchRunId,
-    startPollingCard,
     stopPollingCard,
-    trackBatch,
-    maybeFinishGenerating,
-    makeId,
   } = cards;
 
   const { aiLoading, generateSellingPointsWithAI } = useAiSellingPointsWriter({
@@ -196,11 +190,11 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
     historyLoading,
     jobLoading,
     updateCurrentJobTitle,
-    ensureCurrentJob,
     createNewTask,
     resetWorkspaceToDraft,
     loadHistoryTasks,
     loadGenerationJob,
+    enqueueMediaBatch,
   } = runner;
 
   const actions = useCardActions({
@@ -297,14 +291,11 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
     }
 
     const settingsSnapshot = buildSettingsSnapshot(settings);
-    creatingBatch.value = true;
-    genLogs.value.push(`[${selectedType.title}] 创建视频任务`);
+    const queue = [{ ...selectedType }];
 
-    try {
-      const jobId = await ensureCurrentJob();
-      if (!jobId) return;
-      const saveRes = await updateGenerationJob(jobId, {
-        title: currentTaskTitle.value,
+    await enqueueMediaBatch({
+      queue,
+      snapshotPayload: {
         settings: settingsSnapshot,
         source_images: uploadedImages.value.map((img) => ({
           id: img.id,
@@ -316,57 +307,42 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
         })),
         input_text: settings.productInput,
         structure: [selectedType],
-      });
-      if (saveRes.code !== 0) {
-        toast?.error?.(saveRes.message || "保存视频任务配置失败");
-        return;
-      }
-
-      const result = await generateVideo({
-        type_id: selectedType.typeId,
-        title: selectedType.title,
-        input_mode: selectedType.inputMode,
-        image_urls: imageUrls,
-        user_prompt: settings.productInput,
-        duration: settings.duration,
-        resolution: settings.resolution,
-        aspect_ratio: settingsSnapshot.aspect_ratio,
-        settings_snapshot: settingsSnapshot,
-        sort_order: outputCards.value.length,
-        job_id: jobId,
-      });
-
-      if (result.code !== 0) {
-        toast?.error?.(result.message || "视频任务创建失败");
-        return;
-      }
-
-      const taskId = result.data?.task_id;
-      if (!taskId) {
-        toast?.error?.("视频任务创建失败：后端未返回任务 ID");
-        return;
-      }
-
-      const batchRunId = makeId();
-      activeBatchRunId.value = batchRunId;
-      trackBatch(batchRunId);
-      const card = createCard({
-        taskId,
-        typeId: selectedType.typeId,
-        title: selectedType.title,
-        settingsSnapshot,
-        creditCost: result.data?.credit_cost || 0,
-        batchRunId,
-      });
-      outputCards.value.unshift(card);
-      genLogs.value.push(`[${selectedType.title}] 已进入队列`);
-      startPollingCard(card);
-      maybeFinishGenerating(batchRunId);
-    } catch {
-      toast?.error?.("视频任务创建失败，请稍后重试");
-    } finally {
-      creatingBatch.value = false;
-    }
+      },
+      initialLogs: [`[${selectedType.title}] 创建视频任务`],
+      repeatLog: `[${selectedType.title}] 创建视频任务`,
+      buildSettingsSnapshot: () => settingsSnapshot,
+      createCard({ item, sortOrder, batchRunId, settingsSnapshot: snapshot }) {
+        return createCard({
+          typeId: item.typeId,
+          title: item.title,
+          settingsSnapshot: snapshot,
+          sortOrder,
+          batchRunId,
+        });
+      },
+      createTask({ item, card, settingsSnapshot: snapshot, jobId }) {
+        return generateVideo({
+          type_id: item.typeId,
+          title: item.title,
+          input_mode: item.inputMode,
+          image_urls: imageUrls,
+          user_prompt: settings.productInput,
+          duration: settings.duration,
+          resolution: settings.resolution,
+          aspect_ratio: snapshot.aspect_ratio,
+          settings_snapshot: snapshot,
+          sort_order: card.sortOrder,
+          job_id: jobId,
+        });
+      },
+      getCreateLog: (item) => `[${item.title}] 已进入队列`,
+      getFailLogName: (item) => item.title,
+      allFailedMessage: "视频任务创建失败，请稍后重试",
+      saveErrorMessage: "保存视频任务配置失败",
+      taskIdMissingMessage: "视频任务创建失败：后端未返回任务 ID",
+      insertCards: "after-success",
+      preferCreateErrorAsToast: true,
+    });
   }
 
   async function removeCard(card) {
