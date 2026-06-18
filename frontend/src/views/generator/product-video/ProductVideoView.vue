@@ -1,16 +1,37 @@
 <script setup>
 import { onMounted, ref } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import GenerationHistoryDrawer from "@/components/generation/GenerationHistoryDrawer.vue";
 import GenerationPreviewModal from "@/components/generation/GenerationPreviewModal.vue";
 import GenerationWorkspace from "@/components/generation/GenerationWorkspace.vue";
 import GeneratorLayout from "@/components/layout/GeneratorLayout.vue";
 import VideoSettingsPanel from "@/components/product-video/VideoSettingsPanel.vue";
+import { useGeneratorRouteJob } from "@/composables/useGeneratorRouteJob.js";
 import { useProductVideoGenerator } from "@/composables/useProductVideoGenerator.js";
+import { useConfirm } from "@/composables/useConfirm.js";
 import { useToast } from "@/composables/useToast.js";
 import { videoDemoTypes } from "@/constants/productVideo.js";
 
+const route = useRoute();
+const router = useRouter();
+const confirm = useConfirm();
 const toast = useToast();
-const video = useProductVideoGenerator({ toast });
+const video = useProductVideoGenerator({
+  toast,
+  onJobCreated(jobId) {
+    router.replace(`/generator/product-video/${jobId}`);
+  },
+});
 const zoomCard = ref(null);
+
+const { openHistory, pickHistory, handleCreateNewTask, handleDeleteJob } = useGeneratorRouteJob({
+  generator: video,
+  route,
+  router,
+  basePath: "/generator/product-video",
+  toast,
+  confirm,
+});
 
 onMounted(() => {
   video.loadCreditCosts();
@@ -23,6 +44,10 @@ function openPreview(card) {
 
 function closePreview() {
   zoomCard.value = null;
+}
+
+function closeHistoryDrawer() {
+  video.showHistoryDrawer.value = false;
 }
 </script>
 
@@ -55,7 +80,6 @@ function closePreview() {
       :selected-cards-count="video.selectedCardsCount.value"
       selected-image-label="商品视频"
       :get-module-name="video.getVideoModuleName"
-      title-badge="商品视频任务"
       empty-title="商品视频示例"
       empty-subtitle="这里仅用于预览不同电商视频风格，左侧选择的视频方向才会影响生成设置。"
       :empty-slides="videoDemoTypes"
@@ -66,15 +90,27 @@ function closePreview() {
       loading-description="正在创建商品视频任务，稍后会在右侧显示生成进度"
       progress-text="正在生成商品视频"
       poll-hint="每 3 秒轮询任务状态"
-      @update:current-task-title="video.currentTaskTitle.value = $event"
+      @update:current-task-title="video.updateCurrentJobTitle"
       @select-all-cards="video.toggleSelectAllCards"
       @batch-download="video.batchDownload"
       @toggle-card="video.toggleCardSelection"
       @download-card="video.downloadSingleVideo"
       @zoom-card="openPreview"
       @delete-card="video.removeCard"
-      @create-new-task="video.showNotice('商品视频新建任务会在历史记录接入时开放')"
-      @open-history="video.showNotice('商品视频生成记录会在下一批接入')"
+      @create-new-task="handleCreateNewTask"
+      @open-history="openHistory"
+    />
+
+    <GenerationHistoryDrawer
+      :open="video.showHistoryDrawer.value"
+      :jobs="video.historyTasks.value"
+      :loading="video.historyLoading.value"
+      :current-job-id="video.currentJobId.value"
+      empty-hint="点击「新建任务」开始生成商品视频"
+      unit="个"
+      @close="closeHistoryDrawer"
+      @pick="pickHistory"
+      @delete="handleDeleteJob"
     />
 
     <GenerationPreviewModal

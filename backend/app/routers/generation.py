@@ -9,17 +9,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.deps import get_current_user, get_db
 from app.core.json_utils import dump_json, parse_json_or_none
 from app.core.time import to_utc_iso, utc_now
-from app.models import GenerationJob, ImageTask, User
+from app.models import GenerationJob, ImageTask, User, VideoTask
 from app.schemas.response import Response, fail, success
 
 router = APIRouter(prefix="/generation", tags=["生成任务"])
 
-SUPPORTED_SCENARIOS = {"product_suite", "product_image", "outfit", "free_image"}
+SUPPORTED_SCENARIOS = {"product_suite", "product_image", "outfit", "free_image", "product_video"}
 SCENARIO_TITLE_PREFIX = {
     "product_suite": "商品套图",
     "product_image": "商品详情图",
     "outfit": "服饰穿搭",
     "free_image": "自由生图",
+    "product_video": "商品视频",
 }
 
 TERMINAL_DONE = "done"
@@ -59,6 +60,62 @@ class UpdateJobRequest(BaseModel):
 def _default_title(scenario: str) -> str:
     prefix = SCENARIO_TITLE_PREFIX.get(scenario, scenario)
     return f"{prefix}_{utc_now():%Y%m%d_%H%M%S}"
+
+
+def _task_model_for_scenario(scenario: str):
+    return VideoTask if scenario == "product_video" else ImageTask
+
+
+def _image_task_payload(task: ImageTask) -> dict:
+    return {
+        "task_id": task.id,
+        "media_type": "image",
+        "type_id": task.type_id,
+        "title": task.title,
+        "sort_order": task.sort_order,
+        "status": task.status,
+        "progress": task.progress or 0,
+        "result_url": task.result_url,
+        "size": task.size,
+        "error_message": task.error_message,
+        "credit_cost": task.credit_cost,
+        "credit_refunded": bool(task.credit_refunded),
+        "replaced_by_task_id": task.replaced_by_task_id,
+        "prompt": task.prompt,
+        "edit_instruction": task.edit_instruction,
+        "system_prompt_snapshot": task.system_prompt_snapshot,
+        "task_prompt_snapshot": task.task_prompt_snapshot,
+        "user_prompt": task.user_prompt,
+        "prompt_template_refs": parse_json_or_none(task.prompt_template_refs_json),
+        "settings_snapshot": parse_json_or_none(task.settings_snapshot_json),
+    }
+
+
+def _video_task_payload(task: VideoTask) -> dict:
+    return {
+        "task_id": task.id,
+        "media_type": "video",
+        "type_id": task.type_id,
+        "title": task.title,
+        "sort_order": task.sort_order,
+        "status": task.status,
+        "progress": task.progress or 0,
+        "result_url": task.result_url,
+        "input_mode": task.input_mode,
+        "input_images": parse_json_or_none(task.input_images_json) or [],
+        "duration": task.duration,
+        "resolution": task.resolution,
+        "aspect_ratio": task.aspect_ratio,
+        "error_message": task.error_message,
+        "credit_cost": task.credit_cost,
+        "credit_refunded": bool(task.credit_refunded),
+        "prompt": task.prompt,
+        "system_prompt_snapshot": task.system_prompt_snapshot,
+        "task_prompt_snapshot": task.task_prompt_snapshot,
+        "user_prompt": task.user_prompt,
+        "prompt_template_refs": parse_json_or_none(task.prompt_template_refs_json),
+        "settings_snapshot": parse_json_or_none(task.settings_snapshot_json),
+    }
 
 
 @router.post("/jobs", response_model=Response)
@@ -119,13 +176,16 @@ async def list_jobs(
         return success([])
 
     job_ids = [job.id for job in jobs]
+    task_model = _task_model_for_scenario(scenario)
+    task_conditions = [
+        task_model.user_id == current_user.id,
+        task_model.job_id.in_(job_ids),
+        task_model.archived == False,  # noqa: E712
+    ]
+    if task_model is ImageTask:
+        task_conditions.append(ImageTask.replaced_by_task_id.is_(None))
     tasks_rows = await db.execute(
-        select(ImageTask.job_id, ImageTask.status).where(
-            ImageTask.user_id == current_user.id,
-            ImageTask.job_id.in_(job_ids),
-            ImageTask.archived == False,  # noqa: E712
-            ImageTask.replaced_by_task_id.is_(None),
-        )
+        select(task_model.job_id, task_model.status).where(*task_conditions)
     )
     stats: dict[str, dict[str, int]] = {
         jid: {"total": 0, "completed": 0, "failed": 0} for jid in job_ids
@@ -180,40 +240,23 @@ async def get_job(
     if not job:
         return fail("任务不存在")
 
-    tasks_result = await db.execute(
-        select(ImageTask)
-        .where(
-            ImageTask.job_id == job_id,
-            ImageTask.user_id == current_user.id,
-            ImageTask.archived == False,  # noqa: E712
-            ImageTask.replaced_by_task_id.is_(None),
-        )
-        .order_by(ImageTask.sort_order.asc(), ImageTask.created_at.asc())
-    )
-    items = [
-        {
-            "task_id": task.id,
-            "type_id": task.type_id,
-            "title": task.title,
-            "sort_order": task.sort_order,
-            "status": task.status,
-            "progress": task.progress or 0,
-            "result_url": task.result_url,
-            "size": task.size,
-            "error_message": task.error_message,
-            "credit_cost": task.credit_cost,
-            "credit_refunded": bool(task.credit_refunded),
-            "replaced_by_task_id": task.replaced_by_task_id,
-            "prompt": task.prompt,
-            "edit_instruction": task.edit_instruction,
-            "system_prompt_snapshot": task.system_prompt_snapshot,
-            "task_prompt_snapshot": task.task_prompt_snapshot,
-            "user_prompt": task.user_prompt,
-            "prompt_template_refs": parse_json_or_none(task.prompt_template_refs_json),
-            "settings_snapshot": parse_json_or_none(task.settings_snapshot_json),
-        }
-        for task in tasks_result.scalars().all()
+    task_model = _task_model_for_scenario(job.scenario)
+    task_conditions = [
+        task_model.job_id == job_id,
+        task_model.user_id == current_user.id,
+        task_model.archived == False,  # noqa: E712
     ]
+    if task_model is ImageTask:
+        task_conditions.append(ImageTask.replaced_by_task_id.is_(None))
+    tasks_result = await db.execute(
+        select(task_model)
+        .where(*task_conditions)
+        .order_by(task_model.sort_order.asc(), task_model.created_at.asc())
+    )
+    if task_model is VideoTask:
+        items = [_video_task_payload(task) for task in tasks_result.scalars().all()]
+    else:
+        items = [_image_task_payload(task) for task in tasks_result.scalars().all()]
 
     total = len(items)
     completed = sum(1 for t in items if t["status"] == TERMINAL_DONE)

@@ -3,7 +3,7 @@ import { getAdminImageTasks } from "@/api/admin.js";
 import { createAdminPageState, useAdminPageLoader } from "@/composables/admin/useAdminPageState.js";
 import { useToast } from "@/composables/useToast.js";
 
-const imageTasksState = reactive(createAdminPageState({ status: "", scenario: "" }));
+const imageTasksState = reactive(createAdminPageState({ status: "", scenario: "", mediaType: "" }));
 
 export function useAdminImageTasks() {
   const toast = useToast();
@@ -16,8 +16,9 @@ export function useAdminImageTasks() {
       {
         status: imageTasksState.status || undefined,
         scenario: imageTasksState.scenario || undefined,
+        media_type: imageTasksState.mediaType || undefined,
       },
-      "加载生图任务失败",
+      "加载生成任务失败",
     );
   }
 

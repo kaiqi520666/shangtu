@@ -1,6 +1,8 @@
 import { computed, onBeforeUnmount, reactive, ref } from "vue";
 import { generateVideo, getVideoCreditCosts, getVideoDownloadUrl, getVideoTask } from "@/api/video.js";
-import { useAuthStore } from "@/stores/auth.js";
+import { updateGenerationJob } from "@/api/generation.js";
+import { useCardActions } from "@/composables/useCardActions.js";
+import { useGenerationRunner } from "@/composables/useGenerationRunner.js";
 import {
   defaultVideoCreditCosts,
   getVideoDemoType,
@@ -54,8 +56,7 @@ function getRequiredImageMessage(inputMode, count) {
   return "";
 }
 
-export function useProductVideoGenerator({ toast } = {}) {
-  const authStore = useAuthStore();
+export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
   const settings = reactive({
     videoType: videoDemoTypes[0].typeId,
     inputMode: videoDemoTypes[0].inputMode,
@@ -69,10 +70,10 @@ export function useProductVideoGenerator({ toast } = {}) {
   const uploadedImages = ref([]);
   const mainImageIndex = ref(0);
   const creditCosts = ref({ ...defaultVideoCreditCosts });
-  const currentTaskTitle = ref("");
   const outputCards = ref([]);
   const genLogs = ref([]);
   const creatingBatch = ref(false);
+  const activeBatchRunId = ref("");
 
   const pollTimers = new Map();
   const pollInFlight = new Set();
@@ -90,8 +91,6 @@ export function useProductVideoGenerator({ toast } = {}) {
   );
   const jobTotal = computed(() => outputCards.value.length);
   const generating = computed(() => runningCount.value > 0);
-  const selectedCards = computed(() => outputCards.value.filter((card) => card.selected));
-  const selectedCardsCount = computed(() => selectedCards.value.length);
 
   async function loadCreditCosts() {
     try {
@@ -115,24 +114,145 @@ export function useProductVideoGenerator({ toast } = {}) {
     toast?.info?.(message);
   }
 
-  function createCard({ taskId, typeId, title, settingsSnapshot, creditCost }) {
+  const cardsAdapter = {
+    outputCards,
+    genLogs,
+    creatingBatch,
+    generating,
+    activeBatchRunId,
+    startPollingCard,
+    clearAllPollTimers,
+    trackBatch() {},
+    maybeFinishGenerating() {},
+    makeId,
+    TERMINAL_STATUSES,
+  };
+
+  const runner = useGenerationRunner({
+    scenario: "product_video",
+    cards: cardsAdapter,
+    toast,
+    onJobCreated,
+    mediaUnit: "个",
+    resetSceneState() {
+      uploadedImages.value = [];
+      mainImageIndex.value = 0;
+      settings.videoType = videoDemoTypes[0].typeId;
+      settings.inputMode = videoDemoTypes[0].inputMode;
+      settings.market = "global";
+      settings.language = "english";
+      settings.sizePreset = "tiktok_9_16";
+      settings.duration = 6;
+      settings.resolution = "720p";
+      settings.productInput = "";
+    },
+    applyJobData(data) {
+      restoreVideoJobData(data);
+    },
+    restoreCard(item) {
+      return createCard({
+        taskId: item.task_id,
+        typeId: item.type_id,
+        title: item.title || getVideoModuleName(item.type_id),
+        settingsSnapshot: item.settings_snapshot || null,
+        creditCost: item.credit_cost || 0,
+        status: item.status || "pending",
+        resultUrl: item.result_url || "",
+        errorMessage: item.error_message || "",
+        progress: item.progress || 0,
+        sortOrder: item.sort_order || 0,
+      });
+    },
+  });
+
+  const {
+    currentJobId,
+    currentTaskTitle,
+    historyTasks,
+    showHistoryDrawer,
+    historyLoading,
+    jobLoading,
+    updateCurrentJobTitle,
+    ensureCurrentJob,
+    createNewTask,
+    resetWorkspaceToDraft,
+    loadHistoryTasks,
+    loadGenerationJob,
+  } = runner;
+
+  const actions = useCardActions({
+    outputCards,
+    currentTaskTitle,
+    getCardName: (card) => card.strategyTitle || getVideoModuleName(card.typeId),
+    getDownloadUrl: (card) => getVideoDownloadUrl(card.taskId),
+    mediaLabel: "视频",
+    mediaUnit: "个",
+    archiveName: "商品视频",
+    toast,
+  });
+
+  const {
+    selectedCardsCount,
+    toggleCardSelection,
+    toggleSelectAllCards,
+    batchDownload,
+    downloadSingleMedia: downloadSingleVideo,
+  } = actions;
+
+  function createCard({
+    taskId,
+    typeId,
+    title,
+    settingsSnapshot,
+    creditCost,
+    status = "pending",
+    resultUrl = "",
+    errorMessage = "",
+    progress = 0,
+    sortOrder = outputCards.value.length,
+  }) {
     return reactive({
       id: makeId(),
       taskId,
       typeId,
-      dataUrl: "",
-      resultUrl: "",
+      dataUrl: resultUrl,
+      resultUrl,
       selected: false,
-      status: "pending",
+      status,
       strategyTitle: title || "商品视频",
       strategyContent: settingsSnapshot?.product_input || "",
-      errorMessage: "",
-      sortOrder: outputCards.value.length,
+      errorMessage,
+      sortOrder,
       batchRunId: "",
       creditCost,
       userPrompt: settingsSnapshot?.product_input || "",
       settingsSnapshot,
+      progress,
     });
+  }
+
+  function restoreVideoJobData(data) {
+    const s = data.settings || {};
+    if (typeof s.type_id === "string") {
+      settings.videoType = s.type_id;
+      settings.inputMode = getVideoDemoType(s.type_id).inputMode;
+    }
+    if (typeof s.input_mode === "string") settings.inputMode = s.input_mode;
+    if (typeof s.market === "string") settings.market = s.market;
+    if (typeof s.language === "string") settings.language = s.language;
+    if (typeof s.size_preset === "string") settings.sizePreset = s.size_preset;
+    if (typeof s.duration === "number") settings.duration = s.duration;
+    if (typeof s.resolution === "string") settings.resolution = s.resolution;
+    settings.productInput = data.input_text || s.product_input || "";
+    if (Array.isArray(data.source_images)) {
+      uploadedImages.value = data.source_images.map((img) => ({
+        ...img,
+        previewUrl: img?.url || img?.previewUrl || "",
+      }));
+    } else {
+      uploadedImages.value = [];
+    }
+    mainImageIndex.value = 0;
   }
 
   async function generateProductVideo() {
@@ -158,6 +278,27 @@ export function useProductVideoGenerator({ toast } = {}) {
     genLogs.value.push(`[${selectedType.title}] 创建视频任务`);
 
     try {
+      const jobId = await ensureCurrentJob();
+      if (!jobId) return;
+      const saveRes = await updateGenerationJob(jobId, {
+        title: currentTaskTitle.value,
+        settings: settingsSnapshot,
+        source_images: uploadedImages.value.map((img) => ({
+          id: img.id,
+          url: img.url,
+          objectKey: img.objectKey,
+          contentType: img.contentType,
+          size: img.size,
+          previewUrl: img.url || img.previewUrl,
+        })),
+        input_text: settings.productInput,
+        structure: [selectedType],
+      });
+      if (saveRes.code !== 0) {
+        toast?.error?.(saveRes.message || "保存视频任务配置失败");
+        return;
+      }
+
       const result = await generateVideo({
         type_id: selectedType.typeId,
         title: selectedType.title,
@@ -169,6 +310,7 @@ export function useProductVideoGenerator({ toast } = {}) {
         aspect_ratio: settingsSnapshot.aspect_ratio,
         settings_snapshot: settingsSnapshot,
         sort_order: outputCards.value.length,
+        job_id: jobId,
       });
 
       if (result.code !== 0) {
@@ -276,59 +418,6 @@ export function useProductVideoGenerator({ toast } = {}) {
     pollInFlight.clear();
   }
 
-  function toggleCardSelection(id) {
-    const card = outputCards.value.find((item) => item.id === id);
-    if (card) card.selected = !card.selected;
-  }
-
-  function toggleSelectAllCards(value) {
-    outputCards.value.forEach((card) => {
-      card.selected = value;
-    });
-  }
-
-  async function downloadSingleVideo(card) {
-    if (!card?.taskId || card.status !== "done") {
-      toast?.info?.("该视频还未生成完成");
-      return;
-    }
-    try {
-      const res = await fetch(getVideoDownloadUrl(card.taskId), {
-        headers: { Authorization: `Bearer ${authStore.token}` },
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const blob = await res.blob();
-      const ext = blob.type === "video/webm" ? "webm" : blob.type === "video/quicktime" ? "mov" : "mp4";
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `${currentTaskTitle.value || "商品视频"}_${card.strategyTitle || "video"}.${ext}`;
-      link.click();
-      URL.revokeObjectURL(url);
-    } catch {
-      const link = document.createElement("a");
-      link.href = card.dataUrl;
-      link.target = "_blank";
-      link.rel = "noopener";
-      link.click();
-    }
-  }
-
-  async function batchDownload() {
-    const downloadable = selectedCards.value.filter(
-      (card) => card.status === "done" && card.dataUrl,
-    );
-    if (downloadable.length === 0) {
-      toast?.info?.("请先勾选已生成完成的视频");
-      return;
-    }
-    if (downloadable.length > 1) {
-      toast?.info?.("视频批量打包会在资产库接入后开放，当前请单个下载");
-      return;
-    }
-    await downloadSingleVideo(downloadable[0]);
-  }
-
   function removeCard(card) {
     outputCards.value = outputCards.value.filter((item) => item.id !== card.id);
     stopPollingCard(card.id);
@@ -338,14 +427,21 @@ export function useProductVideoGenerator({ toast } = {}) {
     return getVideoDemoType(typeId).title || "商品视频";
   }
 
-  onBeforeUnmount(clearAllPollTimers);
+  onBeforeUnmount(() => {
+    runner.cleanup();
+  });
 
   return {
     settings,
     uploadedImages,
     mainImageIndex,
     creditCosts,
+    currentJobId,
     currentTaskTitle,
+    historyTasks,
+    showHistoryDrawer,
+    historyLoading,
+    jobLoading,
     outputCards,
     genLogs,
     creatingBatch,
@@ -359,12 +455,16 @@ export function useProductVideoGenerator({ toast } = {}) {
     updateSettings,
     showNotice,
     generateProductVideo,
+    createNewTask,
+    resetWorkspaceToDraft,
+    updateCurrentJobTitle,
+    loadHistoryTasks,
+    loadGenerationJob,
     toggleCardSelection,
     toggleSelectAllCards,
     downloadSingleVideo,
     batchDownload,
     removeCard,
     getVideoModuleName,
-    authStore,
   };
 }

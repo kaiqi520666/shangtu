@@ -1,17 +1,87 @@
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_user, get_db
 from app.core.time import to_utc_iso
-from app.models import GenerationJob, ImageTask, User
+from app.models import GenerationJob, ImageTask, User, VideoTask
 from app.schemas.response import Response, fail, success
 
 router = APIRouter(prefix="/asset", tags=["资产库"])
 
-SCENARIO_FILTER = {"product_suite", "product_image", "outfit", "free_image"}
+SCENARIO_FILTER = {"product_suite", "product_image", "outfit", "free_image", "product_video"}
 PAGE_SIZE_MAX = 50
+
+
+async def _query_image_assets(
+    db: AsyncSession,
+    *,
+    user_id: int,
+    scenario: str | None,
+) -> list[dict]:
+    if scenario == "product_video":
+        return []
+    stmt = (
+        select(ImageTask, GenerationJob)
+        .outerjoin(GenerationJob, GenerationJob.id == ImageTask.job_id)
+        .where(
+            ImageTask.user_id == user_id,
+            ImageTask.status == "done",
+            ImageTask.archived == False,  # noqa: E712
+        )
+    )
+    if scenario:
+        stmt = stmt.where(ImageTask.job_id.isnot(None), GenerationJob.scenario == scenario)
+    result = await db.execute(stmt)
+    return [
+        {
+            "task_id": task.id,
+            "media_type": "image",
+            "result_url": task.result_url,
+            "title": task.title or "",
+            "type_id": task.type_id or "",
+            "scenario": job.scenario if job else "",
+            "job_title": job.title if job else "",
+            "created_at": to_utc_iso(task.created_at),
+            "_created_at": task.created_at,
+        }
+        for task, job in result.all()
+    ]
+
+
+async def _query_video_assets(
+    db: AsyncSession,
+    *,
+    user_id: int,
+    scenario: str | None,
+) -> list[dict]:
+    if scenario and scenario != "product_video":
+        return []
+    stmt = (
+        select(VideoTask, GenerationJob)
+        .outerjoin(GenerationJob, GenerationJob.id == VideoTask.job_id)
+        .where(
+            VideoTask.user_id == user_id,
+            VideoTask.status == "done",
+            VideoTask.archived == False,  # noqa: E712
+        )
+    )
+    result = await db.execute(stmt)
+    return [
+        {
+            "task_id": task.id,
+            "media_type": "video",
+            "result_url": task.result_url,
+            "title": task.title or "",
+            "type_id": task.type_id or "",
+            "scenario": job.scenario if job else "product_video",
+            "job_title": job.title if job else "",
+            "created_at": to_utc_iso(task.created_at),
+            "_created_at": task.created_at,
+        }
+        for task, job in result.all()
+    ]
 
 
 @router.get("/list", response_model=Response)
@@ -22,85 +92,19 @@ async def list_assets(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    # 基础条件：当前用户、已完成、未归档
-    base_conditions = [
-        ImageTask.user_id == current_user.id,
-        ImageTask.status == "done",
-        ImageTask.archived == False,  # noqa: E712
-    ]
-
     if scenario:
         if scenario not in SCENARIO_FILTER:
             return fail(f"不支持的场景类型：{scenario}")
-        # 通过 job_id 关联 generation_jobs 取 scenario
-        base_conditions.append(ImageTask.job_id.isnot(None))
-        base_conditions.append(GenerationJob.id == ImageTask.job_id)
-        base_conditions.append(GenerationJob.scenario == scenario)
-        count_query = (
-            select(func.count())
-            .select_from(ImageTask)
-            .join(GenerationJob, GenerationJob.id == ImageTask.job_id)
-            .where(*base_conditions[:3])  # user, status, archived
-            .where(GenerationJob.scenario == scenario)
-        )
-        items_query = (
-            select(
-                ImageTask.id,
-                ImageTask.result_url,
-                ImageTask.title,
-                ImageTask.type_id,
-                ImageTask.job_id,
-                ImageTask.created_at,
-                GenerationJob.scenario,
-                GenerationJob.title.label("job_title"),
-            )
-            .join(GenerationJob, GenerationJob.id == ImageTask.job_id)
-            .where(*base_conditions[:3])
-            .where(GenerationJob.scenario == scenario)
-            .order_by(ImageTask.created_at.desc())
-            .offset((page - 1) * page_size)
-            .limit(page_size)
-        )
-    else:
-        # 全部：含有 job_id 的用 left join 取 scenario，无 job_id 的也返回
-        count_query = (
-            select(func.count())
-            .select_from(ImageTask)
-            .where(*base_conditions)
-        )
-        items_query = (
-            select(
-                ImageTask.id,
-                ImageTask.result_url,
-                ImageTask.title,
-                ImageTask.type_id,
-                ImageTask.job_id,
-                ImageTask.created_at,
-                GenerationJob.scenario,
-                GenerationJob.title.label("job_title"),
-            )
-            .outerjoin(GenerationJob, GenerationJob.id == ImageTask.job_id)
-            .where(*base_conditions)
-            .order_by(ImageTask.created_at.desc())
-            .offset((page - 1) * page_size)
-            .limit(page_size)
-        )
 
-    total = (await db.execute(count_query)).scalar() or 0
-    rows = (await db.execute(items_query)).all()
-
-    items = [
-        {
-            "task_id": row.id,
-            "result_url": row.result_url,
-            "title": row.title or "",
-            "type_id": row.type_id or "",
-            "scenario": row.scenario or "",
-            "job_title": row.job_title or "",
-            "created_at": to_utc_iso(row.created_at),
-        }
-        for row in rows
-    ]
+    image_items = await _query_image_assets(db, user_id=current_user.id, scenario=scenario)
+    video_items = await _query_video_assets(db, user_id=current_user.id, scenario=scenario)
+    all_items = [*image_items, *video_items]
+    all_items.sort(key=lambda item: item["_created_at"], reverse=True)
+    total = len(all_items)
+    start = (page - 1) * page_size
+    items = all_items[start:start + page_size]
+    for item in items:
+        item.pop("_created_at", None)
 
     return success({
         "items": items,
@@ -112,6 +116,7 @@ async def list_assets(
 
 class BatchDeleteRequest(BaseModel):
     task_ids: list[str]
+    media_type: str | None = None
 
 
 @router.delete("/batch", response_model=Response)
@@ -122,26 +127,40 @@ async def batch_delete_assets(
     db: AsyncSession = Depends(get_db),
 ):
     if not req.task_ids:
-        return fail("请选择要删除的图片")
+        return fail("请选择要删除的资产")
     if len(req.task_ids) > 50:
-        return fail("单次最多删除 50 张")
+        return fail("单次最多删除 50 个资产")
 
-    # 硬删除：只删属于当前用户且 status=done 的
-    stmt = (
-        delete(ImageTask)
-        .where(
-            ImageTask.id.in_(req.task_ids),
-            ImageTask.user_id == current_user.id,
-            ImageTask.status == "done",
+    deleted_ids: list[str] = []
+    deleted_video_ids: list[str] = []
+    if req.media_type in (None, "", "image"):
+        stmt = (
+            delete(ImageTask)
+            .where(
+                ImageTask.id.in_(req.task_ids),
+                ImageTask.user_id == current_user.id,
+                ImageTask.status == "done",
+            )
+            .returning(ImageTask.id)
         )
-        .returning(ImageTask.id)
-    )
-    result = await db.execute(stmt)
-    deleted_ids = [row[0] for row in result.all()]
+        result = await db.execute(stmt)
+        deleted_ids.extend([row[0] for row in result.all()])
+    if req.media_type in (None, "", "video"):
+        stmt = (
+            delete(VideoTask)
+            .where(
+                VideoTask.id.in_(req.task_ids),
+                VideoTask.user_id == current_user.id,
+                VideoTask.status == "done",
+            )
+            .returning(VideoTask.id)
+        )
+        result = await db.execute(stmt)
+        deleted_video_ids.extend([row[0] for row in result.all()])
     await db.commit()
 
     # 清理 Redis 缓存 key（best effort）
-    if deleted_ids:
+    if deleted_ids or deleted_video_ids:
         try:
             redis = request.app.state.redis_pool
             keys_to_del = []
@@ -152,9 +171,17 @@ async def batch_delete_assets(
                     f"task:{task_id}:error",
                     f"task:{task_id}:progress",
                 ])
+            for task_id in deleted_video_ids:
+                keys_to_del.extend([
+                    f"video_task:{task_id}:status",
+                    f"video_task:{task_id}:result",
+                    f"video_task:{task_id}:error",
+                    f"video_task:{task_id}:progress",
+                ])
             if keys_to_del:
                 await redis.delete(*keys_to_del)
         except Exception:
             pass  # Redis 清理失败不影响主流程
 
-    return success({"deleted": len(deleted_ids), "deleted_ids": deleted_ids})
+    all_deleted_ids = [*deleted_ids, *deleted_video_ids]
+    return success({"deleted": len(all_deleted_ids), "deleted_ids": all_deleted_ids})

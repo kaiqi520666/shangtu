@@ -48,27 +48,38 @@ function formatDate(isoStr) {
         <button
           type="button"
           class="rounded-lg border border-slate-200 bg-white/95 p-1.5 text-slate-600 shadow transition-colors hover:bg-white hover:text-rose-500"
-          title="删除图片"
+          :title="card.mediaType === 'video' ? '删除视频' : '删除图片'"
           @click="emit('delete-card', card)"
         >
           <Trash2 class="h-3.5 w-3.5" />
         </button>
       </div>
 
-      <!-- 图片区域 -->
+      <!-- 媒体区域 -->
       <button
         type="button"
         class="relative flex aspect-square cursor-pointer items-center justify-center overflow-hidden bg-slate-100 p-3"
         @click="emit('zoom-card', card)"
       >
         <div class="absolute inset-0 bg-gradient-to-b from-transparent to-black/[0.01]"></div>
+        <video
+          v-if="card.mediaType === 'video' && card.dataUrl"
+          :src="card.dataUrl"
+          class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+          muted
+          playsinline
+          preload="metadata"
+        ></video>
         <img
-          v-if="card.dataUrl"
+          v-else-if="card.dataUrl"
           :src="card.dataUrl"
           referrerpolicy="no-referrer"
           class="max-h-full max-w-full object-contain drop-shadow-md transition-transform duration-300 group-hover:scale-[1.03]"
           alt="资产图片"
         />
+        <span v-if="card.mediaType === 'video'" class="absolute bottom-2 left-2 rounded-full bg-black/60 px-2 py-0.5 text-[11px] font-bold text-white">
+          视频
+        </span>
       </button>
 
       <!-- 底部信息 -->

@@ -41,6 +41,21 @@ const paymentConfigLabels = {
       </div>
 
       <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div class="mb-4 flex items-center justify-between">
+          <div>
+            <h2 class="text-sm font-black text-slate-800">商品视频扣费</h2>
+            <p class="mt-1 text-xs text-slate-400">按清晰度配置每秒消耗积分，实际扣费 = 时长 × 每秒积分。</p>
+          </div>
+        </div>
+        <div class="grid gap-3 md:grid-cols-3">
+          <label v-for="resolution in ['480p', '720p', '1080p']" :key="resolution" class="block">
+            <span class="text-xs font-bold text-slate-600">{{ resolution }} 每秒扣费</span>
+            <input v-model.number="state.videoCreditCosts[resolution]" type="number" min="1" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary" />
+          </label>
+        </div>
+      </div>
+
+      <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <div class="mb-4 flex items-center justify-between gap-3">
           <div>
             <h2 class="text-sm font-black text-slate-800">充值套餐</h2>

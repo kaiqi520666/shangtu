@@ -2,6 +2,8 @@ import { computed, ref } from "vue";
 import { useToast } from "@/composables/useToast.js";
 import { useCardActions } from "@/composables/useCardActions.js";
 import { listAssets, deleteAssets } from "@/api/asset.js";
+import { getImageDownloadUrl } from "@/api/image.js";
+import { getVideoDownloadUrl } from "@/api/video.js";
 
 const SCENARIO_OPTIONS = [
   { value: "", label: "全部" },
@@ -9,6 +11,7 @@ const SCENARIO_OPTIONS = [
   { value: "product_image", label: "商品详情图" },
   { value: "outfit", label: "服饰穿搭" },
   { value: "free_image", label: "自由生图" },
+  { value: "product_video", label: "商品视频" },
 ];
 
 export function useAssetLibrary() {
@@ -23,11 +26,17 @@ export function useAssetLibrary() {
 
   const totalPages = computed(() => Math.ceil(total.value / pageSize.value) || 1);
 
-  // 复用 useCardActions（选择 / 下载）
   const actions = useCardActions({
     outputCards: assets,
     currentTaskTitle,
-    getCardName: (card) => card.title || card.typeId || "资产图",
+    getCardName: (card) => card.title || card.typeId || "asset",
+    getDownloadUrl: (card) =>
+      card.mediaType === "video"
+        ? getVideoDownloadUrl(card.taskId)
+        : getImageDownloadUrl(card.taskId),
+    mediaLabel: "资产",
+    mediaUnit: "个",
+    archiveName: "资产库",
     toast,
   });
 
@@ -38,7 +47,7 @@ export function useAssetLibrary() {
     toggleCardSelection,
     toggleSelectAllCards,
     batchDownload,
-    downloadSingleImage,
+    downloadSingleMedia: downloadAsset,
   } = actions;
 
   async function loadAssets() {
@@ -57,7 +66,7 @@ export function useAssetLibrary() {
       }
       const data = result.data || {};
       total.value = data.total || 0;
-      // 映射为卡片格式（兼容 useCardActions 的字段要求）
+      // 映射为资产卡片统一字段，图片和视频共用同一套选择/预览逻辑。
       assets.value = (data.items || []).map((item) => ({
         id: item.task_id,
         taskId: item.task_id,
@@ -66,6 +75,7 @@ export function useAssetLibrary() {
         title: item.title || "",
         typeId: item.type_id || "",
         scenario: item.scenario || "",
+        mediaType: item.media_type || "image",
         jobTitle: item.job_title || "",
         createdAt: item.created_at || "",
         selected: false,
@@ -100,17 +110,18 @@ export function useAssetLibrary() {
   async function deleteSelected() {
     const ids = selectedCards.value.map((card) => card.taskId);
     if (ids.length === 0) {
-      toast.info("请先选择要删除的图片");
+      toast.info("请先选择要删除的资产");
       return false;
     }
     try {
-      const result = await deleteAssets(ids);
+      const mediaTypes = [...new Set(selectedCards.value.map((card) => card.mediaType || "image"))];
+      const result = await deleteAssets(ids, mediaTypes.length === 1 ? mediaTypes[0] : "");
       if (result.code !== 0) {
         toast.error(result.message || "删除失败");
         return false;
       }
       const deletedCount = result.data?.deleted || 0;
-      toast.success(`已删除 ${deletedCount} 张图片`);
+      toast.success(`已删除 ${deletedCount} 个资产`);
       // 刷新当前页（如果删完了当前页，回退一页）
       if (assets.value.length === deletedCount && page.value > 1) {
         page.value -= 1;
@@ -137,14 +148,14 @@ export function useAssetLibrary() {
     pageSize,
     scenario,
     totalPages,
-    // 选择/下载（来自 useCardActions）
+    // 选择/下载
     zoomCard,
     selectedCards,
     selectedCardsCount,
     toggleCardSelection,
     toggleSelectAllCards,
     batchDownload,
-    downloadSingleImage,
+    downloadAsset,
     // 操作
     loadAssets,
     changeScenario,

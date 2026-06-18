@@ -7,10 +7,13 @@ from app.core.deps import get_current_super_admin, get_db
 from app.core.system_settings import (
     SETTING_IMAGE_CREDIT_COSTS,
     SETTING_RECHARGE_PACKAGES,
+    SETTING_VIDEO_CREDIT_COSTS,
     get_effective_image_credit_costs,
     get_effective_recharge_packages,
+    get_effective_video_credit_costs,
     normalize_image_credit_costs,
     normalize_recharge_packages,
+    normalize_video_credit_costs,
     upsert_setting,
 )
 from app.models import User
@@ -29,6 +32,7 @@ async def get_settings(
 ):
     try:
         image_credit_costs = await get_effective_image_credit_costs(db)
+        video_credit_costs = await get_effective_video_credit_costs(db)
         recharge_packages = await get_effective_recharge_packages(db, include_disabled=True)
     except ValueError as exc:
         return fail(str(exc))
@@ -41,6 +45,7 @@ async def get_settings(
     return success(
         {
             "image_credit_costs": image_credit_costs,
+            "video_credit_costs": video_credit_costs,
             "recharge_packages": recharge_packages,
             "payment_config": payment_config,
         }
@@ -55,6 +60,7 @@ async def update_settings(
 ):
     try:
         image_credit_costs = normalize_image_credit_costs(req.image_credit_costs)
+        video_credit_costs = normalize_video_credit_costs(req.video_credit_costs)
         recharge_packages = normalize_recharge_packages(
             [item.model_dump() for item in req.recharge_packages],
             include_disabled=True,
@@ -71,6 +77,13 @@ async def update_settings(
     )
     await upsert_setting(
         db,
+        SETTING_VIDEO_CREDIT_COSTS,
+        video_credit_costs,
+        current_admin.id,
+        "商品视频每秒扣费配置",
+    )
+    await upsert_setting(
+        db,
         SETTING_RECHARGE_PACKAGES,
         recharge_packages,
         current_admin.id,
@@ -84,6 +97,7 @@ async def update_settings(
             "billing",
             {
                 "image_credit_costs": image_credit_costs,
+                "video_credit_costs": video_credit_costs,
                 "recharge_packages_count": len(recharge_packages),
             },
         )
@@ -92,6 +106,7 @@ async def update_settings(
     return success(
         {
             "image_credit_costs": image_credit_costs,
+            "video_credit_costs": video_credit_costs,
             "recharge_packages": recharge_packages,
         }
     )

@@ -23,7 +23,7 @@ from app.core.user_credits import (
     insufficient_credits_message,
     refund_user_credits,
 )
-from app.models import User, VideoTask
+from app.models import GenerationJob, User, VideoTask
 from app.schemas.response import Response, fail, success
 
 router = APIRouter(prefix="/video", tags=["商品视频"])
@@ -143,6 +143,19 @@ async def create_video_task(
     if current_user.credits < credit_cost:
         return fail(insufficient_credits_message(credit_cost, current_user.credits))
 
+    job: GenerationJob | None = None
+    if req.job_id:
+        job_result = await db.execute(
+            select(GenerationJob).where(
+                GenerationJob.id == req.job_id,
+                GenerationJob.user_id == current_user.id,
+                GenerationJob.scenario == "product_video",
+            )
+        )
+        job = job_result.scalar_one_or_none()
+        if not job:
+            return fail("任务不存在")
+
     settings_snapshot = {
         **(req.settings_snapshot or {}),
         "scenario": "product_video",
@@ -175,8 +188,7 @@ async def create_video_task(
     task = VideoTask(
         id=task_id,
         user_id=current_user.id,
-        # 第一批视频任务暂不接入 GenerationJob；保留列给下一批历史记录使用。
-        job_id=None,
+        job_id=job.id if job else None,
         type_id=req.type_id,
         title=req.title,
         sort_order=req.sort_order,
@@ -234,6 +246,17 @@ async def create_video_task(
                 "credit_cost": credit_cost,
             },
         )
+
+    if job is not None and job.status != "generating":
+        try:
+            await db.execute(
+                update(GenerationJob)
+                .where(GenerationJob.id == job.id)
+                .values(status="generating")
+            )
+            await db.commit()
+        except Exception:
+            await db.rollback()
 
     return success(
         {

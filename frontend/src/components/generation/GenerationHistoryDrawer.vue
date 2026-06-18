@@ -23,6 +23,10 @@ defineProps({
     type: String,
     default: '点击「+ 新建任务」开始你的第一次生成',
   },
+  unit: {
+    type: String,
+    default: '张',
+  },
 })
 
 const emit = defineEmits(['close', 'pick', 'delete'])
@@ -91,7 +95,7 @@ function formatTime(value) {
         <div class="mt-1.5 flex items-center justify-between text-[11px] text-slate-500">
           <span>{{ formatTime(job.created_at) }}</span>
           <span>
-            共 {{ job.total }} 张
+            共 {{ job.total }} {{ unit }}
             <span v-if="job.completed > 0" class="text-primary">· {{ job.completed }} 完成</span>
             <span v-if="job.failed > 0" class="text-rose-500">· {{ job.failed }} 失败</span>
           </span>

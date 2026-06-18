@@ -3,7 +3,7 @@ export const adminTabs = [
   { key: "users", label: "用户", to: "/admin/users" },
   { key: "orders", label: "订单", to: "/admin/orders" },
   { key: "transactions", label: "流水", to: "/admin/transactions" },
-  { key: "imageTasks", label: "生图任务", to: "/admin/image-tasks" },
+  { key: "imageTasks", label: "生成任务", to: "/admin/image-tasks" },
   { key: "settings", label: "系统配置", to: "/admin/settings" },
   { key: "promptTemplates", label: "提示词", to: "/admin/prompt-templates" },
   { key: "outfitModels", label: "模特库", to: "/admin/outfit-models" },
@@ -52,6 +52,13 @@ export const scenarioOptions = [
   { label: "商品详情图", value: "product_image" },
   { label: "服饰穿搭", value: "outfit" },
   { label: "自由生图", value: "free_image" },
+  { label: "商品视频", value: "product_video" },
+];
+
+export const taskMediaTypeOptions = [
+  { label: "全部媒体", value: "" },
+  { label: "图片", value: "image" },
+  { label: "视频", value: "video" },
 ];
 
 export const promptScenarioOptions = [

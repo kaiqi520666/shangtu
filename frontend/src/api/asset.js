@@ -6,6 +6,9 @@ export function listAssets({ scenario = "", page = 1, page_size = 20 } = {}) {
   return request.get("/asset/list", { params, timeout: 15000 });
 }
 
-export function deleteAssets(taskIds) {
-  return request.delete("/asset/batch", { data: { task_ids: taskIds }, timeout: 15000 });
+export function deleteAssets(taskIds, mediaType = "") {
+  return request.delete("/asset/batch", {
+    data: { task_ids: taskIds, media_type: mediaType || null },
+    timeout: 15000,
+  });
 }

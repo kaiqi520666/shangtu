@@ -18,6 +18,7 @@ export function useGenerationRunner({
   resetSceneState,
   applyJobData,
   restoreCard,
+  mediaUnit = "张",
 } = {}) {
   const currentJobId = ref("");
   const currentTaskTitle = ref("");
@@ -155,7 +156,7 @@ export function useGenerationRunner({
 
       const pendingCards = restoredCards.filter((card) => !TERMINAL_STATUSES.has(card.status));
       genLogs.value = restoredCards.length
-        ? [`已恢复任务「${currentTaskTitle.value}」，共 ${restoredCards.length} 张`]
+        ? [`已恢复任务「${currentTaskTitle.value}」，共 ${restoredCards.length} ${mediaUnit}`]
         : [];
 
       if (pendingCards.length > 0) {

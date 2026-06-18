@@ -14,6 +14,7 @@ from app.models import (
     OutfitModel,
     PromptTemplate,
     User,
+    VideoTask,
 )
 
 
@@ -78,6 +79,39 @@ def image_task_payload(
         "type_id": task.type_id,
         "title": task.title,
         "size": task.size,
+        "status": task.status,
+        "progress": task.progress,
+        "provider": task.provider,
+        "provider_task_id": task.provider_task_id,
+        "credit_cost": task.credit_cost,
+        "credit_refunded": task.credit_refunded,
+        "result_url": task.result_url,
+        "error_message": task.error_message,
+        "archived": task.archived,
+        "created_at": to_utc_iso(task.created_at),
+    }
+
+
+def video_task_payload(
+    task: VideoTask,
+    user: User | None = None,
+    job: GenerationJob | None = None,
+) -> dict:
+    return {
+        "id": task.id,
+        "media_type": "video",
+        "user_id": task.user_id,
+        "user_email": user.email if user else None,
+        "job_id": task.job_id,
+        "job_title": job.title if job else None,
+        "scenario": job.scenario if job else "product_video",
+        "type_id": task.type_id,
+        "title": task.title,
+        "size": f"{task.aspect_ratio}/{task.resolution}/{task.duration}s",
+        "input_mode": task.input_mode,
+        "duration": task.duration,
+        "resolution": task.resolution,
+        "aspect_ratio": task.aspect_ratio,
         "status": task.status,
         "progress": task.progress,
         "provider": task.provider,
