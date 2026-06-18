@@ -9,6 +9,11 @@ import { useCardActions } from "@/composables/useCardActions.js";
 import { useGenerationRunner } from "@/composables/useGenerationRunner.js";
 import { buildVideoAnalyzeImages } from "@/utils/analyzeImages.js";
 import {
+  createVideoSettingsSnapshot,
+  getSnapshotScene,
+  getSnapshotValue,
+} from "@/utils/generationSnapshots.js";
+import {
   defaultVideoCreditCosts,
   getVideoDemoType,
   videoDemoTypes,
@@ -30,21 +35,20 @@ function getSelectedSize(sizePreset) {
 function buildSettingsSnapshot(settings) {
   const selectedType = getVideoDemoType(settings.videoType);
   const selectedSize = getSelectedSize(settings.sizePreset);
-  return {
-    scenario: "product_video",
-    type_id: settings.videoType,
+  return createVideoSettingsSnapshot({
+    videoType: settings.videoType,
     title: selectedType.title,
-    input_mode: selectedType.inputMode,
+    inputMode: selectedType.inputMode,
     market: settings.market,
-    market_label: getOptionLabel(videoMarketOptions, settings.market),
+    marketLabel: getOptionLabel(videoMarketOptions, settings.market),
     language: settings.language,
-    language_label: getOptionLabel(videoLanguageOptions, settings.language),
-    size_preset: settings.sizePreset,
-    aspect_ratio: selectedSize.aspectRatio,
+    languageLabel: getOptionLabel(videoLanguageOptions, settings.language),
+    sizePreset: settings.sizePreset,
+    aspectRatio: selectedSize.aspectRatio,
     duration: settings.duration,
     resolution: settings.resolution,
-    product_input: settings.productInput,
-  };
+    productInput: settings.productInput,
+  });
 }
 
 function getRequiredImageMessage(inputMode, count) {
@@ -229,13 +233,15 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
     sortOrder = outputCards.value.length,
     batchRunId = "",
   }) {
+    const scene = getSnapshotScene(settingsSnapshot);
+    const productInput = scene.productInput ?? settingsSnapshot?.product_input ?? "";
     const card = cards.createCard({
       typeId,
       strategyTitle: title || "商品视频",
-      strategyContent: settingsSnapshot?.product_input || "",
+      strategyContent: productInput,
       sortOrder,
       batchRunId,
-      userPrompt: settingsSnapshot?.product_input || "",
+      userPrompt: productInput,
       settingsSnapshot,
     });
     card.taskId = taskId || "";
@@ -250,17 +256,26 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
 
   function restoreVideoJobData(data) {
     const s = data.settings || {};
-    if (typeof s.type_id === "string") {
-      settings.videoType = s.type_id;
-      settings.inputMode = getVideoDemoType(s.type_id).inputMode;
+    const scene = getSnapshotScene(s);
+    const videoType = scene.videoType ?? s.type_id;
+    const inputMode = scene.inputMode ?? s.input_mode;
+    const market = scene.market ?? s.market ?? getSnapshotValue(s, "platform");
+    const language = scene.language ?? getSnapshotValue(s, "language");
+    const sizePreset = scene.sizePreset ?? s.size_preset;
+    const duration = scene.duration ?? s.duration;
+    const resolution = scene.resolution ?? s.resolution ?? getSnapshotValue(s, "quality");
+    const productInput = scene.productInput ?? s.product_input;
+    if (typeof videoType === "string") {
+      settings.videoType = videoType;
+      settings.inputMode = getVideoDemoType(videoType).inputMode;
     }
-    if (typeof s.input_mode === "string") settings.inputMode = s.input_mode;
-    if (typeof s.market === "string") settings.market = s.market;
-    if (typeof s.language === "string") settings.language = s.language;
-    if (typeof s.size_preset === "string") settings.sizePreset = s.size_preset;
-    if (typeof s.duration === "number") settings.duration = s.duration;
-    if (typeof s.resolution === "string") settings.resolution = s.resolution;
-    settings.productInput = data.input_text || s.product_input || "";
+    if (typeof inputMode === "string") settings.inputMode = inputMode;
+    if (typeof market === "string") settings.market = market;
+    if (typeof language === "string") settings.language = language;
+    if (typeof sizePreset === "string") settings.sizePreset = sizePreset;
+    if (typeof duration === "number") settings.duration = duration;
+    if (typeof resolution === "string") settings.resolution = resolution;
+    settings.productInput = data.input_text || productInput || "";
     if (Array.isArray(data.source_images)) {
       uploadedImages.value = data.source_images.map((img) => ({
         ...img,
@@ -329,7 +344,7 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
           user_prompt: settings.productInput,
           duration: settings.duration,
           resolution: settings.resolution,
-          aspect_ratio: snapshot.aspect_ratio,
+          aspect_ratio: getSnapshotScene(snapshot).aspectRatio || snapshot.aspect_ratio || snapshot.ratio,
           settings_snapshot: snapshot,
           sort_order: card.sortOrder,
           job_id: jobId,

@@ -3,6 +3,7 @@ import { Download, LoaderCircle, Play, Square, Trash2, TriangleAlert } from 'luc
 import { ref } from 'vue'
 import AppCheckbox from '@/components/ui/AppCheckbox.vue'
 import { useToast } from '@/composables/useToast.js'
+import { getSnapshotScene, getSnapshotValue } from '@/utils/generationSnapshots.js'
 
 defineProps({
   cards: {
@@ -60,10 +61,19 @@ function togglePlay(card) {
 
 function getCardMetaText(card, fallbackPlatform, fallbackLanguage, fallbackVideoLabel) {
   const snapshot = card.settingsSnapshot || {}
-  const platformText = snapshot.platform || snapshot.market_label || snapshot.market || fallbackPlatform
-  const languageText = snapshot.language_label || snapshot.language || fallbackLanguage
-  const durationText = snapshot.duration ? `${snapshot.duration}秒` : ''
-  const resolutionText = snapshot.resolution || ''
+  const scene = getSnapshotScene(snapshot)
+  const platformText =
+    scene.marketLabel ||
+    snapshot.market_label ||
+    getSnapshotValue(snapshot, 'platform') ||
+    scene.market ||
+    snapshot.market ||
+    fallbackPlatform
+  const languageText = scene.languageLabel || snapshot.language_label || getSnapshotValue(snapshot, 'language') || fallbackLanguage
+  const duration = scene.duration ?? snapshot.duration
+  const resolution = scene.resolution || snapshot.resolution || snapshot.quality
+  const durationText = duration ? `${duration}秒` : ''
+  const resolutionText = resolution || ''
   const videoText = [resolutionText, durationText].filter(Boolean).join(' / ') || fallbackVideoLabel
   return [platformText, languageText, videoText].filter(Boolean).join(' ')
 }

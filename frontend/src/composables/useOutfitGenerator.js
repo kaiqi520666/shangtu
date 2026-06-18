@@ -14,6 +14,12 @@ import {
 } from "@/composables/useGenerationCards.js";
 import { useGenerationRunner } from "@/composables/useGenerationRunner.js";
 import { useToast } from "@/composables/useToast.js";
+import {
+  cloneGenerationSettingsSnapshot,
+  createGenerationSettingsSnapshot,
+  getSnapshotScene,
+  getSnapshotValue,
+} from "@/utils/generationSnapshots.js";
 
 export function useOutfitGenerator({ onJobCreated } = {}) {
   const toast = useToast();
@@ -233,21 +239,29 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
   function restoreOutfitJobData(data) {
     if (data.settings && typeof data.settings === "object") {
       const s = data.settings;
-      if (typeof s.platform === "string") settings.platform = s.platform;
-      if (typeof s.language === "string") settings.language = s.language;
-      if (typeof s.ratio === "string" && resolutionMap[s.ratio]) {
-        settings.ratio = s.ratio;
+      const scene = getSnapshotScene(s);
+      const platform = getSnapshotValue(s, "platform");
+      const language = getSnapshotValue(s, "language");
+      const ratio = getSnapshotValue(s, "ratio");
+      const quality = getSnapshotValue(s, "quality");
+      const selectedScenesSnapshot = scene.selectedScenes || s.selectedScenes;
+      const sceneDescriptionSnapshot = scene.sceneDescription ?? s.sceneDescription;
+      const selectedModelIdSnapshot = scene.selectedModelId ?? s.selectedModelId;
+      if (typeof platform === "string") settings.platform = platform;
+      if (typeof language === "string") settings.language = language;
+      if (typeof ratio === "string" && resolutionMap[ratio]) {
+        settings.ratio = ratio;
       }
-      const desiredQuality = typeof s.quality === "string" ? s.quality : settings.quality;
+      const desiredQuality = typeof quality === "string" ? quality : settings.quality;
       settings.quality = resolveQuality(settings.ratio, desiredQuality) || "1K";
-      if (Array.isArray(s.selectedScenes) && s.selectedScenes.length > 0) {
-        selectedScenes.value = s.selectedScenes;
+      if (Array.isArray(selectedScenesSnapshot) && selectedScenesSnapshot.length > 0) {
+        selectedScenes.value = selectedScenesSnapshot;
       }
-      if (typeof s.sceneDescription === "string") {
-        sceneDescription.value = s.sceneDescription;
+      if (typeof sceneDescriptionSnapshot === "string") {
+        sceneDescription.value = sceneDescriptionSnapshot;
       }
-      if (typeof s.selectedModelId === "string") {
-        selectedModelId.value = s.selectedModelId;
+      if (typeof selectedModelIdSnapshot === "string") {
+        selectedModelId.value = selectedModelIdSnapshot;
       }
     }
 
@@ -292,18 +306,23 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
       return;
     }
 
-    const snapshotPayload = {
-      settings: {
-        platform: settings.platform,
-        language: settings.language,
-        ratio: settings.ratio,
-        quality: settings.quality,
+    const baseSettingsSnapshot = createGenerationSettingsSnapshot({
+      scenario: "outfit",
+      platform: settings.platform,
+      language: settings.language,
+      ratio: settings.ratio,
+      quality: settings.quality,
+      scene: {
         selectedScenes: selectedScenes.value,
         sceneDescription: sceneDescription.value,
         selectedModelId: selectedModel.value.id,
         selectedModelName: selectedModel.value.name,
         selectedModelImage: selectedModel.value.image,
       },
+    });
+
+    const snapshotPayload = {
+      settings: baseSettingsSnapshot,
       source_images: garmentImages.value.map((img) => ({
         id: img.id,
         url: img.url,
@@ -328,13 +347,7 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
       snapshotPayload,
       initialLogs: ["服饰穿搭生成任务初始化...", "读取服装图片、模特形象与拍摄场景..."],
       repeatLog: `新一批穿搭图开始生成，共 ${queue.length} 张`,
-      buildSettingsSnapshot: () => ({
-        scenario: "outfit",
-        platform: settings.platform,
-        language: settings.language,
-        ratio: settings.ratio,
-        quality: settings.quality,
-      }),
+      buildSettingsSnapshot: () => cloneGenerationSettingsSnapshot(baseSettingsSnapshot),
       createCard({ item, sortOrder, batchRunId, settingsSnapshot }) {
         return createGenerationCard({
           typeId: item.id,

@@ -15,6 +15,11 @@ import { useAiSellingPointsWriter } from "@/composables/useAiSellingPointsWriter
 import { useCardActions } from "@/composables/useCardActions.js";
 import { useGenerationRunner } from "@/composables/useGenerationRunner.js";
 import { buildProductAnalyzeImages } from "@/utils/analyzeImages.js";
+import {
+  cloneGenerationSettingsSnapshot,
+  createGenerationSettingsSnapshot,
+  getSnapshotValue,
+} from "@/utils/generationSnapshots.js";
 
 function createDefaultSuiteStructure() {
   return suiteStructureDefaults.map((item) => ({
@@ -150,12 +155,16 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
   function restoreSuiteJobData(data) {
     if (data.settings && typeof data.settings === "object") {
       const s = data.settings;
-      if (typeof s.platform === "string") settings.platform = s.platform;
-      if (typeof s.language === "string") settings.language = s.language;
-      if (typeof s.ratio === "string" && resolutionMap[s.ratio]) {
-        settings.ratio = s.ratio;
+      const platform = getSnapshotValue(s, "platform");
+      const language = getSnapshotValue(s, "language");
+      const ratio = getSnapshotValue(s, "ratio");
+      const quality = getSnapshotValue(s, "quality");
+      if (typeof platform === "string") settings.platform = platform;
+      if (typeof language === "string") settings.language = language;
+      if (typeof ratio === "string" && resolutionMap[ratio]) {
+        settings.ratio = ratio;
       }
-      const desiredQuality = typeof s.quality === "string" ? s.quality : settings.quality;
+      const desiredQuality = typeof quality === "string" ? quality : settings.quality;
       settings.quality = resolveQuality(settings.ratio, desiredQuality) || "1K";
     }
     if (Array.isArray(data.source_images)) {
@@ -205,13 +214,19 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
       return;
     }
 
-    const snapshotPayload = {
-      settings: {
-        platform: settings.platform,
-        language: settings.language,
-        ratio: settings.ratio,
-        quality: settings.quality,
+    const baseSettingsSnapshot = createGenerationSettingsSnapshot({
+      scenario: "product_suite",
+      platform: settings.platform,
+      language: settings.language,
+      ratio: settings.ratio,
+      quality: settings.quality,
+      scene: {
+        structure: suiteStructure.value,
       },
+    });
+
+    const snapshotPayload = {
+      settings: baseSettingsSnapshot,
       source_images: uploadedImages.value.map((img) => ({
         id: img.id,
         url: img.url,
@@ -234,13 +249,7 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
       snapshotPayload,
       initialLogs: ["商品套图生成任务初始化...", "读取商品图片、平台规范与套图结构..."],
       repeatLog: `新一批套图开始生成，共 ${queue.length} 张`,
-      buildSettingsSnapshot: () => ({
-        scenario: "product_suite",
-        platform: settings.platform,
-        language: settings.language,
-        ratio: settings.ratio,
-        quality: settings.quality,
-      }),
+      buildSettingsSnapshot: () => cloneGenerationSettingsSnapshot(baseSettingsSnapshot),
       createCard({ item, sortOrder, batchRunId, settingsSnapshot }) {
         return createGenerationCard({
           typeId: item.id,

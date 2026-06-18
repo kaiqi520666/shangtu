@@ -8,6 +8,12 @@ import {
 } from "@/composables/useGenerationCards.js";
 import { useGenerationRunner } from "@/composables/useGenerationRunner.js";
 import { useToast } from "@/composables/useToast.js";
+import {
+  cloneGenerationSettingsSnapshot,
+  createGenerationSettingsSnapshot,
+  getSnapshotScene,
+  getSnapshotValue,
+} from "@/utils/generationSnapshots.js";
 
 function makePromptTitle(prompt) {
   const compact = (prompt || "").trim().replace(/\s+/g, " ");
@@ -130,13 +136,17 @@ export function useFreeImageGenerator({ onJobCreated } = {}) {
   function restoreFreeImageJobData(data) {
     if (data.settings && typeof data.settings === "object") {
       const s = data.settings;
-      if (typeof s.ratio === "string" && resolutionMap[s.ratio]) {
-        settings.ratio = s.ratio;
+      const scene = getSnapshotScene(s);
+      const ratio = getSnapshotValue(s, "ratio");
+      const quality = getSnapshotValue(s, "quality");
+      const promptSnapshot = scene.prompt ?? s.prompt;
+      if (typeof ratio === "string" && resolutionMap[ratio]) {
+        settings.ratio = ratio;
       }
-      const desiredQuality = typeof s.quality === "string" ? s.quality : settings.quality;
+      const desiredQuality = typeof quality === "string" ? quality : settings.quality;
       settings.quality = resolveQuality(settings.ratio, desiredQuality) || "1K";
-      if (typeof s.prompt === "string") {
-        settings.prompt = s.prompt;
+      if (typeof promptSnapshot === "string") {
+        settings.prompt = promptSnapshot;
       }
     }
 
@@ -209,12 +219,19 @@ export function useFreeImageGenerator({ onJobCreated } = {}) {
       },
     ];
 
-    const snapshotPayload = {
-      settings: {
-        ratio: settings.ratio,
-        quality: settings.quality,
+    const baseSettingsSnapshot = createGenerationSettingsSnapshot({
+      scenario: "free_image",
+      platform: "自由生图",
+      language: "",
+      ratio: settings.ratio,
+      quality: settings.quality,
+      scene: {
         prompt,
       },
+    });
+
+    const snapshotPayload = {
+      settings: baseSettingsSnapshot,
       source_images: referenceImages.value.map((img) => ({
         id: img.id,
         url: img.url,
@@ -239,13 +256,7 @@ export function useFreeImageGenerator({ onJobCreated } = {}) {
       repeatLog: "新一张自由生图开始生成",
       buildPrompt: (item) => item.prompt,
       buildUserPrompt: (item) => item.prompt,
-      buildSettingsSnapshot: () => ({
-        scenario: "free_image",
-        platform: "自由生图",
-        language: "",
-        ratio: settings.ratio,
-        quality: settings.quality,
-      }),
+      buildSettingsSnapshot: () => cloneGenerationSettingsSnapshot(baseSettingsSnapshot),
       createCard({ item, sortOrder, batchRunId, settingsSnapshot }) {
         return createGenerationCard({
           typeId: item.id,

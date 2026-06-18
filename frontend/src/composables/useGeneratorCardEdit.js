@@ -1,6 +1,7 @@
 import { ref } from "vue";
 import { deleteImageTask, regenerateImageTask } from "@/api/image.js";
 import { ensureEnoughImageCredits } from "@/composables/useImageCreditCosts.js";
+import { getSnapshotQuality } from "@/utils/generationSnapshots.js";
 
 export function useGeneratorCardEdit({
   generator,
@@ -38,7 +39,7 @@ export function useGeneratorCardEdit({
       return;
     }
     const hasEnoughCredits = await ensureEnoughImageCredits({
-      quality: card.settingsSnapshot?.quality || "1K",
+      quality: getSnapshotQuality(card.settingsSnapshot),
       count: 1,
       toast,
       actionText: "重新生成",

@@ -15,6 +15,12 @@ import { useGenerationRunner } from "@/composables/useGenerationRunner.js";
 import { useAiSellingPointsWriter } from "@/composables/useAiSellingPointsWriter.js";
 import { useToast } from "@/composables/useToast.js";
 import { buildProductAnalyzeImages, hasUploadingImages } from "@/utils/analyzeImages.js";
+import {
+  cloneGenerationSettingsSnapshot,
+  createGenerationSettingsSnapshot,
+  getSnapshotScene,
+  getSnapshotValue,
+} from "@/utils/generationSnapshots.js";
 import { generateProductImageStrategy } from "@/api/image.js";
 
 const DEFAULT_SELECTED_MODULES = [
@@ -171,18 +177,25 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
   function restoreProductImageJobData(data) {
     if (data.settings && typeof data.settings === "object") {
       const s = data.settings;
-      if (typeof s.platform === "string") settings.platform = s.platform;
-      if (typeof s.language === "string") settings.language = s.language;
-      if (typeof s.ratio === "string" && resolutionMap[s.ratio]) {
-        settings.ratio = s.ratio;
+      const scene = getSnapshotScene(s);
+      const platform = getSnapshotValue(s, "platform");
+      const language = getSnapshotValue(s, "language");
+      const ratio = getSnapshotValue(s, "ratio");
+      const quality = getSnapshotValue(s, "quality");
+      const selectedModulesSnapshot = scene.selectedModules || s.selectedModules;
+      const strategyBriefSnapshot = scene.strategyBrief ?? s.strategyBrief;
+      if (typeof platform === "string") settings.platform = platform;
+      if (typeof language === "string") settings.language = language;
+      if (typeof ratio === "string" && resolutionMap[ratio]) {
+        settings.ratio = ratio;
       }
-      const desiredQuality = typeof s.quality === "string" ? s.quality : settings.quality;
+      const desiredQuality = typeof quality === "string" ? quality : settings.quality;
       settings.quality = resolveQuality(settings.ratio, desiredQuality) || "1K";
-      if (Array.isArray(s.selectedModules) && s.selectedModules.length > 0) {
-        selectedModules.value = s.selectedModules;
+      if (Array.isArray(selectedModulesSnapshot) && selectedModulesSnapshot.length > 0) {
+        selectedModules.value = selectedModulesSnapshot;
       }
-      if (typeof s.strategyBrief === "string") {
-        strategyBrief.value = s.strategyBrief;
+      if (typeof strategyBriefSnapshot === "string") {
+        strategyBrief.value = strategyBriefSnapshot;
       }
     }
 
@@ -314,15 +327,20 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
       return;
     }
 
-    const snapshotPayload = {
-      settings: {
-        platform: settings.platform,
-        language: settings.language,
-        ratio: settings.ratio,
-        quality: settings.quality,
+    const baseSettingsSnapshot = createGenerationSettingsSnapshot({
+      scenario: "product_image",
+      platform: settings.platform,
+      language: settings.language,
+      ratio: settings.ratio,
+      quality: settings.quality,
+      scene: {
         selectedModules: selectedModules.value,
         strategyBrief: strategyBrief.value,
       },
+    });
+
+    const snapshotPayload = {
+      settings: baseSettingsSnapshot,
       source_images: uploadedImages.value.map((img) => ({
         id: img.id,
         url: img.url,
@@ -345,13 +363,7 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
       snapshotPayload,
       initialLogs: ["商品详情图生成任务初始化...", "读取商品图片、模块策略与详情页结构..."],
       repeatLog: `新一批详情图开始生成，共 ${queue.length} 张`,
-      buildSettingsSnapshot: () => ({
-        scenario: "product_image",
-        platform: settings.platform,
-        language: settings.language,
-        ratio: settings.ratio,
-        quality: settings.quality,
-      }),
+      buildSettingsSnapshot: () => cloneGenerationSettingsSnapshot(baseSettingsSnapshot),
       createCard({ item, sortOrder, batchRunId, settingsSnapshot }) {
         return createGenerationCard({
           typeId: item.id,
