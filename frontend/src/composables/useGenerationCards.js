@@ -17,31 +17,19 @@ function makeId() {
   return `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function parseTaskSize(size) {
-  if (typeof size !== "string" || !size.includes("/")) return null;
-  const [ratio, quality] = size.split("/");
-  if (!ratio && !quality) return null;
-  return {
-    ...(ratio ? { ratio } : {}),
-    ...(quality ? { quality } : {}),
-  };
-}
-
-function resolveSettingsSnapshot(rawSnapshot, size, existingSnapshot = null) {
+function resolveSettingsSnapshot(rawSnapshot, existingSnapshot = null) {
   const snapshot =
     rawSnapshot && typeof rawSnapshot === "object" && !Array.isArray(rawSnapshot)
       ? rawSnapshot
       : null;
-  const sizeSnapshot = parseTaskSize(size);
   const existing =
     existingSnapshot && typeof existingSnapshot === "object" && !Array.isArray(existingSnapshot)
       ? existingSnapshot
       : null;
 
-  if (!existing && !sizeSnapshot && !snapshot) return null;
+  if (!existing && !snapshot) return null;
   return {
     ...(existing || {}),
-    ...(sizeSnapshot || {}),
     ...(snapshot || {}),
   };
 }
@@ -173,7 +161,6 @@ export function useGenerationCards({
       }
       const nextSettingsSnapshot = resolveSettingsSnapshot(
         data.settings_snapshot,
-        data.size,
         card.settingsSnapshot,
       );
       if (nextSettingsSnapshot) {
@@ -325,7 +312,6 @@ export function useGenerationCards({
       userPrompt: extra.userPrompt ?? getPromptSnapshotUser(item),
       settingsSnapshot: resolveSettingsSnapshot(
         extra.settingsSnapshot ?? item.settings_snapshot,
-        item.size,
       ),
     });
   }

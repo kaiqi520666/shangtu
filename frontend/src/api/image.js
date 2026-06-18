@@ -36,7 +36,6 @@ export function getImageCreditCosts() {
 }
 
 export function generateImage({
-  prompt,
   user_prompt = null,
   image_urls = null,
   ratio,
@@ -50,7 +49,6 @@ export function generateImage({
   return request.post(
     "/image/generate",
     {
-      prompt,
       user_prompt,
       image_urls,
       ratio,

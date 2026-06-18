@@ -77,7 +77,7 @@ export function useFreeImageGenerator({ onJobCreated } = {}) {
       restoreFreeImageJobData(data);
     },
     restoreCard(item) {
-      const promptSnapshotUser = item.prompt_snapshot?.user || item.prompt || "";
+      const promptSnapshotUser = item.prompt_snapshot?.user || "";
       return restoreGenerationCard(item, {
         typeId: item.type_id || "free",
         strategyTitle: item.title || makePromptTitle(promptSnapshotUser),
@@ -252,7 +252,6 @@ export function useFreeImageGenerator({ onJobCreated } = {}) {
       snapshotPayload,
       initialLogs: ["自由生图任务初始化...", "读取提示词与参考图..."],
       repeatLog: "新一张自由生图开始生成",
-      buildPrompt: (item) => item.prompt,
       buildUserPrompt: (item) => item.prompt,
       buildSettingsSnapshot: () => cloneGenerationSettingsSnapshot(baseSettingsSnapshot),
       createCard({ item, sortOrder, batchRunId, settingsSnapshot }) {

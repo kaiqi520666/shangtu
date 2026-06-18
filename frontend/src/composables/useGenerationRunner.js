@@ -405,7 +405,6 @@ export function useGenerationRunner({
     resolution,
     snapshotPayload,
     createCard,
-    buildPrompt,
     buildUserPrompt,
     buildSettingsSnapshot,
     initialLogs = [],
@@ -436,13 +435,11 @@ export function useGenerationRunner({
           actionText: "本次生成",
         }),
       createTask({ item, card, settingsSnapshot, jobId }) {
-        const prompt = buildPrompt?.(item, card) || "";
         const userPrompt = buildUserPrompt?.(item, card) || null;
         if (userPrompt) {
           card.userPrompt = userPrompt;
         }
         return generateImage({
-          prompt,
           user_prompt: userPrompt,
           image_urls: imageUrls,
           ratio,

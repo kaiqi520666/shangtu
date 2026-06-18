@@ -53,7 +53,6 @@ IMAGE_PROMPT_STRATEGIES = {
 
 
 class GenerateRequest(BaseModel):
-    prompt: str
     user_prompt: str | None = None
     image_urls: list[str] = Field(default_factory=list)
     ratio: str = "1:1"
@@ -115,26 +114,24 @@ async def _build_image_task_prompt(
     job: GenerationJob | None,
     req: GenerateRequest,
 ) -> tuple[str, dict]:
+    user_prompt = (req.user_prompt or "").strip()
     if job is None:
-        final_prompt = req.prompt
-        return final_prompt, build_prompt_snapshot(
-            user=req.user_prompt or req.prompt,
-            final=final_prompt,
-        )
+        if not user_prompt:
+            raise ValueError("请输入提示词")
+        return user_prompt, build_prompt_snapshot(user=user_prompt, final=user_prompt)
 
     strategy = IMAGE_PROMPT_STRATEGIES[job.scenario]
     if not strategy["use_template"]:
-        if not req.prompt.strip():
+        if not user_prompt:
             raise ValueError("请输入提示词")
-        final_prompt = req.prompt
-        return final_prompt, build_prompt_snapshot(user=req.prompt, final=final_prompt)
+        return user_prompt, build_prompt_snapshot(user=user_prompt, final=user_prompt)
 
     built_prompt = await build_image_generate_prompt(
         db,
         job=job,
         type_id=req.type_id,
         title=req.title,
-        user_prompt=req.user_prompt or req.prompt,
+        user_prompt=user_prompt,
     )
     return built_prompt.final_prompt, built_prompt.prompt_snapshot
 
