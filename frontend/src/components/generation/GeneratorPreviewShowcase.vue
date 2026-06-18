@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue'
-import { Play, Volume2 } from 'lucide-vue-next'
+import { Play, Square } from 'lucide-vue-next'
 
 const props = defineProps({
   title: {
@@ -70,10 +70,11 @@ function toggleVideo(slide, index) {
           <button
             type="button"
             class="absolute bottom-3 left-3 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-slate-900 shadow-lg backdrop-blur transition-transform hover:scale-105"
+            :title="playingSlideKey === getSlideKey(slide, index) ? '停止预览' : '播放预览'"
             @click.stop="toggleVideo(slide, index)"
           >
             <Play v-if="playingSlideKey !== getSlideKey(slide, index)" class="h-4 w-4 fill-current" />
-            <Volume2 v-else class="h-4 w-4" />
+            <Square v-else class="h-4 w-4 fill-current" />
           </button>
         </div>
         <div class="mt-3 text-center">
