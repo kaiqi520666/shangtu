@@ -94,21 +94,9 @@ npm run build
 
 ## 数据和任务规则
 
-- 生成任务的参数事实来源是 `settings_snapshot_json`。
-- 图片和视频 prompt 快照统一使用 `prompt_snapshot_json`，结构为：
-
-```json
-{
-  "system": "",
-  "task": "",
-  "user": "",
-  "final": "",
-  "template_refs": []
-}
-```
-
-- 不再新增 `system_prompt_snapshot`、`task_prompt_snapshot`、`user_prompt`、`prompt_template_refs_json` 这类拆散字段。
-- 单图重生创建新任务并用 `replaced_by_task_id` 指向新版本；工作台只显示当前版本。
+- 数据结构以当前 models、schemas 和 API payload 为准；不要在 `AGENTS.md` 记录字段清单。
+- 修改任务模型、快照结构或生成链路时，同步更新相关 model、router、worker、frontend restore/display 逻辑。
+- 删除或替换旧数据结构时，直接改调用方，不保留新旧结构并行解析。
 
 ## Git 规则
 
