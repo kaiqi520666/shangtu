@@ -83,15 +83,24 @@ async def ensure_runtime_schema(engine: AsyncEngine) -> None:
                     provider_task_id VARCHAR(128),
                     credit_cost INTEGER NOT NULL DEFAULT 1,
                     credit_refunded BOOLEAN NOT NULL DEFAULT FALSE,
-                    system_prompt_snapshot TEXT,
-                    task_prompt_snapshot TEXT,
-                    user_prompt TEXT,
-                    prompt_template_refs_json TEXT,
+                    prompt_snapshot_json TEXT,
                     settings_snapshot_json TEXT,
                     archived BOOLEAN,
                     archived_at TIMESTAMPTZ,
                     created_at TIMESTAMPTZ
                 )
+                """
+            )
+        )
+        await conn.execute(
+            text(
+                """
+                ALTER TABLE video_tasks
+                ADD COLUMN IF NOT EXISTS prompt_snapshot_json TEXT,
+                DROP COLUMN IF EXISTS system_prompt_snapshot,
+                DROP COLUMN IF EXISTS task_prompt_snapshot,
+                DROP COLUMN IF EXISTS user_prompt,
+                DROP COLUMN IF EXISTS prompt_template_refs_json
                 """
             )
         )

@@ -23,10 +23,7 @@ class ImagePromptBuildResult:
 @dataclass(slots=True)
 class VideoPromptBuildResult:
     final_prompt: str
-    system_prompt_snapshot: str
-    task_prompt_snapshot: str
-    user_prompt: str
-    prompt_template_refs_json: str
+    prompt_snapshot: dict
 
 
 def compose_image_prompt(
@@ -285,10 +282,13 @@ async def build_video_generate_prompt(
 
     return VideoPromptBuildResult(
         final_prompt=final_prompt,
-        system_prompt_snapshot=system_prompt,
-        task_prompt_snapshot=task_prompt,
-        user_prompt=effective_user_prompt,
-        prompt_template_refs_json=_template_refs_json(lookup.templates),
+        prompt_snapshot=build_prompt_snapshot(
+            system=system_prompt,
+            task=task_prompt,
+            user=effective_user_prompt,
+            final=final_prompt,
+            template_refs=_template_refs(lookup.templates),
+        ),
     )
 
 

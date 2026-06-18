@@ -12,6 +12,7 @@ from app.core.credits import normalize_video_resolution
 from app.core.deps import get_current_user, get_db
 from app.core.image_prompt_builder import build_video_generate_prompt
 from app.core.json_utils import dump_json_or_none, parse_json_or_none
+from app.core.prompt_snapshot import dump_prompt_snapshot, parse_prompt_snapshot
 from app.core.system_settings import (
     get_effective_video_credit_cost,
     get_effective_video_credit_costs,
@@ -199,10 +200,7 @@ async def create_video_task(
         resolution=normalized_resolution,
         aspect_ratio=aspect_ratio,
         status="pending",
-        system_prompt_snapshot=built_prompt.system_prompt_snapshot,
-        task_prompt_snapshot=built_prompt.task_prompt_snapshot,
-        user_prompt=built_prompt.user_prompt,
-        prompt_template_refs_json=built_prompt.prompt_template_refs_json,
+        prompt_snapshot_json=dump_prompt_snapshot(built_prompt.prompt_snapshot),
         settings_snapshot_json=dump_json_or_none(settings_snapshot),
         credit_cost=credit_cost,
     )
@@ -337,10 +335,7 @@ async def get_video_task(
             "status": status,
             "result_url": result_url,
             "prompt": task.prompt,
-            "system_prompt_snapshot": task.system_prompt_snapshot,
-            "task_prompt_snapshot": task.task_prompt_snapshot,
-            "user_prompt": task.user_prompt,
-            "prompt_template_refs": parse_json_or_none(task.prompt_template_refs_json) or [],
+            "prompt_snapshot": parse_prompt_snapshot(task.prompt_snapshot_json),
             "settings_snapshot": parse_json_or_none(task.settings_snapshot_json),
             "input_mode": task.input_mode,
             "input_images": parse_json_or_none(task.input_images_json) or [],
