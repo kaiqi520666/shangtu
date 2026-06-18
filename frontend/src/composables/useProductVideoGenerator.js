@@ -1,7 +1,11 @@
-import { computed, onBeforeUnmount, reactive, ref } from "vue";
+import { onBeforeUnmount, reactive, ref } from "vue";
 import { deleteVideoTask, generateVideo, getVideoCreditCosts, getVideoDownloadUrl, getVideoTask } from "@/api/video.js";
 import { analyzeImage } from "@/api/image.js";
 import { updateGenerationJob } from "@/api/generation.js";
+import {
+  createBatchFinishedHandler,
+  useGenerationCards,
+} from "@/composables/useGenerationCards.js";
 import { useCardActions } from "@/composables/useCardActions.js";
 import { useGenerationRunner } from "@/composables/useGenerationRunner.js";
 import { buildVideoAnalyzeImages, hasUploadingImages } from "@/utils/analyzeImages.js";
@@ -14,12 +18,7 @@ import {
   videoSizeOptions,
 } from "@/constants/productVideo.js";
 
-const POLL_INTERVAL_MS = 3000;
-const TERMINAL_STATUSES = new Set(["done", "failed", "timeout"]);
-
-function makeId() {
-  return `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-}
+const VIDEO_POLL_INTERVAL_MS = 3000;
 
 function getOptionLabel(options, value) {
   return options.find((item) => item.value === value)?.label || value;
@@ -72,28 +71,41 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
   const uploadedImages = ref([]);
   const mainImageIndex = ref(0);
   const creditCosts = ref({ ...defaultVideoCreditCosts });
-  const outputCards = ref([]);
-  const genLogs = ref([]);
   const aiLoading = ref(false);
-  const creatingBatch = ref(false);
-  const activeBatchRunId = ref("");
-
-  const pollTimers = new Map();
-  const pollInFlight = new Set();
-
-  const runningCount = computed(
-    () => outputCards.value.filter((card) => !TERMINAL_STATUSES.has(card.status)).length,
-  );
-  const generatedCount = computed(
-    () => outputCards.value.filter((card) => card.status === "done").length,
-  );
-  const failedCount = computed(
-    () =>
-      outputCards.value.filter((card) => card.status === "failed" || card.status === "timeout")
-        .length,
-  );
-  const jobTotal = computed(() => outputCards.value.length);
-  const generating = computed(() => runningCount.value > 0);
+  const cards = useGenerationCards({
+    getTask: getVideoTask,
+    pollIntervalMs: VIDEO_POLL_INTERVAL_MS,
+    mediaLabel: "视频",
+    preloadResult: false,
+    getLogPrefix: (card) => card.strategyTitle || getVideoModuleName(card.typeId),
+    onCardDone: (card) => {
+      card.progress = 100;
+    },
+    onBatchFinished: createBatchFinishedHandler({
+      genLogs: null,
+      toast,
+      doneLog: "商品视频任务已结束",
+      successText: "商品视频生成完成",
+      allFailedText: "商品视频生成失败，请稍后重试",
+      partialFailedText: (failed) => `${failed} 个视频生成失败，其余已完成`,
+    }),
+  });
+  const {
+    outputCards,
+    genLogs,
+    creatingBatch,
+    generating,
+    runningCount,
+    generatedCount,
+    failedCount,
+    jobTotal,
+    activeBatchRunId,
+    startPollingCard,
+    stopPollingCard,
+    trackBatch,
+    maybeFinishGenerating,
+    makeId,
+  } = cards;
 
   async function loadCreditCosts() {
     try {
@@ -163,23 +175,9 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
     }
   }
 
-  const cardsAdapter = {
-    outputCards,
-    genLogs,
-    creatingBatch,
-    generating,
-    activeBatchRunId,
-    startPollingCard,
-    clearAllPollTimers,
-    trackBatch() {},
-    maybeFinishGenerating() {},
-    makeId,
-    TERMINAL_STATUSES,
-  };
-
   const runner = useGenerationRunner({
     scenario: "product_video",
-    cards: cardsAdapter,
+    cards,
     toast,
     onJobCreated,
     mediaUnit: "个",
@@ -259,25 +257,25 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
     errorMessage = "",
     progress = 0,
     sortOrder = outputCards.value.length,
+    batchRunId = "",
   }) {
-    return reactive({
-      id: makeId(),
-      taskId,
+    const card = cards.createCard({
       typeId,
-      dataUrl: resultUrl,
-      resultUrl,
-      selected: false,
-      status,
       strategyTitle: title || "商品视频",
       strategyContent: settingsSnapshot?.product_input || "",
-      errorMessage,
       sortOrder,
-      batchRunId: "",
-      creditCost,
+      batchRunId,
       userPrompt: settingsSnapshot?.product_input || "",
       settingsSnapshot,
-      progress,
     });
+    card.taskId = taskId || "";
+    card.dataUrl = resultUrl;
+    card.resultUrl = resultUrl;
+    card.status = status;
+    card.errorMessage = errorMessage;
+    card.creditCost = creditCost;
+    card.progress = progress;
+    return card;
   }
 
   function restoreVideoJobData(data) {
@@ -373,98 +371,26 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
         return;
       }
 
+      const batchRunId = makeId();
+      activeBatchRunId.value = batchRunId;
+      trackBatch(batchRunId);
       const card = createCard({
         taskId,
         typeId: selectedType.typeId,
         title: selectedType.title,
         settingsSnapshot,
         creditCost: result.data?.credit_cost || 0,
+        batchRunId,
       });
       outputCards.value.unshift(card);
       genLogs.value.push(`[${selectedType.title}] 已进入队列`);
       startPollingCard(card);
+      maybeFinishGenerating(batchRunId);
     } catch {
       toast?.error?.("视频任务创建失败，请稍后重试");
     } finally {
       creatingBatch.value = false;
     }
-  }
-
-  function startPollingCard(card) {
-    if (!card.taskId) return;
-    stopPollingCard(card.id);
-    const timer = window.setInterval(() => {
-      pollCardOnce(card).catch(() => {});
-    }, POLL_INTERVAL_MS);
-    pollTimers.set(card.id, timer);
-    pollCardOnce(card).catch(() => {});
-  }
-
-  async function pollCardOnce(card) {
-    if (!card.taskId || TERMINAL_STATUSES.has(card.status)) {
-      stopPollingCard(card.id);
-      return;
-    }
-    if (pollInFlight.has(card.id)) return;
-    pollInFlight.add(card.id);
-    try {
-      const result = await getVideoTask(card.taskId);
-      if (result.code !== 0) return;
-      const data = result.data || {};
-      const status = data.status || "processing";
-      const resultUrl = data.result_url || "";
-
-      if (data.settings_snapshot) {
-        card.settingsSnapshot = {
-          ...(card.settingsSnapshot || {}),
-          ...data.settings_snapshot,
-        };
-      }
-      if (typeof data.user_prompt === "string") {
-        card.userPrompt = data.user_prompt;
-      }
-      if (typeof data.progress === "number") {
-        card.progress = data.progress;
-      }
-
-      if (status === "done" && resultUrl) {
-        stopPollingCard(card.id);
-        card.resultUrl = resultUrl;
-        card.dataUrl = resultUrl;
-        card.status = "done";
-        card.progress = 100;
-        genLogs.value.push(`[${card.strategyTitle}] 已完成`);
-        toast?.success?.("商品视频生成完成");
-      } else if (status === "failed" || status === "timeout") {
-        stopPollingCard(card.id);
-        card.status = status;
-        card.errorMessage = data.error_message || (status === "timeout" ? "视频生成超时" : "视频生成失败");
-        genLogs.value.push(`[${card.strategyTitle}] ${status === "timeout" ? "超时" : "失败"}：${card.errorMessage}`);
-        toast?.error?.(card.errorMessage);
-      } else {
-        card.status = status === "done" ? "processing" : status;
-      }
-    } catch {
-      // 单次轮询失败不打断任务。
-    } finally {
-      pollInFlight.delete(card.id);
-    }
-  }
-
-  function stopPollingCard(cardId) {
-    const timer = pollTimers.get(cardId);
-    if (timer) {
-      window.clearInterval(timer);
-      pollTimers.delete(cardId);
-    }
-  }
-
-  function clearAllPollTimers() {
-    for (const timer of pollTimers.values()) {
-      window.clearInterval(timer);
-    }
-    pollTimers.clear();
-    pollInFlight.clear();
   }
 
   async function removeCard(card) {

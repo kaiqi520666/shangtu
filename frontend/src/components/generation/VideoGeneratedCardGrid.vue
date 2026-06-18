@@ -1,5 +1,5 @@
 <script setup>
-import { Download, LoaderCircle, Play, Trash2, TriangleAlert, Volume2 } from 'lucide-vue-next'
+import { Download, LoaderCircle, Play, Square, Trash2, TriangleAlert } from 'lucide-vue-next'
 import { ref } from 'vue'
 import AppCheckbox from '@/components/ui/AppCheckbox.vue'
 import { useToast } from '@/composables/useToast.js'
@@ -126,7 +126,7 @@ function getCardMetaText(card, fallbackPlatform, fallbackLanguage, fallbackVideo
         ></video>
         <div v-if="canDownload(card)" class="absolute bottom-3 left-3 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-slate-900 shadow-lg backdrop-blur">
           <Play v-if="playingCardId !== card.id" class="h-4 w-4 fill-current" />
-          <Volume2 v-else class="h-4 w-4" />
+          <Square v-else class="h-4 w-4 fill-current" />
         </div>
         <div v-else-if="isFailed(card)" class="flex flex-col items-center gap-1.5 px-4 text-center text-rose-500">
           <TriangleAlert class="h-7 w-7" />

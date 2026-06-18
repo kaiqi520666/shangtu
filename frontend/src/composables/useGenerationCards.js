@@ -1,7 +1,7 @@
 import { computed, ref, reactive } from "vue";
 import { getImageTask } from "@/api/image.js";
 
-const POLL_INTERVAL_MS = 5000;
+const DEFAULT_POLL_INTERVAL_MS = 5000;
 const TERMINAL_STATUSES = new Set(["done", "failed", "timeout"]);
 
 function preloadImage(url) {
@@ -71,16 +71,24 @@ export function createBatchFinishedHandler({
 }
 
 /**
- * 通用生图卡片状态 + 轮询引擎。
+ * 通用生成卡片状态 + 轮询引擎。
  * 与场景无关，可被商品套图 / 详情图 / 穿搭等场景 composable 复用。
  *
  * @param {Object} options
+ * @param {Function} [options.getTask] - 单任务查询接口，默认查询图片任务
+ * @param {number} [options.pollIntervalMs] - 轮询间隔，默认 5 秒
+ * @param {string} [options.mediaLabel] - 日志和错误文案里的媒体名称，默认沿用通用文案
+ * @param {boolean} [options.preloadResult] - done 后是否预加载结果资源，默认 true
  * @param {Function} [options.onCardDone] - 单卡完成回调 (card) => void
  * @param {Function} [options.onCardFailed] - 单卡失败/超时回调 (card) => void
  * @param {Function} [options.onBatchFinished] - 当前批次全部终态回调 ({ total, done, failed }) => void
  * @param {Function} [options.getLogPrefix] - 日志前缀 (card) => string，默认 card.strategyTitle
  */
 export function useGenerationCards({
+  getTask = getImageTask,
+  pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
+  mediaLabel = "",
+  preloadResult = true,
   onCardDone,
   onCardFailed,
   onBatchFinished,
@@ -122,7 +130,7 @@ export function useGenerationCards({
     stopPollingCard(card.id);
     const timer = window.setInterval(() => {
       pollCardOnce(card).catch(() => {});
-    }, POLL_INTERVAL_MS);
+    }, pollIntervalMs);
     pollTimers.set(card.id, timer);
     pollCardOnce(card).catch(() => {});
   }
@@ -136,7 +144,7 @@ export function useGenerationCards({
     if (pollInFlight.has(card.id)) return;
     pollInFlight.add(card.id);
     try {
-      const result = await getImageTask(card.taskId);
+      const result = await getTask(card.taskId);
       if (result.code !== 0) return;
 
       // 处理本次响应前再校验一次终态，避免并发响应叠加导致 generatedCount 重复 +1
@@ -148,6 +156,12 @@ export function useGenerationCards({
       const data = result.data || {};
       const status = data.status || "processing";
       const resultUrl = data.result_url || "";
+      if (typeof data.progress === "number") {
+        card.progress = data.progress;
+      }
+      if (typeof data.credit_cost === "number") {
+        card.creditCost = data.credit_cost;
+      }
       if (typeof data.user_prompt === "string") {
         card.userPrompt = data.user_prompt;
       }
@@ -166,11 +180,13 @@ export function useGenerationCards({
           card.status = "processing";
         } else {
           stopPollingCard(card.id);
-          // 保持遮罩：预加载新图完成后再切换状态
-          try {
-            await preloadImage(resultUrl);
-          } catch {
-            // 预加载失败也继续
+          if (preloadResult) {
+            // 保持遮罩：预加载新图完成后再切换状态。视频等媒体可关闭预加载。
+            try {
+              await preloadImage(resultUrl);
+            } catch {
+              // 预加载失败也继续
+            }
           }
           card.resultUrl = resultUrl;
           card.dataUrl = resultUrl;
@@ -182,7 +198,11 @@ export function useGenerationCards({
         }
       } else if (status === "failed" || status === "timeout") {
         card.status = status;
-        card.errorMessage = data.error_message || (status === "timeout" ? "生成超时" : "生成失败");
+        const fallbackMessage =
+          status === "timeout"
+            ? `${mediaLabel}生成超时`
+            : `${mediaLabel}生成失败`;
+        card.errorMessage = data.error_message || fallbackMessage;
         genLogs.value.push(
           `[${logPrefix(card)}] ${status === "timeout" ? "超时" : "失败"}：${card.errorMessage}`,
         );
