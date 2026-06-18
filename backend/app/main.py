@@ -8,7 +8,7 @@ from fastapi import FastAPI
 
 from app.core.database import Base, engine
 from app.core.schema_migrations import ensure_runtime_schema
-from app.routers import admin, asset, auth, billing, generation, image, outfit
+from app.routers import admin, asset, auth, billing, generation, image, outfit, video
 import app.models
 
 load_dotenv()
@@ -37,3 +37,4 @@ app.include_router(image.router)
 app.include_router(generation.router)
 app.include_router(asset.router)
 app.include_router(outfit.router)
+app.include_router(video.router)

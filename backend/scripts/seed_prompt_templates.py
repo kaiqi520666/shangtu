@@ -61,6 +61,50 @@ PRODUCT_IMAGE_TYPES = [
 ]
 
 
+PRODUCT_VIDEO_TYPES = [
+    (
+        "ugc_seeding",
+        "UGC种草",
+        "生成真实用户视角的电商种草短视频：画面自然、有生活气息，像买家在真实场景中分享商品体验。重点呈现商品被使用、被拿起或被展示的过程，节奏轻快可信，不要夸张广告化。",
+    ),
+    (
+        "product_talk",
+        "产品口播",
+        "生成产品口播风格短视频：以人物或产品作为首帧延展，画面像创作者面对镜头讲解商品卖点。动作和镜头变化要自然，突出商品主体和讲解氛围，不要生成无法确认的品牌背书或夸张承诺。",
+    ),
+    (
+        "product_demo",
+        "产品演示",
+        "生成产品功能演示短视频：参考多张产品图稳定还原外观，通过旋转、推近、手部操作、场景使用或细节切换展示商品功能。画面应清楚解释商品怎么用、有什么亮点。",
+    ),
+    (
+        "tvc_ad",
+        "TVC广告",
+        "生成具有品牌广告片质感的商品短视频：光影精致、镜头运动克制、构图高级，突出产品质感与场景氛围。不要虚构品牌 Logo、奖项、认证、价格或官方背书。",
+    ),
+    (
+        "short_drama",
+        "带货短剧",
+        "生成短剧情节带货视频：围绕一个简单生活情境或冲突，让商品自然进入剧情并成为解决方案。节奏要像短视频平台内容，不要过度复杂，不要虚构具体人物身份和不可验证效果。",
+    ),
+    (
+        "pain_solution",
+        "痛点解决",
+        "生成从痛点画面过渡到解决效果的短视频：第一帧呈现问题或不便，最后一帧呈现商品解决后的状态。中间用自然镜头运动或操作过程连接，突出前后变化但避免绝对化承诺。",
+    ),
+    (
+        "unboxing",
+        "开箱种草",
+        "生成第一视角开箱种草短视频：从包装、拆开、拿出商品到展示细节形成顺滑过渡。画面应有开箱惊喜感和真实感，保持商品外观一致，不要虚构包装文字或赠品。",
+    ),
+    (
+        "reaction",
+        "反应展示",
+        "生成反应展示短视频：从展示前状态过渡到使用后或看到效果后的真实反应。强调自然表情、动作反馈和商品带来的即时感受，不要夸张功效或制造不可信的表演。",
+    ),
+]
+
+
 OUTFIT_SCENE_TYPES = [
     (
         "studio",
@@ -384,6 +428,19 @@ def _template_rows() -> list[dict]:
             ),
         },
         {
+            "scenario": "product_video",
+            "purpose": "video_generate",
+            "platform": None,
+            "type_id": None,
+            "model": "seedance-2",
+            "name": "商品视频-生成通用规则",
+            "content": (
+                "你是专业电商短视频生成导演。必须以用户上传图片中的商品为主体，保持商品外观、颜色、材质、结构和核心特征一致。"
+                "镜头运动、人物动作、场景变化可以服务视频方向，但不要虚构品牌 Logo、认证、奖项、价格、销量、医疗功效或无法确认的参数。"
+                "输出应适合电商短视频投放和商品页展示，节奏清晰，主体稳定，避免画面漂移、商品变形、文字乱码和过度炫技。"
+            ),
+        },
+        {
             "scenario": None,
             "purpose": "ai_write",
             "platform": None,
@@ -489,6 +546,19 @@ def _template_rows() -> list[dict]:
                 "type_id": type_id,
                 "model": "gpt-image-2",
                 "name": f"商品详情图-{module_name}默认用户提示词",
+                "content": content,
+            }
+        )
+
+    for type_id, video_name, content in PRODUCT_VIDEO_TYPES:
+        rows.append(
+            {
+                "scenario": "product_video",
+                "purpose": "video_generate",
+                "platform": None,
+                "type_id": type_id,
+                "model": "seedance-2",
+                "name": f"商品视频-{video_name}默认用户提示词",
                 "content": content,
             }
         )
@@ -657,9 +727,29 @@ async def verify_lookup() -> None:
                 f"服饰穿搭提示词模板查询缺少: {', '.join(sorted(outfit_missing))}"
             )
 
+        video = await get_prompt_templates(
+            db,
+            scenario="product_video",
+            purpose="video_generate",
+            platform="global",
+            type_id="ugc_seeding",
+            model="seedance-2",
+        )
+        video_names = [template.name for template in video.templates]
+        video_required = {
+            "商品视频-生成通用规则",
+            "商品视频-UGC种草默认用户提示词",
+        }
+        video_missing = video_required - set(video_names)
+        if video_missing:
+            raise RuntimeError(
+                f"商品视频提示词模板查询缺少: {', '.join(sorted(video_missing))}"
+            )
+
         print("lookup order:", " -> ".join(names))
         print("fallback order:", " -> ".join(fallback_names))
         print("outfit order:", " -> ".join(outfit_names))
+        print("video order:", " -> ".join(video_names))
 
 
 async def main() -> None:

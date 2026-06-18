@@ -9,11 +9,21 @@ from app.core.prompt_templates import get_prompt_templates
 from app.models import GenerationJob
 
 IMAGE_GENERATE_MODEL = "gpt-image-2"
+VIDEO_GENERATE_MODEL = "seedance-2"
 QWEN_TEXT_MODEL = "qwen3.6-flash"
 
 
 @dataclass(slots=True)
 class ImagePromptBuildResult:
+    final_prompt: str
+    system_prompt_snapshot: str
+    task_prompt_snapshot: str
+    user_prompt: str
+    prompt_template_refs_json: str
+
+
+@dataclass(slots=True)
+class VideoPromptBuildResult:
     final_prompt: str
     system_prompt_snapshot: str
     task_prompt_snapshot: str
@@ -31,6 +41,23 @@ def compose_image_prompt(
         "【系统提示词】",
         (system_prompt or "").strip(),
         "【任务提示词】",
+        (task_prompt or "").strip(),
+        "【用户提示词】",
+        (user_prompt or "").strip(),
+    ]
+    return "\n".join(part for part in final_parts if part)
+
+
+def compose_video_prompt(
+    *,
+    system_prompt: str | None,
+    task_prompt: str | None,
+    user_prompt: str | None,
+) -> str:
+    final_parts = [
+        "【系统提示词】",
+        (system_prompt or "").strip(),
+        "【视频任务提示词】",
         (task_prompt or "").strip(),
         "【用户提示词】",
         (user_prompt or "").strip(),
@@ -156,7 +183,15 @@ async def build_image_generate_prompt(
         for template in type_templates
         if template.content and template.content.strip()
     )
-    effective_user_prompt = (user_prompt or "").strip() or default_user_prompt
+    product_requirement = (user_prompt or "").strip()
+    if default_user_prompt and product_requirement:
+        effective_user_prompt = (
+            f"{default_user_prompt}\n\n"
+            "【商品卖点与视频要求】\n"
+            f"{product_requirement}"
+        )
+    else:
+        effective_user_prompt = product_requirement or default_user_prompt
     if not effective_user_prompt:
         raise ValueError("未找到当前图种的默认提示词，请检查提示词模板配置")
     task_prompt = _format_task_prompt(
@@ -173,6 +208,79 @@ async def build_image_generate_prompt(
     )
 
     return ImagePromptBuildResult(
+        final_prompt=final_prompt,
+        system_prompt_snapshot=system_prompt,
+        task_prompt_snapshot=task_prompt,
+        user_prompt=effective_user_prompt,
+        prompt_template_refs_json=_template_refs(lookup.templates),
+    )
+
+
+async def build_video_generate_prompt(
+    db: AsyncSession,
+    *,
+    type_id: str,
+    title: str | None,
+    user_prompt: str | None,
+    settings: dict,
+) -> VideoPromptBuildResult:
+    type_id = (type_id or "").strip()
+    if not type_id:
+        raise ValueError("视频生成缺少视频方向")
+
+    platform = str(settings.get("platform") or settings.get("market") or "").strip() or None
+    language = str(settings.get("language") or "").strip() or "未指定"
+    aspect_ratio = str(settings.get("aspect_ratio") or settings.get("aspectRatio") or "").strip() or "未指定"
+    resolution = str(settings.get("resolution") or "").strip() or "未指定"
+    duration = str(settings.get("duration") or "").strip() or "未指定"
+    input_mode = str(settings.get("input_mode") or settings.get("inputMode") or "").strip() or "未指定"
+
+    lookup = await get_prompt_templates(
+        db,
+        scenario="product_video",
+        purpose="video_generate",
+        platform=platform,
+        type_id=type_id,
+        model=VIDEO_GENERATE_MODEL,
+    )
+    system_templates, type_templates = _split_templates_by_type(lookup.templates, type_id)
+    system_prompt = "\n\n".join(
+        template.content.strip()
+        for template in system_templates
+        if template.content and template.content.strip()
+    )
+    default_user_prompt = "\n\n".join(
+        template.content.strip()
+        for template in type_templates
+        if template.content and template.content.strip()
+    )
+    effective_user_prompt = (user_prompt or "").strip() or default_user_prompt
+    if not effective_user_prompt:
+        raise ValueError("未找到当前视频方向的默认提示词，请检查提示词模板配置")
+
+    task_prompt = "\n".join(
+        line
+        for line in [
+            "【任务】生成一条电商商品短视频。",
+            f"【视频方向】{title or type_id}",
+            f"【投放市场/平台】{platform or '未指定'}",
+            f"【语言/声音】{language}",
+            f"【画面比例】{aspect_ratio}",
+            f"【清晰度】{resolution}",
+            f"【时长】{duration}秒",
+            f"【参考素材模式】{input_mode}",
+            "【强约束】保持用户上传商品图里的主体、颜色、材质、结构和核心外观一致；不要虚构品牌 Logo、认证、价格、销量或无法确认的参数。",
+        ]
+        if line
+    )
+
+    final_prompt = compose_video_prompt(
+        system_prompt=system_prompt,
+        task_prompt=task_prompt,
+        user_prompt=effective_user_prompt,
+    )
+
+    return VideoPromptBuildResult(
         final_prompt=final_prompt,
         system_prompt_snapshot=system_prompt,
         task_prompt_snapshot=task_prompt,

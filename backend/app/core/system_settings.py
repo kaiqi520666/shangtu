@@ -6,13 +6,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.credits import (
     DEFAULT_IMAGE_CREDIT_COSTS,
+    DEFAULT_VIDEO_CREDIT_COSTS,
     get_image_credit_costs,
+    get_video_credit_costs,
     normalize_image_resolution,
+    normalize_video_resolution,
 )
 from app.core.json_utils import dump_json, parse_json_or_none
 from app.models import SystemSetting
 
 SETTING_IMAGE_CREDIT_COSTS = "image_credit_costs"
+SETTING_VIDEO_CREDIT_COSTS = "video_credit_costs"
 SETTING_RECHARGE_PACKAGES = "credit_recharge_packages"
 
 DEFAULT_RECHARGE_PACKAGES: list[dict[str, Any]] = [
@@ -63,6 +67,22 @@ def normalize_image_credit_costs(raw: dict[str, Any]) -> dict[str, int]:
             raise ValueError(f"{resolution} 扣费必须是正整数") from exc
         if cost < 1:
             raise ValueError(f"{resolution} 扣费必须大于等于 1")
+        costs[resolution] = cost
+    return costs
+
+
+def normalize_video_credit_costs(raw: dict[str, Any]) -> dict[str, int]:
+    costs: dict[str, int] = {}
+    for resolution in DEFAULT_VIDEO_CREDIT_COSTS:
+        value = raw.get(resolution)
+        if value is None:
+            value = raw.get(resolution.upper())
+        try:
+            cost = int(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{resolution} 每秒扣费必须是正整数") from exc
+        if cost < 1:
+            raise ValueError(f"{resolution} 每秒扣费必须大于等于 1")
         costs[resolution] = cost
     return costs
 
@@ -137,6 +157,31 @@ async def get_effective_image_credit_cost(db: AsyncSession, resolution: str | No
         supported = " / ".join(DEFAULT_IMAGE_CREDIT_COSTS.keys())
         raise ValueError(f"不支持的清晰度：{resolution}，请选择 {supported}")
     return costs[normalized]
+
+
+async def get_effective_video_credit_costs(db: AsyncSession) -> dict[str, int]:
+    setting = await get_setting(db, SETTING_VIDEO_CREDIT_COSTS)
+    if setting:
+        parsed = parse_json_or_none(setting.value_json)
+        if not isinstance(parsed, dict):
+            raise ValueError("数据库中的视频扣费配置不是有效对象")
+        return normalize_video_credit_costs(parsed)
+    return get_video_credit_costs()
+
+
+async def get_effective_video_credit_cost(
+    db: AsyncSession,
+    resolution: str | None,
+    duration: int,
+) -> int:
+    normalized = normalize_video_resolution(resolution)
+    costs = await get_effective_video_credit_costs(db)
+    if normalized not in costs:
+        supported = " / ".join(DEFAULT_VIDEO_CREDIT_COSTS.keys())
+        raise ValueError(f"不支持的视频清晰度：{resolution}，请选择 {supported}")
+    if duration < 4 or duration > 15:
+        raise ValueError("视频时长必须在 4-15 秒之间")
+    return int(costs[normalized]) * int(duration)
 
 
 async def get_effective_recharge_packages(

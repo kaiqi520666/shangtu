@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 from sqlalchemy import select, update
 
 from app.core.database import SessionLocal
-from app.core.oss import ALLOWED_IMAGE_TYPES, upload_image_bytes
+from app.core.oss import ALLOWED_IMAGE_TYPES, ALLOWED_VIDEO_TYPES, upload_image_bytes, upload_video_bytes
 
 load_dotenv()
 
@@ -22,9 +22,12 @@ for _proxy_key in ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"):
     os.environ.pop(_proxy_key, None)
 
 DEFAULT_GENERATED_CONTENT_TYPE = "image/png"
+DEFAULT_GENERATED_VIDEO_CONTENT_TYPE = "video/mp4"
 
 POLL_INTERVAL_SECONDS = 5
 MAX_WAIT_SECONDS = 20 * 60
+VIDEO_POLL_INTERVAL_SECONDS = 10
+VIDEO_MAX_WAIT_SECONDS = 40 * 60
 
 # ToAPIS 支持的 (ratio, resolution) → 像素尺寸；与前端 frontend/src/constants/generator.js#resolutionMap 完全对齐
 TOAPIS_SIZE_TABLE: dict[str, dict[str, tuple[int, int]]] = {
@@ -82,12 +85,57 @@ async def update_task_in_db(
         await session.commit()
 
 
+async def update_video_task_in_db(
+    task_id: str,
+    *,
+    status: str | None = None,
+    result_url: str | None = None,
+    error_message: str | None = None,
+    progress: int | None = None,
+    provider_task_id: str | None = None,
+) -> None:
+    from app.models import VideoTask
+
+    values: dict[str, Any] = {}
+    if status is not None:
+        values["status"] = status
+    if result_url is not None:
+        values["result_url"] = result_url
+    if error_message is not None:
+        values["error_message"] = error_message
+    if progress is not None:
+        values["progress"] = max(0, min(100, int(progress)))
+    if provider_task_id is not None:
+        values["provider_task_id"] = provider_task_id
+
+    if not values:
+        return
+
+    async with SessionLocal() as session:
+        await session.execute(
+            update(VideoTask)
+            .where(VideoTask.id == task_id)
+            .values(**values)
+        )
+        await session.commit()
+
+
 async def fetch_task_user_id(task_id: str) -> int | None:
     from app.models import ImageTask
 
     async with SessionLocal() as session:
         result = await session.execute(
             select(ImageTask.user_id).where(ImageTask.id == task_id)
+        )
+        return result.scalar_one_or_none()
+
+
+async def fetch_video_task_user_id(task_id: str) -> int | None:
+    from app.models import VideoTask
+
+    async with SessionLocal() as session:
+        result = await session.execute(
+            select(VideoTask.user_id).where(VideoTask.id == task_id)
         )
         return result.scalar_one_or_none()
 
@@ -113,6 +161,21 @@ def normalize_content_type(raw: str | None) -> str:
     return DEFAULT_GENERATED_CONTENT_TYPE
 
 
+def normalize_video_content_type(raw: str | None, url: str | None = None) -> str:
+    if raw:
+        main = raw.split(";", 1)[0].strip().lower()
+        if main in ALLOWED_VIDEO_TYPES:
+            return main
+    url_lower = (url or "").lower()
+    if url_lower.endswith(".webm"):
+        return "video/webm"
+    if url_lower.endswith(".mov"):
+        return "video/quicktime"
+    if url_lower.endswith(".mkv"):
+        return "video/x-matroska"
+    return DEFAULT_GENERATED_VIDEO_CONTENT_TYPE
+
+
 def build_create_payload(
     *,
     prompt: str,
@@ -131,6 +194,30 @@ def build_create_payload(
     }
     if reference_urls:
         payload["image_urls"] = reference_urls
+    return payload
+
+
+def build_video_create_payload(
+    *,
+    prompt: str,
+    duration: int,
+    aspect_ratio: str,
+    resolution: str,
+    image_with_roles: list[dict[str, str]],
+    generate_audio: bool = True,
+    client_business_id: str | None = None,
+) -> dict:
+    payload: dict[str, Any] = {
+        "model": "seedance-2",
+        "prompt": prompt,
+        "duration": int(duration),
+        "aspect_ratio": aspect_ratio,
+        "resolution": resolution,
+        "image_with_roles": image_with_roles,
+        "generate_audio": generate_audio,
+    }
+    if client_business_id:
+        payload["client_business_id"] = client_business_id
     return payload
 
 
@@ -239,9 +326,37 @@ async def materialize_to_oss(
     )
 
 
+async def materialize_video_to_oss(
+    *,
+    user_id: int,
+    url: str,
+    client: httpx.AsyncClient,
+):
+    download = await client.get(url)
+    download.raise_for_status()
+    content_bytes = download.content
+    content_type = normalize_video_content_type(
+        download.headers.get("content-type"),
+        url,
+    )
+
+    return await upload_video_bytes(
+        user_id=user_id,
+        content=content_bytes,
+        content_type=content_type,
+        source="generated-videos",
+    )
+
+
 async def _set_progress(redis, task_id: str, value: int) -> None:
     await redis.set(
         f"task:{task_id}:progress", str(max(0, min(100, value))), ex=7200
+    )
+
+
+async def _set_video_progress(redis, task_id: str, value: int) -> None:
+    await redis.set(
+        f"video_task:{task_id}:progress", str(max(0, min(100, value))), ex=7200
     )
 
 
@@ -267,6 +382,23 @@ def normalize_provider_error(message: str | None) -> str:
     if any("一" <= ch <= "鿿" for ch in message):
         return message
     return "生图失败，请调整提示词后重试。"
+
+
+def normalize_video_provider_error(message: str | None) -> str:
+    if not message:
+        return "视频生成失败，请调整提示词或参考图后重试。"
+    lower = message.lower()
+    if "unsafe" in lower:
+        return "视频内容触发平台安全策略，请减少敏感词、夸张功效、品牌/认证/人物相关描述后重新生成。"
+    if "rate limit" in lower or "too many requests" in lower or "429" in lower:
+        return "视频生成服务繁忙，请稍后再试。"
+    if "timeout" in lower or "timed out" in lower or "超时" in message:
+        return "视频生成任务超时，请稍后重试。"
+    if "upstream api failed" in lower or "upstream" in lower:
+        return "上游视频生成服务暂时失败，请稍后重试。"
+    if any("一" <= ch <= "鿿" for ch in message):
+        return message
+    return "视频生成失败，请调整提示词或参考图后重试。"
 
 
 async def refund_task_credit(task_id: str) -> bool:
@@ -302,6 +434,39 @@ async def refund_task_credit(task_id: str) -> bool:
     return True
 
 
+async def refund_video_task_credit(task_id: str) -> bool:
+    """幂等退款：按视频任务实际扣费退回积分，已退过直接 no-op。"""
+    from app.models import User, VideoTask
+
+    async with SessionLocal() as session:
+        async with session.begin():
+            task_row = await session.execute(
+                select(
+                    VideoTask.user_id,
+                    VideoTask.credit_cost,
+                    VideoTask.credit_refunded,
+                ).where(VideoTask.id == task_id).with_for_update()
+            )
+            row = task_row.first()
+            if not row:
+                return False
+            user_id, credit_cost, refunded = row
+            if refunded:
+                return False
+            refund_amount = max(1, int(credit_cost or 1))
+            await session.execute(
+                update(User).where(User.id == user_id).values(
+                    credits=User.credits + refund_amount
+                )
+            )
+            await session.execute(
+                update(VideoTask).where(VideoTask.id == task_id).values(
+                    credit_refunded=True
+                )
+            )
+    return True
+
+
 async def _mark_failed(redis, task_id: str, raw_message: str) -> None:
     print(f"[task {task_id}] failed (raw): {raw_message}")
     friendly = normalize_provider_error(raw_message)
@@ -318,6 +483,24 @@ async def _mark_timeout(redis, task_id: str, raw_message: str) -> None:
     await refund_task_credit(task_id)
     await redis.set(f"task:{task_id}:error", friendly, ex=3600)
     await redis.set(f"task:{task_id}:status", "timeout", ex=3600)
+
+
+async def _mark_video_failed(redis, task_id: str, raw_message: str) -> None:
+    print(f"[video task {task_id}] failed (raw): {raw_message}")
+    friendly = normalize_video_provider_error(raw_message)
+    await update_video_task_in_db(task_id, status="failed", error_message=friendly)
+    await refund_video_task_credit(task_id)
+    await redis.set(f"video_task:{task_id}:error", friendly, ex=3600)
+    await redis.set(f"video_task:{task_id}:status", "failed", ex=3600)
+
+
+async def _mark_video_timeout(redis, task_id: str, raw_message: str) -> None:
+    print(f"[video task {task_id}] timeout (raw): {raw_message}")
+    friendly = normalize_video_provider_error(raw_message)
+    await update_video_task_in_db(task_id, status="timeout", error_message=friendly)
+    await refund_video_task_credit(task_id)
+    await redis.set(f"video_task:{task_id}:error", friendly, ex=3600)
+    await redis.set(f"video_task:{task_id}:status", "timeout", ex=3600)
 
 
 async def generate_image(
@@ -481,3 +664,163 @@ async def generate_image(
         print(f"任务失败详细错误: {e}")
         traceback.print_exc()
         await _mark_failed(redis, task_id, str(e))
+
+
+async def generate_video(
+    ctx,
+    task_id: str,
+    prompt: str,
+    duration: int,
+    aspect_ratio: str,
+    resolution: str,
+    image_with_roles: list[dict[str, str]],
+    generate_audio: bool = True,
+):
+    redis = ctx["redis"]
+
+    try:
+        await redis.set(f"video_task:{task_id}:status", "processing", ex=7200)
+        await _set_video_progress(redis, task_id, 0)
+        await update_video_task_in_db(task_id, status="processing", progress=0)
+
+        if not TOAPIS_KEY:
+            await _mark_video_failed(redis, task_id, "TOAPIS_KEY 未配置，无法调用视频生成服务")
+            return
+
+        user_id = await fetch_video_task_user_id(task_id)
+        if not user_id:
+            await _mark_video_failed(redis, task_id, "视频任务不存在或已删除")
+            return
+
+        create_payload = build_video_create_payload(
+            prompt=prompt,
+            duration=duration,
+            aspect_ratio=aspect_ratio,
+            resolution=resolution,
+            image_with_roles=image_with_roles,
+            generate_audio=generate_audio,
+            client_business_id=task_id,
+        )
+
+        transport = httpx.AsyncHTTPTransport(proxy=None)
+        async with httpx.AsyncClient(timeout=90, transport=transport) as client:
+            try:
+                create_resp = await client.post(
+                    f"{TOAPIS_BASE_URL}/v1/videos/generations",
+                    headers={
+                        "Authorization": f"Bearer {TOAPIS_KEY}",
+                        "Content-Type": "application/json",
+                    },
+                    json=create_payload,
+                )
+                create_resp.raise_for_status()
+                create_result = create_resp.json()
+            except httpx.HTTPError as e:
+                await _mark_video_failed(redis, task_id, f"创建 ToAPIS 视频任务失败: {e}")
+                return
+            except ValueError as e:
+                await _mark_video_failed(redis, task_id, f"ToAPIS 视频创建响应解析失败: {e}")
+                return
+
+            print(f"toapis 视频创建响应: {create_result}")
+
+            provider_task_id = extract_provider_task_id(create_result)
+            if not provider_task_id:
+                err = (
+                    extract_provider_error(create_result)
+                    or "ToAPIS 未返回 video task id"
+                )
+                await _mark_video_failed(redis, task_id, err)
+                return
+
+            await update_video_task_in_db(task_id, provider_task_id=provider_task_id)
+
+            poll_url = f"{TOAPIS_BASE_URL}/v1/videos/generations/{provider_task_id}"
+            deadline = time.monotonic() + VIDEO_MAX_WAIT_SECONDS
+            final_status: str | None = None
+            final_url: str | None = None
+            final_error: str | None = None
+
+            while time.monotonic() < deadline:
+                await asyncio.sleep(VIDEO_POLL_INTERVAL_SECONDS)
+                try:
+                    poll_resp = await client.get(
+                        poll_url,
+                        headers={"Authorization": f"Bearer {TOAPIS_KEY}"},
+                    )
+                    poll_resp.raise_for_status()
+                    poll_result = poll_resp.json()
+                except httpx.HTTPError as e:
+                    print(f"轮询 ToAPIS 视频异常: {e}")
+                    continue
+                except ValueError as e:
+                    print(f"ToAPIS 视频轮询响应解析失败: {e}")
+                    continue
+
+                provider_status = extract_provider_status(poll_result)
+                provider_progress = extract_provider_progress(poll_result)
+
+                if provider_progress is not None:
+                    await _set_video_progress(redis, task_id, provider_progress)
+                    await update_video_task_in_db(task_id, progress=provider_progress)
+
+                if provider_status in TOAPIS_STATUS_DONE:
+                    final_url = extract_result_url(poll_result)
+                    if final_url:
+                        final_status = "done"
+                    else:
+                        final_status = "failed"
+                        final_error = "ToAPIS 已完成但未返回视频 URL"
+                    break
+
+                if provider_status in TOAPIS_STATUS_FAILED:
+                    final_status = "failed"
+                    final_error = (
+                        extract_provider_error(poll_result) or "ToAPIS 视频任务失败"
+                    )
+                    break
+                # queued / in_progress / 未知状态：继续轮询
+            else:
+                await _mark_video_timeout(redis, task_id, "等待 ToAPIS 视频任务超时")
+                return
+
+            if final_status == "failed" or not final_url:
+                await _mark_video_failed(
+                    redis, task_id, final_error or "ToAPIS 视频任务失败"
+                )
+                return
+
+            try:
+                uploaded = await materialize_video_to_oss(
+                    user_id=user_id,
+                    url=final_url,
+                    client=client,
+                )
+            except httpx.HTTPError as e:
+                await _mark_video_failed(redis, task_id, f"下载生成视频失败: {e}")
+                return
+            except Exception as e:
+                traceback.print_exc()
+                await _mark_video_failed(redis, task_id, f"视频上传 OSS 失败: {e}")
+                return
+
+        await update_video_task_in_db(
+            task_id,
+            status="done",
+            result_url=uploaded.url,
+            progress=100,
+        )
+        await redis.set(
+            f"video_task:{task_id}:result",
+            json.dumps({"url": uploaded.url}),
+            ex=86400,
+        )
+        await _set_video_progress(redis, task_id, 100)
+        await redis.set(f"video_task:{task_id}:status", "done", ex=86400)
+
+    except httpx.TimeoutException:
+        await _mark_video_timeout(redis, task_id, "请求 ToAPIS 视频服务超时")
+    except Exception as e:
+        print(f"视频任务失败详细错误: {e}")
+        traceback.print_exc()
+        await _mark_video_failed(redis, task_id, str(e))

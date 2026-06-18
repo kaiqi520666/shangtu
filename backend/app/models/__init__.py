@@ -7,6 +7,7 @@ from app.models.outfit_model import OutfitModel
 from app.models.prompt_template import PromptTemplate
 from app.models.system_setting import SystemSetting
 from app.models.user import User
+from app.models.video_task import VideoTask
 
 __all__ = [
     "AdminAuditLog",
@@ -18,4 +19,5 @@ __all__ = [
     "PromptTemplate",
     "SystemSetting",
     "User",
+    "VideoTask",
 ]

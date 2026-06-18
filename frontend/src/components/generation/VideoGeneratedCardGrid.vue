@@ -60,8 +60,8 @@ function togglePlay(card) {
 
 function getCardMetaText(card, fallbackPlatform, fallbackLanguage, fallbackVideoLabel) {
   const snapshot = card.settingsSnapshot || {}
-  const platformText = snapshot.platform || fallbackPlatform
-  const languageText = snapshot.language || fallbackLanguage
+  const platformText = snapshot.platform || snapshot.market_label || snapshot.market || fallbackPlatform
+  const languageText = snapshot.language_label || snapshot.language || fallbackLanguage
   const durationText = snapshot.duration ? `${snapshot.duration}秒` : ''
   const resolutionText = snapshot.resolution || ''
   const videoText = [resolutionText, durationText].filter(Boolean).join(' / ') || fallbackVideoLabel

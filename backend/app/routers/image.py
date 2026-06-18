@@ -29,6 +29,12 @@ from app.core.system_settings import (
     get_effective_image_credit_costs,
 )
 from app.core.time import to_utc_iso, utc_now
+from app.core.user_credits import (
+    deduct_user_credits as _deduct_user_credits,
+    get_user_credits as _get_user_credits,
+    insufficient_credits_message as _insufficient_credits_message,
+    refund_user_credits as _refund_user_credits,
+)
 from app.models import GenerationJob, ImageTask, User
 from app.schemas.response import Response, fail, success
 
@@ -64,38 +70,6 @@ class ProductImageStrategyRequest(BaseModel):
 
 class FreeImageOptimizeRequest(BaseModel):
     prompt: str
-
-
-async def _get_user_credits(db: AsyncSession, user_id: int) -> int:
-    result = await db.execute(select(User.credits).where(User.id == user_id))
-    return int(result.scalar_one_or_none() or 0)
-
-
-def _insufficient_credits_message(required: int, available: int) -> str:
-    return f"积分不足，本次需要 {required} 点，当前剩余 {max(0, available)} 点"
-
-
-async def _deduct_user_credits(db: AsyncSession, user_id: int, cost: int) -> int | None:
-    result = await db.execute(
-        update(User)
-        .where(User.id == user_id, User.credits >= cost)
-        .values(credits=User.credits - cost)
-        .returning(User.credits)
-        .execution_options(synchronize_session=False)
-    )
-    value = result.scalar_one_or_none()
-    return int(value) if value is not None else None
-
-
-async def _refund_user_credits(db: AsyncSession, user_id: int, cost: int) -> int:
-    result = await db.execute(
-        update(User)
-        .where(User.id == user_id)
-        .values(credits=User.credits + cost)
-        .returning(User.credits)
-        .execution_options(synchronize_session=False)
-    )
-    return int(result.scalar_one())
 
 
 def _redis_str(value) -> str | None:

@@ -230,7 +230,7 @@ const emit = defineEmits([
         <VideoGeneratedCardGrid
           v-if="mediaType === 'video'"
           :cards="outputCards"
-          :platform="settings.platform"
+          :platform="settings.platform || settings.market || ''"
           :language="settings.language"
           :video-label="selectedImageLabel"
           :get-module-name="getModuleName"
@@ -242,7 +242,7 @@ const emit = defineEmits([
         <GeneratedCardGrid
           v-else
           :cards="outputCards"
-          :platform="settings.platform"
+          :platform="settings.platform || settings.market || ''"
           :language="settings.language"
           :image-label="selectedImageLabel"
           :get-module-name="getModuleName"

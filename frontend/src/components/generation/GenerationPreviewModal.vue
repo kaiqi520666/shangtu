@@ -14,6 +14,10 @@ defineProps({
     type: String,
     default: '生成图片预览',
   },
+  mediaType: {
+    type: String,
+    default: 'image',
+  },
 })
 
 const emit = defineEmits(['close'])
@@ -27,7 +31,15 @@ const emit = defineEmits(['close'])
     @close="emit('close')"
   >
     <div v-if="card" class="bg-slate-100 p-6">
-      <img :src="card.dataUrl" class="mx-auto max-h-[75vh] rounded-xl object-contain shadow-lg" :alt="alt" />
+      <video
+        v-if="mediaType === 'video'"
+        :src="card.dataUrl"
+        class="mx-auto max-h-[75vh] rounded-xl object-contain shadow-lg"
+        controls
+        autoplay
+        playsinline
+      ></video>
+      <img v-else :src="card.dataUrl" class="mx-auto max-h-[75vh] rounded-xl object-contain shadow-lg" :alt="alt" />
     </div>
   </AppModal>
 </template>
