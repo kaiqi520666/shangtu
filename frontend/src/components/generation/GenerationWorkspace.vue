@@ -3,6 +3,7 @@ import { Clock3, Download, ImageIcon, Plus, RefreshCw } from 'lucide-vue-next'
 import GeneratedCardGrid from '@/components/generation/GeneratedCardGrid.vue'
 import GeneratorPreviewShowcase from '@/components/generation/GeneratorPreviewShowcase.vue'
 import GeneratorWorkspaceShell from '@/components/generation/GeneratorWorkspaceShell.vue'
+import VideoGeneratedCardGrid from '@/components/generation/VideoGeneratedCardGrid.vue'
 
 defineProps({
   settings: {
@@ -81,6 +82,14 @@ defineProps({
     type: String,
     default: 'image',
   },
+  mediaType: {
+    type: String,
+    default: 'image',
+  },
+  mediaUnit: {
+    type: String,
+    default: '张',
+  },
   loadingTitle: {
     type: String,
     default: 'AI 图片生成中',
@@ -137,7 +146,7 @@ const emit = defineEmits([
             </div>
             <button type="button" class="flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-1.5 text-xs font-bold text-white shadow-md transition-all hover:bg-secondary" @click="emit('batch-download')">
               <Download class="h-3.5 w-3.5 stroke-[2.5]" />
-              批量下载 ({{ selectedCardsCount }}张)
+              批量下载 ({{ selectedCardsCount }}{{ mediaUnit }})
             </button>
             <div class="h-4 w-px bg-slate-200"></div>
           </template>
@@ -178,7 +187,7 @@ const emit = defineEmits([
                 <template v-if="loadingDescription">{{ loadingDescription }}</template>
                 <template v-else>
                   正在按 <span class="font-semibold text-primary">{{ settings.platform }}</span> 和
-                  <span class="font-semibold text-secondary">{{ selectedImageLabel }}</span> 输出图片
+                  <span class="font-semibold text-secondary">{{ selectedImageLabel }}</span> 输出{{ mediaType === 'video' ? '视频' : '图片' }}
                 </template>
               </slot>
             </p>
@@ -208,17 +217,30 @@ const emit = defineEmits([
             <span>
               {{ progressText }}，进行中
               <span class="font-bold text-primary">{{ runningCount }}</span>
-              张，已完成
+              {{ mediaUnit }}，已完成
               <span class="font-bold text-primary">{{ generatedCount }}</span>
               / {{ jobTotal || totalCount }}
               <template v-if="failedCount > 0">
-                ，失败 <span class="font-bold text-rose-500">{{ failedCount }}</span> 张
+                ，失败 <span class="font-bold text-rose-500">{{ failedCount }}</span> {{ mediaUnit }}
               </template>
             </span>
           </div>
           <span class="font-mono text-slate-400">{{ pollHint }}</span>
         </div>
+        <VideoGeneratedCardGrid
+          v-if="mediaType === 'video'"
+          :cards="outputCards"
+          :platform="settings.platform"
+          :language="settings.language"
+          :video-label="selectedImageLabel"
+          :get-module-name="getModuleName"
+          @toggle-card="emit('toggle-card', $event)"
+          @download-card="emit('download-card', $event)"
+          @zoom-card="emit('zoom-card', $event)"
+          @delete-card="emit('delete-card', $event)"
+        />
         <GeneratedCardGrid
+          v-else
           :cards="outputCards"
           :platform="settings.platform"
           :language="settings.language"

@@ -45,6 +45,14 @@ const props = defineProps({
     type: Boolean,
     default: true,
   },
+  showMainAction: {
+    type: Boolean,
+    default: true,
+  },
+  badgeTextResolver: {
+    type: Function,
+    default: null,
+  },
 });
 
 const emit = defineEmits(["update:images", "update:mainIndex", "notify"]);
@@ -175,6 +183,15 @@ function openPreview(img) {
   if (!getPreview(img)) return;
   previewImage.value = img;
 }
+
+function getBadgeText(index) {
+  return props.badgeTextResolver ? props.badgeTextResolver(index) : props.mainBadgeText;
+}
+
+function shouldShowBadge(index) {
+  if (props.badgeTextResolver) return true;
+  return props.showMainAction && index === props.mainIndex;
+}
 </script>
 
 <template>
@@ -228,6 +245,7 @@ function openPreview(img) {
           class="absolute inset-0 flex items-center justify-center gap-1.5 bg-slate-900/60 opacity-0 transition-opacity group-hover:opacity-100"
         >
           <button
+            v-if="showMainAction"
             type="button"
             class="rounded border border-slate-100 bg-white p-1.5 text-xs text-slate-800 shadow transition-colors hover:bg-slate-100"
             :class="index === mainIndex ? 'border-primary text-primary' : ''"
@@ -246,10 +264,10 @@ function openPreview(img) {
           </button>
         </div>
         <span
-          v-if="index === mainIndex"
+          v-if="shouldShowBadge(index)"
           class="absolute bottom-1 right-1 rounded bg-primary px-1.5 py-0.5 text-xs font-bold text-white shadow-sm"
         >
-          {{ mainBadgeText }}
+          {{ getBadgeText(index) }}
         </span>
       </div>
 

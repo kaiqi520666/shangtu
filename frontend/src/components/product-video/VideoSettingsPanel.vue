@@ -82,6 +82,11 @@ const uploadLimitMessage = computed(() => {
   return "首帧模式只能上传 1 张图片";
 });
 const showUploadPlaceholders = computed(() => selectedType.value.inputMode === "first_last_frame");
+const showMainImageAction = computed(() => !["first_frame", "first_last_frame", "reference_images"].includes(selectedType.value.inputMode));
+const badgeTextResolver = computed(() => {
+  if (selectedType.value.inputMode !== "first_last_frame") return null;
+  return (index) => (index === 0 ? "开始" : "结束");
+});
 const estimatedCredits = computed(() =>
   getVideoCreditCost({
     resolution: props.settings.resolution,
@@ -142,6 +147,8 @@ function notifyPending(featureName) {
       main-badge-text="素材"
       :limit-message="uploadLimitMessage"
       :show-placeholders="showUploadPlaceholders"
+      :show-main-action="showMainImageAction"
+      :badge-text-resolver="badgeTextResolver"
       @update:images="emit('update:uploadedImages', $event)"
       @update:main-index="emit('update:mainImageIndex', $event)"
       @notify="emit('notify', $event)"
