@@ -40,6 +40,10 @@ export function getVideoTask(taskId) {
   return request.get(`/video/task/${taskId}`, { timeout: 15000 });
 }
 
+export function deleteVideoTask(taskId) {
+  return request.delete(`/video/task/${taskId}`, { timeout: 15000 });
+}
+
 export function getVideoDownloadUrl(taskId) {
   return `${request.defaults.baseURL}/video/task/${taskId}/download`;
 }

@@ -16,7 +16,7 @@ from app.core.system_settings import (
     get_effective_video_credit_cost,
     get_effective_video_credit_costs,
 )
-from app.core.time import to_utc_iso
+from app.core.time import to_utc_iso, utc_now
 from app.core.user_credits import (
     deduct_user_credits,
     get_user_credits,
@@ -354,6 +354,34 @@ async def get_video_task(
             "credits": latest_credits,
         }
     )
+
+
+@router.delete("/task/{task_id}", response_model=Response)
+async def delete_video_task(
+    task_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """软删除单个视频任务（仅标记 archived，不物理删除 OSS 文件）。"""
+    result = await db.execute(
+        select(VideoTask).where(
+            VideoTask.id == task_id,
+            VideoTask.user_id == current_user.id,
+        )
+    )
+    task = result.scalar_one_or_none()
+    if not task:
+        return fail("视频不存在")
+
+    task.archived = True
+    task.archived_at = utc_now()
+    try:
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        return fail("删除失败，请稍后重试")
+
+    return success({"task_id": task_id})
 
 
 @router.get("/task/{task_id}/download")

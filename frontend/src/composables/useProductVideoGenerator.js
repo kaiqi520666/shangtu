@@ -1,5 +1,5 @@
 import { computed, onBeforeUnmount, reactive, ref } from "vue";
-import { generateVideo, getVideoCreditCosts, getVideoDownloadUrl, getVideoTask } from "@/api/video.js";
+import { deleteVideoTask, generateVideo, getVideoCreditCosts, getVideoDownloadUrl, getVideoTask } from "@/api/video.js";
 import { analyzeImage } from "@/api/image.js";
 import { updateGenerationJob } from "@/api/generation.js";
 import { useCardActions } from "@/composables/useCardActions.js";
@@ -467,9 +467,24 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
     pollInFlight.clear();
   }
 
-  function removeCard(card) {
-    outputCards.value = outputCards.value.filter((item) => item.id !== card.id);
-    stopPollingCard(card.id);
+  async function removeCard(card) {
+    if (!card?.taskId) {
+      outputCards.value = outputCards.value.filter((item) => item.id !== card?.id);
+      return;
+    }
+
+    try {
+      const result = await deleteVideoTask(card.taskId);
+      if (result.code !== 0) {
+        toast?.error?.(result.message || "删除失败");
+        return;
+      }
+      outputCards.value = outputCards.value.filter((item) => item.id !== card.id);
+      stopPollingCard(card.id);
+      toast?.success?.("视频已删除");
+    } catch {
+      toast?.error?.("删除失败，请稍后重试");
+    }
   }
 
   function getVideoModuleName(typeId) {
