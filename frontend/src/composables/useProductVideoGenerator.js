@@ -1,8 +1,10 @@
 import { computed, onBeforeUnmount, reactive, ref } from "vue";
 import { generateVideo, getVideoCreditCosts, getVideoDownloadUrl, getVideoTask } from "@/api/video.js";
+import { analyzeImage } from "@/api/image.js";
 import { updateGenerationJob } from "@/api/generation.js";
 import { useCardActions } from "@/composables/useCardActions.js";
 import { useGenerationRunner } from "@/composables/useGenerationRunner.js";
+import { buildVideoAnalyzeImages, hasUploadingImages } from "@/utils/analyzeImages.js";
 import {
   defaultVideoCreditCosts,
   getVideoDemoType,
@@ -72,6 +74,7 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
   const creditCosts = ref({ ...defaultVideoCreditCosts });
   const outputCards = ref([]);
   const genLogs = ref([]);
+  const aiLoading = ref(false);
   const creatingBatch = ref(false);
   const activeBatchRunId = ref("");
 
@@ -112,6 +115,53 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
 
   function showNotice(message) {
     toast?.info?.(message);
+  }
+
+  async function generateSellingPointsWithAI() {
+    const selectedType = getVideoDemoType(settings.videoType);
+    const imageCount = uploadedImages.value.filter((item) => item?.url).length;
+    const images = buildVideoAnalyzeImages(selectedType.inputMode, uploadedImages.value);
+    const requirementMessage = getRequiredImageMessage(selectedType.inputMode, imageCount);
+    if (requirementMessage) {
+      toast?.info?.(requirementMessage);
+      return "";
+    }
+    if (hasUploadingImages(uploadedImages.value)) {
+      toast?.info?.("素材还在上传中，请稍候");
+      return "";
+    }
+
+    aiLoading.value = true;
+    try {
+      const result = await analyzeImage({
+        images,
+        platform: settings.market,
+        scenario: "product_video",
+        type_id: selectedType.typeId,
+      });
+      if (result.code !== 0) {
+        toast?.error?.(result.message || "AI 分析失败，请稍后重试");
+        return "";
+      }
+
+      const content = result.data?.content?.trim();
+      if (!content) {
+        toast?.error?.("AI 未返回有效内容");
+        return "";
+      }
+      settings.productInput = content;
+      return content;
+    } catch (error) {
+      const status = error.response?.status;
+      if (status === 401) {
+        toast?.error?.("登录已过期，请重新登录");
+      } else {
+        toast?.error?.(error.response?.data?.message || "AI 分析失败，请稍后重试");
+      }
+      return "";
+    } finally {
+      aiLoading.value = false;
+    }
   }
 
   const cardsAdapter = {
@@ -436,6 +486,7 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
     uploadedImages,
     mainImageIndex,
     creditCosts,
+    aiLoading,
     currentJobId,
     currentTaskTitle,
     historyTasks,
@@ -454,6 +505,7 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
     loadCreditCosts,
     updateSettings,
     showNotice,
+    generateSellingPointsWithAI,
     generateProductVideo,
     createNewTask,
     resetWorkspaceToDraft,

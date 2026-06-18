@@ -22,6 +22,26 @@ export function buildProductAnalyzeImages(uploadedImages, mainImageIndex = 0) {
   });
 }
 
+export function buildVideoAnalyzeImages(inputMode, uploadedImages) {
+  const images = (uploadedImages || []).filter((img) => img?.url);
+
+  if (inputMode === "first_frame") {
+    return images.slice(0, 1).map((img) => ({ url: img.url, label: "首帧图" }));
+  }
+
+  if (inputMode === "first_last_frame") {
+    return images.slice(0, 2).map((img, index) => ({
+      url: img.url,
+      label: index === 0 ? "开始画面" : "结束画面",
+    }));
+  }
+
+  return images.slice(0, 9).map((img, index) => ({
+    url: img.url,
+    label: `参考图${index + 1}`,
+  }));
+}
+
 export function hasUploadingImages(uploadedImages) {
   return (uploadedImages || []).some((img) => img?.uploading);
 }

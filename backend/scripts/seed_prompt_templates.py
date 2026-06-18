@@ -105,6 +105,57 @@ PRODUCT_VIDEO_TYPES = [
 ]
 
 
+PRODUCT_VIDEO_AI_WRITE_FORMAT = (
+    "请严格按以下格式输出，不要输出 markdown，不要输出解释，不要输出多余标题。"
+    "内容要写给不懂提示词的电商用户，短句清楚，可直接填入“商品卖点 / 视频要求”。\n\n"
+    "1.产品名称：\n2.核心卖点：\n3.目标人群：\n4.视频开场：\n5.镜头表现：\n6.画面氛围：\n7.需避免："
+)
+
+
+PRODUCT_VIDEO_AI_WRITE_TYPES = [
+    (
+        "ugc_seeding",
+        "UGC种草",
+        "重点分析适合真实用户分享的商品体验、生活场景、上手动作和可信口吻。输出要像短视频创作者的种草 brief，避免广告腔。",
+    ),
+    (
+        "product_talk",
+        "产品口播",
+        "重点分析适合口播讲解的核心卖点、开场抓手、讲解顺序和人物持物/展示方式。输出要便于生成面对镜头讲解的短视频。",
+    ),
+    (
+        "product_demo",
+        "产品演示",
+        "重点分析商品功能、操作步骤、多角度展示、细节切换和使用场景。输出要说明视频里应该怎么演示商品，而不是只写静态卖点。",
+    ),
+    (
+        "tvc_ad",
+        "TVC广告",
+        "重点分析品牌广告片质感所需的光影、构图、镜头运动、材质特写和高级场景。输出要克制、有质感，不要虚构品牌背书。",
+    ),
+    (
+        "short_drama",
+        "带货短剧",
+        "重点分析商品适合嵌入的生活情境、简单冲突、转折点和自然露出方式。输出要形成一段短剧情 brief，不要复杂剧情。",
+    ),
+    (
+        "pain_solution",
+        "痛点解决",
+        "重点分析开始画面中的问题、不便或痛点，以及结束画面中的解决状态。输出要强调前后变化和中间过渡动作，避免绝对化功效。",
+    ),
+    (
+        "unboxing",
+        "开箱种草",
+        "重点分析包装、开箱动作、拿出商品、细节展示和惊喜感。输出要适合第一视角开箱视频，不要虚构包装文字或赠品。",
+    ),
+    (
+        "reaction",
+        "反应展示",
+        "重点分析展示前状态、使用后反应、人物动作反馈和情绪变化。输出要自然可信，不要夸张表演或无法确认的效果。",
+    ),
+]
+
+
 OUTFIT_SCENE_TYPES = [
     (
         "studio",
@@ -563,6 +614,19 @@ def _template_rows() -> list[dict]:
             }
         )
 
+    for type_id, video_name, focus in PRODUCT_VIDEO_AI_WRITE_TYPES:
+        rows.append(
+            {
+                "scenario": "product_video",
+                "purpose": "ai_write",
+                "platform": None,
+                "type_id": type_id,
+                "model": "qwen3.6-flash",
+                "name": f"商品视频-{video_name}AI帮写规则",
+                "content": "\n\n".join([focus, PRODUCT_VIDEO_AI_WRITE_FORMAT]),
+            }
+        )
+
     for type_id, scene_name, content in OUTFIT_SCENE_TYPES:
         rows.append(
             {
@@ -746,10 +810,23 @@ async def verify_lookup() -> None:
                 f"商品视频提示词模板查询缺少: {', '.join(sorted(video_missing))}"
             )
 
+        video_ai_write = await get_prompt_templates(
+            db,
+            scenario="product_video",
+            purpose="ai_write",
+            platform="global",
+            type_id="ugc_seeding",
+            model="qwen3.6-flash",
+        )
+        video_ai_write_names = [template.name for template in video_ai_write.templates]
+        if "商品视频-UGC种草AI帮写规则" not in video_ai_write_names:
+            raise RuntimeError("商品视频 AI 帮写模板查询缺少: 商品视频-UGC种草AI帮写规则")
+
         print("lookup order:", " -> ".join(names))
         print("fallback order:", " -> ".join(fallback_names))
         print("outfit order:", " -> ".join(outfit_names))
         print("video order:", " -> ".join(video_names))
+        print("video ai_write order:", " -> ".join(video_ai_write_names))
 
 
 async def main() -> None:

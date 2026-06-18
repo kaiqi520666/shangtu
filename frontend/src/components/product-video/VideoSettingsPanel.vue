@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from "vue";
-import { Sparkles, WandSparkles } from "lucide-vue-next";
+import { LoaderCircle, Sparkles, WandSparkles } from "lucide-vue-next";
 import GeneratorActionFooter from "@/components/generation/GeneratorActionFooter.vue";
 import GeneratorSidePanelShell from "@/components/generation/GeneratorSidePanelShell.vue";
 import ImageUploader from "@/components/generation/ImageUploader.vue";
@@ -34,6 +34,10 @@ const props = defineProps({
     type: Object,
     default: () => defaultVideoCreditCosts,
   },
+  aiLoading: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const emit = defineEmits([
@@ -41,6 +45,7 @@ const emit = defineEmits([
   "update:uploadedImages",
   "update:mainImageIndex",
   "notify",
+  "ai-write",
   "generate",
 ]);
 
@@ -128,7 +133,7 @@ function updateVideoType(typeId) {
 }
 
 function notifyPending(featureName) {
-  emit("notify", `${featureName}会在商品视频后端接入时开放`);
+  emit("notify", `${featureName}会在后续版本开放`);
 }
 </script>
 
@@ -186,10 +191,12 @@ function notifyPending(featureName) {
           <button
             type="button"
             class="flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-primary shadow-sm transition-colors hover:border-primary/30 hover:bg-primary/5"
-            @click="notifyPending('AI 帮写')"
+            :disabled="aiLoading"
+            @click="emit('ai-write')"
           >
-            <Sparkles class="h-3.5 w-3.5" />
-            AI 帮写
+            <LoaderCircle v-if="aiLoading" class="h-3.5 w-3.5 animate-spin" />
+            <Sparkles v-else class="h-3.5 w-3.5" />
+            {{ aiLoading ? "AI 帮写中..." : "AI 帮写" }}
           </button>
         </div>
         <textarea
