@@ -19,7 +19,6 @@ import {
   cloneGenerationSettingsSnapshot,
   createGenerationSettingsSnapshot,
   getSnapshotScene,
-  getSnapshotValue,
 } from "@/utils/generationSnapshots.js";
 import { generateProductImageStrategy } from "@/api/image.js";
 
@@ -178,12 +177,8 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
     if (data.settings && typeof data.settings === "object") {
       const s = data.settings;
       const scene = getSnapshotScene(s);
-      const platform = getSnapshotValue(s, "platform");
-      const language = getSnapshotValue(s, "language");
-      const ratio = getSnapshotValue(s, "ratio");
-      const quality = getSnapshotValue(s, "quality");
-      const selectedModulesSnapshot = scene.selectedModules || s.selectedModules;
-      const strategyBriefSnapshot = scene.strategyBrief ?? s.strategyBrief;
+      const { platform, language, ratio, quality } = s;
+      const { selectedModules, strategyBrief: nextStrategyBrief } = scene;
       if (typeof platform === "string") settings.platform = platform;
       if (typeof language === "string") settings.language = language;
       if (typeof ratio === "string" && resolutionMap[ratio]) {
@@ -191,11 +186,11 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
       }
       const desiredQuality = typeof quality === "string" ? quality : settings.quality;
       settings.quality = resolveQuality(settings.ratio, desiredQuality) || "1K";
-      if (Array.isArray(selectedModulesSnapshot) && selectedModulesSnapshot.length > 0) {
-        selectedModules.value = selectedModulesSnapshot;
+      if (Array.isArray(selectedModules) && selectedModules.length > 0) {
+        selectedModules.value = selectedModules;
       }
-      if (typeof strategyBriefSnapshot === "string") {
-        strategyBrief.value = strategyBriefSnapshot;
+      if (typeof nextStrategyBrief === "string") {
+        strategyBrief.value = nextStrategyBrief;
       }
     }
 

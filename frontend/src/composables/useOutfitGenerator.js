@@ -18,7 +18,6 @@ import {
   cloneGenerationSettingsSnapshot,
   createGenerationSettingsSnapshot,
   getSnapshotScene,
-  getSnapshotValue,
 } from "@/utils/generationSnapshots.js";
 
 export function useOutfitGenerator({ onJobCreated } = {}) {
@@ -240,13 +239,12 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
     if (data.settings && typeof data.settings === "object") {
       const s = data.settings;
       const scene = getSnapshotScene(s);
-      const platform = getSnapshotValue(s, "platform");
-      const language = getSnapshotValue(s, "language");
-      const ratio = getSnapshotValue(s, "ratio");
-      const quality = getSnapshotValue(s, "quality");
-      const selectedScenesSnapshot = scene.selectedScenes || s.selectedScenes;
-      const sceneDescriptionSnapshot = scene.sceneDescription ?? s.sceneDescription;
-      const selectedModelIdSnapshot = scene.selectedModelId ?? s.selectedModelId;
+      const { platform, language, ratio, quality } = s;
+      const {
+        selectedScenes: nextSelectedScenes,
+        sceneDescription: nextSceneDescription,
+        selectedModelId: nextSelectedModelId,
+      } = scene;
       if (typeof platform === "string") settings.platform = platform;
       if (typeof language === "string") settings.language = language;
       if (typeof ratio === "string" && resolutionMap[ratio]) {
@@ -254,14 +252,14 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
       }
       const desiredQuality = typeof quality === "string" ? quality : settings.quality;
       settings.quality = resolveQuality(settings.ratio, desiredQuality) || "1K";
-      if (Array.isArray(selectedScenesSnapshot) && selectedScenesSnapshot.length > 0) {
-        selectedScenes.value = selectedScenesSnapshot;
+      if (Array.isArray(nextSelectedScenes) && nextSelectedScenes.length > 0) {
+        selectedScenes.value = nextSelectedScenes;
       }
-      if (typeof sceneDescriptionSnapshot === "string") {
-        sceneDescription.value = sceneDescriptionSnapshot;
+      if (typeof nextSceneDescription === "string") {
+        sceneDescription.value = nextSceneDescription;
       }
-      if (typeof selectedModelIdSnapshot === "string") {
-        selectedModelId.value = selectedModelIdSnapshot;
+      if (typeof nextSelectedModelId === "string") {
+        selectedModelId.value = nextSelectedModelId;
       }
     }
 

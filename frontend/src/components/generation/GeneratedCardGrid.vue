@@ -3,7 +3,6 @@ import { Download, LoaderCircle, Pencil, Trash2, TriangleAlert } from 'lucide-vu
 import AppCheckbox from '@/components/ui/AppCheckbox.vue'
 import { useToast } from '@/composables/useToast.js'
 import { formatImageLabel } from '@/constants/generator.js'
-import { getSnapshotValue } from '@/utils/generationSnapshots.js'
 
 defineProps({
   cards: {
@@ -59,10 +58,9 @@ function canDownload(card) {
 
 function getCardMetaText(card, fallbackPlatform, fallbackLanguage, fallbackImageLabel) {
   const snapshot = card.settingsSnapshot || {}
-  const platformText = getSnapshotValue(snapshot, 'platform') || fallbackPlatform
-  const languageText = getSnapshotValue(snapshot, 'language') || fallbackLanguage
-  const ratio = getSnapshotValue(snapshot, 'ratio')
-  const quality = getSnapshotValue(snapshot, 'quality')
+  const platformText = snapshot.platform || fallbackPlatform
+  const languageText = snapshot.language || fallbackLanguage
+  const { ratio, quality } = snapshot
   const imageText =
     ratio || quality
       ? formatImageLabel({

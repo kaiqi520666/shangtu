@@ -12,7 +12,6 @@ import {
   cloneGenerationSettingsSnapshot,
   createGenerationSettingsSnapshot,
   getSnapshotScene,
-  getSnapshotValue,
 } from "@/utils/generationSnapshots.js";
 
 function makePromptTitle(prompt) {
@@ -137,16 +136,14 @@ export function useFreeImageGenerator({ onJobCreated } = {}) {
     if (data.settings && typeof data.settings === "object") {
       const s = data.settings;
       const scene = getSnapshotScene(s);
-      const ratio = getSnapshotValue(s, "ratio");
-      const quality = getSnapshotValue(s, "quality");
-      const promptSnapshot = scene.prompt ?? s.prompt;
+      const { ratio, quality } = s;
       if (typeof ratio === "string" && resolutionMap[ratio]) {
         settings.ratio = ratio;
       }
       const desiredQuality = typeof quality === "string" ? quality : settings.quality;
       settings.quality = resolveQuality(settings.ratio, desiredQuality) || "1K";
-      if (typeof promptSnapshot === "string") {
-        settings.prompt = promptSnapshot;
+      if (typeof scene.prompt === "string") {
+        settings.prompt = scene.prompt;
       }
     }
 

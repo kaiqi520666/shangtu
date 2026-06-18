@@ -18,7 +18,6 @@ import { buildProductAnalyzeImages } from "@/utils/analyzeImages.js";
 import {
   cloneGenerationSettingsSnapshot,
   createGenerationSettingsSnapshot,
-  getSnapshotValue,
 } from "@/utils/generationSnapshots.js";
 
 function createDefaultSuiteStructure() {
@@ -155,10 +154,7 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
   function restoreSuiteJobData(data) {
     if (data.settings && typeof data.settings === "object") {
       const s = data.settings;
-      const platform = getSnapshotValue(s, "platform");
-      const language = getSnapshotValue(s, "language");
-      const ratio = getSnapshotValue(s, "ratio");
-      const quality = getSnapshotValue(s, "quality");
+      const { platform, language, ratio, quality } = s;
       if (typeof platform === "string") settings.platform = platform;
       if (typeof language === "string") settings.language = language;
       if (typeof ratio === "string" && resolutionMap[ratio]) {

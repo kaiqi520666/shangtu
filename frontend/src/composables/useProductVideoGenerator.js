@@ -11,7 +11,6 @@ import { buildVideoAnalyzeImages } from "@/utils/analyzeImages.js";
 import {
   createVideoSettingsSnapshot,
   getSnapshotScene,
-  getSnapshotValue,
 } from "@/utils/generationSnapshots.js";
 import {
   defaultVideoCreditCosts,
@@ -234,7 +233,7 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
     batchRunId = "",
   }) {
     const scene = getSnapshotScene(settingsSnapshot);
-    const productInput = scene.productInput ?? settingsSnapshot?.product_input ?? "";
+    const productInput = typeof scene.productInput === "string" ? scene.productInput : "";
     const card = cards.createCard({
       typeId,
       strategyTitle: title || "商品视频",
@@ -257,14 +256,14 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
   function restoreVideoJobData(data) {
     const s = data.settings || {};
     const scene = getSnapshotScene(s);
-    const videoType = scene.videoType ?? s.type_id;
-    const inputMode = scene.inputMode ?? s.input_mode;
-    const market = scene.market ?? s.market ?? getSnapshotValue(s, "platform");
-    const language = scene.language ?? getSnapshotValue(s, "language");
-    const sizePreset = scene.sizePreset ?? s.size_preset;
-    const duration = scene.duration ?? s.duration;
-    const resolution = scene.resolution ?? s.resolution ?? getSnapshotValue(s, "quality");
-    const productInput = scene.productInput ?? s.product_input;
+    const videoType = scene.videoType;
+    const inputMode = scene.inputMode;
+    const market = scene.market || s.platform;
+    const language = scene.language || s.language;
+    const sizePreset = scene.sizePreset;
+    const duration = scene.duration;
+    const resolution = scene.resolution || s.quality;
+    const productInput = scene.productInput;
     if (typeof videoType === "string") {
       settings.videoType = videoType;
       settings.inputMode = getVideoDemoType(videoType).inputMode;
@@ -344,7 +343,7 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
           user_prompt: settings.productInput,
           duration: settings.duration,
           resolution: settings.resolution,
-          aspect_ratio: getSnapshotScene(snapshot).aspectRatio || snapshot.aspect_ratio || snapshot.ratio,
+          aspect_ratio: getSnapshotScene(snapshot).aspectRatio || snapshot.ratio,
           settings_snapshot: snapshot,
           sort_order: card.sortOrder,
           job_id: jobId,

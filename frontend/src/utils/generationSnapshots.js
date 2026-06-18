@@ -74,13 +74,8 @@ export function getSnapshotScene(snapshot) {
     : {};
 }
 
-export function getSnapshotValue(snapshot, key, sceneKey = key) {
-  const scene = getSnapshotScene(snapshot);
-  return scene[sceneKey] ?? snapshot?.[key];
-}
-
 export function getSnapshotQuality(snapshot, fallback = "1K") {
-  return snapshot?.quality || getSnapshotScene(snapshot).resolution || fallback;
+  return snapshot?.quality || fallback;
 }
 
 export function cloneGenerationSettingsSnapshot(snapshot) {
