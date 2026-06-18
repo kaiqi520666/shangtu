@@ -7,7 +7,6 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 
 from app.core.database import Base, engine
-from app.core.schema_migrations import ensure_runtime_schema
 from app.routers import admin, asset, auth, billing, generation, image, outfit, video
 import app.models
 
@@ -18,7 +17,6 @@ load_dotenv()
 async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    await ensure_runtime_schema(engine)
 
     app.state.redis_pool = await create_pool(
         RedisSettings.from_dsn(os.getenv("REDIS_URL", "redis://localhost:6379"))
