@@ -499,7 +499,11 @@ async def get_tasks(
 ):
     result = await db.execute(
         select(ImageTask)
-        .where(ImageTask.user_id == current_user.id)
+        .where(
+            ImageTask.user_id == current_user.id,
+            ImageTask.archived.is_(False),
+            ImageTask.replaced_by_task_id.is_(None),
+        )
         .order_by(ImageTask.created_at.desc())
     )
     return success(result.scalars().all())

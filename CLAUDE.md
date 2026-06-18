@@ -165,7 +165,7 @@ CREATE INDEX ix_prompt_templates_lookup
 - 设置面板 `ProductSuiteSettingsPanel`（图片上传 / 平台 / 语言 / 比例 / 画质 / 商品输入 / `SuiteStructureConfigurator`）
 - 工作区 `ProductSuiteWorkspace`：header 右侧 `+ 新建任务` / `生成记录` 按钮；进度展示、生成日志、卡片网格、批量下载（仅 `outputCards.length > 0` 时显示）、单卡缩放/下载；卡片支持 `pending/processing/done/failed/timeout` 状态蒙层
 - **数据状态：上传 / AI 读图 / 批量生图全部已对接后端**。`generateSuiteImages`：按 `buildSuiteQueue()` 展开（动态数量，由 `suiteStructure.enabled + count` 决定），首次点击生成时若 `currentJobId` 为空先 `createGenerationJob('product_suite')`，逐张 `POST /image/generate` 并带 `job_id/type_id/title/sort_order`（带主图 OSS url），每 5 秒轮询；`pollInFlight` 单飞锁；`jobTotal` 启动时锁定 = `queue.length`，分母不漂移；同 job 内多次点击生成不清空旧 cards，新批次插到前面，每张带 `batchRunId`，`maybeFinishGenerating` 只看本批次终态；`onBeforeUnmount` 清理所有定时器
-- 父任务持久化：`createNewTask()` 新建一条 job 并清空当前工作区（含 `uploadedImages/productInput/outputCards/genLogs/suiteStructure 默认结构`）；`生成记录` 抽屉调 `listGenerationJobs('product_suite')`，点击恢复 → `loadGenerationJob(jobId)` 把 `settings/source_images/structure/items` 写回 reactive 状态，未完成 items 自动重启 polling；标题统一来自后端，前端输入框改名只改本地（暂未做 PATCH 持久化）
+- 父任务持久化：`createNewTask()` 新建一条 job 并清空当前工作区（含 `uploadedImages/productInput/outputCards/genLogs/suiteStructure 默认结构`）；`生成记录` 抽屉调 `listGenerationJobs('product_suite')`，点击恢复 → `loadGenerationJob(jobId)` 把 `settings/source_images/structure/items` 写回 reactive 状态，未完成 items 自动重启 polling；标题统一来自后端，前端输入框改名会通过 debounce 调 `PATCH /generation/jobs/{job_id}` 持久化
 
 #### 商品详情图（`/generator/product-image`）
 
