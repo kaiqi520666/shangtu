@@ -1,14 +1,14 @@
 import { onBeforeUnmount, reactive, ref } from "vue";
 import { deleteVideoTask, generateVideo, getVideoCreditCosts, getVideoDownloadUrl, getVideoTask } from "@/api/video.js";
-import { analyzeImage } from "@/api/image.js";
 import { updateGenerationJob } from "@/api/generation.js";
 import {
   createBatchFinishedHandler,
   useGenerationCards,
 } from "@/composables/useGenerationCards.js";
+import { useAiSellingPointsWriter } from "@/composables/useAiSellingPointsWriter.js";
 import { useCardActions } from "@/composables/useCardActions.js";
 import { useGenerationRunner } from "@/composables/useGenerationRunner.js";
-import { buildVideoAnalyzeImages, hasUploadingImages } from "@/utils/analyzeImages.js";
+import { buildVideoAnalyzeImages } from "@/utils/analyzeImages.js";
 import {
   defaultVideoCreditCosts,
   getVideoDemoType,
@@ -71,7 +71,6 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
   const uploadedImages = ref([]);
   const mainImageIndex = ref(0);
   const creditCosts = ref({ ...defaultVideoCreditCosts });
-  const aiLoading = ref(false);
   const cards = useGenerationCards({
     getTask: getVideoTask,
     pollIntervalMs: VIDEO_POLL_INTERVAL_MS,
@@ -107,6 +106,29 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
     makeId,
   } = cards;
 
+  const { aiLoading, generateSellingPointsWithAI } = useAiSellingPointsWriter({
+    toast,
+    buildImages: () => {
+      const selectedType = getVideoDemoType(settings.videoType);
+      return buildVideoAnalyzeImages(selectedType.inputMode, uploadedImages.value);
+    },
+    getUploadedImages: () => uploadedImages.value,
+    getAnalyzePayload: () => {
+      const selectedType = getVideoDemoType(settings.videoType);
+      return {
+        platform: settings.market,
+        scenario: "product_video",
+        type_id: selectedType.typeId,
+      };
+    },
+    validate: () => {
+      const selectedType = getVideoDemoType(settings.videoType);
+      const imageCount = uploadedImages.value.filter((item) => item?.url).length;
+      return getRequiredImageMessage(selectedType.inputMode, imageCount);
+    },
+    uploadingMessage: "素材还在上传中，请稍候",
+  });
+
   async function loadCreditCosts() {
     try {
       const result = await getVideoCreditCosts();
@@ -127,52 +149,6 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
 
   function showNotice(message) {
     toast?.info?.(message);
-  }
-
-  async function generateSellingPointsWithAI() {
-    const selectedType = getVideoDemoType(settings.videoType);
-    const imageCount = uploadedImages.value.filter((item) => item?.url).length;
-    const images = buildVideoAnalyzeImages(selectedType.inputMode, uploadedImages.value);
-    const requirementMessage = getRequiredImageMessage(selectedType.inputMode, imageCount);
-    if (requirementMessage) {
-      toast?.info?.(requirementMessage);
-      return "";
-    }
-    if (hasUploadingImages(uploadedImages.value)) {
-      toast?.info?.("素材还在上传中，请稍候");
-      return "";
-    }
-
-    aiLoading.value = true;
-    try {
-      const result = await analyzeImage({
-        images,
-        platform: settings.market,
-        scenario: "product_video",
-        type_id: selectedType.typeId,
-      });
-      if (result.code !== 0) {
-        toast?.error?.(result.message || "AI 分析失败，请稍后重试");
-        return "";
-      }
-
-      const content = result.data?.content?.trim();
-      if (!content) {
-        toast?.error?.("AI 未返回有效内容");
-        return "";
-      }
-      return content;
-    } catch (error) {
-      const status = error.response?.status;
-      if (status === 401) {
-        toast?.error?.("登录已过期，请重新登录");
-      } else {
-        toast?.error?.(error.response?.data?.message || "AI 分析失败，请稍后重试");
-      }
-      return "";
-    } finally {
-      aiLoading.value = false;
-    }
   }
 
   const runner = useGenerationRunner({
