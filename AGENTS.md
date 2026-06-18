@@ -1,20 +1,19 @@
 # AGENTS.md
 
-给新开的 AI / Codex / Claude 窗口快速接手 Shangtu 项目用。  
-更完整的项目记忆见 [CLAUDE.md](CLAUDE.md)。
+ShangTu（商图）是一个 AI 电商内容生成 SaaS，当前覆盖商品图、服饰穿搭图、商品视频、资产库和管理后台。本文只记录 Codex 在本仓库长期需要遵守的项目规则；项目历史、阶段性计划和临时上下文不要写进这里。
 
-## 项目定位
+## 项目阶段：MVP
 
-Shangtu（商图）是一个 AI 电商商品图生成 SaaS：
-
-- 上传商品图到阿里云 OSS
-- AI 读图生成商品卖点
-- 按平台、比例、画质和图种批量生成商品图片
-- 生图走 ToAPIS `gpt-image-2` 异步任务
-- 后端负责轮询上游、转存 OSS、持久化任务、失败退款
-- 前端负责工作台、任务恢复、生成记录、卡片轮询、下载和编辑重生
-
-当前是 MVP 阶段。商品套图链路已经是真实后端闭环；商品详情图/服饰穿搭仍在逐步从 Mock 切到真实任务体系。
+- 当前处于 MVP 阶段，无线上用户，无需考虑向后兼容、数据迁移、平滑升级。
+- 禁止编写以下内容，除非我明确要求：
+  - 兼容旧版本字段/接口的判断分支（如 if (oldField) {...} else {...}）
+  - feature flag / 灰度开关
+  - deprecated 标记 + 保留旧代码路径
+  - 防御性的多版本数据结构解析
+  - "为未来扩展预留"的抽象层、接口、配置项
+- 发现需求变更时，直接修改/删除旧代码，不要并存新旧两套逻辑。
+- 数据库字段变更：直接 ALTER/DROP，不写迁移兼容代码，迁移脚本本身可以是一次性、破坏性的。
+- 如果你认为某处确实需要兼容处理，先停下来问我，不要自己决定写。
 
 ## 技术栈
 
@@ -25,453 +24,95 @@ Shangtu（商图）是一个 AI 电商商品图生成 SaaS：
 - SQLAlchemy 2.0 async + asyncpg
 - PostgreSQL
 - Redis + arq worker
-- 阿里云 OSS (`oss2`)
-- ToAPIS `gpt-image-2`
-- DashScope `qwen3.6-flash`
-- JWT (`python-jose`) + bcrypt (`passlib`)
+- 阿里云 OSS
+- ToAPIS：`gpt-image-2`、`seedance-2`
+- DashScope：`qwen3.6-flash`
 
 前端：
 
 - Vue 3 + `<script setup>`
-- Vite 8
-- Vue Router
-- Tailwind CSS v4
+- Vite
+- Tailwind CSS
 - lucide-vue-next
 - axios
-- JSZip
-- oxlint / eslint / oxfmt
-
-## 关键目录
-
-```text
-backend/app/
-├── main.py                  # FastAPI 入口，注册 routers，lifespan 初始化 Redis
-├── core/
-│   ├── auth.py              # JWT / 密码
-│   ├── database.py          # async engine / session
-│   ├── deps.py              # get_current_user / get_db
-│   ├── schema_migrations.py # MVP 期旧库启动补字段
-│   ├── image_analyzer.py    # DashScope AI 读图
-│   ├── prompt_templates.py  # 提示词模板查询服务
-│   ├── oss.py               # OSS 上传
-│   └── time.py              # UTC 时间工具 utc_now / to_utc_iso
-├── models/
-│   ├── user.py
-│   ├── admin_audit_log.py
-│   ├── image_task.py
-│   ├── generation_job.py
-│   ├── credit_order.py
-│   ├── credit_transaction.py
-│   └── prompt_template.py
-├── routers/
-│   ├── admin.py             # 超级管理员后台
-│   ├── auth.py
-│   ├── image.py             # 上传 / AI读图 / 生图任务 / 单图删除重生下载
-│   ├── generation.py        # 父任务 job CRUD / 工作台快照
-│   └── asset.py             # 资产库列表 / 批量删除
-├── schemas/response.py      # 统一响应壳 {code, message, data}
-└── worker/
-    ├── settings.py          # arq WorkerSettings
-    └── tasks.py             # generate_image 后台任务
-
-backend/scripts/
-└── seed_prompt_templates.py  # 幂等写入第一批提示词模板种子数据
-
-frontend/src/
-├── api/
-│   ├── request.js
-│   ├── auth.js
-│   ├── image.js
-│   ├── generation.js
-│   └── asset.js
-├── composables/
-│   ├── useAuth.js
-│   ├── useToast.js
-│   ├── useConfirm.js
-│   ├── useGenerationCards.js
-│   ├── useCardActions.js
-│   ├── useProductSuiteGenerator.js
-│   ├── useGenerator.js
-│   ├── useOutfitGenerator.js
-│   └── useAssetLibrary.js
-├── views/
-│   ├── auth/
-│   │   ├── LoginView.vue
-│   │   └── RegisterView.vue
-│   ├── generator/
-│   │   ├── product-suite/ProductSuiteView.vue
-│   │   ├── product-image/ProductImageView.vue
-│   │   ├── outfit/OutfitView.vue
-│   │   └── assets/AssetLibraryView.vue
-│   └── HomeView.vue
-├── components/
-└── constants/
-```
-
-## 后端现状
-
-统一响应格式：
-
-```json
-{ "code": 0, "message": "success", "data": {} }
-```
-
-业务失败使用 `fail(...)`，通常是 `code != 0`，不要随意改成裸 HTTP error。
-
-核心接口：
-
-- `POST /auth/register`
-- `POST /auth/login`
-- `GET /admin/overview`
-- `GET /admin/users`
-- `PATCH /admin/users/{user_id}`
-- `POST /admin/users/{user_id}/credits/adjust`
-- `GET /admin/credit-orders`
-- `GET /admin/credit-transactions`
-- `POST /image/upload`
-- `POST /image/analyze`
-- `POST /image/generate`
-- `POST /image/free-image/optimize`
-- `GET /image/task/{task_id}`
-- `GET /image/task/{task_id}/download`
-- `DELETE /image/task/{task_id}`
-- `POST /image/task/{task_id}/regenerate`
-- `POST /generation/jobs`
-- `GET /generation/jobs?scenario=...`
-- `GET /generation/jobs/{job_id}`
-- `PATCH /generation/jobs/{job_id}`
-- `DELETE /generation/jobs/{job_id}`
-- `GET /asset/list`
-- `DELETE /asset/batch`
-
-### GenerationJob / ImageTask
-
-### 用户权限 / 管理后台
-
-`users` 现在有两种角色：
-
-- `user`
-- `super_admin`
-
-`users.status` 为 `active / disabled`。禁用用户不能登录，已有 token 也会被 `get_current_user` 拒绝。初始超级管理员通过 SQL 设置：
-
-```sql
-UPDATE users SET role='super_admin' WHERE email='你的邮箱';
-```
-
-管理后台接口统一走 `/admin/*`，只有 `role='super_admin' AND status='active'` 可访问。后台手动加减积分写 `credit_transactions(type='admin_adjust')`，同时写 `admin_audit_logs`。
-
-前端 `/admin` 复用 `GeneratorLayout`，左侧导航在“资产库”下方用分割线隔开“管理后台”，仅超级管理员可见。
-
-### GenerationJob / ImageTask
-
-`GenerationJob` 是父任务/工作台：
-
-- `scenario`
-- `title`
-- `status`
-- `settings_json`
-- `source_images_json`
-- `input_text`
-- `structure_json`
-- `archived`
-- `created_at`
-- `updated_at`
-
-`ImageTask` 是单张图任务：
-
-- `job_id`
-- `replaced_by_task_id`
-- `type_id`
-- `title`
-- `sort_order`
-- `prompt`
-- `size = "{ratio}/{resolution}"`
-- `status = pending | processing | done | failed | timeout`
-- `result_url`
-- `error_message`
-- `progress`
-- `provider_task_id`
-- `credit_refunded`
-- `edit_instruction`
-- `system_prompt_snapshot`
-- `task_prompt_snapshot`
-- `user_prompt`
-- `prompt_template_refs_json`
-- `settings_snapshot_json`
-- `archived`
-
-`settings_snapshot_json` 是单张图生成时的参数事实来源，至少保存当时的 `scenario/platform/language/ratio/quality` 等；右侧卡片展示图片参数时应优先读单图快照，不要读当前左侧表单设置。
-
-单图重新生成会新建一条 `ImageTask`，继承旧图的提示词模板快照和 `settings_snapshot_json`，并把旧任务的 `replaced_by_task_id` 指向新任务；工作台恢复只显示当前版本，旧图保留在资产库/历史数据里。
-
-场景目前后端已支持：
-
-- `product_suite`
-- `product_image`
-- `outfit`
-- `free_image`
-
-`/image/generate` 允许上述场景的 job，参考图统一使用 `image_urls` 数组。Worker 不关心场景，只处理 prompt、尺寸、参考图和任务 ID。
-`free_image` 是自由生图场景：不接入 `prompt_templates`，不拼任何系统提示词；生图最终 prompt 严格等于用户输入框内容，参考图只通过 `image_urls` 传给模型。
-
-### PromptTemplate
-
-`prompt_templates` 是后端内部提示词模板表，当前只作为基础设施和种子数据存在，尚未接入现有生成链路。
-
-- 查询服务：`backend/app/core/prompt_templates.py`
-- 种子脚本：`backend/scripts/seed_prompt_templates.py`
-- 执行方式：在 `backend/` 下运行 `.\.venv\Scripts\python.exe scripts\seed_prompt_templates.py`
-- 当前 seed 覆盖通用生图规则、前端平台列表的平台专属规则、商品套图图种默认提示词、商品详情图模块默认提示词、AI 帮写和详情图策略提示词。
-- 商品套图和商品详情图 `/image/generate` 已优先接入 `image_generate` 模板拼接：通用规则 + 场景规则 + 平台规则 + 图种默认用户提示词 + 用户提示词，最终完整 prompt 仍写入 `image_tasks.prompt`。
-- AI 帮写已接 `ai_write` 模板；商品详情图策略生成已接 `strategy` 模板。
-
-### 生图任务流
-
-前端调 `/image/generate` 后：
-
-1. 后端扣 1 积分并创建 `ImageTask(pending)`
-2. 入队 Redis/arq：`generate_image`
-3. worker 设置 `processing`
-4. 调 ToAPIS 创建远端任务
-5. 每 5 秒轮询 ToAPIS，最长 20 分钟
-6. 成功后下载上游图片
-7. 上传到自己的 OSS
-8. DB 写入 `result_url`
-9. Redis 写 `status=done` 和 `result`
-
-失败/超时：
-
-- worker 会归一化上游错误为中文友好文案
-- 失败会通过 `refund_task_credit` 幂等退款
-- 原始上游错误只打印日志，不直接展示给用户
-
-### 时间约定
-
-后端时间已明确 UTC：
-
-- `backend/app/core/time.py`
-- `utc_now()`
-- `to_utc_iso()`
-- 相关模型字段已改为 `DateTime(timezone=True)`
-- 用户已经手动把 PostgreSQL 字段迁移成 `TIMESTAMPTZ`
-
-不要再新增 `datetime.now()`、`datetime.utcnow()`、`func.now()`。新增时间写入统一用 `utc_now()`，接口返回时间统一用 `to_utc_iso()`。
-
-## 前端现状
-
-### 路由
-
-当前主要路由：
-
-- `/login`
-- `/register`
-- `/generator/product-suite/:jobId?`
-- `/generator/product-image`
-- `/generator/outfit`
-- `/generator/assets`
-
-### 商品套图
-
-商品套图是当前最完整的真实链路。
-
-入口：
-
-- `frontend/src/views/generator/product-suite/ProductSuiteView.vue`
-- `frontend/src/composables/useProductSuiteGenerator.js`
-- `frontend/src/constants/productSuite.js`
-
-能力：
-
-- 上传商品图到 OSS
-- AI 帮写商品卖点
-- 配置平台、排版语言、比例、画质
-- 配置白底图、场景图、卖点图、细节图数量
-- 第一次生成自动创建 `product_suite` job
-- URL 恢复：`/generator/product-suite/:jobId`
-- 生成记录抽屉
-- 同一个 job 内可多次生成，追加新图片，不清空旧图
-- 卡片轮询
-- 失败展示和失败不扣积分提示
-- 单图下载、批量 zip 下载
-- 单图删除
-- 单图编辑重新生成，复用原图作为参考图，成功后替换原卡片图片
-
-### 通用前端 composable
-
-`useGenerationCards.js`：
-
-- `outputCards`
-- `genLogs`
-- `generating`
-- `generatedCount`
-- `jobTotal`
-- `activeBatchRunId`
-- `startPollingCard`
-- `pollCardOnce`
-- `clearAllPollTimers`
-- `maybeFinishGenerating`
-- `createCard`
-
-`useCardActions.js`：
-
-- `zoomCard`
-- `selectedCards`
-- `selectedCardsCount`
-- `toggleCardSelection`
-- `toggleSelectAllCards`
-- `downloadSingleImage`
-- `batchDownload`
-- `downloadAsZip`
-
-新增场景时优先组合这两个 composable，不要复制商品套图里轮询/下载逻辑。
-
-### 商品详情图
-
-路由和旧页面存在，但生成逻辑仍主要来自旧 Mock 工作台。后端已支持 `product_image` 场景。下一步应该做：
-
-- 新的 `ProductImageView`
-- 新的 `useProductImageGenerator`
-- 复用 `useGenerationCards`
-- 复用 `useCardActions`
-- 使用 `scenario = "product_image"`
-- 支持 `/generator/product-image/:jobId?`
-- 接入 `GenerationJob + ImageTask` 闭环
-
-第一版不要做长图拼接、拖拽排序、模块策略二次编辑，先跑通任务闭环。
-
-### 资产库
-
-入口：
-
-- `/generator/assets`
-- `frontend/src/views/generator/assets/AssetLibraryView.vue`
-- `frontend/src/composables/useAssetLibrary.js`
-- `frontend/src/components/AssetCardGrid.vue`
-- 后端 `backend/app/routers/asset.py`
-
-能力：
-
-- 分页列出当前用户已完成图片
-- 按 `product_suite / product_image / outfit` 筛选
-- 大图预览
-- 单张下载
-- 批量 zip 下载
-- 批量删除
-
-注意：当前资产库删除接口是硬删除 `ImageTask` 记录，但不物理删除 OSS 文件。后续最好改成软删除或补 OSS 物理删除能力，避免“永久删除”语义不一致。
-
-### 服饰穿搭模特库
-
-入口：
-
-- 前端 `frontend/src/composables/useOutfitGenerator.js`
-- 前端接口 `frontend/src/api/outfit.js`
-- 后端接口 `backend/app/routers/outfit.py`
-- 后端模型 `backend/app/models/outfit_model.py`
-- 上传脚本 `backend/scripts/upload_outfit_models.py`
-
-能力：
-
-- `GET /outfit/models` 返回 active 模特列表
-- 图片存 OSS，元数据存 `outfit_models`
-- 前端按后端返回顺序显示，后端按 `sort_order asc, created_at asc` 排序
-- 本地 `frontend/public/model/` 只作为上传源，不要提交到 git
+- JavaScript only，不使用 TypeScript
 
 ## 常用命令
 
 后端：
 
-```powershell
+```bash
 cd backend
 uv sync
 uv run uvicorn app.main:app --reload
 uv run arq app.worker.settings.WorkerSettings
-.\.venv\Scripts\python.exe -m compileall app
-.\.venv\Scripts\python.exe scripts\upload_outfit_models.py
+uv run python -m compileall app
 ```
 
 前端：
 
-```powershell
+```bash
 cd frontend
 npm install
 npm run dev
 npm run build
 ```
 
-注意：`npm run lint` 会带 `--fix`，可能改文件。只想验证时优先跑 `npm run build`。
+验证优先级：
 
-## 环境变量
+- 后端改动至少跑 `cd backend && uv run python -m compileall app`
+- 前端改动至少跑 `cd frontend && npm run build`
+- 提交前跑 `git diff --check`
 
-后端 `.env` 关键项：
+## 通用编码规则
 
-```env
-DATABASE_URL=
-REDIS_URL=
-SECRET_KEY=
+- 优先读现有实现，复用已有组件、composable、API helper、工具函数。
+- 发现两处以上相似逻辑，优先抽共享函数/组件/composable，不复制粘贴改变量名。
+- 不新增无必要依赖；新增生产依赖前先说明方案并等确认。
+- 不写“以后可能用”的代码，不保留死代码。
+- 不做无关重构；每次提交保持一个清晰主题。
+- 注释只写能帮助理解复杂逻辑的内容，不写代码表面含义。
+- Python 依赖管理统一用 `uv`，不要用裸 `pip install` 或 conda。
 
-OSS_ACCESS_KEY_ID=
-OSS_ACCESS_KEY_SECRET=
-OSS_ENDPOINT=
-OSS_BUCKET_NAME=
-OSS_PUBLIC_BASE_URL=
+## 后端规则
 
-DASHSCOPE_URL=
-DASHSCOPE_API_KEY=
+- API 统一返回 `{ code, message, data }` 响应壳；业务失败用 `fail(...)`。
+- 时间统一使用 `backend/app/core/time.py` 里的 `utc_now()` / `to_utc_iso()`，不要新增 `datetime.now()`、`datetime.utcnow()`、`func.now()`。
+- 数据库 schema 以当前 SQLAlchemy models 为准；干净环境重新部署。
+- 不维护 Alembic、不维护运行时 schema 兼容补丁、不维护手动 SQL 文档。
+- 涉及积分扣减、退款、任务状态的代码必须保持事务一致性和幂等退款。
+- Worker 上游错误只展示归一化后的中文友好文案，原始错误只进日志。
 
-TOAPIS_KEY=
-TOAPIS_URL=https://toapis.com
+## 前端规则
+
+- 业务状态和副作用优先放 composable，组件保持薄。
+- 通用请求放 `frontend/src/api/`，不要在多个页面重复写同一请求逻辑。
+- 通用 UI 放 `frontend/src/components/ui/`，业务组件放对应业务目录。
+- 生成工作台优先复用现有 shell、卡片、上传、选择器、toast、confirm、runner、card actions。
+- 不为视频/图片重复写两套相同的工作台逻辑；差异只放在真正不同的卡片、输入或接口适配层。
+- 管理后台继续复用 `AdminLayoutView`、`AdminPagination`、`AppSelect`、`AppCheckbox`、`AppModal`、`GlobalConfirm`、`GlobalToast`。
+
+## 数据和任务规则
+
+- 生成任务的参数事实来源是 `settings_snapshot_json`。
+- 图片和视频 prompt 快照统一使用 `prompt_snapshot_json`，结构为：
+
+```json
+{
+  "system": "",
+  "task": "",
+  "user": "",
+  "final": "",
+  "template_refs": []
+}
 ```
 
-前端：
+- 不再新增 `system_prompt_snapshot`、`task_prompt_snapshot`、`user_prompt`、`prompt_template_refs_json` 这类拆散字段。
+- 单图重生创建新任务并用 `replaced_by_task_id` 指向新版本；工作台只显示当前版本。
 
-```env
-VITE_API_BASE_URL=
-```
+## Git 规则
 
-## 编码和编辑约定
-
-- 除非用户明确打出“执行”两个字，否则只讨论和分析，不要修改代码、配置、文档或运行会改变项目状态的命令。
-- Windows 环境读取文件用：
-  `Get-Content <path> -Encoding UTF8`
-- 不要用 `cat` / `type` 读中文文件，容易乱码。
-- 手工编辑文件优先用 `apply_patch`。
-- 不要随意重置用户改动，不要使用 `git reset --hard`。
-- 每次完成任务（新增功能、修改功能、修复 bug）后，自动执行 `git commit`，commit message 简明描述本次变更，不需要询问。
-- `DEVLOG.md` 已不再作为必维护文件；完成任务后不要为了记录流水而更新它。
-- 后端接口保持统一响应壳。
-- 前端业务逻辑尽量放 composables，组件保持薄。
-- 新增场景时优先复用 `useGenerationCards` / `useCardActions`。
-- 新增后端时间字段或返回时间时，统一用 `utc_now()` / `to_utc_iso()`。
-
-## 最小改动与溯源规则
-
-- 遇到异常展示、异常文案、异常字段或异常行为时，必须先定位来源：后端返回 / 大模型返回 / 前端拼接 / 前端状态加工 / 历史脏数据。
-- 未定位来源前，不要提出多层兜底方案，不要同时建议前端过滤、后端清洗、提示词修改等多处改动。
-- 如果问题由本项目代码主动生成，优先删除或修正源头，不要额外增加防御层。
-- 除非用户明确要求增强鲁棒性，否则不要为单点问题扩大改动面。
-- 给修改建议时必须先说明：来源、原因、最小改动点、影响范围、是否需要改前端/后端。
-- hover、拖拽、滚动、浮层预览等复杂前端交互，以用户真实手动操作反馈为准；自动化浏览器无法触发或验证时，不要因此改动已经被用户确认可用的实现。
-
-## 已知技术债
-
-- 没有 Alembic，开发期依赖 `Base.metadata.create_all`，旧库字段需要手动迁移。提示词快照字段旧库需补：`ALTER TABLE image_tasks ADD COLUMN IF NOT EXISTS system_prompt_snapshot TEXT, ADD COLUMN IF NOT EXISTS task_prompt_snapshot TEXT, ADD COLUMN IF NOT EXISTS user_prompt TEXT, ADD COLUMN IF NOT EXISTS prompt_template_refs_json TEXT;` 重新生成保留历史需补：`ALTER TABLE image_tasks ADD COLUMN IF NOT EXISTS replaced_by_task_id VARCHAR(36);` 单图参数快照需补：`ALTER TABLE image_tasks ADD COLUMN IF NOT EXISTS settings_snapshot_json TEXT;`
-- 商品详情图和服饰穿搭还没有完全接入真实生图任务闭环。
-- 资产库删除目前只删 DB 记录，不删 OSS 文件。
-- 用户额度已通过 Pinia 管理，生图/重生/轮询响应里的 `credits` 会自动同步；后续仍可补 `GET /auth/me` 做页面恢复后的主动刷新。
-- 资产库 / 详情图还需要更多端到端验证。
-
-## 给新 Agent 的建议
-
-接手时优先看：
-
-1. [CLAUDE.md](CLAUDE.md)
-2. `frontend/src/composables/useProductSuiteGenerator.js`
-3. `frontend/src/composables/useGenerationCards.js`
-4. `frontend/src/composables/useCardActions.js`
-5. `backend/app/routers/image.py`
-6. `backend/app/routers/generation.py`
-7. `backend/app/worker/tasks.py`
-
-如果要继续做商品详情图，不要从旧 `useGenerator.js` 直接复制大块 Mock 逻辑。应该以商品套图的真实任务闭环为模板，组合通用 composable，再只写详情图自己的结构、队列和 prompt。
+- 每次完成代码修改后自动提交，commit message 简明描述本次改动。
+- 不使用 `git reset --hard`、`git checkout --` 等破坏性命令，除非用户明确要求。
+- 不回滚用户未要求回滚的改动。
+- 提交前自查 diff，确认没有夹带无关文件或生成产物。
