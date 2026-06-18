@@ -59,11 +59,11 @@ function closeHistoryDrawer() {
       :main-image-index="video.mainImageIndex.value"
       :credit-costs="video.creditCosts.value"
       :ai-loading="video.aiLoading.value"
+      :generate-selling-points="video.generateSellingPointsWithAI"
       @update:settings="video.updateSettings"
       @update:uploaded-images="video.uploadedImages.value = $event"
       @update:main-image-index="video.mainImageIndex.value = $event"
       @notify="video.showNotice"
-      @ai-write="video.generateSellingPointsWithAI"
       @generate="video.generateProductVideo"
     />
 

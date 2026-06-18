@@ -149,7 +149,6 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
         toast?.error?.("AI 未返回有效内容");
         return "";
       }
-      settings.productInput = content;
       return content;
     } catch (error) {
       const status = error.response?.status;
