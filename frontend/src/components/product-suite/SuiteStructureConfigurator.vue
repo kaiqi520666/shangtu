@@ -93,7 +93,10 @@ function changeCount(index, step) {
                 <h4 class="text-sm font-bold text-slate-900">{{ item.name }}</h4>
                 <p class="mt-1 text-xs leading-relaxed text-slate-500">{{ item.description }}</p>
               </div>
-              <div class="flex shrink-0 items-center rounded-lg border border-slate-200 bg-white p-0.5 shadow-sm">
+              <div
+                v-if="item.enabled"
+                class="flex shrink-0 items-center rounded-lg border border-slate-200 bg-white p-0.5 shadow-sm"
+              >
                 <button
                   type="button"
                   class="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"

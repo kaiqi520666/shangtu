@@ -1,6 +1,6 @@
 <script setup>
 import { RouterLink } from "vue-router";
-import { ArrowRight, ImagePlus, Layers3, Shirt, Sparkles } from "lucide-vue-next";
+import { ArrowRight, Clapperboard, ImagePlus, Layers3, Shirt, Sparkles } from "lucide-vue-next";
 import { useAuthStore } from "@/stores/auth.js";
 
 const authStore = useAuthStore();
@@ -9,6 +9,7 @@ const loginTarget = { path: "/login", query: { redirect: "/generator/product-sui
 const featureItems = [
   { icon: Layers3, title: "商品套图", desc: "批量生成主图、场景图、卖点图和细节图。" },
   { icon: ImagePlus, title: "商品详情图", desc: "根据卖点生成多张详情页模块图。" },
+  { icon: Clapperboard, title: "商品视频", desc: "用商品图生成 UGC 种草、产品演示和广告短片。" },
   { icon: Shirt, title: "服饰穿搭", desc: "上传服装图，搭配模特和拍摄场景。" },
   { icon: Sparkles, title: "自由生图", desc: "支持文生图和参考图生图。" },
 ];
@@ -25,7 +26,7 @@ const featureItems = [
         </div>
         <div>
           <p class="text-sm font-bold text-slate-900">商图 AI</p>
-          <p class="text-xs text-slate-500">AI 电商商品图生成工作台</p>
+          <p class="text-xs text-slate-500">AI 电商内容生成工作台</p>
         </div>
       </div>
     </header>
@@ -38,10 +39,10 @@ const featureItems = [
           商图 AI 工作台
         </p>
         <h1 class="text-4xl font-black leading-tight text-slate-950 md:text-5xl">
-          AI 电商商品图生成工作台
+          AI 电商内容生成工作台
         </h1>
         <p class="mt-5 max-w-xl text-sm leading-7 text-slate-600">
-          上传商品图，批量生成商品套图、详情图、服饰穿搭图和自由生图素材，让电商视觉生产更快进入可用状态。
+          上传商品图，批量生成商品套图、详情图、商品视频、服饰穿搭图和自由生图素材，让电商内容生产更快进入可用状态。
         </p>
         <div class="mt-8 flex flex-wrap items-center gap-3">
           <RouterLink
