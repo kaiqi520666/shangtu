@@ -41,7 +41,7 @@ function handleChange(event) {
 
 <template>
   <label
-    class="inline-flex shrink-0 items-center gap-1.5 text-xs font-bold transition-colors"
+    class="relative inline-flex shrink-0 items-center gap-1.5 text-xs font-bold transition-colors"
     :class="[
       label ? 'text-slate-600 hover:text-slate-800' : '',
       disabled ? 'cursor-not-allowed opacity-50' : readonly ? 'cursor-default' : 'cursor-pointer',
@@ -50,7 +50,7 @@ function handleChange(event) {
     @keydown.stop
   >
     <input
-      class="sr-only"
+      class="absolute left-0 top-0 h-px w-px opacity-0"
       type="checkbox"
       :checked="modelValue"
       :disabled="disabled"
