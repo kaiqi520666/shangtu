@@ -93,6 +93,38 @@ PRODUCT_IMAGE_MODULES = {
 }
 
 
+PRODUCT_SUITE_STRUCTURES = {
+    "white-bg": {
+        "name": "白底图",
+        "desc": "适配平台首图规范，突出商品主体与干净轮廓。",
+        "strategy": "纯净浅色或白色背景，商品主体居中完整展示，轮廓清晰，光影自然。",
+        "default_count": 1,
+        "max_count": 6,
+    },
+    "scene": {
+        "name": "场景图",
+        "desc": "把商品放进真实使用环境，强化购买代入感。",
+        "strategy": "围绕商品用途构建可信场景，保持商品主体准确，背景服务商品而不喧宾夺主。",
+        "default_count": 1,
+        "max_count": 6,
+    },
+    "selling-point": {
+        "name": "卖点图",
+        "desc": "提炼核心优势，用高可读信息块表达产品价值。",
+        "strategy": "用清晰标题、短句卖点和适量视觉标注表达核心优势，避免信息过密。",
+        "default_count": 1,
+        "max_count": 6,
+    },
+    "detail": {
+        "name": "细节图",
+        "desc": "展示材质、结构、功能细节，降低用户决策疑虑。",
+        "strategy": "使用局部特写、放大框或简洁标注展示材质、结构、功能或工艺细节。",
+        "default_count": 1,
+        "max_count": 6,
+    },
+}
+
+
 class DashScopeConfigError(RuntimeError):
     pass
 
@@ -225,6 +257,65 @@ JSON 格式：
 }}"""
 
 
+def build_product_suite_strategy_prompt(
+    *,
+    platform: str,
+    language: str,
+    product_input: str,
+    structures: list[dict],
+    template_prompt: str | None = None,
+) -> str:
+    structures_text = "\n".join(
+        [
+            (
+                f"{index}. id={item['id']}，name={item['name']}，count={item['count']}，"
+                f"用途={item['desc']}，默认策略={item['strategy']}"
+            )
+            for index, item in enumerate(structures, start=1)
+        ]
+    )
+    structure_ids = [item["id"] for item in structures]
+    base_prompt = template_prompt.strip() if template_prompt else "你是资深电商商品套图策划和视觉总监。"
+
+    return f"""{base_prompt}
+请结合用户上传的商品图片、用户填写的商品卖点要求，以及用户选择的套图结构，生成一组可编辑的商品套图策略。
+
+当前投放平台：{platform or '未指定'}
+排版语言：{language or '中文'}
+
+用户商品卖点与要求：
+{product_input}
+
+用户选择的套图结构，必须按以下顺序生成：
+{structures_text}
+
+输出要求：
+1. 只输出 JSON，不要 markdown，不要解释，不要代码块。
+2. items 数量必须等于用户选择的套图类型数量，顺序必须一致。
+3. 每个 item id 必须来自这个列表：{json.dumps(structure_ids, ensure_ascii=False)}
+4. count 必须等于用户选择的数量，不要自行增减。
+5. 不要编造品牌 Logo、认证、价格、销量、型号、具体参数；如果图片和卖点中没有明确依据，只做谨慎表达。
+6. content 是给前端 textarea 展示和后续生图 prompt 使用的内容，使用短行文本，每行一个要点。
+7. 策略要适合电商套图，保证同一批图片商品主体一致、风格统一，但每个套图类型有明确作用。
+
+JSON 格式：
+{{
+  "brief": "一句话概括本次商品套图策略",
+  "items": [
+    {{
+      "id": "white-bg",
+      "name": "白底图",
+      "title": "干净主图突出商品完整轮廓",
+      "description": "适配平台首图规范，突出商品主体与干净轮廓。",
+      "strategy": "纯白或浅灰背景，商品居中完整展示，光影自然。",
+      "content": "画面目标：...\\n主体构图：...\\n文字与标注：...",
+      "count": 1,
+      "enabled": true
+    }}
+  ]
+}}"""
+
+
 async def analyze_product_image(
     *,
     images: list[dict],
@@ -342,6 +433,52 @@ def _selected_product_image_modules(module_ids: list[str]) -> list[dict]:
     return selected
 
 
+def _selected_product_suite_structures(structure: list[dict]) -> list[dict]:
+    if not structure:
+        raise ValueError("请至少选择一个套图类型")
+
+    selected: list[dict] = []
+    seen: set[str] = set()
+    unsupported: list[str] = []
+    for item in structure:
+        if not isinstance(item, dict):
+            continue
+        structure_id = str(item.get("id") or "").strip()
+        if not structure_id or structure_id in seen:
+            continue
+        config = PRODUCT_SUITE_STRUCTURES.get(structure_id)
+        if not config:
+            unsupported.append(structure_id)
+            continue
+        enabled = bool(item.get("enabled", True))
+        if not enabled:
+            seen.add(structure_id)
+            continue
+        try:
+            count = int(item.get("count", config["default_count"]))
+        except (TypeError, ValueError):
+            raise ValueError(f"{config['name']}数量无效")
+        if count < 1 or count > config["max_count"]:
+            raise ValueError(f"{config['name']}数量必须在 1-{config['max_count']} 张之间")
+        selected.append(
+            {
+                "id": structure_id,
+                "name": config["name"],
+                "desc": config["desc"],
+                "strategy": config["strategy"],
+                "count": count,
+                "enabled": True,
+            }
+        )
+        seen.add(structure_id)
+
+    if unsupported:
+        raise ValueError(f"存在不支持的套图类型：{', '.join(unsupported)}")
+    if not selected:
+        raise ValueError("请至少选择一个套图类型")
+    return selected
+
+
 def _parse_json_response(content: str) -> dict:
     text = content.strip()
     if text.startswith("```"):
@@ -383,6 +520,17 @@ def _fallback_module_content(module: dict, index: int) -> str:
     )
 
 
+def _fallback_suite_content(item: dict, index: int) -> str:
+    return "\n".join(
+        [
+            f"画面目标：{item['desc']}",
+            f"视觉策略：{item['strategy']}",
+            f"生成数量：{item['count']} 张",
+            "统一要求：保持商品主体、颜色、材质和核心外观一致，文字信息清晰克制。",
+        ]
+    )
+
+
 def _normalize_strategy_response(parsed: dict, selected_modules: list[dict]) -> dict:
     raw_modules = parsed.get("modules")
     if not isinstance(raw_modules, list):
@@ -413,27 +561,36 @@ def _normalize_strategy_response(parsed: dict, selected_modules: list[dict]) -> 
     return {"brief": brief, "modules": modules}
 
 
-async def generate_product_image_strategy(
-    *,
-    images: list[dict],
-    platform: str = "",
-    language: str = "中文",
-    product_input: str = "",
-    module_ids: list[str],
-    template_prompt: str | None = None,
-) -> dict:
-    normalized_input = product_input.strip()
-    if not normalized_input:
-        raise ValueError("请先填写商品卖点与要求")
+def _normalize_suite_strategy_response(parsed: dict, selected_structures: list[dict]) -> dict:
+    raw_items = parsed.get("items")
+    if not isinstance(raw_items, list):
+        raw_items = []
 
-    selected_modules = _selected_product_image_modules(module_ids)
-    prompt = build_product_image_strategy_prompt(
-        platform=platform,
-        language=language,
-        product_input=normalized_input[:4000],
-        modules=selected_modules,
-        template_prompt=template_prompt,
+    raw_by_id = {item.get("id"): item for item in raw_items if isinstance(item, dict) and item.get("id")}
+    items = []
+    for index, structure in enumerate(selected_structures):
+        raw = raw_by_id.get(structure["id"]) or {}
+        content = _stringify_content(raw.get("content"))
+        items.append(
+            {
+                "id": structure["id"],
+                "name": structure["name"],
+                "title": _stringify_content(raw.get("title")) or f"{structure['name']}策略",
+                "description": _stringify_content(raw.get("description")) or structure["desc"],
+                "strategy": _stringify_content(raw.get("strategy")) or structure["strategy"],
+                "content": content or _fallback_suite_content(structure, index),
+                "count": structure["count"],
+                "enabled": True,
+            }
+        )
+
+    brief = _stringify_content(parsed.get("brief")) or (
+        f"已根据商品图片、卖点和平台规则生成 {len(items)} 个套图类型策略。"
     )
+    return {"brief": brief, "items": items}
+
+
+async def _request_dashscope_strategy_json(*, images: list[dict], prompt: str) -> dict:
     content = build_multimodal_image_content(images)
     content.append(
         {
@@ -472,5 +629,54 @@ async def generate_product_image_strategy(
     if not content or not content.strip():
         raise RuntimeError("DashScope未返回有效内容")
 
-    parsed = _parse_json_response(content)
+    return _parse_json_response(content)
+
+
+async def generate_product_image_strategy(
+    *,
+    images: list[dict],
+    platform: str = "",
+    language: str = "中文",
+    product_input: str = "",
+    module_ids: list[str],
+    template_prompt: str | None = None,
+) -> dict:
+    normalized_input = product_input.strip()
+    if not normalized_input:
+        raise ValueError("请先填写商品卖点与要求")
+
+    selected_modules = _selected_product_image_modules(module_ids)
+    prompt = build_product_image_strategy_prompt(
+        platform=platform,
+        language=language,
+        product_input=normalized_input[:4000],
+        modules=selected_modules,
+        template_prompt=template_prompt,
+    )
+    parsed = await _request_dashscope_strategy_json(images=images, prompt=prompt)
     return _normalize_strategy_response(parsed, selected_modules)
+
+
+async def generate_product_suite_strategy(
+    *,
+    images: list[dict],
+    platform: str = "",
+    language: str = "中文",
+    product_input: str = "",
+    structure: list[dict],
+    template_prompt: str | None = None,
+) -> dict:
+    normalized_input = product_input.strip()
+    if not normalized_input:
+        raise ValueError("请先填写商品卖点与要求")
+
+    selected_structures = _selected_product_suite_structures(structure)
+    prompt = build_product_suite_strategy_prompt(
+        platform=platform,
+        language=language,
+        product_input=normalized_input[:4000],
+        structures=selected_structures,
+        template_prompt=template_prompt,
+    )
+    parsed = await _request_dashscope_strategy_json(images=images, prompt=prompt)
+    return _normalize_suite_strategy_response(parsed, selected_structures)

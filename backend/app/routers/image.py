@@ -14,12 +14,14 @@ from app.core.image_analyzer import (
     DashScopeConfigError,
     analyze_product_image,
     generate_product_image_strategy,
+    generate_product_suite_strategy,
     optimize_free_image_prompt,
 )
 from app.core.image_prompt_builder import (
     build_ai_write_prompt,
     build_image_generate_prompt,
     build_product_image_strategy_template_prompt,
+    build_product_suite_strategy_template_prompt,
 )
 from app.core.json_utils import dump_json_or_none, parse_json_or_none
 from app.core.oss import OssConfigError, upload_image_bytes
@@ -82,6 +84,14 @@ class ProductImageStrategyRequest(BaseModel):
     language: str = "中文"
     product_input: str
     module_ids: list[str]
+
+
+class ProductSuiteStrategyRequest(BaseModel):
+    images: list[ImageLabelItem]
+    platform: str = ""
+    language: str = "中文"
+    product_input: str
+    structure: list[dict]
 
 
 class FreeImageOptimizeRequest(BaseModel):
@@ -229,6 +239,33 @@ async def product_image_strategy(
         return fail(str(e))
     except Exception:
         return fail("详情页策略生成失败")
+
+    return success(strategy)
+
+
+@router.post("/product-suite/strategy", response_model=Response)
+async def product_suite_strategy(
+    req: ProductSuiteStrategyRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        template_prompt = await build_product_suite_strategy_template_prompt(
+            db,
+            platform=req.platform,
+        )
+        strategy = await generate_product_suite_strategy(
+            images=[item.model_dump() for item in req.images],
+            platform=req.platform,
+            language=req.language,
+            product_input=req.product_input,
+            structure=req.structure,
+            template_prompt=template_prompt,
+        )
+    except (ValueError, DashScopeConfigError, RuntimeError) as e:
+        return fail(str(e))
+    except Exception:
+        return fail("套图策略生成失败")
 
     return success(strategy)
 

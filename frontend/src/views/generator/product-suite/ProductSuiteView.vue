@@ -6,6 +6,7 @@ import GenerationPreviewModal from '@/components/generation/GenerationPreviewMod
 import GenerationWorkspace from '@/components/generation/GenerationWorkspace.vue'
 import GeneratorLayout from '@/components/layout/GeneratorLayout.vue'
 import ProductSuiteSettingsPanel from '@/components/product-suite/ProductSuiteSettingsPanel.vue'
+import ProductSuiteStrategyReviewPanel from '@/components/product-suite/ProductSuiteStrategyReviewPanel.vue'
 import { useGeneratorCardEdit } from '@/composables/useGeneratorCardEdit.js'
 import { useGeneratorRouteJob } from '@/composables/useGeneratorRouteJob.js'
 import { useProductSuiteGenerator } from '@/composables/useProductSuiteGenerator.js'
@@ -63,18 +64,37 @@ function closePreview() {
 
 <template>
   <GeneratorLayout>
+    <ProductSuiteStrategyReviewPanel
+      v-if="suite.strategyPanelVisible.value"
+      placement="side"
+      :loading="suite.strategyLoading.value"
+      :brief="suite.strategyBrief.value"
+      :items="suite.suiteStrategyItems.value"
+      :settings="suite.settings"
+      :selected-image-label="suite.selectedImageLabel.value"
+      :dirty="suite.strategyDirty.value"
+      :total-count="suite.strategyTotalCount.value"
+      @back="suite.backToConfig"
+      @confirm="suite.confirmStrategyAndGenerate"
+      @update-item="suite.updateSuiteStrategyItem"
+      @reorder-items="suite.reorderSuiteStrategyItems"
+      @remove-item="suite.removeSuiteStrategyItem"
+    />
+
     <ProductSuiteSettingsPanel
+      v-else
       :settings="suite.settings"
       :uploaded-images="suite.uploadedImages.value"
       :main-image-index="suite.mainImageIndex.value"
       :suite-structure="suite.suiteStructure.value"
       :ai-loading="suite.aiLoading.value"
-      :can-generate="suite.canGenerate.value"
+      :can-generate-strategy="suite.canGenerateStrategy.value"
       :creating-batch="suite.creatingBatch.value"
       :has-running-tasks="suite.hasRunningTasks.value"
       :generating="suite.generating.value"
+      :strategy-loading="suite.strategyLoading.value"
       :generated-count="suite.generatedCount.value"
-      :total-count="suite.totalCount.value"
+      :total-count="suite.configuredTotalCount.value"
       :job-total="suite.jobTotal.value"
       :selected-image-label="suite.selectedImageLabel.value"
       :generate-selling-points="suite.generateSellingPointsWithAI"
@@ -83,7 +103,7 @@ function closePreview() {
       @update:main-image-index="suite.mainImageIndex.value = $event"
       @update:suite-structure="suite.suiteStructure.value = $event"
       @notify="suite.showNotice"
-      @generate="suite.generateSuiteImages"
+      @generate-strategy="suite.triggerStrategyGeneration"
     />
 
     <GenerationWorkspace

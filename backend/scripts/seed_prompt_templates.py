@@ -540,6 +540,20 @@ def _template_rows() -> list[dict]:
                 "modules 数量必须等于用户选择图种数量，顺序必须一致；不要编造品牌 Logo、认证、价格、销量、型号、具体参数。"
             ),
         },
+        {
+            "scenario": "product_suite",
+            "purpose": "strategy",
+            "platform": None,
+            "type_id": None,
+            "model": "qwen3.6-flash",
+            "name": "商品套图-策略生成规则",
+            "content": (
+                "你是资深电商商品套图策划和视觉总监。请结合用户上传的商品图片、用户填写的商品卖点要求，"
+                "以及用户选择的套图结构，生成一组可编辑的商品套图策略。只输出 JSON，不要 markdown，"
+                "items 数量必须等于用户选择的套图类型数量，顺序必须一致；count 必须等于用户选择的数量；"
+                "不要编造品牌 Logo、认证、价格、销量、型号、具体参数。"
+            ),
+        },
     ]
 
     for platform, rules in PLATFORM_RULES.items():
@@ -770,6 +784,18 @@ async def verify_lookup() -> None:
         if "生图通用主体一致规则" not in fallback_names:
             raise RuntimeError("平台不匹配时应回退通用生图模板")
 
+        suite_strategy = await get_prompt_templates(
+            db,
+            scenario="product_suite",
+            purpose="strategy",
+            platform="亚马逊",
+            type_id=None,
+            model="qwen3.6-flash",
+        )
+        suite_strategy_names = [template.name for template in suite_strategy.templates]
+        if "商品套图-策略生成规则" not in suite_strategy_names:
+            raise RuntimeError("商品套图策略模板查询缺少: 商品套图-策略生成规则")
+
         outfit = await get_prompt_templates(
             db,
             scenario="outfit",
@@ -824,6 +850,7 @@ async def verify_lookup() -> None:
 
         print("lookup order:", " -> ".join(names))
         print("fallback order:", " -> ".join(fallback_names))
+        print("suite strategy order:", " -> ".join(suite_strategy_names))
         print("outfit order:", " -> ".join(outfit_names))
         print("video order:", " -> ".join(video_names))
         print("video ai_write order:", " -> ".join(video_ai_write_names))

@@ -27,6 +27,20 @@ export function generateProductImageStrategy({
   );
 }
 
+export function generateProductSuiteStrategy({
+  images = [],
+  platform = "",
+  language = "中文",
+  product_input,
+  structure,
+}) {
+  return request.post(
+    "/image/product-suite/strategy",
+    { images, platform, language, product_input, structure },
+    { timeout: 120000 },
+  );
+}
+
 export function optimizeFreeImagePrompt(prompt) {
   return request.post("/image/free-image/optimize", { prompt }, { timeout: 120000 });
 }
