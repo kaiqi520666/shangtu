@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from 'vue'
-import { LoaderCircle, WandSparkles } from 'lucide-vue-next'
+import { LoaderCircle, Sparkles } from 'lucide-vue-next'
 import GeneratorActionFooter from '@/components/generation/GeneratorActionFooter.vue'
 import GeneratorSidePanelShell from '@/components/generation/GeneratorSidePanelShell.vue'
 import ImageUploader from '@/components/generation/ImageUploader.vue'
@@ -66,7 +66,11 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
-  canGenerate: {
+  canGenerateStrategy: {
+    type: Boolean,
+    default: false,
+  },
+  strategyLoading: {
     type: Boolean,
     default: false,
   },
@@ -82,13 +86,17 @@ const emit = defineEmits([
   'notify',
   'upload-model',
   'delete-model',
-  'generate-images',
+  'generate-strategy',
 ])
 
 const primaryText = computed(() => {
+  if (props.garmentImages.length === 0) return '请先上传服装图片'
+  if (!props.selectedModelId) return '请选择模特形象'
+  if (props.selectedScenes.length === 0) return '请至少选择一个拍摄场景'
+  if (props.strategyLoading) return 'AI 正在生成策略...'
+  if (props.hasRunningTasks) return '生成中暂不可改策略'
   if (props.creatingBatch) return '正在创建任务...'
-  if (props.hasRunningTasks) return '追加生成'
-  return '生成图片'
+  return `AI 生成穿搭策略（${props.selectedScenes.length}张）`
 })
 </script>
 
@@ -137,12 +145,12 @@ const primaryText = computed(() => {
     <template #footer>
       <GeneratorActionFooter
         :primary-text="primaryText"
-        :primary-disabled="modelsLoading || !canGenerate"
-        @primary="emit('generate-images')"
+        :primary-disabled="modelsLoading || !canGenerateStrategy"
+        @primary="emit('generate-strategy')"
       >
         <template #primary-icon>
-          <LoaderCircle v-if="creatingBatch" class="h-4 w-4 animate-spin" />
-          <WandSparkles v-else class="h-4 w-4" />
+          <LoaderCircle v-if="strategyLoading || creatingBatch" class="h-4 w-4 animate-spin" />
+          <Sparkles v-else class="h-4 w-4" />
         </template>
       </GeneratorActionFooter>
     </template>

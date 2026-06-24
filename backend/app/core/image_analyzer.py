@@ -125,6 +125,45 @@ PRODUCT_SUITE_STRUCTURES = {
 }
 
 
+OUTFIT_SCENES = {
+    "studio": {
+        "name": "纯色棚拍",
+        "desc": "纯色或浅灰棚拍背景，画面干净专业，突出服装整体版型、长度、肩线和垂坠感。",
+        "strategy": "柔和商业摄影布光，模特自然站立或轻微转身，背景克制，服装轮廓完整清晰。",
+    },
+    "street": {
+        "name": "都市街头",
+        "desc": "都市街头场景，突出服装的日常穿搭感和街拍质感。",
+        "strategy": "自然日光或轻微电影感光影，模特行走或站立，背景有城市线条但不抢主体。",
+    },
+    "cafe": {
+        "name": "街角咖啡",
+        "desc": "街角咖啡店或休闲空间，强化服装的生活方式氛围和亲和力。",
+        "strategy": "暖色自然光，模特坐姿或站姿放松，画面带轻松社交和日常出街感。",
+    },
+    "lawn": {
+        "name": "自然草坪",
+        "desc": "公园草坪或自然绿地场景，呈现舒适、清新、自然的穿搭氛围。",
+        "strategy": "柔和户外光线，背景清爽不过度杂乱，模特姿态自然舒展。",
+    },
+    "beach": {
+        "name": "度假海滩",
+        "desc": "海滩或滨海步道场景，突出服装在户外度假场景中的搭配效果。",
+        "strategy": "明亮自然光和轻松假日氛围，模特动作轻盈，画面干净通透。",
+    },
+    "home": {
+        "name": "温馨居家",
+        "desc": "居家室内场景，展示服装的舒适度、日常感和亲和力。",
+        "strategy": "柔和窗光、简洁家具和温暖色调，模特自然坐立或轻松活动。",
+    },
+    "gallery": {
+        "name": "艺术展馆",
+        "desc": "艺术展馆或现代极简空间，突出服装的时尚感和高级质感。",
+        "strategy": "留白充足、线条干净、光影高级，模特姿态克制自然。",
+    },
+}
+
+
 class DashScopeConfigError(RuntimeError):
     pass
 
@@ -316,6 +355,67 @@ JSON 格式：
 }}"""
 
 
+def build_outfit_strategy_prompt(
+    *,
+    platform: str,
+    language: str,
+    scene_description: str,
+    selected_model_name: str,
+    scenes: list[dict],
+    template_prompt: str | None = None,
+) -> str:
+    scenes_text = "\n".join(
+        [
+            (
+                f"{index}. id={item['id']}，name={item['name']}，"
+                f"场景目标={item['desc']}，默认策略={item['strategy']}"
+            )
+            for index, item in enumerate(scenes, start=1)
+        ]
+    )
+    scene_ids = [item["id"] for item in scenes]
+    base_prompt = template_prompt.strip() if template_prompt else "你是资深电商服饰穿搭摄影策划和视觉总监。"
+
+    return f"""{base_prompt}
+请结合用户上传的服装图、模特参考图、用户选择的拍摄场景，生成一组可编辑的服饰穿搭拍摄策略。
+
+当前投放平台：{platform or '未指定'}
+排版语言：{language or '中文'}
+模特名称：{selected_model_name or '未指定'}
+用户自定义场景补充：{scene_description or '无'}
+
+用户选择的拍摄场景，必须按以下顺序生成：
+{scenes_text}
+
+输出要求：
+1. 只输出 JSON，不要 markdown，不要解释，不要代码块。
+2. items 数量必须等于用户选择场景数量，顺序必须一致。
+3. 每个 item id 必须来自这个列表：{json.dumps(scene_ids, ensure_ascii=False)}
+4. content 是给前端 textarea 展示和后续生图 prompt 使用的内容，必须包含“模特姿态”“镜头角度”“服装保真约束”“画面氛围”四段，用户会看到并可编辑。
+5. 服装保真约束是硬约束：必须要求保持用户上传服装图的颜色、版型、材质、图案、长度、领口、袖型、廓形和核心外观一致。
+6. 不要虚构品牌 Logo、价格、销量、材质成分、认证或图片中无法确认的服装参数。
+7. 策略要适合电商穿搭图，主体清晰、真实可信，避免多人物、换衣服、改变服装款式。
+
+JSON 格式：
+{{
+  "brief": "一句话概括本次穿搭拍摄策略",
+  "items": [
+    {{
+      "id": "street",
+      "name": "都市街头",
+      "title": "都市街头自然行走穿搭",
+      "description": "都市街头场景，突出服装的日常穿搭感和街拍质感。",
+      "strategy": "自然日光或轻微电影感光影，模特行走或站立。",
+      "pose": "模特姿态：...",
+      "camera": "镜头角度：...",
+      "fidelity": "服装保真约束：...",
+      "atmosphere": "画面氛围：...",
+      "content": "模特姿态：...\\n镜头角度：...\\n服装保真约束：...\\n画面氛围：..."
+    }}
+  ]
+}}"""
+
+
 async def analyze_product_image(
     *,
     images: list[dict],
@@ -479,6 +579,31 @@ def _selected_product_suite_structures(structure: list[dict]) -> list[dict]:
     return selected
 
 
+def _selected_outfit_scenes(scene_ids: list[str]) -> list[dict]:
+    if not scene_ids:
+        raise ValueError("请至少选择一个拍摄场景")
+
+    selected: list[dict] = []
+    seen: set[str] = set()
+    unsupported: list[str] = []
+    for scene_id in scene_ids:
+        scene_id = str(scene_id or "").strip()
+        if not scene_id or scene_id in seen:
+            continue
+        scene = OUTFIT_SCENES.get(scene_id)
+        if not scene:
+            unsupported.append(scene_id)
+            continue
+        selected.append({"id": scene_id, **scene})
+        seen.add(scene_id)
+
+    if unsupported:
+        raise ValueError(f"存在不支持的拍摄场景：{', '.join(unsupported)}")
+    if not selected:
+        raise ValueError("请至少选择一个拍摄场景")
+    return selected
+
+
 def _parse_json_response(content: str) -> dict:
     text = content.strip()
     if text.startswith("```"):
@@ -527,6 +652,17 @@ def _fallback_suite_content(item: dict, index: int) -> str:
             f"视觉策略：{item['strategy']}",
             f"生成数量：{item['count']} 张",
             "统一要求：保持商品主体、颜色、材质和核心外观一致，文字信息清晰克制。",
+        ]
+    )
+
+
+def _fallback_outfit_content(scene: dict, index: int) -> str:
+    return "\n".join(
+        [
+            "模特姿态：自然站立或轻微动态姿势，肢体舒展，完整展示服装版型。",
+            "镜头角度：中景到全身构图，镜头略低或平视，保证服装比例自然。",
+            "服装保真约束：保持上传服装的颜色、版型、材质、图案、长度、领口、袖型、廓形和核心外观一致，不换款不改款。",
+            f"画面氛围：{scene['strategy']}",
         ]
     )
 
@@ -586,6 +722,47 @@ def _normalize_suite_strategy_response(parsed: dict, selected_structures: list[d
 
     brief = _stringify_content(parsed.get("brief")) or (
         f"已根据商品图片、卖点和平台规则生成 {len(items)} 个套图类型策略。"
+    )
+    return {"brief": brief, "items": items}
+
+
+def _normalize_outfit_strategy_response(parsed: dict, selected_scenes: list[dict]) -> dict:
+    raw_items = parsed.get("items")
+    if not isinstance(raw_items, list):
+        raw_items = []
+
+    raw_by_id = {item.get("id"): item for item in raw_items if isinstance(item, dict) and item.get("id")}
+    items = []
+    for index, scene in enumerate(selected_scenes):
+        raw = raw_by_id.get(scene["id"]) or {}
+        content = _stringify_content(raw.get("content"))
+        pose = _stringify_content(raw.get("pose"))
+        camera = _stringify_content(raw.get("camera"))
+        fidelity = _stringify_content(raw.get("fidelity"))
+        atmosphere = _stringify_content(raw.get("atmosphere"))
+        if not content:
+            content = "\n".join(
+                part
+                for part in [pose, camera, fidelity, atmosphere]
+                if part
+            )
+        items.append(
+            {
+                "id": scene["id"],
+                "name": scene["name"],
+                "title": _stringify_content(raw.get("title")) or f"{scene['name']}穿搭策略",
+                "description": _stringify_content(raw.get("description")) or scene["desc"],
+                "strategy": _stringify_content(raw.get("strategy")) or scene["strategy"],
+                "pose": pose,
+                "camera": camera,
+                "fidelity": fidelity,
+                "atmosphere": atmosphere,
+                "content": content or _fallback_outfit_content(scene, index),
+            }
+        )
+
+    brief = _stringify_content(parsed.get("brief")) or (
+        f"已根据服装图、模特参考和场景配置生成 {len(items)} 个穿搭拍摄策略。"
     )
     return {"brief": brief, "items": items}
 
@@ -680,3 +857,26 @@ async def generate_product_suite_strategy(
     )
     parsed = await _request_dashscope_strategy_json(images=images, prompt=prompt)
     return _normalize_suite_strategy_response(parsed, selected_structures)
+
+
+async def generate_outfit_strategy(
+    *,
+    images: list[dict],
+    platform: str = "",
+    language: str = "中文",
+    scene_description: str = "",
+    selected_model_name: str = "",
+    scene_ids: list[str],
+    template_prompt: str | None = None,
+) -> dict:
+    selected_scenes = _selected_outfit_scenes(scene_ids)
+    prompt = build_outfit_strategy_prompt(
+        platform=platform,
+        language=language,
+        scene_description=scene_description.strip()[:4000],
+        selected_model_name=selected_model_name.strip(),
+        scenes=selected_scenes,
+        template_prompt=template_prompt,
+    )
+    parsed = await _request_dashscope_strategy_json(images=images, prompt=prompt)
+    return _normalize_outfit_strategy_response(parsed, selected_scenes)

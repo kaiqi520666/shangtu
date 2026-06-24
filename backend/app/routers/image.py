@@ -13,6 +13,7 @@ from app.core.deps import get_current_user, get_db
 from app.core.image_analyzer import (
     DashScopeConfigError,
     analyze_product_image,
+    generate_outfit_strategy,
     generate_product_image_strategy,
     generate_product_suite_strategy,
     optimize_free_image_prompt,
@@ -20,6 +21,7 @@ from app.core.image_analyzer import (
 from app.core.image_prompt_builder import (
     build_ai_write_prompt,
     build_image_generate_prompt,
+    build_outfit_strategy_template_prompt,
     build_product_image_strategy_template_prompt,
     build_product_suite_strategy_template_prompt,
 )
@@ -92,6 +94,15 @@ class ProductSuiteStrategyRequest(BaseModel):
     language: str = "中文"
     product_input: str
     structure: list[dict]
+
+
+class OutfitStrategyRequest(BaseModel):
+    images: list[ImageLabelItem]
+    platform: str = ""
+    language: str = "中文"
+    scene_description: str = ""
+    selected_model_name: str = ""
+    scene_ids: list[str]
 
 
 class FreeImageOptimizeRequest(BaseModel):
@@ -266,6 +277,34 @@ async def product_suite_strategy(
         return fail(str(e))
     except Exception:
         return fail("套图策略生成失败")
+
+    return success(strategy)
+
+
+@router.post("/outfit/strategy", response_model=Response)
+async def outfit_strategy(
+    req: OutfitStrategyRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        template_prompt = await build_outfit_strategy_template_prompt(
+            db,
+            platform=req.platform,
+        )
+        strategy = await generate_outfit_strategy(
+            images=[item.model_dump() for item in req.images],
+            platform=req.platform,
+            language=req.language,
+            scene_description=req.scene_description,
+            selected_model_name=req.selected_model_name,
+            scene_ids=req.scene_ids,
+            template_prompt=template_prompt,
+        )
+    except (ValueError, DashScopeConfigError, RuntimeError) as e:
+        return fail(str(e))
+    except Exception:
+        return fail("穿搭策略生成失败")
 
     return success(strategy)
 

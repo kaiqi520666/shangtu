@@ -554,6 +554,20 @@ def _template_rows() -> list[dict]:
                 "不要编造品牌 Logo、认证、价格、销量、型号、具体参数。"
             ),
         },
+        {
+            "scenario": "outfit",
+            "purpose": "strategy",
+            "platform": None,
+            "type_id": None,
+            "model": "qwen3.6-flash",
+            "name": "服饰穿搭-策略生成规则",
+            "content": (
+                "你是资深电商服饰穿搭摄影策划和视觉总监。请结合用户上传的服装图、模特参考图和拍摄场景，"
+                "生成一组可编辑的穿搭拍摄策略。只输出 JSON，不要 markdown，items 数量必须等于用户选择场景数量，"
+                "顺序必须一致。content 必须包含模特姿态、镜头角度、服装保真约束、画面氛围四段；"
+                "服装保真约束必须写给用户看，强调保持服装颜色、版型、材质、图案、长度、领口、袖型、廓形和核心外观一致。"
+            ),
+        },
     ]
 
     for platform, rules in PLATFORM_RULES.items():
@@ -796,6 +810,18 @@ async def verify_lookup() -> None:
         if "商品套图-策略生成规则" not in suite_strategy_names:
             raise RuntimeError("商品套图策略模板查询缺少: 商品套图-策略生成规则")
 
+        outfit_strategy = await get_prompt_templates(
+            db,
+            scenario="outfit",
+            purpose="strategy",
+            platform="亚马逊",
+            type_id=None,
+            model="qwen3.6-flash",
+        )
+        outfit_strategy_names = [template.name for template in outfit_strategy.templates]
+        if "服饰穿搭-策略生成规则" not in outfit_strategy_names:
+            raise RuntimeError("服饰穿搭策略模板查询缺少: 服饰穿搭-策略生成规则")
+
         outfit = await get_prompt_templates(
             db,
             scenario="outfit",
@@ -851,6 +877,7 @@ async def verify_lookup() -> None:
         print("lookup order:", " -> ".join(names))
         print("fallback order:", " -> ".join(fallback_names))
         print("suite strategy order:", " -> ".join(suite_strategy_names))
+        print("outfit strategy order:", " -> ".join(outfit_strategy_names))
         print("outfit order:", " -> ".join(outfit_names))
         print("video order:", " -> ".join(video_names))
         print("video ai_write order:", " -> ".join(video_ai_write_names))

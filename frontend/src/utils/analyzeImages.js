@@ -42,6 +42,22 @@ export function buildVideoAnalyzeImages(inputMode, uploadedImages) {
   }));
 }
 
+export function buildOutfitAnalyzeImages(garmentImages, mainGarmentIndex = 0, selectedModel = null) {
+  const images = buildProductAnalyzeImages(garmentImages, mainGarmentIndex).map((item) => ({
+    ...item,
+    label: item.label === "主图" ? "服装主图" : item.label.replace("细节图", "服装细节图"),
+  }));
+
+  if (selectedModel?.image) {
+    images.push({
+      url: selectedModel.image,
+      label: "模特参考图",
+    });
+  }
+
+  return images;
+}
+
 export function hasUploadingImages(uploadedImages) {
   return (uploadedImages || []).some((img) => img?.uploading);
 }

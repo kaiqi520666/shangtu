@@ -6,6 +6,7 @@ import {
   resolveQuality,
 } from "@/constants/generator.js";
 import { outfitPreviewSlides, scenePresets } from "@/constants/outfit.js";
+import { generateOutfitStrategy } from "@/api/image.js";
 import { deleteOutfitModel, listOutfitModels, uploadOutfitModel } from "@/api/outfit.js";
 import { useCardActions } from "@/composables/useCardActions.js";
 import {
@@ -13,12 +14,25 @@ import {
   useGenerationCards,
 } from "@/composables/useGenerationCards.js";
 import { useGenerationRunner } from "@/composables/useGenerationRunner.js";
+import { useGenerationStrategyFlow } from "@/composables/useGenerationStrategyFlow.js";
 import { useToast } from "@/composables/useToast.js";
 import {
   cloneGenerationSettingsSnapshot,
   createGenerationSettingsSnapshot,
   getSnapshotScene,
 } from "@/utils/generationSnapshots.js";
+import { buildOutfitAnalyzeImages, hasUploadingImages } from "@/utils/analyzeImages.js";
+
+function cloneUploadedImages(images) {
+  return images.map((img) => ({
+    id: img.id,
+    url: img.url,
+    objectKey: img.objectKey,
+    contentType: img.contentType,
+    size: img.size,
+    previewUrl: img.url || img.previewUrl,
+  }));
+}
 
 export function useOutfitGenerator({ onJobCreated } = {}) {
   const toast = useToast();
@@ -58,10 +72,38 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
   const modelUploading = ref(false);
   const modelDeletingId = ref("");
   const selectedModelId = ref("");
+  const restoredModelSnapshot = ref(null);
   const selectedScenes = ref(["street"]);
   const sceneDescription = ref("");
-
   const settings = reactive(createDefaultGenerationSettings({ ratio: "3:4" }));
+
+  const selectedModel = computed(() =>
+    modelLibrary.value.find((model) => model.id === selectedModelId.value) ||
+    (restoredModelSnapshot.value?.id === selectedModelId.value ? restoredModelSnapshot.value : null),
+  );
+
+  const strategyFlow = useGenerationStrategyFlow({
+    buildInputSnapshot: buildOutfitStrategySnapshot,
+  });
+
+  const {
+    workflowStep,
+    strategyBrief,
+    strategyItems: outfitStrategyItems,
+    strategySnapshot,
+    strategyDirty,
+    strategyLoading,
+    strategyPanelVisible,
+    canGenerateWithStrategy,
+    startStrategyLoading,
+    setStrategyResult,
+    resetStrategy,
+    setStrategyStep,
+    updateStrategyItem: updateOutfitStrategyItem,
+    reorderStrategyItems: reorderOutfitStrategyItems,
+    removeStrategyItem: removeOutfitStrategyItem,
+    backToConfig,
+  } = strategyFlow;
 
   const runner = useGenerationRunner({
     scenario: "outfit",
@@ -73,16 +115,18 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
       mainGarmentIndex.value = 0;
       selectedScenes.value = ["street"];
       sceneDescription.value = "";
+      restoredModelSnapshot.value = null;
       settings.productInput = "";
+      resetStrategy("config");
     },
     applyJobData(data) {
       restoreOutfitJobData(data);
     },
     restoreCard(item) {
-      const scene = findScene(item.type_id);
+      const strategyItem = findOutfitStrategyItem(item.type_id);
       return restoreGenerationCard(item, {
-        strategyTitle: item.title || scene.label,
-        strategyContent: scene.description,
+        strategyTitle: item.title || strategyItem.title || getSceneName(item.type_id),
+        strategyContent: strategyItem.content || strategyItem.strategy || getSceneStrategy(item.type_id),
       });
     },
   });
@@ -119,16 +163,20 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
     downloadSingleImage,
   } = actions;
 
-  const selectedModel = computed(() =>
-    modelLibrary.value.find((model) => model.id === selectedModelId.value),
+  const configuredTotalCount = computed(() => selectedScenes.value.length);
+  const strategyTotalCount = computed(() => outfitStrategyItems.value.length);
+  const totalCount = computed(() => strategyTotalCount.value || configuredTotalCount.value);
+  const hasGenerationSource = computed(
+    () => garmentImages.value.length > 0 && Boolean(selectedModel.value?.image),
   );
-  const totalCount = computed(() => selectedScenes.value.length);
-  const canGenerate = computed(
+  const canGenerateStrategy = computed(
     () =>
-      garmentImages.value.length > 0 &&
-      Boolean(selectedModel.value?.image) &&
+      hasGenerationSource.value &&
       selectedScenes.value.length > 0 &&
-      !creatingBatch.value,
+      !modelsLoading.value &&
+      !strategyLoading.value &&
+      !creatingBatch.value &&
+      !hasRunningTasks.value,
   );
   const selectedImageLabel = computed(() => {
     syncQualityForRatio();
@@ -156,11 +204,7 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
       }
 
       modelLibrary.value = (result.data || []).map(normalizeModel);
-      if (
-        (!selectedModelId.value ||
-          !modelLibrary.value.some((model) => model.id === selectedModelId.value)) &&
-        modelLibrary.value.length > 0
-      ) {
+      if (!selectedModel.value && modelLibrary.value.length > 0) {
         selectedModelId.value = modelLibrary.value[0].id;
       }
     } catch (error) {
@@ -236,6 +280,7 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
   }
 
   function restoreOutfitJobData(data) {
+    let restoredStrategyBrief = "";
     if (data.settings && typeof data.settings === "object") {
       const s = data.settings;
       const scene = getSnapshotScene(s);
@@ -244,7 +289,11 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
         selectedScenes: nextSelectedScenes,
         sceneDescription: nextSceneDescription,
         selectedModelId: nextSelectedModelId,
+        selectedModelName: nextSelectedModelName,
+        selectedModelImage: nextSelectedModelImage,
+        strategyBrief: nextStrategyBrief,
       } = scene;
+      restoredStrategyBrief = typeof nextStrategyBrief === "string" ? nextStrategyBrief : "";
       if (typeof platform === "string") settings.platform = platform;
       if (typeof language === "string") settings.language = language;
       if (typeof ratio === "string" && resolutionMap[ratio]) {
@@ -260,6 +309,13 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
       }
       if (typeof nextSelectedModelId === "string") {
         selectedModelId.value = nextSelectedModelId;
+        if (typeof nextSelectedModelImage === "string" && nextSelectedModelImage) {
+          restoredModelSnapshot.value = {
+            id: nextSelectedModelId,
+            name: typeof nextSelectedModelName === "string" ? nextSelectedModelName : "已恢复模特",
+            image: nextSelectedModelImage,
+          };
+        }
       }
     }
 
@@ -277,7 +333,102 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
     settings.productInput = data.input_text || "";
     if (Array.isArray(data.structure) && data.structure.length > 0) {
       selectedScenes.value = data.structure.map((item) => item.id).filter(Boolean);
+      setStrategyResult({
+        brief: restoredStrategyBrief,
+        items: normalizeOutfitStrategyItems(data.structure),
+        snapshot: buildOutfitStrategySnapshot(),
+        step: "result",
+      });
+    } else {
+      resetStrategy("config");
     }
+  }
+
+  async function triggerStrategyGeneration() {
+    const mainImg = garmentImages.value[mainGarmentIndex.value];
+    const inputSnapshot = buildOutfitStrategySnapshot();
+    if (hasRunningTasks.value) {
+      toast.info("当前任务正在生成中，请稍后再生成穿搭策略");
+      return;
+    }
+    if (creatingBatch.value) {
+      toast.info("正在创建图片任务，请稍候");
+      return;
+    }
+    if (garmentImages.value.length === 0) {
+      toast.info("请先上传服装图片");
+      return;
+    }
+    if (!mainImg || !mainImg.url) {
+      toast.info("服装图还未上传完成，请稍候再试");
+      return;
+    }
+    if (hasUploadingImages(garmentImages.value)) {
+      toast.info("服装图还在上传中，请稍候");
+      return;
+    }
+    if (!selectedModel.value?.image) {
+      toast.info("请选择模特形象");
+      return;
+    }
+    if (selectedScenes.value.length === 0) {
+      toast.info("请至少选择一个拍摄场景");
+      return;
+    }
+
+    startStrategyLoading({ snapshot: inputSnapshot });
+
+    try {
+      const result = await generateOutfitStrategy({
+        images: inputSnapshot.images,
+        platform: settings.platform,
+        language: settings.language,
+        scene_description: sceneDescription.value,
+        selected_model_name: selectedModel.value.name,
+        scene_ids: selectedScenes.value,
+      });
+
+      if (result.code !== 0) {
+        toast.error(result.message || "穿搭策略生成失败，请稍后重试");
+        setStrategyStep("config");
+        return;
+      }
+
+      const items = Array.isArray(result.data?.items) ? result.data.items : [];
+      if (items.length === 0) {
+        toast.error("AI 未返回有效穿搭策略");
+        setStrategyStep("config");
+        return;
+      }
+
+      const normalizedItems = normalizeOutfitStrategyItems(items);
+      const brief =
+        result.data?.brief ||
+        `${settings.platform} / ${settings.language} / ${selectedImageLabel.value}，已为 ${normalizedItems.length} 个场景生成可编辑穿搭策略。`;
+      setStrategyResult({
+        brief,
+        items: normalizedItems,
+        snapshot: inputSnapshot,
+      });
+      toast.success("穿搭策略已生成，可编辑后继续出图");
+    } catch (error) {
+      const status = error.response?.status;
+      if (status === 401) {
+        toast.error("登录已过期，请重新登录");
+      } else {
+        toast.error(error.response?.data?.message || "穿搭策略生成失败，请稍后重试");
+      }
+      setStrategyStep("config");
+    }
+  }
+
+  async function confirmStrategyAndGenerate() {
+    if (outfitStrategyItems.value.length === 0) {
+      toast.info("请先生成穿搭策略");
+      return;
+    }
+
+    await generateOutfitImages();
   }
 
   async function generateOutfitImages() {
@@ -290,7 +441,7 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
       toast.info("服装图还未上传完成，请稍候再试");
       return;
     }
-    if (mainImg.uploading) {
+    if (hasUploadingImages(garmentImages.value)) {
       toast.info("服装图还在上传中，请稍候");
       return;
     }
@@ -300,7 +451,7 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
     }
     const queue = buildOutfitQueue();
     if (queue.length === 0) {
-      toast.info("请至少选择一个拍摄场景");
+      toast.info("请至少保留一个穿搭策略");
       return;
     }
 
@@ -316,59 +467,115 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
         selectedModelId: selectedModel.value.id,
         selectedModelName: selectedModel.value.name,
         selectedModelImage: selectedModel.value.image,
+        strategyBrief: strategyBrief.value,
       },
     });
 
     const snapshotPayload = {
       settings: baseSettingsSnapshot,
-      source_images: garmentImages.value.map((img) => ({
-        id: img.id,
-        url: img.url,
-        objectKey: img.objectKey,
-        contentType: img.contentType,
-        size: img.size,
-        previewUrl: img.url || img.previewUrl,
-      })),
+      source_images: cloneUploadedImages(garmentImages.value),
       input_text: sceneDescription.value,
-      structure: queue.map((item) => ({
-        id: item.id,
-        title: item.title,
-        description: item.description,
-      })),
+      structure: outfitStrategyItems.value,
     };
 
-    await enqueueImageBatch({
+    const ok = await enqueueImageBatch({
       queue,
       imageUrls: [mainImg.url, selectedModel.value.image],
       ratio: settings.ratio,
       resolution: settings.quality,
       snapshotPayload,
-      initialLogs: ["服饰穿搭生成任务初始化...", "读取服装图片、模特形象与拍摄场景..."],
+      initialLogs: ["服饰穿搭生成任务初始化...", "读取服装图片、模特形象与穿搭策略..."],
       repeatLog: `新一批穿搭图开始生成，共 ${queue.length} 张`,
       buildSettingsSnapshot: () => cloneGenerationSettingsSnapshot(baseSettingsSnapshot),
       createCard({ item, sortOrder, batchRunId, settingsSnapshot }) {
         return createGenerationCard({
           typeId: item.id,
           strategyTitle: item.title,
-          strategyContent: item.description,
+          strategyContent: item.content || item.fidelity || item.strategy,
           sortOrder,
           batchRunId,
           settingsSnapshot,
         });
       },
+      buildUserPrompt: buildUserPromptForItem,
       getCreateLog: (item) => `正在生成 [${item.title}] 穿搭图...`,
       getFailLogName: (item) => item.title,
       allFailedMessage: "所有穿搭图任务都创建失败，请稍后重试",
     });
+
+    if (ok || outputCards.value.length > 0) {
+      setStrategyStep("result");
+    }
+  }
+
+  function buildOutfitStrategySnapshot() {
+    return {
+      scenario: "outfit",
+      images: buildOutfitAnalyzeImages(
+        garmentImages.value,
+        mainGarmentIndex.value,
+        selectedModel.value,
+      ),
+      platform: settings.platform,
+      language: settings.language,
+      ratio: settings.ratio,
+      quality: settings.quality,
+      selectedModelId: selectedModel.value?.id || "",
+      selectedModelName: selectedModel.value?.name || "",
+      selectedScenes: [...selectedScenes.value],
+      sceneDescription: sceneDescription.value,
+    };
   }
 
   function buildOutfitQueue() {
-    return selectedScenes.value.map((sceneId) => {
-      const scene = findScene(sceneId);
+    return outfitStrategyItems.value.map((item, index) => ({
+      ...item,
+      id: item.id,
+      name: item.name || getSceneName(item.id),
+      title: item.title || `${getSceneName(item.id)}穿搭策略`,
+      content: composeOutfitStrategyContent(item),
+      strategy: item.strategy || getSceneStrategy(item.id),
+      index: index + 1,
+    }));
+  }
+
+  function buildUserPromptForItem(item) {
+    const lines = [
+      `【拍摄场景】${item.name}`,
+      item.title ? `【策略标题】${item.title}` : "",
+      item.strategy ? `【场景策略】${item.strategy}` : "",
+      item.pose ? `【模特姿态】${item.pose}` : "",
+      item.camera ? `【镜头角度】${item.camera}` : "",
+      item.fidelity ? `【服装保真约束】${item.fidelity}` : "",
+      item.atmosphere ? `【画面氛围】${item.atmosphere}` : "",
+      item.content ? `【完整策略】${item.content}` : "",
+    ];
+    return lines.filter(Boolean).join("\n");
+  }
+
+  function composeOutfitStrategyContent(item) {
+    const content = (item.content || "").trim();
+    if (content) return content;
+    return [item.pose, item.camera, item.fidelity, item.atmosphere].filter(Boolean).join("\n");
+  }
+
+  function normalizeOutfitStrategyItems(items) {
+    return items.map((item, index) => {
+      const scene = findScene(item.id);
+      const fidelity =
+        item.fidelity ||
+        "服装保真约束：保持上传服装的颜色、版型、材质、图案、长度、领口、袖型、廓形和核心外观一致，不换款不改款。";
       return {
-        id: sceneId,
-        title: scene.label,
-        description: scene.description,
+        id: item.id || scene.id || `outfit-${index + 1}`,
+        name: item.name || scene.label || `场景 ${index + 1}`,
+        title: item.title || `${scene.label || "穿搭"}策略`,
+        description: item.description || scene.description || "",
+        strategy: item.strategy || scene.description || "",
+        pose: item.pose || "",
+        camera: item.camera || "",
+        fidelity,
+        atmosphere: item.atmosphere || "",
+        content: item.content || [item.pose, item.camera, fidelity, item.atmosphere].filter(Boolean).join("\n"),
       };
     });
   }
@@ -399,6 +606,16 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
     return `${scene.label}穿搭图，保持服装与模特参考一致，画面自然、清晰、适合电商展示。`;
   }
 
+  function findOutfitStrategyItem(typeId) {
+    return outfitStrategyItems.value.find((item) => item.id === typeId) || {
+      id: typeId,
+      name: getSceneName(typeId),
+      title: getSceneName(typeId),
+      content: getSceneStrategy(typeId),
+      strategy: getSceneStrategy(typeId),
+    };
+  }
+
   onMounted(() => {
     loadOutfitModels();
   });
@@ -424,6 +641,14 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
     historyLoading,
     jobLoading,
     settings,
+    workflowStep,
+    strategyBrief,
+    strategySnapshot,
+    strategyDirty,
+    strategyLoading,
+    strategyPanelVisible,
+    canGenerateWithStrategy,
+    outfitStrategyItems,
     generating,
     creatingBatch,
     hasRunningTasks,
@@ -435,17 +660,24 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
     outputCards,
     zoomCard,
     selectedModel,
-    canGenerate,
+    canGenerateStrategy,
     selectedCards,
     selectedCardsCount,
     totalCount,
+    configuredTotalCount,
+    strategyTotalCount,
     selectedImageLabel,
     previewSlides,
     showNotice: toast.info,
     loadOutfitModels,
     uploadModel,
     deleteModel,
-    generateOutfitImages,
+    triggerStrategyGeneration,
+    confirmStrategyAndGenerate,
+    updateOutfitStrategyItem,
+    reorderOutfitStrategyItems,
+    removeOutfitStrategyItem,
+    backToConfig,
     getSceneName,
     getSceneStrategy,
     toggleCardSelection,

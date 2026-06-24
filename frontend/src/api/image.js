@@ -41,6 +41,21 @@ export function generateProductSuiteStrategy({
   );
 }
 
+export function generateOutfitStrategy({
+  images = [],
+  platform = "",
+  language = "中文",
+  scene_description = "",
+  selected_model_name = "",
+  scene_ids,
+}) {
+  return request.post(
+    "/image/outfit/strategy",
+    { images, platform, language, scene_description, selected_model_name, scene_ids },
+    { timeout: 120000 },
+  );
+}
+
 export function optimizeFreeImagePrompt(prompt) {
   return request.post("/image/free-image/optimize", { prompt }, { timeout: 120000 });
 }

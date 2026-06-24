@@ -344,3 +344,19 @@ async def build_product_suite_strategy_template_prompt(
         model=QWEN_TEXT_MODEL,
     )
     return lookup.content.strip()
+
+
+async def build_outfit_strategy_template_prompt(
+    db: AsyncSession,
+    *,
+    platform: str | None,
+) -> str:
+    lookup = await get_prompt_templates(
+        db,
+        scenario="outfit",
+        purpose="strategy",
+        platform=platform,
+        type_id=None,
+        model=QWEN_TEXT_MODEL,
+    )
+    return lookup.content.strip()

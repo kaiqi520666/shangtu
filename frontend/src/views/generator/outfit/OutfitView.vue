@@ -6,6 +6,7 @@ import GenerationPreviewModal from '@/components/generation/GenerationPreviewMod
 import GenerationWorkspace from '@/components/generation/GenerationWorkspace.vue'
 import GeneratorLayout from '@/components/layout/GeneratorLayout.vue'
 import OutfitSettingsPanel from '@/components/outfit/OutfitSettingsPanel.vue'
+import OutfitStrategyReviewPanel from '@/components/outfit/OutfitStrategyReviewPanel.vue'
 import { useGeneratorCardEdit } from '@/composables/useGeneratorCardEdit.js'
 import { useGeneratorRouteJob } from '@/composables/useGeneratorRouteJob.js'
 import { useOutfitGenerator } from '@/composables/useOutfitGenerator.js'
@@ -73,7 +74,24 @@ async function handleDeleteModel(modelId) {
 
 <template>
   <GeneratorLayout>
+    <OutfitStrategyReviewPanel
+      v-if="outfit.strategyPanelVisible.value"
+      placement="side"
+      :loading="outfit.strategyLoading.value"
+      :brief="outfit.strategyBrief.value"
+      :items="outfit.outfitStrategyItems.value"
+      :settings="outfit.settings"
+      :selected-image-label="outfit.selectedImageLabel.value"
+      :dirty="outfit.strategyDirty.value"
+      @back="outfit.backToConfig"
+      @confirm="outfit.confirmStrategyAndGenerate"
+      @update-item="outfit.updateOutfitStrategyItem"
+      @reorder-items="outfit.reorderOutfitStrategyItems"
+      @remove-item="outfit.removeOutfitStrategyItem"
+    />
+
     <OutfitSettingsPanel
+      v-else
       :settings="outfit.settings"
       :garment-images="outfit.garmentImages.value"
       :main-garment-index="outfit.mainGarmentIndex.value"
@@ -88,7 +106,8 @@ async function handleDeleteModel(modelId) {
       :loading="outfit.generating.value"
       :creating-batch="outfit.creatingBatch.value"
       :has-running-tasks="outfit.hasRunningTasks.value"
-      :can-generate="outfit.canGenerate.value"
+      :can-generate-strategy="outfit.canGenerateStrategy.value"
+      :strategy-loading="outfit.strategyLoading.value"
       @update:settings="Object.assign(outfit.settings, $event)"
       @update:garment-images="outfit.garmentImages.value = $event"
       @update:main-garment-index="outfit.mainGarmentIndex.value = $event"
@@ -98,7 +117,7 @@ async function handleDeleteModel(modelId) {
       @notify="outfit.showNotice"
       @upload-model="outfit.uploadModel"
       @delete-model="handleDeleteModel"
-      @generate-images="outfit.generateOutfitImages"
+      @generate-strategy="outfit.triggerStrategyGeneration"
     />
 
     <GenerationWorkspace
