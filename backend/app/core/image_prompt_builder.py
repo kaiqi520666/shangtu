@@ -314,46 +314,15 @@ async def build_ai_write_prompt(
     return "\n\n".join(part for part in [content, dynamic] if part)
 
 
-async def build_product_image_strategy_template_prompt(
+async def build_strategy_template_prompt(
     db: AsyncSession,
     *,
+    scenario: str,
     platform: str | None,
 ) -> str:
     lookup = await get_prompt_templates(
         db,
-        scenario="product_image",
-        purpose="strategy",
-        platform=platform,
-        type_id=None,
-        model=QWEN_TEXT_MODEL,
-    )
-    return lookup.content.strip()
-
-
-async def build_product_suite_strategy_template_prompt(
-    db: AsyncSession,
-    *,
-    platform: str | None,
-) -> str:
-    lookup = await get_prompt_templates(
-        db,
-        scenario="product_suite",
-        purpose="strategy",
-        platform=platform,
-        type_id=None,
-        model=QWEN_TEXT_MODEL,
-    )
-    return lookup.content.strip()
-
-
-async def build_outfit_strategy_template_prompt(
-    db: AsyncSession,
-    *,
-    platform: str | None,
-) -> str:
-    lookup = await get_prompt_templates(
-        db,
-        scenario="outfit",
+        scenario=scenario,
         purpose="strategy",
         platform=platform,
         type_id=None,

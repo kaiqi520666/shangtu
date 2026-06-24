@@ -21,7 +21,7 @@ import {
   createGenerationSettingsSnapshot,
   getSnapshotScene,
 } from "@/utils/generationSnapshots.js";
-import { generateProductImageStrategy } from "@/api/image.js";
+import { generateImageStrategy } from "@/api/image.js";
 
 const DEFAULT_SELECTED_MODULES = [
   "first-screen",
@@ -264,7 +264,8 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
     startStrategyLoading({ snapshot: inputSnapshot });
 
     try {
-      const result = await generateProductImageStrategy({
+      const result = await generateImageStrategy({
+        scenario: inputSnapshot.scenario,
         images,
         platform: settings.platform,
         language: settings.language,

@@ -13,45 +13,32 @@ export function analyzeImage({ images = [], platform = "", scenario = null, type
   return request.post("/image/analyze", { images, platform, scenario, type_id }, { timeout: 120000 });
 }
 
-export function generateProductImageStrategy({
+export function generateImageStrategy({
+  scenario,
   images = [],
   platform = "",
   language = "中文",
-  product_input,
-  module_ids,
-}) {
-  return request.post(
-    "/image/product-image/strategy",
-    { images, platform, language, product_input, module_ids },
-    { timeout: 120000 },
-  );
-}
-
-export function generateProductSuiteStrategy({
-  images = [],
-  platform = "",
-  language = "中文",
-  product_input,
-  structure,
-}) {
-  return request.post(
-    "/image/product-suite/strategy",
-    { images, platform, language, product_input, structure },
-    { timeout: 120000 },
-  );
-}
-
-export function generateOutfitStrategy({
-  images = [],
-  platform = "",
-  language = "中文",
+  product_input = "",
+  module_ids = [],
+  structure = [],
   scene_description = "",
   selected_model_name = "",
-  scene_ids,
+  scene_ids = [],
 }) {
   return request.post(
-    "/image/outfit/strategy",
-    { images, platform, language, scene_description, selected_model_name, scene_ids },
+    "/image/strategy",
+    {
+      scenario,
+      images,
+      platform,
+      language,
+      product_input,
+      module_ids,
+      structure,
+      scene_description,
+      selected_model_name,
+      scene_ids,
+    },
     { timeout: 120000 },
   );
 }

@@ -21,7 +21,7 @@ import {
   createGenerationSettingsSnapshot,
   getSnapshotScene,
 } from "@/utils/generationSnapshots.js";
-import { generateProductSuiteStrategy } from "@/api/image.js";
+import { generateImageStrategy } from "@/api/image.js";
 
 function createDefaultSuiteStructure() {
   return suiteStructureDefaults.map((item) => ({
@@ -268,7 +268,8 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
     startStrategyLoading({ snapshot: inputSnapshot });
 
     try {
-      const result = await generateProductSuiteStrategy({
+      const result = await generateImageStrategy({
+        scenario: inputSnapshot.scenario,
         images: inputSnapshot.images,
         platform: settings.platform,
         language: settings.language,

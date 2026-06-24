@@ -6,7 +6,7 @@ import {
   resolveQuality,
 } from "@/constants/generator.js";
 import { outfitPreviewSlides, scenePresets } from "@/constants/outfit.js";
-import { generateOutfitStrategy } from "@/api/image.js";
+import { generateImageStrategy } from "@/api/image.js";
 import { deleteOutfitModel, listOutfitModels, uploadOutfitModel } from "@/api/outfit.js";
 import { useCardActions } from "@/composables/useCardActions.js";
 import {
@@ -379,7 +379,8 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
     startStrategyLoading({ snapshot: inputSnapshot });
 
     try {
-      const result = await generateOutfitStrategy({
+      const result = await generateImageStrategy({
+        scenario: inputSnapshot.scenario,
         images: inputSnapshot.images,
         platform: settings.platform,
         language: settings.language,

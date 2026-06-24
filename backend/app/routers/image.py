@@ -13,17 +13,13 @@ from app.core.deps import get_current_user, get_db
 from app.core.image_analyzer import (
     DashScopeConfigError,
     analyze_product_image,
-    generate_outfit_strategy,
-    generate_product_image_strategy,
-    generate_product_suite_strategy,
+    generate_image_strategy,
     optimize_free_image_prompt,
 )
 from app.core.image_prompt_builder import (
     build_ai_write_prompt,
     build_image_generate_prompt,
-    build_outfit_strategy_template_prompt,
-    build_product_image_strategy_template_prompt,
-    build_product_suite_strategy_template_prompt,
+    build_strategy_template_prompt,
 )
 from app.core.json_utils import dump_json_or_none, parse_json_or_none
 from app.core.oss import OssConfigError, upload_image_bytes
@@ -80,29 +76,17 @@ class AnalyzeImageRequest(BaseModel):
     type_id: str | None = None
 
 
-class ProductImageStrategyRequest(BaseModel):
+class StrategyRequest(BaseModel):
+    scenario: str
     images: list[ImageLabelItem]
     platform: str = ""
     language: str = "中文"
-    product_input: str
-    module_ids: list[str]
-
-
-class ProductSuiteStrategyRequest(BaseModel):
-    images: list[ImageLabelItem]
-    platform: str = ""
-    language: str = "中文"
-    product_input: str
-    structure: list[dict]
-
-
-class OutfitStrategyRequest(BaseModel):
-    images: list[ImageLabelItem]
-    platform: str = ""
-    language: str = "中文"
+    product_input: str = ""
+    module_ids: list[str] = Field(default_factory=list)
+    structure: list[dict] = Field(default_factory=list)
     scene_description: str = ""
     selected_model_name: str = ""
-    scene_ids: list[str]
+    scene_ids: list[str] = Field(default_factory=list)
 
 
 class FreeImageOptimizeRequest(BaseModel):
@@ -227,75 +211,31 @@ async def analyze_image(
     return success({"content": content})
 
 
-@router.post("/product-image/strategy", response_model=Response)
-async def product_image_strategy(
-    req: ProductImageStrategyRequest,
+@router.post("/strategy", response_model=Response)
+async def image_strategy(
+    req: StrategyRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    scenario = req.scenario.strip()
+    if scenario not in {"product_image", "product_suite", "outfit"}:
+        return fail("不支持的策略场景")
+
     try:
-        template_prompt = await build_product_image_strategy_template_prompt(
+        template_prompt = await build_strategy_template_prompt(
             db,
+            scenario=scenario,
             platform=req.platform,
         )
-        strategy = await generate_product_image_strategy(
-            images=[item.model_dump() for item in req.images],
+        images = [item.model_dump() for item in req.images]
+        strategy = await generate_image_strategy(
+            scenario=scenario,
+            images=images,
             platform=req.platform,
             language=req.language,
             product_input=req.product_input,
             module_ids=req.module_ids,
-            template_prompt=template_prompt,
-        )
-    except (ValueError, DashScopeConfigError, RuntimeError) as e:
-        return fail(str(e))
-    except Exception:
-        return fail("详情页策略生成失败")
-
-    return success(strategy)
-
-
-@router.post("/product-suite/strategy", response_model=Response)
-async def product_suite_strategy(
-    req: ProductSuiteStrategyRequest,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    try:
-        template_prompt = await build_product_suite_strategy_template_prompt(
-            db,
-            platform=req.platform,
-        )
-        strategy = await generate_product_suite_strategy(
-            images=[item.model_dump() for item in req.images],
-            platform=req.platform,
-            language=req.language,
-            product_input=req.product_input,
             structure=req.structure,
-            template_prompt=template_prompt,
-        )
-    except (ValueError, DashScopeConfigError, RuntimeError) as e:
-        return fail(str(e))
-    except Exception:
-        return fail("套图策略生成失败")
-
-    return success(strategy)
-
-
-@router.post("/outfit/strategy", response_model=Response)
-async def outfit_strategy(
-    req: OutfitStrategyRequest,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    try:
-        template_prompt = await build_outfit_strategy_template_prompt(
-            db,
-            platform=req.platform,
-        )
-        strategy = await generate_outfit_strategy(
-            images=[item.model_dump() for item in req.images],
-            platform=req.platform,
-            language=req.language,
             scene_description=req.scene_description,
             selected_model_name=req.selected_model_name,
             scene_ids=req.scene_ids,
@@ -304,7 +244,12 @@ async def outfit_strategy(
     except (ValueError, DashScopeConfigError, RuntimeError) as e:
         return fail(str(e))
     except Exception:
-        return fail("穿搭策略生成失败")
+        messages = {
+            "product_image": "详情页策略生成失败",
+            "product_suite": "套图策略生成失败",
+            "outfit": "穿搭策略生成失败",
+        }
+        return fail(messages[scenario])
 
     return success(strategy)
 
