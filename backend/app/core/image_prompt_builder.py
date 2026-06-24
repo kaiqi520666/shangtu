@@ -115,7 +115,7 @@ def _format_task_prompt(
             f"【模特要求】使用用户选择的模特图作为人物参考{model_suffix}。",
             extra_requirement and "【补充要求】",
             extra_requirement,
-            "【强约束】只生成一位模特；不要换服装；不要改变模特主体身份特征；不要虚构品牌 Logo、价格、促销文字、认证标识或无法确认的信息。",
+            "【强约束】只生成一位模特；不要换服装；不要改变模特主体身份特征；不要虚构品牌 Logo、价格、促销文字、认证标识或无法确认的信息；如需添加文字必须使用上述指定语言，文字简洁清晰，适合电商平台展示。",
         ]
         return "\n".join(line for line in lines if line)
     else:
