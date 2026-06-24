@@ -72,6 +72,7 @@ function closePreview() {
       :modules="generator.moduleContents.value"
       :settings="generator.settings"
       :selected-image-label="generator.selectedImageLabel.value"
+      :dirty="generator.strategyDirty.value"
       @back="generator.backToConfig"
       @confirm="generator.confirmStrategyAndGenerate"
       @update-module="generator.updateModuleContent"

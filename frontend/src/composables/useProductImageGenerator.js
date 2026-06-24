@@ -12,6 +12,7 @@ import {
   useGenerationCards,
 } from "@/composables/useGenerationCards.js";
 import { useGenerationRunner } from "@/composables/useGenerationRunner.js";
+import { useGenerationStrategyFlow } from "@/composables/useGenerationStrategyFlow.js";
 import { useAiSellingPointsWriter } from "@/composables/useAiSellingPointsWriter.js";
 import { useToast } from "@/composables/useToast.js";
 import { buildProductAnalyzeImages, hasUploadingImages } from "@/utils/analyzeImages.js";
@@ -69,11 +70,30 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
   const uploadedImages = ref([]);
   const mainImageIndex = ref(0);
   const selectedModules = ref(createDefaultSelectedModules());
-  const workflowStep = ref("config");
-  const strategyBrief = ref("");
-  const moduleContents = ref([]);
-
   const settings = reactive(createDefaultGenerationSettings());
+
+  const strategyFlow = useGenerationStrategyFlow({
+    buildInputSnapshot: buildProductImageStrategySnapshot,
+  });
+
+  const {
+    workflowStep,
+    strategyBrief,
+    strategyItems: moduleContents,
+    strategySnapshot,
+    strategyDirty,
+    strategyLoading,
+    strategyPanelVisible,
+    canGenerateWithStrategy,
+    startStrategyLoading,
+    setStrategyResult,
+    resetStrategy,
+    setStrategyStep,
+    updateStrategyItem: updateModuleContent,
+    reorderStrategyItems: reorderModuleContents,
+    removeStrategyItem: removeModuleContent,
+    backToConfig,
+  } = strategyFlow;
 
   const { aiLoading, generateSellingPointsWithAI } = useAiSellingPointsWriter({
     toast,
@@ -95,9 +115,7 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
       mainImageIndex.value = 0;
       selectedModules.value = createDefaultSelectedModules();
       settings.productInput = "";
-      strategyBrief.value = "";
-      moduleContents.value = [];
-      workflowStep.value = "config";
+      resetStrategy("config");
     },
     applyJobData(data) {
       restoreProductImageJobData(data);
@@ -143,10 +161,6 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
     downloadSingleImage,
   } = actions;
 
-  const strategyLoading = computed(() => workflowStep.value === "strategy-loading");
-  const strategyPanelVisible = computed(
-    () => workflowStep.value === "strategy-loading" || workflowStep.value === "strategy-review",
-  );
   const hasGenerationSource = computed(
     () => uploadedImages.value.length > 0 && settings.productInput.trim().length > 0,
   );
@@ -174,11 +188,13 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
   });
 
   function restoreProductImageJobData(data) {
+    let restoredStrategyBrief = "";
     if (data.settings && typeof data.settings === "object") {
       const s = data.settings;
       const scene = getSnapshotScene(s);
       const { platform, language, ratio, quality } = s;
       const { selectedModules, strategyBrief: nextStrategyBrief } = scene;
+      restoredStrategyBrief = typeof nextStrategyBrief === "string" ? nextStrategyBrief : "";
       if (typeof platform === "string") settings.platform = platform;
       if (typeof language === "string") settings.language = language;
       if (typeof ratio === "string" && resolutionMap[ratio]) {
@@ -188,9 +204,6 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
       settings.quality = resolveQuality(settings.ratio, desiredQuality) || "1K";
       if (Array.isArray(selectedModules) && selectedModules.length > 0) {
         selectedModules.value = selectedModules;
-      }
-      if (typeof nextStrategyBrief === "string") {
-        strategyBrief.value = nextStrategyBrief;
       }
     }
 
@@ -207,18 +220,22 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
 
     settings.productInput = data.input_text || "";
     if (Array.isArray(data.structure) && data.structure.length > 0) {
-      moduleContents.value = data.structure;
       selectedModules.value = data.structure.map((item) => item.id).filter(Boolean);
-      workflowStep.value = "result";
+      setStrategyResult({
+        brief: restoredStrategyBrief,
+        items: data.structure,
+        snapshot: buildProductImageStrategySnapshot(),
+        step: "result",
+      });
     } else {
-      moduleContents.value = [];
-      workflowStep.value = "config";
+      resetStrategy("config");
     }
   }
 
   async function triggerStrategyGeneration() {
     const mainImg = uploadedImages.value[mainImageIndex.value];
-    const images = buildProductAnalyzeImages(uploadedImages.value, mainImageIndex.value);
+    const inputSnapshot = buildProductImageStrategySnapshot();
+    const images = inputSnapshot.images;
     if (hasRunningTasks.value) {
       toast.info("当前任务正在生成中，请稍后再生成模块策略");
       return;
@@ -244,9 +261,7 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
       return;
     }
 
-    workflowStep.value = "strategy-loading";
-    strategyBrief.value = "";
-    moduleContents.value = [];
+    startStrategyLoading({ snapshot: inputSnapshot });
 
     try {
       const result = await generateProductImageStrategy({
@@ -259,23 +274,27 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
 
       if (result.code !== 0) {
         toast.error(result.message || "模块策略生成失败，请稍后重试");
-        workflowStep.value = "config";
+        setStrategyStep("config");
         return;
       }
 
       const modules = Array.isArray(result.data?.modules) ? result.data.modules : [];
       if (modules.length === 0) {
         toast.error("AI 未返回有效模块策略");
-        workflowStep.value = "config";
+        setStrategyStep("config");
         return;
       }
 
-      moduleContents.value = normalizeStrategyModules(modules);
-      selectedModules.value = moduleContents.value.map((module) => module.id);
-      strategyBrief.value =
+      const normalizedModules = normalizeStrategyModules(modules);
+      selectedModules.value = normalizedModules.map((module) => module.id).filter(Boolean);
+      const brief =
         result.data?.brief ||
-        `${settings.platform} / ${settings.language} / ${selectedImageLabel.value}，已为 ${moduleContents.value.length} 个图种生成可编辑模块内容。`;
-      workflowStep.value = "strategy-review";
+        `${settings.platform} / ${settings.language} / ${selectedImageLabel.value}，已为 ${normalizedModules.length} 个图种生成可编辑模块内容。`;
+      setStrategyResult({
+        brief,
+        items: normalizedModules,
+        snapshot: inputSnapshot,
+      });
       toast.success("模块策略已生成，可编辑后继续出图");
     } catch (error) {
       const status = error.response?.status;
@@ -284,7 +303,7 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
       } else {
         toast.error(error.response?.data?.message || "模块策略生成失败，请稍后重试");
       }
-      workflowStep.value = "config";
+      setStrategyStep("config");
     }
   }
 
@@ -329,7 +348,7 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
       ratio: settings.ratio,
       quality: settings.quality,
       scene: {
-        selectedModules: selectedModules.value,
+        selectedModules: getActiveStrategyModuleIds(),
         strategyBrief: strategyBrief.value,
       },
     });
@@ -376,8 +395,27 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
     });
 
     if (ok || outputCards.value.length > 0) {
-      workflowStep.value = "result";
+      setStrategyStep("result");
     }
+  }
+
+  function buildProductImageStrategySnapshot() {
+    return {
+      scenario: "product_image",
+      images: buildProductAnalyzeImages(uploadedImages.value, mainImageIndex.value),
+      platform: settings.platform,
+      language: settings.language,
+      ratio: settings.ratio,
+      quality: settings.quality,
+      productInput: settings.productInput,
+      moduleIds: [...selectedModules.value],
+    };
+  }
+
+  function getActiveStrategyModuleIds() {
+    return moduleContents.value.length > 0
+      ? moduleContents.value.map((module) => module.id).filter(Boolean)
+      : selectedModules.value;
   }
 
   function buildProductImageQueue() {
@@ -422,29 +460,6 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
         strategy: module.strategy || fallback?.strategy || "",
       };
     });
-  }
-
-  function updateModuleContent(index, patch) {
-    const current = moduleContents.value[index];
-    if (!current) return;
-    moduleContents.value[index] = {
-      ...current,
-      ...patch,
-    };
-  }
-
-  function reorderModuleContents(nextModules) {
-    moduleContents.value = nextModules;
-    selectedModules.value = nextModules.map((module) => module.id).filter(Boolean);
-  }
-
-  function removeModuleContent(index) {
-    moduleContents.value = moduleContents.value.filter((_, currentIndex) => currentIndex !== index);
-    selectedModules.value = moduleContents.value.map((module) => module.id).filter(Boolean);
-  }
-
-  function backToConfig() {
-    workflowStep.value = "config";
   }
 
   function getModuleName(id) {
@@ -492,6 +507,8 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
     aiLoading,
     workflowStep,
     strategyBrief,
+    strategySnapshot,
+    strategyDirty,
     moduleContents,
     settings,
     generating,
@@ -508,6 +525,7 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
     canGenerateStrategy,
     strategyLoading,
     strategyPanelVisible,
+    canGenerateWithStrategy,
     selectedCards,
     selectedCardsCount,
     totalCount,
