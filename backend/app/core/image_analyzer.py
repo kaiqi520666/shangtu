@@ -9,160 +9,6 @@ load_dotenv()
 
 DASHSCOPE_MODEL = "qwen3.6-flash"
 
-PRODUCT_IMAGE_MODULES = {
-    "first-screen": {
-        "name": "首屏主视觉",
-        "desc": "极简大图与大字报，第一眼传递核心卖点价值。",
-        "strategy": "大标题聚焦，高饱和度背板突显商品核心形态。",
-    },
-    "core-selling": {
-        "name": "核心卖点图",
-        "desc": "突出商品三大硬核优势，多点对照打消疑虑。",
-        "strategy": "三栏目清单排版，配图层级鲜明。",
-    },
-    "use-scenario": {
-        "name": "使用场景图",
-        "desc": "呈现真实使用状态或家居融入。",
-        "strategy": "融合淡雅环境投影，拉近用户心理距离。",
-    },
-    "multi-angle": {
-        "name": "多角度呈现图",
-        "desc": "展示侧面、背面及折叠等完整外观。",
-        "strategy": "三视图对齐，透视比例精准缩放。",
-    },
-    "ambient-scene": {
-        "name": "场景氛围图",
-        "desc": "强光影写实渲染，增强商品的高级质感。",
-        "strategy": "暖色调逆光底板，配合微小阴影质感。",
-    },
-    "detail-zoom": {
-        "name": "商品细节图",
-        "desc": "局部放大，精细展现材质和精湛工艺。",
-        "strategy": "中心放大镜切割圆圈，拉线批注。",
-    },
-    "brand-story": {
-        "name": "品牌故事图",
-        "desc": "传达品牌匠心，突显高档商品格调。",
-        "strategy": "英文点缀，加宽留白，典雅无衬线排版。",
-    },
-    "specs-info": {
-        "name": "尺寸/规格/容量图",
-        "desc": "直观标注物理尺寸与对比参照物。",
-        "strategy": "添加标注线与比例尺，数值一目了然。",
-    },
-    "contrast-effect": {
-        "name": "效果对比图",
-        "desc": "使用前/后、升级前/后的直观效果。",
-        "strategy": "双栏垂直切割，BEFORE / AFTER 徽章强对抗。",
-    },
-    "tech-specs": {
-        "name": "详细规格/参数表",
-        "desc": "将复杂工业数据整合为超清美化表格。",
-        "strategy": "圆角半透明卡片表格，结构化突出核心。",
-    },
-    "manufacturing": {
-        "name": "工艺制作图",
-        "desc": "展示精密做工、材质层级拆解。",
-        "strategy": "爆炸视图效果，精细拆解元器件架构。",
-    },
-    "freebies": {
-        "name": "配件/赠品图",
-        "desc": "明确告知用户收货拆箱的丰富组合。",
-        "strategy": "买即送角贴，配全套礼盒全家福。",
-    },
-    "series-show": {
-        "name": "系列展示图",
-        "desc": "多配色、多SKU合辑呈现，极大提升加购。",
-        "strategy": "多色环绕渐变，卡片式并列。",
-    },
-    "ingredients": {
-        "name": "商品成分图",
-        "desc": "透明呈现成分比例或纯净配料表。",
-        "strategy": "分子网格配图，科学健康风骨。",
-    },
-    "warranty": {
-        "name": "售后保障图",
-        "desc": "官方质保、包邮无忧、金牌认证退换。",
-        "strategy": "醒目信任徽章，构建消费安全感。",
-    },
-    "usage-tips": {
-        "name": "使用建议图",
-        "desc": "温馨提示使用建议、充电与养护说明。",
-        "strategy": "简洁图标列表，避免售后客诉纠纷。",
-    },
-}
-
-
-PRODUCT_SUITE_STRUCTURES = {
-    "white-bg": {
-        "name": "白底图",
-        "desc": "适配平台首图规范，突出商品主体与干净轮廓。",
-        "strategy": "纯净浅色或白色背景，商品主体居中完整展示，轮廓清晰，光影自然。",
-        "default_count": 1,
-        "max_count": 6,
-    },
-    "scene": {
-        "name": "场景图",
-        "desc": "把商品放进真实使用环境，强化购买代入感。",
-        "strategy": "围绕商品用途构建可信场景，保持商品主体准确，背景服务商品而不喧宾夺主。",
-        "default_count": 1,
-        "max_count": 6,
-    },
-    "selling-point": {
-        "name": "卖点图",
-        "desc": "提炼核心优势，用高可读信息块表达产品价值。",
-        "strategy": "用清晰标题、短句卖点和适量视觉标注表达核心优势，避免信息过密。",
-        "default_count": 1,
-        "max_count": 6,
-    },
-    "detail": {
-        "name": "细节图",
-        "desc": "展示材质、结构、功能细节，降低用户决策疑虑。",
-        "strategy": "使用局部特写、放大框或简洁标注展示材质、结构、功能或工艺细节。",
-        "default_count": 1,
-        "max_count": 6,
-    },
-}
-
-
-OUTFIT_SCENES = {
-    "studio": {
-        "name": "纯色棚拍",
-        "desc": "纯色或浅灰棚拍背景，画面干净专业，突出服装整体版型、长度、肩线和垂坠感。",
-        "strategy": "柔和商业摄影布光，模特自然站立或轻微转身，背景克制，服装轮廓完整清晰。",
-    },
-    "street": {
-        "name": "都市街头",
-        "desc": "都市街头场景，突出服装的日常穿搭感和街拍质感。",
-        "strategy": "自然日光或轻微电影感光影，模特行走或站立，背景有城市线条但不抢主体。",
-    },
-    "cafe": {
-        "name": "街角咖啡",
-        "desc": "街角咖啡店或休闲空间，强化服装的生活方式氛围和亲和力。",
-        "strategy": "暖色自然光，模特坐姿或站姿放松，画面带轻松社交和日常出街感。",
-    },
-    "lawn": {
-        "name": "自然草坪",
-        "desc": "公园草坪或自然绿地场景，呈现舒适、清新、自然的穿搭氛围。",
-        "strategy": "柔和户外光线，背景清爽不过度杂乱，模特姿态自然舒展。",
-    },
-    "beach": {
-        "name": "度假海滩",
-        "desc": "海滩或滨海步道场景，突出服装在户外度假场景中的搭配效果。",
-        "strategy": "明亮自然光和轻松假日氛围，模特动作轻盈，画面干净通透。",
-    },
-    "home": {
-        "name": "温馨居家",
-        "desc": "居家室内场景，展示服装的舒适度、日常感和亲和力。",
-        "strategy": "柔和窗光、简洁家具和温暖色调，模特自然坐立或轻松活动。",
-    },
-    "gallery": {
-        "name": "艺术展馆",
-        "desc": "艺术展馆或现代极简空间，突出服装的时尚感和高级质感。",
-        "strategy": "留白充足、线条干净、光影高级，模特姿态克制自然。",
-    },
-}
-
 
 class DashScopeConfigError(RuntimeError):
     pass
@@ -512,17 +358,23 @@ async def optimize_free_image_prompt(prompt: str) -> str:
     return content.strip()
 
 
-def _selected_product_image_modules(module_ids: list[str]) -> list[dict]:
+def _catalog_by_id(catalog: list[dict]) -> dict[str, dict]:
+    return {str(item.get("id") or "").strip(): item for item in catalog if item.get("id")}
+
+
+def _selected_product_image_modules(module_ids: list[str], catalog: list[dict]) -> list[dict]:
     if not module_ids:
         raise ValueError("请至少选择一个生成图种")
 
+    catalog_by_id = _catalog_by_id(catalog)
     selected: list[dict] = []
     seen: set[str] = set()
     unsupported: list[str] = []
     for module_id in module_ids:
-        if module_id in seen:
+        module_id = str(module_id or "").strip()
+        if not module_id or module_id in seen:
             continue
-        module = PRODUCT_IMAGE_MODULES.get(module_id)
+        module = catalog_by_id.get(module_id)
         if not module:
             unsupported.append(module_id)
             continue
@@ -536,10 +388,11 @@ def _selected_product_image_modules(module_ids: list[str]) -> list[dict]:
     return selected
 
 
-def _selected_product_suite_structures(structure: list[dict]) -> list[dict]:
+def _selected_product_suite_structures(structure: list[dict], catalog: list[dict]) -> list[dict]:
     if not structure:
         raise ValueError("请至少选择一个套图类型")
 
+    catalog_by_id = _catalog_by_id(catalog)
     selected: list[dict] = []
     seen: set[str] = set()
     unsupported: list[str] = []
@@ -549,7 +402,7 @@ def _selected_product_suite_structures(structure: list[dict]) -> list[dict]:
         structure_id = str(item.get("id") or "").strip()
         if not structure_id or structure_id in seen:
             continue
-        config = PRODUCT_SUITE_STRUCTURES.get(structure_id)
+        config = catalog_by_id.get(structure_id)
         if not config:
             unsupported.append(structure_id)
             continue
@@ -557,12 +410,14 @@ def _selected_product_suite_structures(structure: list[dict]) -> list[dict]:
         if not enabled:
             seen.add(structure_id)
             continue
+        default_count = int(config.get("default_count") or 1)
+        max_count = int(config.get("max_count") or default_count)
         try:
-            count = int(item.get("count", config["default_count"]))
+            count = int(item.get("count", default_count))
         except (TypeError, ValueError):
             raise ValueError(f"{config['name']}数量无效")
-        if count < 1 or count > config["max_count"]:
-            raise ValueError(f"{config['name']}数量必须在 1-{config['max_count']} 张之间")
+        if count < 1 or count > max_count:
+            raise ValueError(f"{config['name']}数量必须在 1-{max_count} 张之间")
         selected.append(
             {
                 "id": structure_id,
@@ -582,10 +437,11 @@ def _selected_product_suite_structures(structure: list[dict]) -> list[dict]:
     return selected
 
 
-def _selected_outfit_scenes(scene_ids: list[str]) -> list[dict]:
+def _selected_outfit_scenes(scene_ids: list[str], catalog: list[dict]) -> list[dict]:
     if not scene_ids:
         raise ValueError("请至少选择一个拍摄场景")
 
+    catalog_by_id = _catalog_by_id(catalog)
     selected: list[dict] = []
     seen: set[str] = set()
     unsupported: list[str] = []
@@ -593,7 +449,7 @@ def _selected_outfit_scenes(scene_ids: list[str]) -> list[dict]:
         scene_id = str(scene_id or "").strip()
         if not scene_id or scene_id in seen:
             continue
-        scene = OUTFIT_SCENES.get(scene_id)
+        scene = catalog_by_id.get(scene_id)
         if not scene:
             unsupported.append(scene_id)
             continue
@@ -815,6 +671,7 @@ async def _request_dashscope_strategy_json(*, images: list[dict], prompt: str) -
 def _build_strategy_prompt(
     *,
     scenario: str,
+    catalog: list[dict],
     platform: str = "",
     language: str = "中文",
     product_input: str = "",
@@ -829,7 +686,7 @@ def _build_strategy_prompt(
         normalized_input = product_input.strip()
         if not normalized_input:
             raise ValueError("请先填写商品卖点与要求")
-        selected_modules = _selected_product_image_modules(module_ids or [])
+        selected_modules = _selected_product_image_modules(module_ids or [], catalog)
         return (
             build_product_image_strategy_prompt(
                 platform=platform,
@@ -846,7 +703,7 @@ def _build_strategy_prompt(
         normalized_input = product_input.strip()
         if not normalized_input:
             raise ValueError("请先填写商品卖点与要求")
-        selected_structures = _selected_product_suite_structures(structure or [])
+        selected_structures = _selected_product_suite_structures(structure or [], catalog)
         return (
             build_product_suite_strategy_prompt(
                 platform=platform,
@@ -860,7 +717,7 @@ def _build_strategy_prompt(
         )
 
     if scenario == "outfit":
-        selected_scenes = _selected_outfit_scenes(scene_ids or [])
+        selected_scenes = _selected_outfit_scenes(scene_ids or [], catalog)
         return (
             build_outfit_strategy_prompt(
                 platform=platform,
@@ -890,6 +747,7 @@ def _normalize_strategy_result(scenario: str, parsed: dict, selected_items: list
 async def generate_image_strategy(
     *,
     scenario: str,
+    catalog: list[dict],
     images: list[dict],
     platform: str = "",
     language: str = "中文",
@@ -903,6 +761,7 @@ async def generate_image_strategy(
 ) -> dict:
     prompt, normalized_scenario, selected_items = _build_strategy_prompt(
         scenario=scenario,
+        catalog=catalog,
         platform=platform,
         language=language,
         product_input=product_input,

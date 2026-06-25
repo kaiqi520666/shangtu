@@ -114,6 +114,7 @@ docker buildx build --platform linux/amd64,linux/arm64 \
 
 ```bash
 docker exec -it <backend容器名> python scripts/seed_prompt_templates.py
+docker exec -it <backend容器名> python scripts/seed_product_catalog.py
 docker exec -it <backend容器名> python scripts/upload_outfit_models.py
 ```
 

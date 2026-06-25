@@ -23,6 +23,7 @@ from app.core.image_prompt_builder import (
 )
 from app.core.json_utils import dump_json_or_none, parse_json_or_none
 from app.core.oss import OssConfigError, upload_image_bytes
+from app.core.product_catalog import get_all_catalog, get_catalog
 from app.core.prompt_snapshot import (
     build_prompt_snapshot,
     dump_prompt_snapshot,
@@ -227,9 +228,11 @@ async def image_strategy(
             scenario=scenario,
             platform=req.platform,
         )
+        catalog = await get_catalog(db, scenario=scenario)
         images = [item.model_dump() for item in req.images]
         strategy = await generate_image_strategy(
             scenario=scenario,
+            catalog=catalog,
             images=images,
             platform=req.platform,
             language=req.language,
@@ -252,6 +255,14 @@ async def image_strategy(
         return fail(messages[scenario])
 
     return success(strategy)
+
+
+@router.get("/catalog", response_model=Response)
+async def image_catalog(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return success(await get_all_catalog(db))
 
 
 @router.post("/free-image/optimize", response_model=Response)

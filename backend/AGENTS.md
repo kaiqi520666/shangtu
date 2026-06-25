@@ -20,6 +20,7 @@ uv sync
 uv run uvicorn app.main:app --reload
 uv run arq app.worker.settings.WorkerSettings
 uv run python -m compileall app
+uv run python scripts/seed_product_catalog.py
 ```
 
 ## 后端规则
