@@ -5,7 +5,7 @@ import {
   resolutionMap,
   resolveQuality,
 } from "@/constants/generator.js";
-import { outfitPreviewSlides, scenePresets } from "@/constants/outfit.js";
+import { outfitPreviewSlides } from "@/constants/outfit.js";
 import { generateImageStrategy } from "@/api/image.js";
 import { deleteOutfitModel, listOutfitModels, uploadOutfitModel } from "@/api/outfit.js";
 import { useCardActions } from "@/composables/useCardActions.js";
@@ -22,6 +22,7 @@ import {
   getSnapshotScene,
 } from "@/utils/generationSnapshots.js";
 import { buildOutfitAnalyzeImages, hasUploadingImages } from "@/utils/analyzeImages.js";
+import { useCatalogStore } from "@/stores/catalog.js";
 
 function cloneUploadedImages(images) {
   return images.map((img) => ({
@@ -37,6 +38,9 @@ function cloneUploadedImages(images) {
 export function useOutfitGenerator({ onJobCreated } = {}) {
   const toast = useToast();
   const genLogs = ref([]);
+  const catalog = useCatalogStore();
+  const outfitScenes = computed(() => catalog.outfitScenes);
+  const catalogLoading = computed(() => catalog.loading);
 
   const cards = useGenerationCards({
     genLogs,
@@ -73,7 +77,7 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
   const modelDeletingId = ref("");
   const selectedModelId = ref("");
   const restoredModelSnapshot = ref(null);
-  const selectedScenes = ref(["street"]);
+  const selectedScenes = ref([]);
   const sceneDescription = ref("");
   const settings = reactive(createDefaultGenerationSettings({ ratio: "3:4" }));
 
@@ -113,7 +117,7 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
     resetSceneState() {
       garmentImages.value = [];
       mainGarmentIndex.value = 0;
-      selectedScenes.value = ["street"];
+      selectedScenes.value = createDefaultSelectedScenes();
       sceneDescription.value = "";
       restoredModelSnapshot.value = null;
       settings.productInput = "";
@@ -174,6 +178,7 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
       hasGenerationSource.value &&
       selectedScenes.value.length > 0 &&
       !modelsLoading.value &&
+      !catalogLoading.value &&
       !strategyLoading.value &&
       !creatingBatch.value &&
       !hasRunningTasks.value,
@@ -191,6 +196,26 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
       sourceImage: src,
     }));
   });
+
+  function createDefaultSelectedScenes() {
+    return outfitScenes.value[0]?.id ? [outfitScenes.value[0].id] : [];
+  }
+
+  async function loadCatalog() {
+    try {
+      await catalog.ensureLoaded();
+      selectedScenes.value = resolveSelectedScenes(selectedScenes.value);
+    } catch (error) {
+      toast.error(error.response?.data?.message || "穿搭场景目录加载失败");
+    }
+  }
+
+  function resolveSelectedScenes(sceneIds) {
+    const catalogIds = outfitScenes.value.map((scene) => scene.id);
+    const selected = sceneIds.filter((id) => catalogIds.includes(id));
+    if (selected.length > 0) return selected;
+    return createDefaultSelectedScenes();
+  }
 
   async function loadOutfitModels() {
     modelsLoading.value = true;
@@ -373,6 +398,10 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
     }
     if (selectedScenes.value.length === 0) {
       toast.info("请至少选择一个拍摄场景");
+      return;
+    }
+    if (catalogLoading.value || outfitScenes.value.length === 0) {
+      toast.info("拍摄场景目录正在加载，请稍候");
       return;
     }
 
@@ -571,7 +600,7 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
         name: item.name || scene.label || `场景 ${index + 1}`,
         title: item.title || `${scene.label || "穿搭"}策略`,
         description: item.description || scene.description || "",
-        strategy: item.strategy || scene.description || "",
+        strategy: item.strategy || scene.strategy || "",
         pose: item.pose || "",
         camera: item.camera || "",
         fidelity,
@@ -589,11 +618,12 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
   }
 
   function findScene(id) {
-    const preset = scenePresets.find((scene) => scene.id === id);
+    const preset = catalog.findOutfitScene(id);
     return {
       id,
       label: preset?.label || id || "服饰穿搭图",
-      description: getSceneStrategy(id),
+      description: preset?.desc || "",
+      strategy: preset?.strategy || getSceneStrategy(id),
     };
   }
 
@@ -602,9 +632,7 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
   }
 
   function getSceneStrategy(id) {
-    const scene = scenePresets.find((item) => item.id === id);
-    if (!scene) return "服饰穿搭场景生成";
-    return `${scene.label}穿搭图，保持服装与模特参考一致，画面自然、清晰、适合电商展示。`;
+    return catalog.findOutfitScene(id)?.strategy || "服饰穿搭场景生成";
   }
 
   function findOutfitStrategyItem(typeId) {
@@ -618,6 +646,7 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
   }
 
   onMounted(() => {
+    loadCatalog();
     loadOutfitModels();
   });
 
@@ -669,6 +698,8 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
     strategyTotalCount,
     selectedImageLabel,
     previewSlides,
+    outfitScenes,
+    catalogLoading,
     showNotice: toast.info,
     loadOutfitModels,
     uploadModel,

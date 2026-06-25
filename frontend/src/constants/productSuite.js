@@ -1,34 +1,3 @@
-export const suiteStructureDefaults = [
-  {
-    id: "white-bg",
-    name: "白底图",
-    description: "适配平台首图规范，突出商品主体与干净轮廓。",
-    defaultCount: 1,
-    maxCount: 6,
-  },
-  {
-    id: "scene",
-    name: "场景图",
-    description: "把商品放进真实使用环境，强化购买代入感。",
-    defaultCount: 1,
-    maxCount: 6,
-  },
-  {
-    id: "selling-point",
-    name: "卖点图",
-    description: "提炼核心优势，用高可读信息块表达产品价值。",
-    defaultCount: 1,
-    maxCount: 6,
-  },
-  {
-    id: "detail",
-    name: "细节图",
-    description: "展示材质、结构、功能细节，降低用户决策疑虑。",
-    defaultCount: 1,
-    maxCount: 6,
-  },
-];
-
 export const productSuitePreviewSlides = [
   {
     caption: "围绕同一商品自动生成白底、场景、卖点和细节套图，适合多平台批量上架。",

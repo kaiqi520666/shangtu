@@ -1,11 +1,10 @@
-import { computed, onBeforeUnmount, reactive, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import {
   createDefaultGenerationSettings,
   formatImageLabel,
   resolutionMap,
   resolveQuality,
 } from "@/constants/generator.js";
-import { suiteStructureDefaults } from "@/constants/productSuite.js";
 import { useToast } from "@/composables/useToast.js";
 import {
   createBatchFinishedHandler,
@@ -22,9 +21,10 @@ import {
   getSnapshotScene,
 } from "@/utils/generationSnapshots.js";
 import { generateImageStrategy } from "@/api/image.js";
+import { useCatalogStore } from "@/stores/catalog.js";
 
-function createDefaultSuiteStructure() {
-  return suiteStructureDefaults.map((item) => ({
+function createSuiteStructureFromCatalog(items) {
+  return items.map((item) => ({
     ...item,
     enabled: true,
     count: item.defaultCount,
@@ -45,6 +45,9 @@ function cloneUploadedImages(images) {
 export function useProductSuiteGenerator({ onJobCreated } = {}) {
   const toast = useToast();
   const genLogs = ref([]);
+  const catalog = useCatalogStore();
+  const suiteCatalog = computed(() => catalog.suiteStructures);
+  const catalogLoading = computed(() => catalog.loading);
 
   const cards = useGenerationCards({
     genLogs,
@@ -76,7 +79,7 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
   const uploadedImages = ref([]);
   const mainImageIndex = ref(0);
   const settings = reactive(createDefaultGenerationSettings());
-  const suiteStructure = ref(createDefaultSuiteStructure());
+  const suiteStructure = ref([]);
 
   const strategyFlow = useGenerationStrategyFlow({
     buildInputSnapshot: buildSuiteStrategySnapshot,
@@ -120,7 +123,7 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
       uploadedImages.value = [];
       mainImageIndex.value = 0;
       settings.productInput = "";
-      suiteStructure.value = createDefaultSuiteStructure();
+      suiteStructure.value = createSuiteStructureFromCatalog(suiteCatalog.value);
       resetStrategy("config");
     },
     applyJobData(data) {
@@ -184,6 +187,7 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
     () =>
       hasGenerationSource.value &&
       configuredTotalCount.value > 0 &&
+      !catalogLoading.value &&
       !strategyLoading.value &&
       !creatingBatch.value &&
       !hasRunningTasks.value,
@@ -192,6 +196,30 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
     syncQualityForRatio();
     return formatImageLabel({ ratio: settings.ratio, quality: settings.quality });
   });
+
+  async function loadCatalog() {
+    try {
+      await catalog.ensureLoaded();
+      syncSuiteStructureWithCatalog();
+    } catch (error) {
+      toast.error(error.response?.data?.message || "套图目录加载失败");
+    }
+  }
+
+  function syncSuiteStructureWithCatalog() {
+    suiteStructure.value = suiteCatalog.value.map((catalogItem) => {
+      const current = suiteStructure.value.find((item) => item.id === catalogItem.id);
+      return {
+        ...catalogItem,
+        enabled: current ? Boolean(current.enabled) : true,
+        count: current ? clampStructureCount(current.count, catalogItem.maxCount) : catalogItem.defaultCount,
+      };
+    });
+  }
+
+  function clampStructureCount(count, maxCount) {
+    return Math.min(Math.max(1, Number(count) || 1), maxCount);
+  }
 
   function restoreSuiteJobData(data) {
     let restoredStrategyBrief = "";
@@ -262,6 +290,10 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
     }
     if (configuredTotalCount.value === 0) {
       toast.info("请至少选择一个套图类型");
+      return;
+    }
+    if (catalogLoading.value || suiteCatalog.value.length === 0) {
+      toast.info("套图目录正在加载，请稍候");
       return;
     }
 
@@ -442,14 +474,14 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
 
   function normalizeSuiteStrategyItems(items) {
     return items.map((item, index) => {
-      const fallback = suiteStructureDefaults.find((structure) => structure.id === item.id);
+      const fallback = catalog.findSuiteStructure(item.id);
       const count = Math.max(1, Number(item.count) || fallback?.defaultCount || 1);
       return {
         id: item.id || fallback?.id || `suite-${index + 1}`,
         name: item.name || fallback?.name || `套图 ${index + 1}`,
         title: item.title || `${fallback?.name || "套图"}策略`,
         description: item.description || fallback?.description || "",
-        strategy: item.strategy || fallback?.description || "",
+        strategy: item.strategy || fallback?.strategy || "",
         content: item.content || "",
         count,
         enabled: true,
@@ -465,11 +497,11 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
   }
 
   function getStructureName(id) {
-    return suiteStructureDefaults.find((item) => item.id === id)?.name || id || "商品套图";
+    return catalog.findSuiteStructure(id)?.name || id || "商品套图";
   }
 
   function getStructureStrategy(id) {
-    return suiteStructureDefaults.find((item) => item.id === id)?.description || "商品套图生成";
+    return catalog.findSuiteStructure(id)?.strategy || "商品套图生成";
   }
 
   function findSuiteStrategyItem(typeId) {
@@ -484,6 +516,10 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
 
   onBeforeUnmount(() => {
     runner.cleanup();
+  });
+
+  onMounted(() => {
+    loadCatalog();
   });
 
   return {
@@ -524,6 +560,7 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
     selectedCards,
     selectedCardsCount,
     selectedImageLabel,
+    catalogLoading,
     generateSellingPointsWithAI,
     triggerStrategyGeneration,
     confirmStrategyAndGenerate,

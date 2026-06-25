@@ -48,6 +48,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  catalogLoading: {
+    type: Boolean,
+    default: false,
+  },
   generatedCount: {
     type: Number,
     default: 0,
@@ -82,6 +86,7 @@ const emit = defineEmits([
 const primaryText = computed(() => {
   if (props.uploadedImages.length === 0) return '请先上传商品图片'
   if (!props.settings.productInput.trim()) return '请填写商品卖点与要求'
+  if (props.catalogLoading) return '套图目录加载中...'
   if (props.totalCount === 0) return '请至少选择一个套图类型'
   if (props.strategyLoading) return 'AI 正在生成策略...'
   if (props.hasRunningTasks) return '生成中暂不可改策略'

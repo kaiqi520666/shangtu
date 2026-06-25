@@ -1,6 +1,5 @@
-import { computed, onBeforeUnmount, reactive, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import {
-  availableModules,
   createDefaultGenerationSettings,
   formatImageLabel,
   resolutionMap,
@@ -22,6 +21,7 @@ import {
   getSnapshotScene,
 } from "@/utils/generationSnapshots.js";
 import { generateImageStrategy } from "@/api/image.js";
+import { useCatalogStore } from "@/stores/catalog.js";
 
 const DEFAULT_SELECTED_MODULES = [
   "first-screen",
@@ -39,6 +39,9 @@ function createDefaultSelectedModules() {
 export function useProductImageGenerator({ onJobCreated } = {}) {
   const toast = useToast();
   const genLogs = ref([]);
+  const catalog = useCatalogStore();
+  const availableModules = computed(() => catalog.modules);
+  const catalogLoading = computed(() => catalog.loading);
 
   const cards = useGenerationCards({
     genLogs,
@@ -171,6 +174,8 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
     () =>
       hasGenerationSource.value &&
       selectedModules.value.length > 0 &&
+      availableModules.value.length > 0 &&
+      !catalogLoading.value &&
       !creatingBatch.value &&
       !strategyLoading.value,
   );
@@ -178,6 +183,8 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
     () =>
       hasGenerationSource.value &&
       selectedModules.value.length > 0 &&
+      availableModules.value.length > 0 &&
+      !catalogLoading.value &&
       !strategyLoading.value &&
       !creatingBatch.value &&
       !hasRunningTasks.value,
@@ -186,6 +193,23 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
     syncQualityForRatio();
     return formatImageLabel({ ratio: settings.ratio, quality: settings.quality });
   });
+
+  async function loadCatalog() {
+    try {
+      await catalog.ensureLoaded();
+      selectedModules.value = resolveSelectedModules(selectedModules.value);
+    } catch (error) {
+      toast.error(error.response?.data?.message || "图种目录加载失败");
+    }
+  }
+
+  function resolveSelectedModules(moduleIds) {
+    const catalogIds = availableModules.value.map((module) => module.id);
+    const selected = moduleIds.filter((id) => catalogIds.includes(id));
+    if (selected.length > 0) return selected;
+    const defaults = DEFAULT_SELECTED_MODULES.filter((id) => catalogIds.includes(id));
+    return defaults.length > 0 ? defaults : catalogIds.slice(0, 6);
+  }
 
   function restoreProductImageJobData(data) {
     let restoredStrategyBrief = "";
@@ -258,6 +282,10 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
     }
     if (selectedModules.value.length === 0) {
       toast.info("请至少选择一个生成图种");
+      return;
+    }
+    if (catalogLoading.value || availableModules.value.length === 0) {
+      toast.info("图种目录正在加载，请稍候");
       return;
     }
 
@@ -452,7 +480,7 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
 
   function normalizeStrategyModules(modules) {
     return modules.map((module, index) => {
-      const fallback = availableModules.find((item) => item.id === module.id);
+      const fallback = catalog.findModule(module.id);
       return {
         id: module.id || fallback?.id || `module-${index + 1}`,
         moduleName: module.moduleName || fallback?.name || `模块 ${index + 1}`,
@@ -464,11 +492,11 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
   }
 
   function getModuleName(id) {
-    return availableModules.find((module) => module.id === id)?.name || id || "详情图";
+    return catalog.findModule(id)?.name || id || "详情图";
   }
 
   function getModuleStrategy(id) {
-    return availableModules.find((module) => module.id === id)?.strategy || "";
+    return catalog.findModule(id)?.strategy || "";
   }
 
   function syncQualityForRatio() {
@@ -493,6 +521,10 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
 
   onBeforeUnmount(() => {
     runner.cleanup();
+  });
+
+  onMounted(() => {
+    loadCatalog();
   });
 
   return {
@@ -531,6 +563,8 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
     selectedCardsCount,
     totalCount,
     selectedImageLabel,
+    availableModules,
+    catalogLoading,
     showNotice: toast.info,
     generateSellingPointsWithAI,
     hasGenerationSource,

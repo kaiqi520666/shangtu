@@ -101,6 +101,8 @@ async function handleDeleteModel(modelId) {
       :model-deleting-id="outfit.modelDeletingId.value"
       :selected-model-id="outfit.selectedModelId.value"
       :selected-scenes="outfit.selectedScenes.value"
+      :scenes="outfit.outfitScenes.value"
+      :catalog-loading="outfit.catalogLoading.value"
       :scene-description="outfit.sceneDescription.value"
       :selected-image-label="outfit.selectedImageLabel.value"
       :loading="outfit.generating.value"

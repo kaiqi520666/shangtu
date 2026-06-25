@@ -51,6 +51,10 @@ export function getImageCreditCosts() {
   return request.get("/image/credit-costs", { timeout: 15000 });
 }
 
+export function getImageCatalog() {
+  return request.get("/image/catalog", { timeout: 15000 });
+}
+
 export function generateImage({
   user_prompt = null,
   image_urls = null,

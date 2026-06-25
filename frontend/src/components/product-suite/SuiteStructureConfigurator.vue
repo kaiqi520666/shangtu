@@ -26,6 +26,10 @@ const iconMap = {
   detail: Search,
 }
 
+function getStructureIcon(id) {
+  return iconMap[id] || ListChecks
+}
+
 function updateItem(index, patch) {
   emit(
     'update:structure',
@@ -84,7 +88,7 @@ function changeCount(index, step) {
             class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
             :class="item.enabled ? 'bg-white text-primary shadow-sm' : 'bg-slate-100 text-slate-400'"
           >
-            <component :is="iconMap[item.id]" class="h-4.5 w-4.5" />
+            <component :is="getStructureIcon(item.id)" class="h-4.5 w-4.5" />
           </span>
 
           <div class="min-w-0 flex-1">

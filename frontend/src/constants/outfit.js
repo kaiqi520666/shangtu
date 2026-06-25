@@ -1,13 +1,3 @@
-export const scenePresets = [
-  { id: 'studio', label: '纯色棚拍' },
-  { id: 'street', label: '都市街头' },
-  { id: 'cafe', label: '街角咖啡' },
-  { id: 'lawn', label: '自然草坪' },
-  { id: 'beach', label: '度假海滩' },
-  { id: 'home', label: '温馨居家' },
-  { id: 'gallery', label: '艺术展馆' },
-]
-
 export const outfitPreviewSlides = [
   {
     caption: '多场景自由切换，轻松拍出大片氛围。',

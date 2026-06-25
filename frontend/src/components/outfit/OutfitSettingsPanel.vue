@@ -7,7 +7,6 @@ import ImageUploader from '@/components/generation/ImageUploader.vue'
 import ProductGenerationBasics from '@/components/generation/ProductGenerationBasics.vue'
 import ModelSelector from '@/components/outfit/ModelSelector.vue'
 import ScenePresetSelector from '@/components/outfit/ScenePresetSelector.vue'
-import { scenePresets } from '@/constants/outfit.js'
 
 const props = defineProps({
   settings: {
@@ -46,6 +45,10 @@ const props = defineProps({
     type: Array,
     required: true,
   },
+  scenes: {
+    type: Array,
+    required: true,
+  },
   sceneDescription: {
     type: String,
     default: '',
@@ -74,6 +77,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  catalogLoading: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 const emit = defineEmits([
@@ -92,6 +99,7 @@ const emit = defineEmits([
 const primaryText = computed(() => {
   if (props.garmentImages.length === 0) return '请先上传服装图片'
   if (!props.selectedModelId) return '请选择模特形象'
+  if (props.catalogLoading) return '场景目录加载中...'
   if (props.selectedScenes.length === 0) return '请至少选择一个拍摄场景'
   if (props.strategyLoading) return 'AI 正在生成策略...'
   if (props.hasRunningTasks) return '生成中暂不可改策略'
@@ -135,7 +143,7 @@ const primaryText = computed(() => {
     />
 
     <ScenePresetSelector
-      :scenes="scenePresets"
+      :scenes="scenes"
       :selected="selectedScenes"
       :description="sceneDescription"
       @update:selected="emit('update:selectedScenes', $event)"
@@ -145,7 +153,7 @@ const primaryText = computed(() => {
     <template #footer>
       <GeneratorActionFooter
         :primary-text="primaryText"
-        :primary-disabled="modelsLoading || !canGenerateStrategy"
+        :primary-disabled="modelsLoading || catalogLoading || !canGenerateStrategy"
         @primary="emit('generate-strategy')"
       >
         <template #primary-icon>

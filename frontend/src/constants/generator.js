@@ -196,22 +196,3 @@ export function createDefaultGenerationSettings(overrides = {}) {
     ...overrides,
   }
 }
-
-export const availableModules = [
-  { id: 'first-screen', name: '首屏主视觉', desc: '极简大图与大字报，第一眼传递核心卖点价值。', strategy: '大标题聚焦，高饱和度背板突显商品核心形态。' },
-  { id: 'core-selling', name: '核心卖点图', desc: '突出商品三大硬核优势，多点对照打消疑虑。', strategy: '三栏目清单排版，配图层级鲜明。' },
-  { id: 'use-scenario', name: '使用场景图', desc: '呈现真实使用状态或家居融入。', strategy: '融合淡雅环境投影，拉近用户心理距离。' },
-  { id: 'multi-angle', name: '多角度呈现图', desc: '展示侧面、背面及折叠等完整外观。', strategy: '三视图对齐，透视比例精准缩放。' },
-  { id: 'ambient-scene', name: '场景氛围图', desc: '强光影写实渲染，增强商品的高级质感。', strategy: '暖色调逆光底板，配合微小阴影质感。' },
-  { id: 'detail-zoom', name: '商品细节图', desc: '局部放大，精细展现材质和精湛工艺。', strategy: '中心放大镜切割圆圈，拉线批注。' },
-  { id: 'brand-story', name: '品牌故事图', desc: '传达品牌匠心，突显高档商品格调。', strategy: '英文点缀，加宽留白，典雅无衬线排版。' },
-  { id: 'specs-info', name: '尺寸/规格/容量图', desc: '直观标注物理尺寸与对比参照物。', strategy: '添加标注线与比例尺，数值一目了然。' },
-  { id: 'contrast-effect', name: '效果对比图', desc: '使用前/后、升级前/后的直观效果。', strategy: '双栏垂直切割，BEFORE / AFTER 徽章强对抗。' },
-  { id: 'tech-specs', name: '详细规格/参数表', desc: '将复杂工业数据整合为超清美化表格。', strategy: '圆角半透明卡片表格，结构化突出核心。' },
-  { id: 'manufacturing', name: '工艺制作图', desc: '展示精密做工、材质层级拆解。', strategy: '爆炸视图效果，精细拆解元器件架构。' },
-  { id: 'freebies', name: '配件/赠品图', desc: '明确告知用户收货拆箱的丰富组合。', strategy: '买即送角贴，配全套礼盒全家福。' },
-  { id: 'series-show', name: '系列展示图', desc: '多配色、多SKU合辑呈现，极大提升加购。', strategy: '多色环绕渐变，卡片式并列。' },
-  { id: 'ingredients', name: '商品成分图', desc: '透明呈现成分比例或纯净配料表。', strategy: '分子网格配图，科学健康风骨。' },
-  { id: 'warranty', name: '售后保障图', desc: '官方质保、包邮无忧、金牌认证退换。', strategy: '醒目信任徽章，构建消费安全感。' },
-  { id: 'usage-tips', name: '使用建议图', desc: '温馨提示使用建议、充电与养护说明。', strategy: '简洁图标列表，避免售后客诉纠纷。' },
-]

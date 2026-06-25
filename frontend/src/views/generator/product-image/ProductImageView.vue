@@ -86,6 +86,8 @@ function closePreview() {
       :uploaded-images="generator.uploadedImages.value"
       :main-image-index="generator.mainImageIndex.value"
       :selected-modules="generator.selectedModules.value"
+      :modules="generator.availableModules.value"
+      :catalog-loading="generator.catalogLoading.value"
       :ai-loading="generator.aiLoading.value"
       :can-generate="generator.canGenerate.value"
       :can-generate-strategy="generator.canGenerateStrategy.value"

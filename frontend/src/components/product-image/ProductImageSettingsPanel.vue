@@ -6,7 +6,6 @@ import GeneratorSidePanelShell from "@/components/generation/GeneratorSidePanelS
 import ImageUploader from "@/components/generation/ImageUploader.vue";
 import ModuleSelector from "@/components/product-image/ModuleSelector.vue";
 import ProductGenerationBasics from "@/components/generation/ProductGenerationBasics.vue";
-import { availableModules } from "@/constants/generator.js";
 
 const props = defineProps({
   settings: {
@@ -24,6 +23,14 @@ const props = defineProps({
   selectedModules: {
     type: Array,
     required: true,
+  },
+  modules: {
+    type: Array,
+    required: true,
+  },
+  catalogLoading: {
+    type: Boolean,
+    default: false,
   },
   aiLoading: {
     type: Boolean,
@@ -82,6 +89,7 @@ const hasGenerationSource = computed(
 );
 const generateButtonText = computed(() => {
   if (!hasGenerationSource.value) return "请先上传产品图并填写商品卖点与要求";
+  if (props.catalogLoading) return "图种目录加载中...";
   if (props.selectedModules.length === 0) return "请至少选择一个生成图种";
   if (props.creatingBatch) return "正在创建任务...";
   if (props.hasRunningTasks) return `追加生成详情图 (${props.selectedModules.length}项)`;
@@ -90,6 +98,7 @@ const generateButtonText = computed(() => {
 
 const strategyButtonText = computed(() => {
   if (props.strategyLoading) return "AI 正在生成策略...";
+  if (props.catalogLoading) return "图种目录加载中...";
   if (props.hasRunningTasks) return "生成中暂不可改策略";
   return "AI 生成策略";
 });
@@ -116,7 +125,7 @@ const strategyButtonText = computed(() => {
 
     <ModuleSelector
       :selected="selectedModules"
-      :modules="availableModules"
+      :modules="modules"
       @update:selected="emit('update:selectedModules', $event)"
     />
 
