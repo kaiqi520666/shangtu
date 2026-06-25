@@ -13,6 +13,7 @@ from app.models import (
     ImageTask,
     OutfitModel,
     PromptTemplate,
+    ProductCatalog,
     User,
     VideoTask,
 )
@@ -152,6 +153,23 @@ def outfit_model_payload(model: OutfitModel) -> dict:
         "active": model.active,
         "created_at": to_utc_iso(model.created_at),
         "updated_at": to_utc_iso(model.updated_at),
+    }
+
+
+def product_catalog_payload(item: ProductCatalog) -> dict:
+    return {
+        "id": item.id,
+        "scenario": item.scenario,
+        "item_id": item.item_id,
+        "name": item.name,
+        "description": item.description,
+        "strategy": item.strategy,
+        "default_count": item.default_count,
+        "max_count": item.max_count,
+        "enabled": item.enabled,
+        "sort": item.sort,
+        "created_at": to_utc_iso(item.created_at),
+        "updated_at": to_utc_iso(item.updated_at),
     }
 
 

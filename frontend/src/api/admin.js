@@ -52,6 +52,14 @@ export function updateAdminPromptTemplate(templateId, payload) {
   return request.patch(`/admin/prompt-templates/${templateId}`, payload, { timeout: 15000 });
 }
 
+export function getAdminProductCatalog(params = {}) {
+  return request.get("/admin/product-catalog", { params, timeout: 15000 });
+}
+
+export function updateAdminProductCatalog(catalogId, payload) {
+  return request.patch(`/admin/product-catalog/${catalogId}`, payload, { timeout: 15000 });
+}
+
 export function getAdminOutfitModels(params = {}) {
   return request.get("/admin/outfit-models", { params, timeout: 15000 });
 }

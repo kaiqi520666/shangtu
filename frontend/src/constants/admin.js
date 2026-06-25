@@ -5,6 +5,7 @@ export const adminTabs = [
   { key: "transactions", label: "流水", to: "/admin/transactions" },
   { key: "imageTasks", label: "生成任务", to: "/admin/image-tasks" },
   { key: "settings", label: "系统配置", to: "/admin/settings" },
+  { key: "productCatalog", label: "商品目录", to: "/admin/product-catalog" },
   { key: "promptTemplates", label: "提示词", to: "/admin/prompt-templates" },
   { key: "outfitModels", label: "模特库", to: "/admin/outfit-models" },
   { key: "auditLogs", label: "审计日志", to: "/admin/audit-logs" },
@@ -77,6 +78,7 @@ export const auditActionOptions = [
   { label: "更新用户", value: "update_user" },
   { label: "调整积分", value: "adjust_credits" },
   { label: "更新配置", value: "update_settings" },
+  { label: "更新商品目录", value: "update_product_catalog" },
   { label: "新增提示词", value: "create_prompt_template" },
   { label: "更新提示词", value: "update_prompt_template" },
   { label: "新增系统模特", value: "create_outfit_model" },
@@ -141,6 +143,11 @@ export function imageTaskStatusLabel(status) {
 
 export function scenarioLabel(scenario) {
   if (!scenario) return "通用";
+  const match = scenarioOptions.find((option) => option.value === scenario);
+  return match?.label || scenario || "-";
+}
+
+export function productCatalogScenarioLabel(scenario) {
   const match = scenarioOptions.find((option) => option.value === scenario);
   return match?.label || scenario || "-";
 }

@@ -43,6 +43,16 @@ export const useCatalogStore = defineStore("catalog", () => {
     if (loaded.value) return;
     if (loadingPromise) return loadingPromise;
 
+    return loadCatalog();
+  }
+
+  async function reload() {
+    loaded.value = false;
+    return loadCatalog();
+  }
+
+  async function loadCatalog() {
+    if (loadingPromise) return loadingPromise;
     loading.value = true;
     loadError.value = "";
     loadingPromise = getImageCatalog()
@@ -91,6 +101,7 @@ export const useCatalogStore = defineStore("catalog", () => {
     suiteStructures,
     outfitScenes,
     ensureLoaded,
+    reload,
     findModule,
     findSuiteStructure,
     findOutfitScene,

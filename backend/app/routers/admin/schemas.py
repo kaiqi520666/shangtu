@@ -55,3 +55,13 @@ class UpdateOutfitModelRequest(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=100)
     sort_order: int | None = Field(default=None, ge=-100000, le=100000)
     active: bool | None = None
+
+
+class ProductCatalogRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    description: str = Field(..., min_length=1)
+    strategy: str = Field(..., min_length=1)
+    default_count: int | None = Field(default=None, ge=1, le=100)
+    max_count: int | None = Field(default=None, ge=1, le=100)
+    enabled: bool = True
+    sort: int = Field(default=0, ge=-100000, le=100000)
