@@ -11,7 +11,6 @@ import {
   createBatchFinishedHandler,
   useGenerationCards,
 } from "@/composables/useGenerationCards.js";
-import { useAiSellingPointsWriter } from "@/composables/useAiSellingPointsWriter.js";
 import { useCardActions } from "@/composables/useCardActions.js";
 import { useGenerationRunner } from "@/composables/useGenerationRunner.js";
 import { useGenerationStrategyFlow } from "@/composables/useGenerationStrategyFlow.js";
@@ -152,29 +151,6 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
     reorderStrategyItems: reorderVideoStrategyItems,
     backToConfig,
   } = strategyFlow;
-
-  const { aiLoading, generateSellingPointsWithAI } = useAiSellingPointsWriter({
-    toast,
-    buildImages: () => {
-      const selectedType = getVideoDemoType(settings.videoType);
-      return buildVideoAnalyzeImages(selectedType.inputMode, uploadedImages.value);
-    },
-    getUploadedImages: () => uploadedImages.value,
-    getAnalyzePayload: () => {
-      const selectedType = getVideoDemoType(settings.videoType);
-      return {
-        platform: settings.market,
-        scenario: "product_video",
-        type_id: selectedType.typeId,
-      };
-    },
-    validate: () => {
-      const selectedType = getVideoDemoType(settings.videoType);
-      const imageCount = uploadedImages.value.filter((item) => item?.url).length;
-      return getRequiredImageMessage(selectedType.inputMode, imageCount);
-    },
-    uploadingMessage: "素材还在上传中，请稍候",
-  });
 
   async function loadCreditCosts() {
     try {
@@ -613,7 +589,6 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
     uploadedImages,
     mainImageIndex,
     creditCosts,
-    aiLoading,
     workflowStep,
     strategyBrief,
     strategySnapshot,
@@ -643,7 +618,6 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
     loadCreditCosts,
     updateSettings,
     showNotice,
-    generateSellingPointsWithAI,
     triggerStrategyGeneration,
     confirmStrategyAndGenerate,
     updateVideoStrategyItem,
