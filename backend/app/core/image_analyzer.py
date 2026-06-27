@@ -135,7 +135,6 @@ JSON 格式：
     {{
       "id": "first-screen",
       "moduleName": "首屏主视觉",
-      "title": "首屏 3 秒内传达核心价值",
       "strategy": "大标题聚焦，高饱和度背板突显商品核心形态。",
       "content": "主标题：...\\n副标题：...\\n画面层级：..."
     }}
@@ -192,7 +191,6 @@ JSON 格式：
     {{
       "id": "white-bg",
       "name": "白底图",
-      "title": "干净主图突出商品完整轮廓",
       "description": "适配平台首图规范，突出商品主体与干净轮廓。",
       "strategy": "纯白或浅灰背景，商品居中完整展示，光影自然。",
       "content": "画面目标：...\\n主体构图：...\\n文字与标注：...",
@@ -252,7 +250,6 @@ JSON 格式：
     {{
       "id": "street",
       "name": "都市街头",
-      "title": "都市街头自然行走穿搭",
       "description": "都市街头场景，突出服装的日常穿搭感和街拍质感。",
       "strategy": "自然日光或轻微电影感光影，模特行走或站立。",
       "pose": "模特姿态：...",
@@ -542,8 +539,6 @@ def _normalize_strategy_response(parsed: dict, selected_modules: list[dict]) -> 
             {
                 "id": module["id"],
                 "moduleName": module["name"],
-                "title": _stringify_content(raw.get("title"))
-                or f"{module['name']}策略",
                 "strategy": _stringify_content(raw.get("strategy"))
                 or module["strategy"],
                 "content": content or _fallback_module_content(module, index),
@@ -570,7 +565,6 @@ def _normalize_suite_strategy_response(parsed: dict, selected_structures: list[d
             {
                 "id": structure["id"],
                 "name": structure["name"],
-                "title": _stringify_content(raw.get("title")) or f"{structure['name']}策略",
                 "description": _stringify_content(raw.get("description")) or structure["desc"],
                 "strategy": _stringify_content(raw.get("strategy")) or structure["strategy"],
                 "content": content or _fallback_suite_content(structure, index),
@@ -609,7 +603,6 @@ def _normalize_outfit_strategy_response(parsed: dict, selected_scenes: list[dict
             {
                 "id": scene["id"],
                 "name": scene["name"],
-                "title": _stringify_content(raw.get("title")) or f"{scene['name']}穿搭策略",
                 "description": _stringify_content(raw.get("description")) or scene["desc"],
                 "strategy": _stringify_content(raw.get("strategy")) or scene["strategy"],
                 "pose": pose,

@@ -129,7 +129,7 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
     restoreCard(item) {
       const strategyItem = findOutfitStrategyItem(item.type_id);
       return restoreGenerationCard(item, {
-        strategyTitle: item.title || strategyItem.title || getSceneName(item.type_id),
+        strategyTitle: getSceneName(item.type_id),
         strategyContent: strategyItem.content || strategyItem.strategy || getSceneStrategy(item.type_id),
       });
     },
@@ -520,7 +520,7 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
       createCard({ item, sortOrder, batchRunId, settingsSnapshot }) {
         return createGenerationCard({
           typeId: item.id,
-          strategyTitle: item.title,
+          strategyTitle: item.name,
           strategyContent: item.content || item.fidelity || item.strategy,
           sortOrder,
           batchRunId,
@@ -528,8 +528,8 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
         });
       },
       buildUserPrompt: buildUserPromptForItem,
-      getCreateLog: (item) => `正在生成 [${item.title}] 穿搭图...`,
-      getFailLogName: (item) => item.title,
+      getCreateLog: (item) => `正在生成 [${item.name}] 穿搭图...`,
+      getFailLogName: (item) => item.name,
       allFailedMessage: "所有穿搭图任务都创建失败，请稍后重试",
     });
 
@@ -562,7 +562,6 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
       ...item,
       id: item.id,
       name: item.name || getSceneName(item.id),
-      title: item.title || `${getSceneName(item.id)}穿搭策略`,
       content: composeOutfitStrategyContent(item),
       strategy: item.strategy || getSceneStrategy(item.id),
       index: index + 1,
@@ -572,7 +571,6 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
   function buildUserPromptForItem(item) {
     const lines = [
       `【拍摄场景】${item.name}`,
-      item.title ? `【策略标题】${item.title}` : "",
       item.strategy ? `【场景策略】${item.strategy}` : "",
       item.pose ? `【模特姿态】${item.pose}` : "",
       item.camera ? `【镜头角度】${item.camera}` : "",
@@ -598,7 +596,6 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
       return {
         id: item.id || scene.id || `outfit-${index + 1}`,
         name: item.name || scene.label || `场景 ${index + 1}`,
-        title: item.title || `${scene.label || "穿搭"}策略`,
         description: item.description || scene.description || "",
         strategy: item.strategy || scene.strategy || "",
         pose: item.pose || "",
@@ -639,7 +636,6 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
     return outfitStrategyItems.value.find((item) => item.id === typeId) || {
       id: typeId,
       name: getSceneName(typeId),
-      title: getSceneName(typeId),
       content: getSceneStrategy(typeId),
       strategy: getSceneStrategy(typeId),
     };

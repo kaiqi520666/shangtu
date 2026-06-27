@@ -124,9 +124,9 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
       restoreProductImageJobData(data);
     },
     restoreCard(item) {
-      const moduleItem = findModuleContent(item.type_id, item.title);
+      const moduleItem = findModuleContent(item.type_id);
       return restoreGenerationCard(item, {
-        strategyTitle: item.title || moduleItem.title,
+        strategyTitle: getModuleName(item.type_id),
         strategyContent: moduleItem.content || moduleItem.strategy,
       });
     },
@@ -410,7 +410,7 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
       createCard({ item, sortOrder, batchRunId, settingsSnapshot }) {
         return createGenerationCard({
           typeId: item.id,
-          strategyTitle: item.title || item.moduleName,
+          strategyTitle: item.moduleName,
           strategyContent: item.content || item.strategy,
           sortOrder,
           batchRunId,
@@ -452,7 +452,6 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
       return moduleContents.value.map((item, index) => ({
         ...item,
         moduleName: item.moduleName || getModuleName(item.id),
-        title: item.title || getModuleName(item.id),
         content: item.content || "",
         strategy: item.strategy || getModuleStrategy(item.id),
         index: index + 1,
@@ -462,7 +461,6 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
     return selectedModules.value.map((moduleId, index) => ({
       id: moduleId,
       moduleName: getModuleName(moduleId),
-      title: getModuleName(moduleId),
       content: getModuleStrategy(moduleId),
       strategy: getModuleStrategy(moduleId),
       index: index + 1,
@@ -471,7 +469,7 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
 
   function buildUserPromptForItem(item) {
     const lines = [
-      `【模块标题】${item.title}`,
+      `【图种】${item.moduleName}`,
       item.strategy ? `【视觉策略】${item.strategy}` : "",
       item.content ? `【模块内容】${item.content}` : "",
     ];
@@ -484,7 +482,6 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
       return {
         id: module.id || fallback?.id || `module-${index + 1}`,
         moduleName: module.moduleName || fallback?.name || `模块 ${index + 1}`,
-        title: module.title || `${fallback?.name || "详情图"}策略`,
         content: module.content || "",
         strategy: module.strategy || fallback?.strategy || "",
       };
@@ -506,13 +503,11 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
     }
   }
 
-  function findModuleContent(typeId, title = "") {
+  function findModuleContent(typeId) {
     return (
-      moduleContents.value.find((module) => module.id === typeId && (!title || module.title === title)) ||
       moduleContents.value.find((module) => module.id === typeId) || {
         id: typeId,
         moduleName: getModuleName(typeId),
-        title: title || getModuleName(typeId),
         content: getModuleStrategy(typeId),
         strategy: getModuleStrategy(typeId),
       }

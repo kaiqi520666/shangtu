@@ -132,7 +132,7 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
     restoreCard(item) {
       const strategyItem = findSuiteStrategyItem(item.type_id);
       return restoreGenerationCard(item, {
-        strategyTitle: item.title || strategyItem.title || getStructureName(item.type_id),
+        strategyTitle: getStructureName(item.type_id),
         strategyContent: strategyItem.content || strategyItem.strategy || getStructureStrategy(item.type_id),
       });
     },
@@ -451,12 +451,11 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
       return Array.from({ length: count }, (_, index) => ({
         ...item,
         name: item.name || getStructureName(item.id),
-        title: item.title || `${item.name || getStructureName(item.id)}策略`,
         content: item.content || "",
         strategy: item.strategy || getStructureStrategy(item.id),
         index: index + 1,
         total: count,
-        cardTitle: count > 1 ? `${item.name || getStructureName(item.id)} ${index + 1}` : item.title || item.name,
+        cardTitle: count > 1 ? `${item.name || getStructureName(item.id)} ${index + 1}` : item.name || getStructureName(item.id),
       }));
     });
   }
@@ -464,7 +463,6 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
   function buildUserPromptForItem(item) {
     const lines = [
       `【套图类型】${item.name}`,
-      item.title ? `【策略标题】${item.title}` : "",
       item.strategy ? `【视觉策略】${item.strategy}` : "",
       item.content ? `【画面要求】${item.content}` : "",
       item.total > 1 ? `【本张序号】${item.index}/${item.total}，同类型多张图需要构图、角度或场景有区分。` : "",
@@ -479,7 +477,6 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
       return {
         id: item.id || fallback?.id || `suite-${index + 1}`,
         name: item.name || fallback?.name || `套图 ${index + 1}`,
-        title: item.title || `${fallback?.name || "套图"}策略`,
         description: item.description || fallback?.description || "",
         strategy: item.strategy || fallback?.strategy || "",
         content: item.content || "",
@@ -508,7 +505,6 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
     return suiteStrategyItems.value.find((item) => item.id === typeId) || {
       id: typeId,
       name: getStructureName(typeId),
-      title: getStructureName(typeId),
       content: getStructureStrategy(typeId),
       strategy: getStructureStrategy(typeId),
     };

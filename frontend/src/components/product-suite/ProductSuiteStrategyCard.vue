@@ -63,13 +63,6 @@ function updateField(key, value) {
       </button>
     </div>
 
-    <input
-      :value="item.title"
-      class="mb-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-primary focus:bg-white focus:ring-1 focus:ring-primary"
-      placeholder="策略标题"
-      @input="updateField('title', $event.target.value)"
-    />
-
     <textarea
       :value="item.content"
       :rows="compact ? 5 : 6"
