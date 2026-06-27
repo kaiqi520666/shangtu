@@ -260,7 +260,7 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
   });
   const strategyMetaText = computed(
     () =>
-      `${selectedType.value.title} / ${getOptionLabel(videoMarketOptions, settings.market)} / ${getOptionLabel(videoLanguageOptions, settings.language)} / ${selectedSize.value.aspectRatio}`,
+      `${selectedType.value.title} / ${getOptionLabel(videoMarketOptions, settings.market)} / ${getOptionLabel(videoLanguageOptions, settings.language)} / ${settings.duration}秒 / ${selectedSize.value.aspectRatio} / ${settings.resolution}`,
   );
 
   function createCard({
@@ -514,42 +514,13 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
       return {
         id: item.id || type.typeId,
         name: item.name || type.title,
-        opening: item.opening || "",
-        motion: item.motion || "",
-        sellingPoints: item.sellingPoints || "",
-        visualStyle: item.visualStyle || "",
-        avoid: item.avoid || "",
-        content: item.content || [item.opening, item.motion, item.sellingPoints, item.visualStyle, item.avoid].filter(Boolean).join("\n"),
+        content: item.content || "",
       };
     });
   }
 
   function updateVideoStrategyItem(index, patch) {
-    const nextPatch = { ...patch };
-    if (
-      Object.keys(patch).some((key) =>
-        ["opening", "motion", "sellingPoints", "visualStyle", "avoid"].includes(key),
-      )
-    ) {
-      const current = videoStrategyItems.value[index] || {};
-      nextPatch.content = composeVideoStrategyContent({
-        ...current,
-        ...nextPatch,
-      });
-    }
-    updateStrategyItem(index, nextPatch);
-  }
-
-  function composeVideoStrategyContent(item) {
-    return [
-      item.opening && `开场：${item.opening}`,
-      item.motion && `镜头运动：${item.motion}`,
-      item.sellingPoints && `卖点呈现：${item.sellingPoints}`,
-      item.visualStyle && `画面风格：${item.visualStyle}`,
-      item.avoid && `避免事项：${item.avoid}`,
-    ]
-      .filter(Boolean)
-      .join("\n");
+    updateStrategyItem(index, patch);
   }
 
   function getConfirmedVideoScript() {

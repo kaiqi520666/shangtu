@@ -292,9 +292,11 @@ def build_video_strategy_prompt(
 1. 只输出 JSON，不要 markdown，不要解释，不要代码块。
 2. items 固定 1 条，id 必须等于 {json.dumps(type_id, ensure_ascii=False)}。
 3. 所有 JSON 字段都必须用中文撰写；最终成片如需文字或配音，会按“最终成片文字/配音语言”翻译呈现。
-4. opening、motion、sellingPoints、visualStyle、avoid 要能直接指导视频生成；content 是给用户编辑和后续生视频 prompt 使用的完整脚本。
-5. 不要编造品牌 Logo、认证、价格、销量、型号、具体参数；如果素材和补充要求中没有明确依据，只做谨慎表达。
-6. 策略要适合电商短视频，节奏清晰，主体稳定，商品外观一致，避免无意义镜头和过度夸张表达。
+4. content 是给用户编辑和后续生视频 prompt 使用的完整脚本，必须按 {duration} 秒时长规划镜头节奏，建议拆成 2-4 个时间段（如 0-2 秒、2-4 秒、4-{duration} 秒）。
+5. content 里要明确写出：成片如需出现文字或配音，必须使用“{language or '中文'}”；如果用户选择纯音乐无口播，则不要安排口播，只保留画面文字或无文字镜头。
+6. content 要覆盖开场、镜头运动、卖点呈现、画面风格和避免事项，但不要拆成多个 JSON 字段。
+7. 不要编造品牌 Logo、认证、价格、销量、型号、具体参数；如果素材和补充要求中没有明确依据，只做谨慎表达。
+8. 策略要适合电商短视频，节奏清晰，主体稳定，商品外观一致，避免无意义镜头和过度夸张表达。
 
 JSON 格式：
 {{
@@ -303,12 +305,7 @@ JSON 格式：
     {{
       "id": "{type_id}",
       "name": "{name or type_id}",
-      "opening": "前 1-2 秒用商品核心画面或使用痛点快速开场。",
-      "motion": "镜头缓慢推进，商品保持清晰稳定，展示关键结构和使用场景。",
-      "sellingPoints": "突出商品核心卖点、适用人群和使用收益。",
-      "visualStyle": "自然光、高级电商质感、节奏轻快但不过度花哨。",
-      "avoid": "避免改变商品颜色、材质、结构；避免虚构品牌、价格、认证和夸张功效。",
-      "content": "开场：...\\n镜头运动：...\\n卖点呈现：...\\n画面风格：...\\n避免事项：..."
+      "content": "0-2秒：...\\n2-4秒：...\\n4-{duration}秒：...\\n文字/配音语言：...\\n避免事项：..."
     }}
   ]
 }}"""
@@ -674,10 +671,10 @@ def _normalize_outfit_strategy_response(parsed: dict, selected_scenes: list[dict
 def _fallback_video_content(item: dict) -> str:
     return "\n".join(
         [
-            f"开场：围绕「{item['name']}」方向，用商品核心画面快速建立观看兴趣。",
-            "镜头运动：镜头保持稳定，适度推进、平移或切换细节，突出商品真实外观。",
-            "卖点呈现：结合用户补充要求，展示商品适用场景、核心卖点和使用价值。",
-            "画面风格：电商短视频质感，主体清晰，节奏紧凑，画面干净。",
+            f"0-2秒：围绕「{item['name']}」方向，用商品核心画面快速建立观看兴趣。",
+            "中段：镜头保持稳定，适度推进、平移或切换细节，突出商品真实外观、适用场景和核心卖点。",
+            "结尾：回到商品完整画面或使用结果，收束记忆点，保持电商短视频质感。",
+            "文字/配音语言：按用户选择的最终成片语言呈现；如果选择纯音乐无口播，则不要安排口播。",
             "避免事项：不要改变商品颜色、材质、结构，不要虚构品牌、价格、认证或无法确认的信息。",
         ]
     )
@@ -695,32 +692,10 @@ def _normalize_video_strategy_response(parsed: dict, selected_item: dict) -> dic
         ),
         raw_items[0] if raw_items and isinstance(raw_items[0], dict) else {},
     )
-    opening = _stringify_content(raw.get("opening"))
-    motion = _stringify_content(raw.get("motion"))
-    selling_points = _stringify_content(raw.get("sellingPoints"))
-    visual_style = _stringify_content(raw.get("visualStyle"))
-    avoid = _stringify_content(raw.get("avoid"))
     content = _stringify_content(raw.get("content"))
-    if not content:
-        content = "\n".join(
-            part
-            for part in [
-                opening and f"开场：{opening}",
-                motion and f"镜头运动：{motion}",
-                selling_points and f"卖点呈现：{selling_points}",
-                visual_style and f"画面风格：{visual_style}",
-                avoid and f"避免事项：{avoid}",
-            ]
-            if part
-        )
     item = {
         "id": selected_item["id"],
         "name": selected_item["name"],
-        "opening": opening,
-        "motion": motion,
-        "sellingPoints": selling_points,
-        "visualStyle": visual_style,
-        "avoid": avoid,
         "content": content or _fallback_video_content(selected_item),
     }
     brief = _stringify_content(parsed.get("brief")) or f"已生成「{selected_item['name']}」视频脚本策略。"
