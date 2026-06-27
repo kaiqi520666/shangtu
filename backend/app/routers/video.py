@@ -10,7 +10,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.credits import normalize_video_resolution
 from app.core.deps import get_current_user, get_db
-from app.core.image_prompt_builder import build_video_generate_prompt
+from app.core.image_analyzer import (
+    DashScopeConfigError,
+    generate_video_strategy,
+)
+from app.core.image_prompt_builder import (
+    build_strategy_template_prompt,
+    build_video_generate_prompt,
+)
 from app.core.json_utils import dump_json_or_none, parse_json_or_none
 from app.core.prompt_snapshot import dump_prompt_snapshot, parse_prompt_snapshot
 from app.core.system_settings import (
@@ -45,6 +52,23 @@ class VideoGenerateRequest(BaseModel):
     settings_snapshot: dict | None = None
     sort_order: int = 0
     job_id: str | None = None
+
+
+class VideoImageItem(BaseModel):
+    url: str
+    label: str = ""
+
+
+class VideoStrategyRequest(BaseModel):
+    type_id: str
+    name: str | None = None
+    input_mode: str
+    images: list[VideoImageItem] = Field(default_factory=list)
+    market: str = ""
+    language: str = ""
+    duration: int = 6
+    aspect_ratio: str = "9:16"
+    product_input: str = ""
 
 
 def _redis_str(value) -> str | None:
@@ -112,6 +136,49 @@ async def video_credit_costs(
     except ValueError as exc:
         return fail(str(exc))
     return success({"costs": costs})
+
+
+@router.post("/strategy", response_model=Response)
+async def video_strategy(
+    req: VideoStrategyRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    images = [item.model_dump() for item in req.images]
+    image_urls = _clean_image_urls([item["url"] for item in images])
+    input_error = _validate_video_inputs(req.input_mode, image_urls)
+    if input_error:
+        return fail(input_error)
+
+    aspect_ratio = str(req.aspect_ratio or "").strip()
+    aspect_error = _validate_aspect_ratio(aspect_ratio)
+    if aspect_error:
+        return fail(aspect_error)
+
+    try:
+        template_prompt = await build_strategy_template_prompt(
+            db,
+            scenario="product_video",
+            platform=req.market,
+        )
+        strategy = await generate_video_strategy(
+            type_id=req.type_id,
+            name=req.name or req.type_id,
+            input_mode=req.input_mode,
+            market=req.market,
+            language=req.language,
+            duration=req.duration,
+            aspect_ratio=aspect_ratio,
+            product_input=req.product_input,
+            images=images,
+            template_prompt=template_prompt,
+        )
+    except (ValueError, DashScopeConfigError, RuntimeError) as e:
+        return fail(str(e))
+    except Exception:
+        return fail("视频策略生成失败")
+
+    return success(strategy)
 
 
 @router.post("/generate", response_model=Response)

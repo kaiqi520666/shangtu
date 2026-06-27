@@ -23,7 +23,9 @@ if str(ROOT_DIR) not in sys.path:
 from app.core import image_prompt_builder  # noqa: E402
 from app.core.image_prompt_builder import (  # noqa: E402
     IMAGE_GENERATE_MODEL,
+    VIDEO_GENERATE_MODEL,
     build_image_generate_prompt,
+    build_video_generate_prompt,
 )
 from app.core.prompt_templates import PromptTemplateLookupResult  # noqa: E402
 
@@ -81,21 +83,33 @@ def _install_fake_lookup() -> list[dict]:
         captured.append(
             dict(scenario=scenario, purpose=purpose, platform=platform, type_id=type_id, model=model)
         )
-        # 模拟清理后的库：type_id IS NULL 的系统规则 + 场景规则
-        templates = [
-            _fake_template(id="sys-global", name="生图通用主体一致规则", content=SYSTEM_RULE_MARK),
-            _fake_template(
-                id=f"scene-{scenario}", name=f"{scenario}-生图场景规则", scenario=scenario,
-                content=SCENE_RULE_MARK,
-            ),
-        ]
+        if purpose == "video_generate":
+            templates = [
+                _fake_template(
+                    id="video-global",
+                    name="商品视频-生成通用规则",
+                    scenario="product_video",
+                    purpose="video_generate",
+                    model=VIDEO_GENERATE_MODEL,
+                    content=SYSTEM_RULE_MARK,
+                ),
+            ]
+        else:
+            templates = [
+                _fake_template(id="sys-global", name="生图通用主体一致规则", content=SYSTEM_RULE_MARK),
+                _fake_template(
+                    id=f"scene-{scenario}", name=f"{scenario}-生图场景规则", scenario=scenario,
+                    content=SCENE_RULE_MARK,
+                ),
+            ]
         # 忠实模拟 SQL：只有按真实 type_id 查询时，库才会返回 per-type 行。
         # 当前实现应固定传 type_id=None，所以这一段永远不该触发。
         if type_id is not None:
             templates.append(
                 _fake_template(
                     id=f"pertype-{type_id}", name=f"{scenario}-{type_id}默认用户提示词",
-                    scenario=scenario, type_id=type_id, content=PER_TYPE_LEAK_MARK,
+                    scenario=scenario, purpose=purpose, type_id=type_id, model=model,
+                    content=PER_TYPE_LEAK_MARK,
                 )
             )
         content = "\n\n".join(t.content for t in templates if t.content)
@@ -172,12 +186,61 @@ async def _check_empty_user_prompt_rejected() -> None:
     raise CheckFailed("空 user_prompt 未被拒绝（策略内容应为必填）")
 
 
+async def _check_video(captured: list[dict]) -> None:
+    strategy_content = "【视频脚本】开场展示商品核心画面，镜头推进到细节，最后呈现使用场景。"
+    settings = {
+        "platform": "global",
+        "language": "english",
+        "aspect_ratio": "9:16",
+        "resolution": "1080p",
+        "duration": 6,
+        "input_mode": "first_frame",
+    }
+
+    captured.clear()
+    result = await build_video_generate_prompt(
+        db=None,
+        type_id="ugc_seeding",
+        title="UGC种草",
+        user_prompt=strategy_content,
+        settings=settings,
+    )
+
+    snapshot = result.prompt_snapshot
+    refs = snapshot["template_refs"]
+    require(len(captured) == 1, f"[product_video] 期望恰好一次模板查询，实得 {len(captured)}")
+    require(captured[0]["type_id"] is None, f"[product_video] 视频生成查询必须 type_id=None，实得 {captured[0]['type_id']!r}")
+    require(
+        captured[0]["purpose"] == "video_generate" and captured[0]["model"] == VIDEO_GENERATE_MODEL,
+        f"[product_video] 查询的 purpose/model 不对：{captured[0]}",
+    )
+    require(PER_TYPE_LEAK_MARK not in result.final_prompt, "[product_video] 最终 prompt 混入了 per-type 默认提示词")
+    require(all(r["type_id"] is None for r in refs), f"[product_video] template_refs 出现了 type_id：{refs}")
+    require(strategy_content in result.final_prompt, "[product_video] 视频脚本未进入最终 prompt")
+    require(snapshot["user"] == strategy_content, "[product_video] snapshot.user 应等于视频脚本")
+
+    try:
+        await build_video_generate_prompt(
+            db=None,
+            type_id="ugc_seeding",
+            title="UGC种草",
+            user_prompt=" ",
+            settings=settings,
+        )
+    except ValueError as exc:
+        require("请先生成并确认视频策略" in str(exc), f"视频空策略报错文案不符：{exc}")
+        print("  ✓ product_video: type_id=None / 无 per-type 泄漏 / 视频脚本必填")
+        return
+    raise CheckFailed("视频空 user_prompt 未被拒绝（视频策略内容应为必填）")
+
+
 async def main() -> None:
     captured = _install_fake_lookup()
     print("生图提示词单源回归断言：")
     for scenario, cfg in SCENARIOS.items():
         await _check_scenario(scenario, cfg, captured)
     await _check_empty_user_prompt_rejected()
+    await _check_video(captured)
     print("ALL PASS")
 
 

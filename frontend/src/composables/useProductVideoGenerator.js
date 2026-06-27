@@ -1,5 +1,12 @@
-import { onBeforeUnmount, reactive, ref } from "vue";
-import { deleteVideoTask, generateVideo, getVideoCreditCosts, getVideoDownloadUrl, getVideoTask } from "@/api/video.js";
+import { computed, onBeforeUnmount, reactive, ref } from "vue";
+import {
+  deleteVideoTask,
+  generateVideo,
+  generateVideoStrategy,
+  getVideoCreditCosts,
+  getVideoDownloadUrl,
+  getVideoTask,
+} from "@/api/video.js";
 import {
   createBatchFinishedHandler,
   useGenerationCards,
@@ -7,6 +14,7 @@ import {
 import { useAiSellingPointsWriter } from "@/composables/useAiSellingPointsWriter.js";
 import { useCardActions } from "@/composables/useCardActions.js";
 import { useGenerationRunner } from "@/composables/useGenerationRunner.js";
+import { useGenerationStrategyFlow } from "@/composables/useGenerationStrategyFlow.js";
 import { buildVideoAnalyzeImages } from "@/utils/analyzeImages.js";
 import {
   createVideoSettingsSnapshot,
@@ -14,6 +22,7 @@ import {
 } from "@/utils/generationSnapshots.js";
 import {
   defaultVideoCreditCosts,
+  getVideoCreditCost,
   getVideoDemoType,
   videoDemoTypes,
   videoLanguageOptions,
@@ -50,6 +59,16 @@ function buildSettingsSnapshot(settings) {
   });
 }
 
+function attachVideoStrategyBrief(snapshot, brief) {
+  return {
+    ...snapshot,
+    scene: {
+      ...(snapshot.scene || {}),
+      strategyBrief: brief,
+    },
+  };
+}
+
 function getRequiredImageMessage(inputMode, count) {
   if (inputMode === "first_frame" && count !== 1) return "请上传 1 张首帧图";
   if (inputMode === "first_last_frame" && count !== 2) return "请上传开始图和结束图";
@@ -73,6 +92,15 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
   const uploadedImages = ref([]);
   const mainImageIndex = ref(0);
   const creditCosts = ref({ ...defaultVideoCreditCosts });
+  const selectedType = computed(() => getVideoDemoType(settings.videoType));
+  const selectedSize = computed(() => getSelectedSize(settings.sizePreset));
+  const estimatedCredits = computed(() =>
+    getVideoCreditCost({
+      resolution: settings.resolution,
+      duration: settings.duration,
+      costs: creditCosts.value,
+    }),
+  );
   const cards = useGenerationCards({
     getTask: getVideoTask,
     pollIntervalMs: VIDEO_POLL_INTERVAL_MS,
@@ -102,6 +130,28 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
     jobTotal,
     stopPollingCard,
   } = cards;
+
+  const strategyFlow = useGenerationStrategyFlow({
+    buildInputSnapshot: buildVideoStrategySnapshot,
+  });
+
+  const {
+    workflowStep,
+    strategyBrief,
+    strategyItems: videoStrategyItems,
+    strategySnapshot,
+    strategyDirty,
+    strategyLoading,
+    strategyPanelVisible,
+    canGenerateWithStrategy,
+    startStrategyLoading,
+    setStrategyResult,
+    resetStrategy,
+    setStrategyStep,
+    updateStrategyItem,
+    reorderStrategyItems: reorderVideoStrategyItems,
+    backToConfig,
+  } = strategyFlow;
 
   const { aiLoading, generateSellingPointsWithAI } = useAiSellingPointsWriter({
     toast,
@@ -165,6 +215,7 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
       settings.duration = 6;
       settings.resolution = "720p";
       settings.productInput = "";
+      resetStrategy("config");
     },
     applyJobData(data) {
       restoreVideoJobData(data);
@@ -180,6 +231,7 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
         resultUrl: item.result_url || "",
         errorMessage: item.error_message || "",
         progress: item.progress || 0,
+        strategyContent: item.prompt_snapshot?.user || "",
         sortOrder: item.sort_order || 0,
       });
     },
@@ -219,6 +271,22 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
     downloadSingleMedia: downloadSingleVideo,
   } = actions;
 
+  const hasRunningTasks = computed(() => runningCount.value > 0 || creatingBatch.value || generating.value);
+  const canGenerateStrategy = computed(() => {
+    const images = uploadedImages.value.filter((item) => item?.url);
+    return (
+      !getRequiredImageMessage(selectedType.value.inputMode, images.length) &&
+      !uploadedImages.value.some((item) => item?.uploading) &&
+      !strategyLoading.value &&
+      !creatingBatch.value &&
+      !hasRunningTasks.value
+    );
+  });
+  const strategyMetaText = computed(
+    () =>
+      `${selectedType.value.title} / ${getOptionLabel(videoMarketOptions, settings.market)} / ${getOptionLabel(videoLanguageOptions, settings.language)} / ${selectedSize.value.aspectRatio}`,
+  );
+
   function createCard({
     taskId,
     typeId,
@@ -231,16 +299,18 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
     progress = 0,
     sortOrder = outputCards.value.length,
     batchRunId = "",
+    strategyContent = "",
   }) {
     const scene = getSnapshotScene(settingsSnapshot);
     const productInput = typeof scene.productInput === "string" ? scene.productInput : "";
+    const content = strategyContent || productInput;
     const card = cards.createCard({
       typeId,
       strategyTitle: title || "商品视频",
-      strategyContent: productInput,
+      strategyContent: content,
       sortOrder,
       batchRunId,
-      userPrompt: productInput,
+      userPrompt: content,
       settingsSnapshot,
     });
     card.taskId = taskId || "";
@@ -284,6 +354,88 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
       uploadedImages.value = [];
     }
     mainImageIndex.value = 0;
+
+    if (Array.isArray(data.structure) && data.structure.length > 0) {
+      setStrategyResult({
+        brief: getSnapshotScene(data.settings || {}).strategyBrief || "",
+        items: normalizeVideoStrategyItems(data.structure),
+        snapshot: buildVideoStrategySnapshot(),
+        step: "strategy-review",
+      });
+    } else {
+      resetStrategy("config");
+    }
+  }
+
+  async function triggerStrategyGeneration() {
+    const imageUrls = uploadedImages.value.map((item) => item?.url).filter(Boolean);
+    const requirementMessage = getRequiredImageMessage(selectedType.value.inputMode, imageUrls.length);
+    if (requirementMessage) {
+      toast?.info?.(requirementMessage);
+      return;
+    }
+    if (uploadedImages.value.some((item) => item?.uploading)) {
+      toast?.info?.("素材还在上传中，请稍等");
+      return;
+    }
+    if (hasRunningTasks.value) {
+      toast?.info?.("当前视频任务还在生成中，请稍后再生成脚本策略");
+      return;
+    }
+
+    const inputSnapshot = buildVideoStrategySnapshot();
+    startStrategyLoading({ snapshot: inputSnapshot });
+
+    try {
+      const result = await generateVideoStrategy({
+        type_id: selectedType.value.typeId,
+        name: selectedType.value.title,
+        input_mode: selectedType.value.inputMode,
+        images: inputSnapshot.images,
+        market: settings.market,
+        language: settings.language,
+        duration: settings.duration,
+        aspect_ratio: selectedSize.value.aspectRatio,
+        product_input: settings.productInput,
+      });
+
+      if (result.code !== 0) {
+        toast?.error?.(result.message || "视频策略生成失败，请稍后重试");
+        setStrategyStep("config");
+        return;
+      }
+
+      const items = Array.isArray(result.data?.items) ? result.data.items : [];
+      if (items.length === 0) {
+        toast?.error?.("AI 未返回有效视频策略");
+        setStrategyStep("config");
+        return;
+      }
+
+      const normalizedItems = normalizeVideoStrategyItems(items);
+      setStrategyResult({
+        brief: result.data?.brief || `已生成「${selectedType.value.title}」视频脚本策略。`,
+        items: normalizedItems,
+        snapshot: inputSnapshot,
+      });
+      toast?.success?.("视频脚本策略已生成，可编辑后继续出片");
+    } catch (error) {
+      const status = error.response?.status;
+      if (status === 401) {
+        toast?.error?.("登录已过期，请重新登录");
+      } else {
+        toast?.error?.(error.response?.data?.message || "视频策略生成失败，请稍后重试");
+      }
+      setStrategyStep("config");
+    }
+  }
+
+  async function confirmStrategyAndGenerate() {
+    if (!canGenerateWithStrategy.value) {
+      toast?.info?.(strategyDirty.value ? "配置已变化，请重新生成视频策略" : "请先生成视频策略");
+      return;
+    }
+    await generateProductVideo();
   }
 
   async function generateProductVideo() {
@@ -303,8 +455,13 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
       toast?.info?.("素材还在上传中，请稍等");
       return;
     }
+    const videoScript = getConfirmedVideoScript();
+    if (!videoScript) {
+      toast?.info?.("请先生成并确认视频策略");
+      return;
+    }
 
-    const settingsSnapshot = buildSettingsSnapshot(settings);
+    const settingsSnapshot = attachVideoStrategyBrief(buildSettingsSnapshot(settings), strategyBrief.value);
     const queue = [{ ...selectedType }];
 
     await enqueueMediaBatch({
@@ -320,9 +477,9 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
           previewUrl: img.url || img.previewUrl,
         })),
         input_text: settings.productInput,
-        structure: [selectedType],
+        structure: videoStrategyItems.value,
       },
-      initialLogs: [`[${selectedType.title}] 创建视频任务`],
+      initialLogs: [`[${selectedType.title}] 创建视频任务`, "读取视频脚本策略与平台规范..."],
       repeatLog: `[${selectedType.title}] 创建视频任务`,
       buildSettingsSnapshot: () => settingsSnapshot,
       createCard({ item, sortOrder, batchRunId, settingsSnapshot: snapshot }) {
@@ -330,6 +487,7 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
           typeId: item.typeId,
           title: item.title,
           settingsSnapshot: snapshot,
+          strategyContent: videoScript,
           sortOrder,
           batchRunId,
         });
@@ -340,7 +498,7 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
           title: item.title,
           input_mode: item.inputMode,
           image_urls: imageUrls,
-          user_prompt: settings.productInput,
+          user_prompt: videoScript,
           duration: settings.duration,
           resolution: settings.resolution,
           aspect_ratio: getSnapshotScene(snapshot).aspectRatio || snapshot.ratio,
@@ -357,6 +515,69 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
       insertCards: "after-success",
       preferCreateErrorAsToast: true,
     });
+  }
+
+  function buildVideoStrategySnapshot() {
+    return {
+      scenario: "product_video",
+      type_id: selectedType.value.typeId,
+      input_mode: selectedType.value.inputMode,
+      market: settings.market,
+      language: settings.language,
+      duration: settings.duration,
+      aspect_ratio: selectedSize.value.aspectRatio,
+      product_input: settings.productInput,
+      images: buildVideoAnalyzeImages(selectedType.value.inputMode, uploadedImages.value),
+    };
+  }
+
+  function normalizeVideoStrategyItems(items) {
+    const source = Array.isArray(items) ? items : [];
+    return source.slice(0, 1).map((item) => {
+      const type = getVideoDemoType(item.id || settings.videoType);
+      return {
+        id: item.id || type.typeId,
+        name: item.name || type.title,
+        opening: item.opening || "",
+        motion: item.motion || "",
+        sellingPoints: item.sellingPoints || "",
+        visualStyle: item.visualStyle || "",
+        avoid: item.avoid || "",
+        content: item.content || [item.opening, item.motion, item.sellingPoints, item.visualStyle, item.avoid].filter(Boolean).join("\n"),
+      };
+    });
+  }
+
+  function updateVideoStrategyItem(index, patch) {
+    const nextPatch = { ...patch };
+    if (
+      Object.keys(patch).some((key) =>
+        ["opening", "motion", "sellingPoints", "visualStyle", "avoid"].includes(key),
+      )
+    ) {
+      const current = videoStrategyItems.value[index] || {};
+      nextPatch.content = composeVideoStrategyContent({
+        ...current,
+        ...nextPatch,
+      });
+    }
+    updateStrategyItem(index, nextPatch);
+  }
+
+  function composeVideoStrategyContent(item) {
+    return [
+      item.opening && `开场：${item.opening}`,
+      item.motion && `镜头运动：${item.motion}`,
+      item.sellingPoints && `卖点呈现：${item.sellingPoints}`,
+      item.visualStyle && `画面风格：${item.visualStyle}`,
+      item.avoid && `避免事项：${item.avoid}`,
+    ]
+      .filter(Boolean)
+      .join("\n");
+  }
+
+  function getConfirmedVideoScript() {
+    return (videoStrategyItems.value[0]?.content || "").trim();
   }
 
   async function removeCard(card) {
@@ -393,6 +614,17 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
     mainImageIndex,
     creditCosts,
     aiLoading,
+    workflowStep,
+    strategyBrief,
+    strategySnapshot,
+    strategyDirty,
+    strategyLoading,
+    strategyPanelVisible,
+    canGenerateWithStrategy,
+    videoStrategyItems,
+    estimatedCredits,
+    canGenerateStrategy,
+    strategyMetaText,
     currentJobId,
     currentTaskTitle,
     historyTasks,
@@ -412,6 +644,11 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
     updateSettings,
     showNotice,
     generateSellingPointsWithAI,
+    triggerStrategyGeneration,
+    confirmStrategyAndGenerate,
+    updateVideoStrategyItem,
+    reorderVideoStrategyItems,
+    backToConfig,
     generateProductVideo,
     createNewTask,
     resetWorkspaceToDraft,

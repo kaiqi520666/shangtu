@@ -10,7 +10,6 @@ import VideoQualitySelector from "@/components/product-video/VideoQualitySelecto
 import VideoTypeSelector from "@/components/product-video/VideoTypeSelector.vue";
 import {
   defaultVideoCreditCosts,
-  getVideoCreditCost,
   getVideoDemoType,
   videoLanguageOptions,
   videoMarketOptions,
@@ -38,6 +37,14 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  canGenerateStrategy: {
+    type: Boolean,
+    default: false,
+  },
+  strategyLoading: {
+    type: Boolean,
+    default: false,
+  },
   generateSellingPoints: {
     type: Function,
     required: true,
@@ -49,7 +56,7 @@ const emit = defineEmits([
   "update:uploadedImages",
   "update:mainImageIndex",
   "notify",
-  "generate",
+  "generate-strategy",
 ]);
 
 const showAiPopover = ref(false);
@@ -98,26 +105,21 @@ const badgeTextResolver = computed(() => {
   if (selectedType.value.inputMode !== "first_last_frame") return null;
   return (index) => (index === 0 ? "开始" : "结束");
 });
-const estimatedCredits = computed(() =>
-  getVideoCreditCost({
-    resolution: props.settings.resolution,
-    duration: props.settings.duration,
-    costs: props.creditCosts,
-  }),
-);
 const generateDisabled = computed(() => {
+  if (props.strategyLoading) return true;
   if (props.uploadedImages.some((img) => img?.uploading)) return true;
   if (selectedType.value.inputMode === "first_last_frame") return props.uploadedImages.length < 2;
   return props.uploadedImages.length < 1;
 });
 const generateText = computed(() => {
+  if (props.strategyLoading) return "AI 正在生成脚本...";
   if (props.uploadedImages.some((img) => img?.uploading)) return "素材上传中...";
   if (generateDisabled.value) {
     if (selectedType.value.inputMode === "first_last_frame") return "请上传开始图和结束图";
     if (selectedType.value.inputMode === "reference_images") return "请至少上传 1 张参考图";
     return "请上传 1 张首帧图";
   }
-  return `生成视频 · ${estimatedCredits.value || "-"} 积分`;
+  return "AI 生成视频策略";
 });
 
 function updateSetting(key, value) {
@@ -275,9 +277,9 @@ function notifyPending(featureName) {
     <template #footer>
       <GeneratorActionFooter
         :primary-text="generateText"
-        :primary-disabled="generateDisabled"
+        :primary-disabled="!canGenerateStrategy || generateDisabled"
         secondary-text="保存草稿"
-        @primary="emit('generate')"
+        @primary="emit('generate-strategy')"
         @secondary="notifyPending('草稿保存')"
       >
         <template #primary-icon>

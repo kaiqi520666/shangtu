@@ -5,6 +5,7 @@ import GenerationHistoryDrawer from "@/components/generation/GenerationHistoryDr
 import GenerationPreviewModal from "@/components/generation/GenerationPreviewModal.vue";
 import GenerationWorkspace from "@/components/generation/GenerationWorkspace.vue";
 import GeneratorLayout from "@/components/layout/GeneratorLayout.vue";
+import ProductVideoStrategyReviewPanel from "@/components/product-video/ProductVideoStrategyReviewPanel.vue";
 import VideoSettingsPanel from "@/components/product-video/VideoSettingsPanel.vue";
 import { useGeneratorRouteJob } from "@/composables/useGeneratorRouteJob.js";
 import { useProductVideoGenerator } from "@/composables/useProductVideoGenerator.js";
@@ -53,18 +54,36 @@ function closeHistoryDrawer() {
 
 <template>
   <GeneratorLayout>
+    <ProductVideoStrategyReviewPanel
+      v-if="video.strategyPanelVisible.value"
+      placement="side"
+      :loading="video.strategyLoading.value"
+      :brief="video.strategyBrief.value"
+      :items="video.videoStrategyItems.value"
+      :meta-text="video.strategyMetaText.value"
+      :dirty="video.strategyDirty.value"
+      :estimated-credits="video.estimatedCredits.value"
+      @back="video.backToConfig"
+      @confirm="video.confirmStrategyAndGenerate"
+      @update-item="video.updateVideoStrategyItem"
+      @reorder-items="video.reorderVideoStrategyItems"
+    />
+
     <VideoSettingsPanel
+      v-else
       :settings="video.settings"
       :uploaded-images="video.uploadedImages.value"
       :main-image-index="video.mainImageIndex.value"
       :credit-costs="video.creditCosts.value"
       :ai-loading="video.aiLoading.value"
+      :can-generate-strategy="video.canGenerateStrategy.value"
+      :strategy-loading="video.strategyLoading.value"
       :generate-selling-points="video.generateSellingPointsWithAI"
       @update:settings="video.updateSettings"
       @update:uploaded-images="video.uploadedImages.value = $event"
       @update:main-image-index="video.mainImageIndex.value = $event"
       @notify="video.showNotice"
-      @generate="video.generateProductVideo"
+      @generate-strategy="video.triggerStrategyGeneration"
     />
 
     <GenerationWorkspace

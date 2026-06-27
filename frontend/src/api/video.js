@@ -4,6 +4,10 @@ export function getVideoCreditCosts() {
   return request.get("/video/credit-costs", { timeout: 15000 });
 }
 
+export function generateVideoStrategy(payload) {
+  return request.post("/video/strategy", payload, { timeout: 120000 });
+}
+
 export function generateVideo({
   type_id,
   title = null,

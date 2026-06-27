@@ -262,6 +262,58 @@ JSON 格式：
 }}"""
 
 
+def build_video_strategy_prompt(
+    *,
+    type_id: str,
+    name: str,
+    input_mode: str,
+    market: str,
+    language: str,
+    duration: int,
+    aspect_ratio: str,
+    product_input: str,
+    template_prompt: str | None = None,
+) -> str:
+    base_prompt = template_prompt.strip() if template_prompt else "你是资深电商短视频脚本策划和视觉导演。"
+    return f"""{base_prompt}
+请结合用户上传的视频素材图、用户选择的视频方向和补充要求，生成一条可编辑的商品视频脚本策略。
+
+视频方向：{name or type_id}
+素材模式：{input_mode or '未指定'}
+目标市场/平台：{market or '未指定'}
+最终成片文字/配音语言：{language or '中文'}
+视频时长：{duration}秒
+画面比例：{aspect_ratio or '未指定'}
+
+用户补充要求：
+{product_input or '无'}
+
+输出要求：
+1. 只输出 JSON，不要 markdown，不要解释，不要代码块。
+2. items 固定 1 条，id 必须等于 {json.dumps(type_id, ensure_ascii=False)}。
+3. 所有 JSON 字段都必须用中文撰写；最终成片如需文字或配音，会按“最终成片文字/配音语言”翻译呈现。
+4. opening、motion、sellingPoints、visualStyle、avoid 要能直接指导视频生成；content 是给用户编辑和后续生视频 prompt 使用的完整脚本。
+5. 不要编造品牌 Logo、认证、价格、销量、型号、具体参数；如果素材和补充要求中没有明确依据，只做谨慎表达。
+6. 策略要适合电商短视频，节奏清晰，主体稳定，商品外观一致，避免无意义镜头和过度夸张表达。
+
+JSON 格式：
+{{
+  "brief": "一句话概括本次视频脚本方向",
+  "items": [
+    {{
+      "id": "{type_id}",
+      "name": "{name or type_id}",
+      "opening": "前 1-2 秒用商品核心画面或使用痛点快速开场。",
+      "motion": "镜头缓慢推进，商品保持清晰稳定，展示关键结构和使用场景。",
+      "sellingPoints": "突出商品核心卖点、适用人群和使用收益。",
+      "visualStyle": "自然光、高级电商质感、节奏轻快但不过度花哨。",
+      "avoid": "避免改变商品颜色、材质、结构；避免虚构品牌、价格、认证和夸张功效。",
+      "content": "开场：...\\n镜头运动：...\\n卖点呈现：...\\n画面风格：...\\n避免事项：..."
+    }}
+  ]
+}}"""
+
+
 async def analyze_product_image(
     *,
     images: list[dict],
@@ -619,6 +671,62 @@ def _normalize_outfit_strategy_response(parsed: dict, selected_scenes: list[dict
     return {"brief": brief, "items": items}
 
 
+def _fallback_video_content(item: dict) -> str:
+    return "\n".join(
+        [
+            f"开场：围绕「{item['name']}」方向，用商品核心画面快速建立观看兴趣。",
+            "镜头运动：镜头保持稳定，适度推进、平移或切换细节，突出商品真实外观。",
+            "卖点呈现：结合用户补充要求，展示商品适用场景、核心卖点和使用价值。",
+            "画面风格：电商短视频质感，主体清晰，节奏紧凑，画面干净。",
+            "避免事项：不要改变商品颜色、材质、结构，不要虚构品牌、价格、认证或无法确认的信息。",
+        ]
+    )
+
+
+def _normalize_video_strategy_response(parsed: dict, selected_item: dict) -> dict:
+    raw_items = parsed.get("items")
+    if not isinstance(raw_items, list):
+        raw_items = []
+    raw = next(
+        (
+            item
+            for item in raw_items
+            if isinstance(item, dict) and item.get("id") == selected_item["id"]
+        ),
+        raw_items[0] if raw_items and isinstance(raw_items[0], dict) else {},
+    )
+    opening = _stringify_content(raw.get("opening"))
+    motion = _stringify_content(raw.get("motion"))
+    selling_points = _stringify_content(raw.get("sellingPoints"))
+    visual_style = _stringify_content(raw.get("visualStyle"))
+    avoid = _stringify_content(raw.get("avoid"))
+    content = _stringify_content(raw.get("content"))
+    if not content:
+        content = "\n".join(
+            part
+            for part in [
+                opening and f"开场：{opening}",
+                motion and f"镜头运动：{motion}",
+                selling_points and f"卖点呈现：{selling_points}",
+                visual_style and f"画面风格：{visual_style}",
+                avoid and f"避免事项：{avoid}",
+            ]
+            if part
+        )
+    item = {
+        "id": selected_item["id"],
+        "name": selected_item["name"],
+        "opening": opening,
+        "motion": motion,
+        "sellingPoints": selling_points,
+        "visualStyle": visual_style,
+        "avoid": avoid,
+        "content": content or _fallback_video_content(selected_item),
+    }
+    brief = _stringify_content(parsed.get("brief")) or f"已生成「{selected_item['name']}」视频脚本策略。"
+    return {"brief": brief, "items": [item]}
+
+
 async def _request_dashscope_strategy_json(*, images: list[dict], prompt: str) -> dict:
     content = build_multimodal_image_content(images)
     content.append(
@@ -767,3 +875,38 @@ async def generate_image_strategy(
     )
     parsed = await _request_dashscope_strategy_json(images=images, prompt=prompt)
     return _normalize_strategy_result(normalized_scenario, parsed, selected_items)
+
+
+async def generate_video_strategy(
+    *,
+    type_id: str,
+    name: str,
+    input_mode: str,
+    market: str = "",
+    language: str = "中文",
+    duration: int = 6,
+    aspect_ratio: str = "9:16",
+    product_input: str = "",
+    images: list[dict],
+    template_prompt: str | None = None,
+) -> dict:
+    normalized_type_id = str(type_id or "").strip()
+    if not normalized_type_id:
+        raise ValueError("视频策略缺少视频方向")
+    selected_item = {
+        "id": normalized_type_id,
+        "name": str(name or "").strip() or normalized_type_id,
+    }
+    prompt = build_video_strategy_prompt(
+        type_id=selected_item["id"],
+        name=selected_item["name"],
+        input_mode=str(input_mode or "").strip(),
+        market=market,
+        language=language,
+        duration=duration,
+        aspect_ratio=aspect_ratio,
+        product_input=product_input.strip()[:4000],
+        template_prompt=template_prompt,
+    )
+    parsed = await _request_dashscope_strategy_json(images=images, prompt=prompt)
+    return _normalize_video_strategy_response(parsed, selected_item)

@@ -40,6 +40,10 @@ const props = defineProps({
     type: String,
     default: "个项目",
   },
+  showItemCount: {
+    type: Boolean,
+    default: true,
+  },
   confirmText: {
     type: String,
     default: "生成图片",
@@ -192,7 +196,10 @@ function handleItemRemove(localIndex) {
             <div class="min-w-0">
               <div class="flex flex-wrap items-center gap-2">
                 <h3 class="text-sm font-bold text-slate-900">{{ successTitle }}</h3>
-                <span class="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary">
+                <span
+                  v-if="showItemCount"
+                  class="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary"
+                >
                   {{ itemCountText }}
                 </span>
                 <span

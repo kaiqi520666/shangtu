@@ -409,6 +409,20 @@ def _template_rows() -> list[dict]:
             ),
         },
         {
+            "scenario": "product_video",
+            "purpose": "strategy",
+            "platform": None,
+            "type_id": None,
+            "model": "qwen3.6-flash",
+            "name": "商品视频-策略生成规则",
+            "content": (
+                "你是资深电商短视频脚本策划和视觉导演。请结合用户上传的视频素材图、用户选择的视频方向和补充要求，"
+                "生成一条可编辑的商品视频脚本策略。只输出 JSON，不要 markdown；items 固定 1 条；"
+                "所有字段必须用中文撰写，最终成片文字或配音会按用户选择语言呈现。脚本应包含开场、镜头运动、"
+                "卖点呈现、画面风格和避免事项，保持商品主体、颜色、材质、结构和核心外观一致。"
+            ),
+        },
+        {
             "scenario": None,
             "purpose": "ai_write",
             "platform": None,
@@ -520,19 +534,6 @@ def _template_rows() -> list[dict]:
             ]
         )
 
-    for type_id, video_name, content in PRODUCT_VIDEO_TYPES:
-        rows.append(
-            {
-                "scenario": "product_video",
-                "purpose": "video_generate",
-                "platform": None,
-                "type_id": type_id,
-                "model": "seedance-2",
-                "name": f"商品视频-{video_name}默认用户提示词",
-                "content": content,
-            }
-        )
-
     for type_id, video_name, focus in PRODUCT_VIDEO_AI_WRITE_TYPES:
         rows.append(
             {
@@ -597,6 +598,7 @@ async def upsert_templates() -> tuple[int, int, int]:
 
     async with SessionLocal() as db:
         await delete_redundant_image_type_templates(db)
+        await delete_redundant_video_type_templates(db)
         for row in rows:
             result = await db.execute(
                 select(PromptTemplate).where(*_exact_filter(row)).limit(1)
@@ -631,6 +633,17 @@ async def delete_redundant_image_type_templates(db) -> None:
             PromptTemplate.purpose == "image_generate",
             PromptTemplate.model == "gpt-image-2",
             PromptTemplate.scenario.in_(["product_image", "product_suite", "outfit"]),
+            PromptTemplate.type_id.is_not(None),
+        )
+    )
+
+
+async def delete_redundant_video_type_templates(db) -> None:
+    await db.execute(
+        delete(PromptTemplate).where(
+            PromptTemplate.purpose == "video_generate",
+            PromptTemplate.model == "seedance-2",
+            PromptTemplate.scenario == "product_video",
             PromptTemplate.type_id.is_not(None),
         )
     )
@@ -736,19 +749,32 @@ async def verify_lookup() -> None:
             scenario="product_video",
             purpose="video_generate",
             platform="global",
-            type_id="ugc_seeding",
+            type_id=None,
             model="seedance-2",
         )
         video_names = [template.name for template in video.templates]
         video_required = {
             "商品视频-生成通用规则",
-            "商品视频-UGC种草默认用户提示词",
         }
         video_missing = video_required - set(video_names)
         if video_missing:
             raise RuntimeError(
                 f"商品视频提示词模板查询缺少: {', '.join(sorted(video_missing))}"
             )
+        if any(template.type_id for template in video.templates):
+            raise RuntimeError("商品视频生成模板不应返回 type_id 级默认提示词")
+
+        video_strategy = await get_prompt_templates(
+            db,
+            scenario="product_video",
+            purpose="strategy",
+            platform="global",
+            type_id=None,
+            model="qwen3.6-flash",
+        )
+        video_strategy_names = [template.name for template in video_strategy.templates]
+        if "商品视频-策略生成规则" not in video_strategy_names:
+            raise RuntimeError("商品视频策略模板查询缺少: 商品视频-策略生成规则")
 
         video_ai_write = await get_prompt_templates(
             db,
@@ -768,6 +794,7 @@ async def verify_lookup() -> None:
         print("outfit strategy order:", " -> ".join(outfit_strategy_names))
         print("outfit order:", " -> ".join(outfit_names))
         print("video order:", " -> ".join(video_names))
+        print("video strategy order:", " -> ".join(video_strategy_names))
         print("video ai_write order:", " -> ".join(video_ai_write_names))
 
 

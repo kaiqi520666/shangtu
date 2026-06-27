@@ -136,16 +136,6 @@ def _format_task_prompt(
     return "\n".join(line for line in lines if line)
 
 
-def _split_templates_by_type(templates, type_id: str | None) -> tuple[list, list]:
-    type_templates = [
-        template
-        for template in templates
-        if template.type_id and template.type_id == type_id
-    ]
-    system_templates = [template for template in templates if not template.type_id]
-    return system_templates, type_templates
-
-
 async def build_image_generate_prompt(
     db: AsyncSession,
     *,
@@ -226,31 +216,17 @@ async def build_video_generate_prompt(
         scenario="product_video",
         purpose="video_generate",
         platform=platform,
-        type_id=type_id,
+        type_id=None,
         model=VIDEO_GENERATE_MODEL,
     )
-    system_templates, type_templates = _split_templates_by_type(lookup.templates, type_id)
     system_prompt = "\n\n".join(
         template.content.strip()
-        for template in system_templates
+        for template in lookup.templates
         if template.content and template.content.strip()
     )
-    default_user_prompt = "\n\n".join(
-        template.content.strip()
-        for template in type_templates
-        if template.content and template.content.strip()
-    )
-    product_requirement = (user_prompt or "").strip()
-    if default_user_prompt and product_requirement:
-        effective_user_prompt = (
-            f"{default_user_prompt}\n\n"
-            "【商品卖点与视频要求】\n"
-            f"{product_requirement}"
-        )
-    else:
-        effective_user_prompt = product_requirement or default_user_prompt
+    effective_user_prompt = (user_prompt or "").strip()
     if not effective_user_prompt:
-        raise ValueError("未找到当前视频方向的默认提示词，请检查提示词模板配置")
+        raise ValueError("请先生成并确认视频策略")
 
     task_prompt = "\n".join(
         line
@@ -263,7 +239,7 @@ async def build_video_generate_prompt(
             f"【清晰度】{resolution}",
             f"【时长】{duration}秒",
             f"【参考素材模式】{input_mode}",
-            "【强约束】保持用户上传商品图里的主体、颜色、材质、结构和核心外观一致；不要虚构品牌 Logo、认证、价格、销量或无法确认的参数。",
+            "【强约束】保持用户上传商品图里的主体、颜色、材质、结构和核心外观一致；不要虚构品牌 Logo、认证、价格、销量或无法确认的参数；如需出现文字或配音，必须使用上述指定语言，简洁清晰。",
         ]
         if line
     )
