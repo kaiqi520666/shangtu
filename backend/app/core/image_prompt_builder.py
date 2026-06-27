@@ -166,23 +166,17 @@ async def build_image_generate_prompt(
         scenario=job.scenario,
         purpose="image_generate",
         platform=platform,
-        type_id=type_id,
+        type_id=None,
         model=IMAGE_GENERATE_MODEL,
     )
-    system_templates, type_templates = _split_templates_by_type(lookup.templates, type_id)
     system_prompt = "\n\n".join(
         template.content.strip()
-        for template in system_templates
+        for template in lookup.templates
         if template.content and template.content.strip()
     )
-    default_user_prompt = "\n\n".join(
-        template.content.strip()
-        for template in type_templates
-        if template.content and template.content.strip()
-    )
-    effective_user_prompt = (user_prompt or "").strip() or default_user_prompt
+    effective_user_prompt = (user_prompt or "").strip()
     if not effective_user_prompt:
-        raise ValueError("未找到当前图种的默认提示词，请检查提示词模板配置")
+        raise ValueError("请先生成并确认图片策略")
     task_prompt = _format_task_prompt(
         settings=settings,
         job=job,

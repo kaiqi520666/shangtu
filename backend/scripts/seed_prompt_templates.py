@@ -4,7 +4,7 @@ import asyncio
 import sys
 from pathlib import Path
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
@@ -15,50 +15,6 @@ from app.core.prompt_templates import get_prompt_templates  # noqa: E402
 from app.core.time import utc_now  # noqa: E402
 from app.models import PromptTemplate  # noqa: E402
 import app.models  # noqa: E402,F401
-
-
-PRODUCT_SUITE_TYPES = [
-    {
-        "type_id": "white-bg",
-        "name": "商品套图-白底图默认用户提示词",
-        "content": "生成白底商品图：纯净浅色或白色背景，商品主体居中完整展示，轮廓清晰，光影自然，适合作为电商主图。",
-    },
-    {
-        "type_id": "scene",
-        "name": "商品套图-场景图默认用户提示词",
-        "content": "生成真实使用场景图：围绕商品用途构建可信场景，保持商品主体准确，强化购买代入感，避免喧宾夺主。",
-    },
-    {
-        "type_id": "selling-point",
-        "name": "商品套图-卖点图默认用户提示词",
-        "content": "生成卖点展示图：突出商品核心优势，信息层级清晰，可加入简洁文字信息块，但不得虚构品牌、认证、价格、销量或无法确认的参数。",
-    },
-    {
-        "type_id": "detail",
-        "name": "商品套图-细节图默认用户提示词",
-        "content": "生成商品细节图：展示材质、结构、功能或工艺细节，可使用局部放大、标注线和简洁说明，帮助用户理解商品品质。",
-    },
-]
-
-
-PRODUCT_IMAGE_TYPES = [
-    ("first-screen", "首屏主视觉", "用首屏大图和清晰标题，在第一眼传达商品核心价值。"),
-    ("core-selling", "核心卖点图", "围绕三到五个核心卖点组织画面，突出商品优势和购买理由。"),
-    ("use-scenario", "使用场景图", "呈现商品真实使用状态或空间融入效果，增强用户代入感。"),
-    ("multi-angle", "多角度呈现图", "展示商品正面、侧面、背面或关键形态变化，保证比例和透视准确。"),
-    ("ambient-scene", "场景氛围图", "通过光影、材质和环境氛围提升商品质感，但商品主体仍需清晰可辨。"),
-    ("detail-zoom", "商品细节图", "用局部放大、拉线批注或特写方式展示材质、接口、纹理、工艺等细节。"),
-    ("brand-story", "品牌故事图", "表达品牌调性、使用理念或品质感，不虚构品牌历史、认证或官方背书。"),
-    ("specs-info", "尺寸/规格/容量图", "用标注线、比例尺或结构化信息表达尺寸、容量、规格等已知信息。"),
-    ("contrast-effect", "效果对比图", "呈现使用前后、升级前后或普通款与升级款的对比关系，避免绝对化承诺。"),
-    ("tech-specs", "详细规格/参数表", "将明确可确认的参数整理成清晰表格或信息面板，不补造未知参数。"),
-    ("manufacturing", "工艺制作图", "展示材质层级、制作工艺或结构拆解，画面专业但不夸大工艺来源。"),
-    ("freebies", "配件/赠品图", "展示包装、配件或赠品组合，仅展示用户明确提供或图片中可确认的内容。"),
-    ("series-show", "系列展示图", "展示多颜色、多规格或系列组合，未提供 SKU 时不要虚构具体款式。"),
-    ("ingredients", "商品成分图", "清晰展示成分、材质或配料信息，只使用用户输入中确认的内容。"),
-    ("warranty", "售后保障图", "表达售后、质保或服务信息时必须基于用户提供内容，不虚构官方承诺。"),
-    ("usage-tips", "使用建议图", "以简洁图标或步骤说明展示使用、保养、安装或注意事项。"),
-]
 
 
 PRODUCT_VIDEO_TYPES = [
@@ -152,45 +108,6 @@ PRODUCT_VIDEO_AI_WRITE_TYPES = [
         "reaction",
         "反应展示",
         "重点分析展示前状态、使用后反应、人物动作反馈和情绪变化。输出要自然可信，不要夸张表演或无法确认的效果。",
-    ),
-]
-
-
-OUTFIT_SCENE_TYPES = [
-    (
-        "studio",
-        "纯色棚拍",
-        "纯色或浅灰棚拍背景，柔和商业摄影布光，模特自然站立展示服装整体版型、长度、肩线和垂坠感，画面干净专业。",
-    ),
-    (
-        "street",
-        "都市街头",
-        "都市街头场景，干净街区、自然日光或轻微电影感光影，模特自然行走或站立，突出服装的日常穿搭感和街拍质感。",
-    ),
-    (
-        "cafe",
-        "街角咖啡",
-        "街角咖啡店或轻松休闲空间，暖色自然光，模特坐姿或站姿自然放松，强化服装的生活方式氛围和亲和力。",
-    ),
-    (
-        "lawn",
-        "自然草坪",
-        "自然草坪或公园绿地场景，柔和户外光线，背景清爽不过度杂乱，呈现舒适、清新、自然的穿搭氛围。",
-    ),
-    (
-        "beach",
-        "度假海滩",
-        "度假海滩或滨海步道场景，明亮自然光和轻松假日氛围，模特姿态自然，突出服装在户外度假场景中的搭配效果。",
-    ),
-    (
-        "home",
-        "温馨居家",
-        "温馨居家室内场景，柔和窗光、简洁家具和舒适氛围，模特自然坐立或轻松活动，展示服装的居家穿搭质感。",
-    ),
-    (
-        "gallery",
-        "艺术展馆",
-        "艺术展馆或现代极简空间，留白充足、线条干净、光影高级，模特姿态克制自然，突出服装的时尚感和高级质感。",
     ),
 ]
 
@@ -603,32 +520,6 @@ def _template_rows() -> list[dict]:
             ]
         )
 
-    for item in PRODUCT_SUITE_TYPES:
-        rows.append(
-            {
-                "scenario": "product_suite",
-                "purpose": "image_generate",
-                "platform": None,
-                "type_id": item["type_id"],
-                "model": "gpt-image-2",
-                "name": item["name"],
-                "content": item["content"],
-            }
-        )
-
-    for type_id, module_name, content in PRODUCT_IMAGE_TYPES:
-        rows.append(
-            {
-                "scenario": "product_image",
-                "purpose": "image_generate",
-                "platform": None,
-                "type_id": type_id,
-                "model": "gpt-image-2",
-                "name": f"商品详情图-{module_name}默认用户提示词",
-                "content": content,
-            }
-        )
-
     for type_id, video_name, content in PRODUCT_VIDEO_TYPES:
         rows.append(
             {
@@ -652,19 +543,6 @@ def _template_rows() -> list[dict]:
                 "model": "qwen3.6-flash",
                 "name": f"商品视频-{video_name}AI帮写规则",
                 "content": "\n\n".join([focus, PRODUCT_VIDEO_AI_WRITE_FORMAT]),
-            }
-        )
-
-    for type_id, scene_name, content in OUTFIT_SCENE_TYPES:
-        rows.append(
-            {
-                "scenario": "outfit",
-                "purpose": "image_generate",
-                "platform": None,
-                "type_id": type_id,
-                "model": "gpt-image-2",
-                "name": f"服饰穿搭-{scene_name}默认用户提示词",
-                "content": content,
             }
         )
 
@@ -718,6 +596,7 @@ async def upsert_templates() -> tuple[int, int, int]:
         await conn.run_sync(Base.metadata.create_all)
 
     async with SessionLocal() as db:
+        await delete_redundant_image_type_templates(db)
         for row in rows:
             result = await db.execute(
                 select(PromptTemplate).where(*_exact_filter(row)).limit(1)
@@ -746,6 +625,17 @@ async def upsert_templates() -> tuple[int, int, int]:
     return inserted, updated, unchanged
 
 
+async def delete_redundant_image_type_templates(db) -> None:
+    await db.execute(
+        delete(PromptTemplate).where(
+            PromptTemplate.purpose == "image_generate",
+            PromptTemplate.model == "gpt-image-2",
+            PromptTemplate.scenario.in_(["product_image", "product_suite", "outfit"]),
+            PromptTemplate.type_id.is_not(None),
+        )
+    )
+
+
 async def verify_lookup() -> None:
     async with SessionLocal() as db:
         for platform in PLATFORM_RULES:
@@ -770,7 +660,7 @@ async def verify_lookup() -> None:
             scenario="product_suite",
             purpose="image_generate",
             platform="亚马逊",
-            type_id="white-bg",
+            type_id=None,
             model="gpt-image-2",
         )
         names = [template.name for template in result.templates]
@@ -778,7 +668,6 @@ async def verify_lookup() -> None:
             "生图通用主体一致规则",
             "亚马逊-生图平台规则",
             "商品套图-生图场景规则",
-            "商品套图-白底图默认用户提示词",
         }
         missing = required - set(names)
         if missing:
@@ -789,7 +678,7 @@ async def verify_lookup() -> None:
             scenario="product_suite",
             purpose="image_generate",
             platform="不存在的平台",
-            type_id="white-bg",
+            type_id=None,
             model="gpt-image-2",
         )
         fallback_names = [template.name for template in fallback.templates]
@@ -827,7 +716,7 @@ async def verify_lookup() -> None:
             scenario="outfit",
             purpose="image_generate",
             platform="亚马逊",
-            type_id="studio",
+            type_id=None,
             model="gpt-image-2",
         )
         outfit_names = [template.name for template in outfit.templates]
@@ -835,7 +724,6 @@ async def verify_lookup() -> None:
             "生图通用主体一致规则",
             "亚马逊-生图平台规则",
             "服饰穿搭-生图场景规则",
-            "服饰穿搭-纯色棚拍默认用户提示词",
         }
         outfit_missing = outfit_required - set(outfit_names)
         if outfit_missing:
