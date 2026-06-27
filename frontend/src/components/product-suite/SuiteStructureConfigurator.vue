@@ -92,28 +92,33 @@ function changeCount(index, step) {
           </span>
 
           <div class="min-w-0 flex-1">
-            <div class="flex items-center justify-between gap-3">
+            <div class="grid grid-cols-[minmax(0,1fr)_7.5rem] items-center gap-3">
               <div class="min-w-0">
                 <h4 class="text-sm font-bold text-slate-900">{{ item.name }}</h4>
                 <p class="mt-1 text-xs leading-relaxed text-slate-500">{{ item.description }}</p>
               </div>
               <div
-                v-if="item.enabled"
-                class="flex shrink-0 items-center rounded-lg border border-slate-200 bg-white p-0.5 shadow-sm"
+                class="flex w-[7.5rem] shrink-0 items-center justify-between rounded-lg border p-0.5 shadow-sm transition-colors"
+                :class="item.enabled ? 'border-slate-200 bg-white' : 'border-slate-200 bg-slate-50 text-slate-400 shadow-none'"
               >
                 <button
                   type="button"
                   class="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
-                  :disabled="item.count <= 1"
+                  :disabled="!item.enabled || item.count <= 1"
                   @click="changeCount(index, -1)"
                 >
                   <Minus class="h-3.5 w-3.5" />
                 </button>
-                <span class="w-7 text-center text-xs font-black text-slate-800">{{ item.count }}</span>
+                <span
+                  class="w-7 text-center text-xs font-black transition-colors"
+                  :class="item.enabled ? 'text-slate-800' : 'text-slate-400'"
+                >
+                  {{ item.count }}
+                </span>
                 <button
                   type="button"
                   class="flex h-7 w-7 items-center justify-center rounded-md text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-40"
-                  :disabled="item.count >= item.maxCount"
+                  :disabled="item.enabled && item.count >= item.maxCount"
                   @click="changeCount(index, 1)"
                 >
                   <Plus class="h-3.5 w-3.5" />
