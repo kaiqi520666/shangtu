@@ -2,6 +2,7 @@
 import { useRouter } from "vue-router";
 import { register } from "@/api/auth.js";
 import AuthForm from "@/components/auth/AuthForm.vue";
+import AuthPageShell from "@/components/auth/AuthPageShell.vue";
 import { useToast } from "@/composables/useToast.js";
 import { useAuthStore } from "@/stores/auth.js";
 
@@ -38,23 +39,10 @@ async function handleRegister(payload) {
 </script>
 
 <template>
-  <div class="grid min-h-screen bg-slate-50 lg:grid-cols-[1fr_480px]">
-    <section
-      class="hidden bg-linear-to-br from-slate-950 via-slate-900 to-emerald-950 p-10 text-white lg:flex lg:flex-col lg:justify-between"
-    >
-      <div class="text-lg font-bold">商图 AI</div>
-      <div>
-        <p class="max-w-xl text-4xl font-bold leading-tight">
-          创建账号，开始搭建你的商品主图流水线。
-        </p>
-        <p class="mt-4 max-w-lg text-sm leading-6 text-slate-300">
-          注册后即可进入生成工作台，上传商品图并批量生成适配多平台的电商视觉素材。
-        </p>
-      </div>
-      <div class="text-xs text-slate-400">商图 AI Generator</div>
-    </section>
-    <section class="flex items-center justify-center bg-white px-6 py-12">
-      <AuthForm mode="register" @submit="handleRegister" />
-    </section>
-  </div>
+  <AuthPageShell
+    headline="创建你的电商视觉工作台。"
+    description="注册后即可管理商品图片、视频生成和资产库，让内容生产从第一天开始保持清爽。"
+  >
+    <AuthForm mode="register" @submit="handleRegister" />
+  </AuthPageShell>
 </template>

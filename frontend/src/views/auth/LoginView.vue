@@ -3,6 +3,7 @@ import { onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { login } from '@/api/auth.js'
 import AuthForm from '@/components/auth/AuthForm.vue'
+import AuthPageShell from '@/components/auth/AuthPageShell.vue'
 import { useToast } from '@/composables/useToast.js'
 import { useAuthStore } from '@/stores/auth.js'
 
@@ -46,17 +47,10 @@ async function handleLogin(payload) {
 </script>
 
 <template>
-  <div class="grid min-h-screen bg-slate-50 lg:grid-cols-[1fr_480px]">
-    <section class="hidden bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 p-10 text-white lg:flex lg:flex-col lg:justify-between">
-      <div class="text-lg font-bold">商图 AI</div>
-      <div>
-        <p class="max-w-xl text-4xl font-bold leading-tight">批量生成适配多平台的商品主图。</p>
-        <p class="mt-4 max-w-lg text-sm leading-6 text-slate-300">用邮箱登录后进入工作台，上传商品图、选择平台和尺寸，一次生成完整电商视觉素材。</p>
-      </div>
-      <div class="text-xs text-slate-400">商图 AI Generator</div>
-    </section>
-    <section class="flex items-center justify-center bg-white px-6 py-12">
-      <AuthForm mode="login" @submit="handleLogin" />
-    </section>
-  </div>
+  <AuthPageShell
+    headline="把商品视觉生产线，放进一个干净的工作台。"
+    description="登录后继续处理商品图、详情图、商品视频和资产沉淀，保持每一次生成都可追踪。"
+  >
+    <AuthForm mode="login" @submit="handleLogin" />
+  </AuthPageShell>
 </template>

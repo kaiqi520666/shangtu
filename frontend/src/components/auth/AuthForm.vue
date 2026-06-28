@@ -23,8 +23,8 @@ const message = ref('')
 
 const isRegister = computed(() => props.mode === 'register')
 const title = computed(() => (isRegister.value ? '创建账号' : '欢迎回来'))
-const subtitle = computed(() => (isRegister.value ? '使用邮箱和密码注册商图 AI' : '登录后继续批量生成商品主图'))
-const buttonText = computed(() => (isRegister.value ? '注册' : '登录'))
+const subtitle = computed(() => (isRegister.value ? '开通你的商图 AI 工作台' : '登录后继续你的内容生产任务'))
+const buttonText = computed(() => (isRegister.value ? '创建账号' : '进入工作台'))
 
 async function handleSubmit() {
   message.value = ''
@@ -59,25 +59,25 @@ async function handleSubmit() {
 </script>
 
 <template>
-  <div class="w-full max-w-sm">
-    <div class="mb-8">
-      <div class="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+  <div class="w-full">
+    <div class="mb-7 text-center">
+      <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-950 text-primary shadow-lg shadow-slate-950/15">
         <Lock class="h-5 w-5" />
       </div>
-      <h1 class="text-2xl font-bold text-slate-900">{{ title }}</h1>
-      <p class="mt-2 text-sm text-slate-500">{{ subtitle }}</p>
+      <h1 class="text-2xl font-black tracking-normal text-slate-950">{{ title }}</h1>
+      <p class="mt-2 text-sm font-medium text-slate-500">{{ subtitle }}</p>
     </div>
 
     <form class="space-y-4" @submit.prevent="handleSubmit">
       <label v-if="isRegister" class="block">
         <span class="mb-1.5 block text-xs font-bold text-slate-500">用户名</span>
-        <span class="flex items-center rounded-xl border border-slate-200 bg-white px-3 transition-colors focus-within:border-primary focus-within:ring-1 focus-within:ring-primary">
+        <span class="flex h-12 items-center rounded-2xl border border-slate-200 bg-slate-50/80 px-3 transition-colors focus-within:border-primary focus-within:bg-white focus-within:ring-2 focus-within:ring-primary/15">
           <UserRound class="h-4 w-4 text-slate-400" />
           <input
             v-model="form.username"
             type="text"
             autocomplete="username"
-            class="min-w-0 flex-1 bg-transparent px-2.5 py-3 text-sm text-slate-800 outline-none placeholder:text-slate-400"
+            class="min-w-0 flex-1 bg-transparent px-2.5 text-sm font-semibold text-slate-800 outline-none placeholder:font-medium placeholder:text-slate-400"
             placeholder="请输入用户名"
           />
         </span>
@@ -85,13 +85,13 @@ async function handleSubmit() {
 
       <label class="block">
         <span class="mb-1.5 block text-xs font-bold text-slate-500">邮箱</span>
-        <span class="flex items-center rounded-xl border border-slate-200 bg-white px-3 transition-colors focus-within:border-primary focus-within:ring-1 focus-within:ring-primary">
+        <span class="flex h-12 items-center rounded-2xl border border-slate-200 bg-slate-50/80 px-3 transition-colors focus-within:border-primary focus-within:bg-white focus-within:ring-2 focus-within:ring-primary/15">
           <Mail class="h-4 w-4 text-slate-400" />
           <input
             v-model="form.email"
             type="email"
             autocomplete="email"
-            class="min-w-0 flex-1 bg-transparent px-2.5 py-3 text-sm text-slate-800 outline-none placeholder:text-slate-400"
+            class="min-w-0 flex-1 bg-transparent px-2.5 text-sm font-semibold text-slate-800 outline-none placeholder:font-medium placeholder:text-slate-400"
             placeholder="you@example.com"
           />
         </span>
@@ -99,16 +99,20 @@ async function handleSubmit() {
 
       <label class="block">
         <span class="mb-1.5 block text-xs font-bold text-slate-500">密码</span>
-        <span class="flex items-center rounded-xl border border-slate-200 bg-white px-3 transition-colors focus-within:border-primary focus-within:ring-1 focus-within:ring-primary">
+        <span class="flex h-12 items-center rounded-2xl border border-slate-200 bg-slate-50/80 px-3 transition-colors focus-within:border-primary focus-within:bg-white focus-within:ring-2 focus-within:ring-primary/15">
           <Lock class="h-4 w-4 text-slate-400" />
           <input
             v-model="form.password"
             :type="showPassword ? 'text' : 'password'"
             autocomplete="current-password"
-            class="min-w-0 flex-1 bg-transparent px-2.5 py-3 text-sm text-slate-800 outline-none placeholder:text-slate-400"
+            class="min-w-0 flex-1 bg-transparent px-2.5 text-sm font-semibold text-slate-800 outline-none placeholder:font-medium placeholder:text-slate-400"
             placeholder="至少 6 位密码"
           />
-          <button type="button" class="text-slate-400 transition-colors hover:text-slate-600" @click="showPassword = !showPassword">
+          <button
+            type="button"
+            class="flex h-8 w-8 items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+            @click="showPassword = !showPassword"
+          >
             <EyeOff v-if="showPassword" class="h-4 w-4" />
             <Eye v-else class="h-4 w-4" />
           </button>
@@ -121,7 +125,7 @@ async function handleSubmit() {
 
       <button
         type="submit"
-        class="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-white shadow-md shadow-primary/20 transition-all hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-70"
+        class="mt-1 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-slate-950 px-4 text-sm font-black text-white shadow-xl shadow-slate-950/15 transition-all hover:-translate-y-0.5 hover:bg-primary hover:shadow-primary/20 disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-70"
         :disabled="loading"
       >
         <LoaderCircle v-if="loading" class="h-4 w-4 animate-spin" />
@@ -129,14 +133,14 @@ async function handleSubmit() {
       </button>
     </form>
 
-    <div class="mt-6 text-center text-sm text-slate-500">
+    <div class="mt-6 text-center text-sm font-medium text-slate-500">
       <template v-if="isRegister">
         已有账号？
-        <RouterLink to="/login" class="font-semibold text-primary hover:text-secondary">去登录</RouterLink>
+        <RouterLink to="/login" class="font-black text-primary hover:text-secondary">去登录</RouterLink>
       </template>
       <template v-else>
         还没有账号？
-        <RouterLink to="/register" class="font-semibold text-primary hover:text-secondary">去注册</RouterLink>
+        <RouterLink to="/register" class="font-black text-primary hover:text-secondary">去注册</RouterLink>
       </template>
     </div>
   </div>
