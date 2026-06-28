@@ -20,7 +20,7 @@ from app.core.generation_prompt_builder import (
 )
 from app.core.json_utils import dump_json_or_none, parse_json_or_none
 from app.core.oss import OssConfigError, upload_image_bytes
-from app.core.product_catalog import get_all_catalog, get_catalog
+from app.core.product_catalog import get_catalog
 from app.core.prompt_template_builder import (
     build_ai_write_prompt,
     build_strategy_template_prompt,
@@ -32,7 +32,6 @@ from app.core.prompt_snapshot import (
 )
 from app.core.system_settings import (
     get_effective_image_credit_cost,
-    get_effective_image_credit_costs,
 )
 from app.core.task_state import (
     clear_task_state_fields,
@@ -49,8 +48,10 @@ from app.core.user_credits import (
 from app.models import GenerationJob, ImageTask, User
 from app.schemas.response import Response, fail, success
 from app.services.generation_tasks import deduct_credits_or_fail, enqueue_or_compensate
+from app.routers.image_catalog import router as image_catalog_router
 
 router = APIRouter(prefix="/image", tags=["生图"])
+router.include_router(image_catalog_router)
 
 IMAGE_PROMPT_STRATEGIES = {
     "product_suite": {"use_template": True},
@@ -244,14 +245,6 @@ async def image_strategy(
     return success(strategy)
 
 
-@router.get("/catalog", response_model=Response)
-async def image_catalog(
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    return success(await get_all_catalog(db))
-
-
 @router.post("/free-image/optimize", response_model=Response)
 async def free_image_optimize(
     req: FreeImageOptimizeRequest,
@@ -265,18 +258,6 @@ async def free_image_optimize(
         return fail("提示词优化失败")
 
     return success({"prompt": content})
-
-
-@router.get("/credit-costs", response_model=Response)
-async def image_credit_costs(
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    try:
-        costs = await get_effective_image_credit_costs(db)
-    except ValueError as exc:
-        return fail(str(exc))
-    return success({"costs": costs})
 
 
 @router.post("/generate", response_model=Response)
