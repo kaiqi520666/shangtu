@@ -123,7 +123,7 @@ generator 场景 composable 命名一致：
 
 需要重点拆分的目录：
 
-- `frontend/src/composables/generator/` 已开始按职责拆出 `batch/`，可继续补齐 `strategy/`、`restore/` 等子目录。
+- `frontend/src/composables/generator/` 已开始按职责拆出 `batch/`、`strategy/`，可继续补齐 `restore/` 等子目录。
 - `backend/app/core/` 有 18 个直接 `.py` 文件，还包含 `providers/`、`strategy/` 子目录。建议把业务文件移出 `core`，否则 `core` 既像基础设施层又像业务服务层。
 
 单文件体量也暴露了目录没有承接复杂度：

@@ -13,7 +13,7 @@ import {
 import { useAiSellingPointsWriter } from "@/composables/useAiSellingPointsWriter.js";
 import { useCardActions } from "@/composables/useCardActions.js";
 import { useMediaBatchRunner } from "@/composables/generator/batch/useMediaBatchRunner.js";
-import { useGenerationStrategyFlow } from "@/composables/generator/useGenerationStrategyFlow.js";
+import { useGenerationStrategyFlow } from "@/composables/generator/strategy/useGenerationStrategyFlow.js";
 import { buildProductAnalyzeImages, hasUploadingImages } from "@/utils/analyzeImages.js";
 import { getApiErrorMessage } from "@/utils/apiError.js";
 import {

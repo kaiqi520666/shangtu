@@ -14,7 +14,7 @@ import {
   useGenerationCards,
 } from "@/composables/generator/useGenerationCards.js";
 import { useMediaBatchRunner } from "@/composables/generator/batch/useMediaBatchRunner.js";
-import { useGenerationStrategyFlow } from "@/composables/generator/useGenerationStrategyFlow.js";
+import { useGenerationStrategyFlow } from "@/composables/generator/strategy/useGenerationStrategyFlow.js";
 import { useToast } from "@/composables/useToast.js";
 import {
   cloneGenerationSettingsSnapshot,
