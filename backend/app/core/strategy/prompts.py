@@ -1,6 +1,12 @@
 import json
 
 
+RULE_JSON_ONLY = "只输出 JSON，不要 markdown，不要解释，不要代码块。"
+RULE_CHINESE_FIELDS_IMAGE = "所有 JSON 字段都必须用中文撰写；最终成图如需文字，会按“最终成图文字语言”翻译呈现。"
+RULE_NO_FABRICATION_IMAGE = "不要编造品牌 Logo、认证、价格、销量、型号、具体参数；如果图片和卖点中没有明确依据，只做谨慎表达。"
+RULE_CONTENT_SHORTLINES = "content 是给前端 textarea 展示和后续生图 prompt 使用的内容，使用短行文本，每行一个要点。"
+
+
 def build_product_prompt(platform: str) -> str:
     return f"""你是电商商品图分析助手。
 请根据图片内容，识别商品类型、外观、材质、用途、适用人群、核心卖点和可用于商品主图生成的关键信息。
@@ -90,12 +96,12 @@ def build_product_image_strategy_prompt(
 {modules_text}
 
 输出要求：
-1. 只输出 JSON，不要 markdown，不要解释，不要代码块。
+1. {RULE_JSON_ONLY}
 2. modules 数量必须等于用户选择图种数量，顺序必须一致。
 3. 每个模块 id 必须来自这个列表：{json.dumps(module_ids, ensure_ascii=False)}
-4. 所有 JSON 字段都必须用中文撰写；最终成图如需文字，会按“最终成图文字语言”翻译呈现。
-5. 不要编造品牌 Logo、认证、价格、销量、型号、具体参数；如果图片和卖点中没有明确依据，只做谨慎表达。
-6. content 是给前端 textarea 展示和后续生图 prompt 使用的内容，使用短行文本，每行一个要点。
+4. {RULE_CHINESE_FIELDS_IMAGE}
+5. {RULE_NO_FABRICATION_IMAGE}
+6. {RULE_CONTENT_SHORTLINES}
 7. 文案要适合电商详情页，不要过度夸张，不要医疗、功效、绝对化承诺。
 
 JSON 格式：
@@ -145,13 +151,13 @@ def build_product_suite_strategy_prompt(
 {structures_text}
 
 输出要求：
-1. 只输出 JSON，不要 markdown，不要解释，不要代码块。
+1. {RULE_JSON_ONLY}
 2. items 数量必须等于用户选择的套图类型数量，顺序必须一致。
 3. 每个 item id 必须来自这个列表：{json.dumps(structure_ids, ensure_ascii=False)}
 4. count 必须等于用户选择的数量，不要自行增减。
-5. 所有 JSON 字段都必须用中文撰写；最终成图如需文字，会按“最终成图文字语言”翻译呈现。
-6. 不要编造品牌 Logo、认证、价格、销量、型号、具体参数；如果图片和卖点中没有明确依据，只做谨慎表达。
-7. content 是给前端 textarea 展示和后续生图 prompt 使用的内容，使用短行文本，每行一个要点。
+5. {RULE_CHINESE_FIELDS_IMAGE}
+6. {RULE_NO_FABRICATION_IMAGE}
+7. {RULE_CONTENT_SHORTLINES}
 8. 策略要适合电商套图，保证同一批图片商品主体一致、风格统一，但每个套图类型有明确作用。
 
 JSON 格式：
@@ -204,10 +210,10 @@ def build_outfit_strategy_prompt(
 {scenes_text}
 
 输出要求：
-1. 只输出 JSON，不要 markdown，不要解释，不要代码块。
+1. {RULE_JSON_ONLY}
 2. items 数量必须等于用户选择场景数量，顺序必须一致。
 3. 每个 item id 必须来自这个列表：{json.dumps(scene_ids, ensure_ascii=False)}
-4. 所有 JSON 字段都必须用中文撰写；最终成图如需文字，会按“最终成图文字语言”翻译呈现。
+4. {RULE_CHINESE_FIELDS_IMAGE}
 5. content 是给前端 textarea 展示和后续生图 prompt 使用的内容，必须包含“模特姿态”“镜头角度”“服装保真约束”“画面氛围”四段，用户会看到并可编辑。
 6. 服装保真约束是硬约束：必须要求保持用户上传服装图的颜色、版型、材质、图案、长度、领口、袖型、廓形和核心外观一致。
 7. 不要虚构品牌 Logo、价格、销量、材质成分、认证或图片中无法确认的服装参数。
@@ -259,7 +265,7 @@ def build_video_strategy_prompt(
 {product_input or '无'}
 
 输出要求：
-1. 只输出 JSON，不要 markdown，不要解释，不要代码块。
+1. {RULE_JSON_ONLY}
 2. items 固定 1 条，id 必须等于 {json.dumps(type_id, ensure_ascii=False)}。
 3. 所有 JSON 字段都必须用中文撰写；最终成片如需文字或配音，会按“最终成片文字/配音语言”翻译呈现。
 4. content 是给用户编辑并直接发送给视频模型的最终提示词，必须按 {duration} 秒时长规划镜头节奏，建议拆成 2-4 个时间段（如 0-2 秒、2-4 秒、4-{duration} 秒）。
