@@ -7,12 +7,6 @@
 
 ## P0 / 高风险
 
-### 1. Worker 图片/视频主编排仍平行实现
-- 位置：`backend/app/worker/image_tasks.py:generate_image`、`backend/app/worker/video_tasks.py:generate_video`、`backend/app/worker/image_tasks.py:_set_progress`、`backend/app/worker/video_tasks.py:_set_video_progress`。
-- 现状：失败归一化已迁到 `backend/app/worker/task_failures.py`，DB/退款同步已迁到 `backend/app/worker/task_state_sync.py`，但图片/视频任务的 provider 创建、轮询、进度写入、结果落 OSS 仍是两套相似编排。
-- 风险：新增媒体类型会继续复制一条完整 worker 流程；轮询/进度/最终落库语义修改时仍要同步图片和视频两处。
-- 建议：抽 `run_generation_task(media_type, config, payload_builder)` 之类的轻量 runner，保留图片/视频差异在 payload、等待时间、错误文案和存储函数配置里。
-
 ## P1 / 中高风险
 
 ### 3. Provider 接口未正式化
