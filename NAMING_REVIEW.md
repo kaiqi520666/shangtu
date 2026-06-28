@@ -131,7 +131,7 @@ generator 场景 composable 命名一致：
 - `backend/app/routers/image_strategy.py`
 - `backend/app/routers/image_tasks.py`
 
-`backend/app/core/ai_generation.py` 仍承载图片分析、图片策略、自由生图 prompt 优化。后续可以继续拆成 `image_analysis.py`、`strategy_generation.py`、`prompt_optimization.py`。
+`backend/app/core/ai_generation.py` 仍承载商品详情图、商品套图、服饰穿搭三类图片策略生成。后续如果策略继续增长，可以改名为 `image_strategy_generation.py` 或继续按场景拆分。
 
 `backend/app/core/generation_prompt_builder.py` 仍同时包含图片生成、AI 文案、策略模板 prompt 构建。后续可以继续按图片生成、AI 文案、策略模板三类 prompt 构建职责拆分。
 
@@ -179,20 +179,17 @@ generator 场景 composable 命名一致：
 1. `backend/app/routers/image.py`
    容易误以为只处理图片任务 CRUD，实际还处理 AI 分析、策略生成、目录、自由生图提示词优化、重生、下载。建议拆 router 或至少改名为 `image_generation.py` 并把 upload/catalog/strategy 分离。
 
-2. `backend/app/core/ai_generation.py`
-   容易误以为只做图片分析，实际还包含图片策略生成和自由生图提示词优化。建议拆成更诚实的策略/分析/prompt 优化模块。
-
-3. `frontend/src/composables/generator/useGenerationRunner.js`
+2. `frontend/src/composables/generator/useGenerationRunner.js`
    名字像通用 runner，但内部默认导入 `generateImage` 和图片积分校验，同时也被视频生成器复用。建议拆成 `useGenerationJobs.js`、`useImageBatchRunner.js`、`useMediaBatchRunner.js`。
 
-4. `backend/app/routers/generation.py`
+3. `backend/app/routers/generation.py`
    名字像所有生成 API 的入口，但实际只管理 `GenerationJob` 容器；真正创建图片/视频任务在 `image.py` 和 `video.py`。建议改为 `generation_jobs.py`，前端 `api/generation.js` 也可改为 `api/generationJobs.js`。
 
 ## 建议优先级
 
 P1：继续拆 `backend/app/routers/image.py`，把上传、策略、任务 CRUD、重生/下载等职责拆到更具体的 router 或 service。
 
-P1：把 `backend/app/core/ai_generation.py`、`backend/app/core/generation_prompt_builder.py` 中的策略/prompt 职责继续拆出，避免 core 文件继续变成业务合集。
+P1：把 `backend/app/core/generation_prompt_builder.py` 中的图片生成、AI 文案、策略模板 prompt 职责继续拆出，避免 core 文件继续变成业务合集。
 
 P2：继续拆 `frontend/src/composables/generator/` 里的大 composable，按 `strategy`、`batch`、`restore` 等职责收敛。
 

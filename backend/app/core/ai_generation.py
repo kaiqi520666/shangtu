@@ -4,10 +4,7 @@ from app.core.strategy.catalog_select import (
     _selected_product_suite_structures,
 )
 from app.core.strategy.dashscope_client import (
-    DashScopeConfigError,
     _request_dashscope_strategy_json,
-    analyze_product_image,
-    optimize_free_image_prompt,
 )
 from app.core.strategy.parsing import (
     _normalize_outfit_strategy_response,
