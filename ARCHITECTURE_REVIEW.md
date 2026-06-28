@@ -15,11 +15,6 @@
 
 ## P1 / 中高风险
 
-### 2. 后端无统一异常处理
-- 位置：`backend/app/schemas/response.py:fail` + 各 router 局部 `except Exception`。
-- 风险：未捕获异常走 FastAPI 默认 500，与 `Response` envelope 不一致；前端 fallback 文案不稳定，线上排查困难。
-- 建议：加 FastAPI 全局 exception handler，把未知异常统一转成 `Response(code=1)` 并记录日志；业务异常保留局部处理。
-
 ### 3. Provider 接口未正式化
 - 位置：`backend/app/core/providers/toapis_provider.py`、`backend/app/core/model_config.py`。
 - 现状：ToAPIS 协议已集中，但仍是一组 ToAPIS 专用函数，不是可替换接口；`model_config.py` 只有模型名，没有 provider 能力元数据。

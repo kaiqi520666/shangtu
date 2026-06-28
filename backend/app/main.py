@@ -1,16 +1,22 @@
 from contextlib import asynccontextmanager
+import logging
 import os
 
 from arq import create_pool
 from arq.connections import RedisSettings
 from dotenv import load_dotenv
 from fastapi import FastAPI
+from fastapi.requests import Request
+from fastapi.responses import JSONResponse
 
 from app.core.database import Base, engine
 from app.routers import admin, asset, auth, billing, generation, image_generation, outfit, video
+from app.schemas.response import fail
 import app.models
 
 load_dotenv()
+
+logger = logging.getLogger("app.api")
 
 
 @asynccontextmanager
@@ -27,6 +33,20 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="ShangTu API", lifespan=lifespan)
+
+
+@app.exception_handler(Exception)
+async def handle_unexpected_exception(request: Request, exc: Exception):
+    logger.exception(
+        "Unhandled exception on %s %s",
+        request.method,
+        request.url.path,
+        exc_info=exc,
+    )
+    return JSONResponse(
+        status_code=200,
+        content=fail("系统异常，请稍后重试").model_dump(),
+    )
 
 app.include_router(admin.router)
 app.include_router(auth.router)
