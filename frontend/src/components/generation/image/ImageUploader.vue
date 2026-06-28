@@ -1,7 +1,8 @@
 <script setup>
 import { computed, ref } from "vue";
-import { CheckCircle2, ImagePlus, LoaderCircle, Trash2, X } from "lucide-vue-next";
+import { CheckCircle2, FolderOpen, ImagePlus, LoaderCircle, Trash2, X } from "lucide-vue-next";
 import { uploadImage } from "@/api/image.js";
+import AssetPickerModal from "@/components/assets/AssetPickerModal.vue";
 import AppModal from "@/components/ui/AppModal.vue";
 
 const props = defineProps({
@@ -60,13 +61,23 @@ const emit = defineEmits(["update:images", "update:mainIndex", "notify"]);
 const fileInput = ref(null);
 const dragOver = ref(false);
 const previewImage = ref(null);
+const assetPickerOpen = ref(false);
 const placeholderCount = computed(() => {
   if (!props.showPlaceholders) return 0;
   return Math.max(0, props.maxCount - props.images.length - 1);
 });
+const remainingCount = computed(() => Math.max(0, props.maxCount - props.images.length));
 
 function triggerFileInput() {
   fileInput.value?.click();
+}
+
+function openAssetPicker() {
+  if (remainingCount.value <= 0) {
+    emit("notify", props.limitMessage);
+    return;
+  }
+  assetPickerOpen.value = true;
 }
 
 function handleFileChange(event) {
@@ -173,6 +184,32 @@ function clearImages() {
   previewImage.value = null;
 }
 
+function addAssetImages(assets) {
+  const limit = remainingCount.value;
+  if (limit <= 0) {
+    emit("notify", props.limitMessage);
+    return;
+  }
+  const selected = assets.slice(0, limit);
+  if (assets.length > selected.length) {
+    emit("notify", `已达到 ${props.maxCount} 张上限，多余图片未添加`);
+  }
+  const nextImages = selected.map((asset) => ({
+    id: `asset_${asset.taskId || asset.id}`,
+    previewUrl: asset.url,
+    url: asset.url,
+    objectKey: "",
+    contentType: "",
+    size: 0,
+    uploading: false,
+    error: "",
+    source: "asset",
+    assetTaskId: asset.taskId || asset.id,
+  }));
+  emit("update:images", [...props.images, ...nextImages]);
+  assetPickerOpen.value = false;
+}
+
 function getPreview(img) {
   if (!img) return "";
   if (typeof img === "string") return img;
@@ -212,6 +249,33 @@ function shouldShowBadge(index) {
       >
         清空
       </button>
+    </div>
+
+    <div class="mb-3 flex gap-2">
+      <button
+        type="button"
+        class="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 transition-colors hover:border-primary/30 hover:bg-primary/5 hover:text-primary"
+        @click="triggerFileInput"
+      >
+        <ImagePlus class="h-4 w-4" />
+        本地上传
+      </button>
+      <button
+        type="button"
+        class="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 transition-colors hover:border-primary/30 hover:bg-primary/5 hover:text-primary"
+        @click="openAssetPicker"
+      >
+        <FolderOpen class="h-4 w-4" />
+        资产库选择
+      </button>
+      <input
+        ref="fileInput"
+        type="file"
+        accept="image/*"
+        class="hidden"
+        multiple
+        @change="handleFileChange"
+      />
     </div>
 
     <div class="grid grid-cols-3 gap-3">
@@ -286,16 +350,8 @@ function shouldShowBadge(index) {
         @drop.prevent="handleDrop"
       >
         <ImagePlus class="mb-1 h-5 w-5 text-slate-400" />
-        <span class="text-center text-xs font-semibold text-slate-500">{{ addText }}</span>
+        <span class="text-center text-xs font-semibold text-slate-500">拖拽到此处</span>
         <span class="mt-0.5 text-center text-xs text-slate-400">{{ hintText }}</span>
-        <input
-          ref="fileInput"
-          type="file"
-          accept="image/*"
-          class="hidden"
-          multiple
-          @change="handleFileChange"
-        />
       </button>
 
       <div
@@ -321,5 +377,16 @@ function shouldShowBadge(index) {
         />
       </div>
     </AppModal>
+
+    <AssetPickerModal
+      :open="assetPickerOpen"
+      media-type="image"
+      title="从资产库选择图片"
+      :max-count="remainingCount"
+      :exclude-urls="images.map((img) => img?.url).filter(Boolean)"
+      @close="assetPickerOpen = false"
+      @confirm="addAssetImages"
+      @notify="emit('notify', $event)"
+    />
   </section>
 </template>

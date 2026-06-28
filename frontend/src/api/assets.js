@@ -1,8 +1,9 @@
 import request from "./request.js";
 
-export function listAssets({ scenario = "", page = 1, page_size = 20 } = {}) {
+export function listAssets({ scenario = "", media_type = "", page = 1, page_size = 20 } = {}) {
   const params = { page, page_size };
   if (scenario) params.scenario = scenario;
+  if (media_type) params.media_type = media_type;
   return request.get("/asset/list", { params, timeout: 15000 });
 }
 

@@ -25,6 +25,7 @@ PAGE_SIZE_MAX = 50
 @router.get("/list", response_model=Response)
 async def list_assets(
     scenario: str | None = Query(None, description="按场景筛选"),
+    media_type: str | None = Query(None, description="按媒体类型筛选"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=PAGE_SIZE_MAX),
     current_user: User = Depends(get_current_user),
@@ -38,8 +39,8 @@ async def list_assets(
     selects = [
         stmt
         for stmt in (
-            image_asset_select(current_user.id, scenario),
-            video_asset_select(current_user.id, scenario),
+            image_asset_select(current_user.id, scenario) if includes_image(media_type) else None,
+            video_asset_select(current_user.id, scenario) if includes_video(media_type) else None,
         )
         if stmt is not None
     ]
