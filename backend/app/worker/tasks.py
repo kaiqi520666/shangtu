@@ -723,7 +723,23 @@ async def generate_video(
                 create_resp.raise_for_status()
                 create_result = create_resp.json()
             except httpx.HTTPError as e:
-                await _mark_video_failed(redis, task_id, f"创建 ToAPIS 视频任务失败: {e}")
+                detail = ""
+                resp = getattr(e, "response", None)
+                if resp is not None:
+                    try:
+                        detail = (resp.text or "")[:500]
+                    except Exception:
+                        detail = ""
+                    print(f"toapis 视频创建失败 status={resp.status_code} body={detail}")
+                    reason = f"{e} | {detail}" if detail else str(e)
+                else:
+                    reason = f"{type(e).__name__}: {e!r}"
+                    print(f"toapis 视频创建传输层错误 {reason}")
+                await _mark_video_failed(
+                    redis,
+                    task_id,
+                    f"创建 ToAPIS 视频任务失败: {reason}",
+                )
                 return
             except ValueError as e:
                 await _mark_video_failed(redis, task_id, f"ToAPIS 视频创建响应解析失败: {e}")
