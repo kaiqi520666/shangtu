@@ -133,7 +133,7 @@ generator 场景 composable 命名一致：
 
 `backend/app/core/ai_generation.py` 仍承载商品详情图、商品套图、服饰穿搭三类图片策略生成。后续如果策略继续增长，可以改名为 `image_strategy_generation.py` 或继续按场景拆分。
 
-`backend/app/core/generation_prompt_builder.py` 仍同时包含图片生成、AI 文案、策略模板 prompt 构建。后续可以继续按图片生成、AI 文案、策略模板三类 prompt 构建职责拆分。
+`backend/app/core/generation_prompt_builder.py` 已聚焦图片生成 prompt 构建。后续如果图片 prompt 继续增长，可以按商品详情图、套图、穿搭继续拆分。
 
 ## 3. 目录嵌套深度与扁平度
 
@@ -189,7 +189,7 @@ generator 场景 composable 命名一致：
 
 P1：继续拆 `backend/app/routers/image.py`，把上传、策略、任务 CRUD、重生/下载等职责拆到更具体的 router 或 service。
 
-P1：把 `backend/app/core/generation_prompt_builder.py` 中的图片生成、AI 文案、策略模板 prompt 职责继续拆出，避免 core 文件继续变成业务合集。
+P1：继续拆 `backend/app/core/ai_generation.py` 或将其改名为 `image_strategy_generation.py`，让文件名更诚实地表达图片策略生成职责。
 
 P2：继续拆 `frontend/src/composables/generator/` 里的大 composable，按 `strategy`、`batch`、`restore` 等职责收敛。
 

@@ -10,10 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.credits import normalize_video_resolution
 from app.core.deps import get_current_user, get_db
 from app.core.strategy.dashscope_client import DashScopeConfigError
-from app.core.generation_prompt_builder import (
-    build_strategy_template_prompt,
-)
 from app.core.json_utils import dump_json_or_none, parse_json_or_none
+from app.core.prompt_template_builder import build_strategy_template_prompt
 from app.core.prompt_snapshot import dump_prompt_snapshot, parse_prompt_snapshot
 from app.core.system_settings import (
     get_effective_video_credit_cost,

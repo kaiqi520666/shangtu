@@ -20,13 +20,13 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from app.core import generation_prompt_builder  # noqa: E402
+from app.core import generation_prompt_builder, prompt_template_builder  # noqa: E402
 from app.core.generation_prompt_builder import (  # noqa: E402
     IMAGE_GENERATE_MODEL,
-    QWEN_TEXT_MODEL,
     build_image_generate_prompt,
-    build_strategy_template_prompt,
 )
+from app.core.model_config import QWEN_TEXT_MODEL  # noqa: E402
+from app.core.prompt_template_builder import build_strategy_template_prompt  # noqa: E402
 from app.core.prompt_templates import PromptTemplateLookupResult  # noqa: E402
 from app.core.video_prompt_builder import build_video_generate_prompt  # noqa: E402
 
@@ -131,6 +131,7 @@ def _install_fake_lookup() -> list[dict]:
         return PromptTemplateLookupResult(templates=templates, content=content)
 
     generation_prompt_builder.get_prompt_templates = fake_get_prompt_templates
+    prompt_template_builder.get_prompt_templates = fake_get_prompt_templates
     return captured
 
 

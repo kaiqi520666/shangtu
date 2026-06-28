@@ -16,13 +16,15 @@ from app.core.strategy.dashscope_client import (
     optimize_free_image_prompt,
 )
 from app.core.generation_prompt_builder import (
-    build_ai_write_prompt,
     build_image_generate_prompt,
-    build_strategy_template_prompt,
 )
 from app.core.json_utils import dump_json_or_none, parse_json_or_none
 from app.core.oss import OssConfigError, upload_image_bytes
 from app.core.product_catalog import get_all_catalog, get_catalog
+from app.core.prompt_template_builder import (
+    build_ai_write_prompt,
+    build_strategy_template_prompt,
+)
 from app.core.prompt_snapshot import (
     build_prompt_snapshot,
     dump_prompt_snapshot,

@@ -4,8 +4,8 @@ from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.json_utils import dump_json, parse_json_object
-from app.core.model_config import IMAGE_GENERATE_MODEL, QWEN_TEXT_MODEL
+from app.core.json_utils import parse_json_object
+from app.core.model_config import IMAGE_GENERATE_MODEL
 from app.core.prompt_snapshot import build_prompt_snapshot
 from app.core.prompt_templates import get_prompt_templates
 from app.models import GenerationJob
@@ -48,10 +48,6 @@ def _template_refs(templates) -> list[dict]:
         }
         for template in templates
     ]
-
-
-def _template_refs_json(templates) -> str:
-    return dump_json(_template_refs(templates))
 
 
 def _format_task_prompt(
@@ -164,43 +160,3 @@ async def build_image_generate_prompt(
             template_refs=_template_refs(lookup.templates),
         ),
     )
-
-
-async def build_ai_write_prompt(
-    db: AsyncSession,
-    *,
-    scenario: str | None,
-    platform: str | None,
-    type_id: str | None = None,
-) -> str:
-    lookup = await get_prompt_templates(
-        db,
-        scenario=scenario,
-        purpose="ai_write",
-        platform=platform,
-        type_id=type_id,
-        model=QWEN_TEXT_MODEL,
-    )
-    content = lookup.content.strip()
-    if not content:
-        return ""
-    dynamic = f"当前投放平台：{platform or '未指定'}"
-    return "\n\n".join(part for part in [content, dynamic] if part)
-
-
-async def build_strategy_template_prompt(
-    db: AsyncSession,
-    *,
-    scenario: str,
-    platform: str | None,
-    type_id: str | None = None,
-) -> str:
-    lookup = await get_prompt_templates(
-        db,
-        scenario=scenario,
-        purpose="strategy",
-        platform=platform,
-        type_id=type_id,
-        model=QWEN_TEXT_MODEL,
-    )
-    return lookup.content.strip()
