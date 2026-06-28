@@ -7,11 +7,11 @@
 
 ## P0 / 高风险
 
-### 1. Worker 失败处理与退款仍是图片/视频双写
-- 位置：`backend/app/worker/tasks.py` 的 `_mark_failed`/`_mark_timeout`/`_mark_video_failed`/`_mark_video_timeout`、`refund_task_credit`/`refund_video_task_credit`、`update_task_in_db`/`update_video_task_in_db`、`_set_progress`/`_set_video_progress`、`fetch_task_user_id`/`fetch_video_task_user_id`。
-- 现状：Redis 写入已统一走 `task_state.py`，但上面这些函数仍是「只有 model 和 media_type 前缀不同」的平行实现，重复度 >70%。
-- 风险：新增媒体类型会继续复制一组；改失败语义/退款逻辑需同步图片和视频两处。
-- 建议：抽 `TaskStateRepository`（参数化 model / media_type）+ `refund_generation_credit(task_model, task_id)`。
+### 1. Worker 图片/视频主编排仍平行实现
+- 位置：`backend/app/worker/image_tasks.py:generate_image`、`backend/app/worker/video_tasks.py:generate_video`、`backend/app/worker/image_tasks.py:_set_progress`、`backend/app/worker/video_tasks.py:_set_video_progress`。
+- 现状：失败归一化已迁到 `backend/app/worker/task_failures.py`，DB/退款同步已迁到 `backend/app/worker/task_state_sync.py`，但图片/视频任务的 provider 创建、轮询、进度写入、结果落 OSS 仍是两套相似编排。
+- 风险：新增媒体类型会继续复制一条完整 worker 流程；轮询/进度/最终落库语义修改时仍要同步图片和视频两处。
+- 建议：抽 `run_generation_task(media_type, config, payload_builder)` 之类的轻量 runner，保留图片/视频差异在 payload、等待时间、错误文案和存储函数配置里。
 
 ## P1 / 中高风险
 
@@ -33,7 +33,7 @@
 
 ### 5. 前端场景 composable 过大
 - 位置：`frontend/src/composables/generator/useOutfitGenerator.js`（最重，兼管模特库 CRUD/上传/删除）、`useProductImageGenerator.js`、`useProductSuiteGenerator.js`、`useProductVideoGenerator.js`，均 500–700+ 行。
-- 现状：已有通用 `frontend/src/composables/generator/useGenerationRunner.js`、`useGenerationCards.js`、`useGenerationStrategyFlow.js`，但场景层仍是「上帝 composable」。
+- 现状：已有通用 `frontend/src/composables/generator/batch/useMediaBatchRunner.js`、`frontend/src/composables/generator/useGenerationCards.js`、`frontend/src/composables/generator/strategy/useGenerationStrategyFlow.js`，但场景层仍是「上帝 composable」。
 - 风险：新增场景大概率复制 500+ 行结构，局部修改易破坏恢复/生成。
 - 建议：先抽 `useOutfitModels()`，再抽 `cloneUploadedImages()`/`restoreCommonImageSettings()`/`validateUploadedMainImage()`/`buildImageSnapshotPayload()` 等轻量共享工具；不急着大框架化。
 
@@ -46,7 +46,7 @@
 
 
 ### 7. Redis 与 DB 双写无强一致保证
-- 位置：worker 写 DB + Redis；router 经 `task_state.merge_task_state` 合并读取；`asset.batch_delete_assets` best effort 清 Redis。
+- 位置：`backend/app/worker/image_tasks.py` / `backend/app/worker/video_tasks.py` 写 DB + Redis；router 经 `backend/app/core/task_state.py:merge_task_state` 合并读取；`backend/app/routers/asset.py:batch_delete_assets` best effort 清 Redis。
 - 现状：「先 DB 后 Redis」+ 合并读取已是正确补丁，但状态仍是双写，Redis 过期/丢失时短期状态可能不一致，前端轮询异常被吞掉只表现为卡住。
 - 建议：以 DB 为最终状态源，Redis 仅作进度缓存；进度长时间不变时给出可见错误或加后台超时扫描。
 
