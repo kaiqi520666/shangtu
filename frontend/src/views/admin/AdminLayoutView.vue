@@ -15,6 +15,7 @@ import {
 import { computed, ref } from "vue";
 import { RouterView, useRoute } from "vue-router";
 import GeneratorLayout from "@/components/layout/GeneratorLayout.vue";
+import AppTabNav from "@/components/ui/AppTabNav.vue";
 import { adminTabs } from "@/constants/admin.js";
 
 const route = useRoute();
@@ -57,30 +58,7 @@ function refreshCurrentView() {
       </header>
 
       <div class="border-b border-slate-200 bg-white px-6">
-        <nav class="flex gap-1.5 overflow-x-auto py-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <RouterLink
-            v-for="tab in adminTabs"
-            :key="tab.key"
-            :to="tab.to"
-            class="group relative flex h-9 shrink-0 items-center gap-2 rounded-lg border px-3 text-xs font-bold transition-colors"
-            :class="
-              activeTab === tab.key
-                ? 'border-primary/20 bg-primary/10 text-primary'
-                : 'border-transparent text-slate-500 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-800'
-            "
-          >
-            <component
-              :is="tabIcons[tab.key]"
-              class="h-3.5 w-3.5"
-              :class="activeTab === tab.key ? 'text-primary' : 'text-slate-400 group-hover:text-slate-600'"
-            />
-            {{ tab.label }}
-            <span
-              v-if="activeTab === tab.key"
-              class="absolute inset-x-3 -bottom-2 h-0.5 rounded-full bg-primary"
-            ></span>
-          </RouterLink>
-        </nav>
+        <AppTabNav :tabs="adminTabs" :active-key="activeTab" :icons="tabIcons" />
       </div>
 
       <main class="flex-1 overflow-y-auto p-6">

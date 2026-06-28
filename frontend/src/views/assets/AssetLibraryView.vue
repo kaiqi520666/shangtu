@@ -1,8 +1,21 @@
 <script setup>
 import { onMounted } from 'vue'
-import { Download, ImageOff, LoaderCircle, Trash2 } from 'lucide-vue-next'
+import {
+  Boxes,
+  Download,
+  FileVideo,
+  ImageOff,
+  Images,
+  LayoutGrid,
+  LoaderCircle,
+  Shirt,
+  Sparkles,
+  Trash2,
+  Video,
+} from 'lucide-vue-next'
 import AppModal from '@/components/ui/AppModal.vue'
 import AppCheckbox from '@/components/ui/AppCheckbox.vue'
+import AppTabNav from '@/components/ui/AppTabNav.vue'
 import AssetCardGrid from '@/components/assets/AssetCardGrid.vue'
 import GeneratorLayout from '@/components/layout/GeneratorLayout.vue'
 import { useAssetLibrary } from '@/composables/useAssetLibrary.js'
@@ -39,6 +52,15 @@ const SCENARIO_LABEL_MAP = {
   free_image: '自由生图',
   product_video: '商品视频',
   free_video: '自由生视频',
+}
+const scenarioIcons = {
+  "": LayoutGrid,
+  product_suite: Boxes,
+  product_image: Images,
+  outfit: Shirt,
+  free_image: Sparkles,
+  product_video: Video,
+  free_video: FileVideo,
 }
 
 function getScenarioLabel(card) {
@@ -100,55 +122,50 @@ onMounted(() => {
   <GeneratorLayout>
     <div class="flex flex-1 flex-col overflow-hidden">
       <!-- 顶部工具栏 -->
-      <header class="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-3">
-        <div class="flex items-center gap-4">
+      <header class="space-y-2 border-b border-slate-200 bg-white px-6 py-3">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
           <h1 class="text-base font-bold text-slate-800">资产库</h1>
-          <!-- 场景筛选 -->
-          <nav class="flex gap-1 rounded-lg bg-slate-100 p-0.5">
+            <span class="text-xs font-semibold text-slate-400">共 {{ total }} 个</span>
+          </div>
+          <div class="flex items-center gap-3">
+            <!-- 全选 -->
+            <AppCheckbox
+              :model-value="isAllSelected()"
+              label="全选"
+              size="sm"
+              :disabled="assets.length === 0"
+              @change="handleToggleAll"
+            />
+            <!-- 批量下载 -->
             <button
-              v-for="opt in SCENARIO_OPTIONS"
-              :key="opt.value"
               type="button"
-              class="rounded-md px-3 py-1.5 text-xs font-medium transition-all"
-              :class="scenario === opt.value
-                ? 'bg-white text-slate-800 shadow-sm'
-                : 'text-slate-500 hover:text-slate-700'"
-              @click="changeScenario(opt.value)"
+              class="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              :disabled="selectedCardsCount === 0"
+              @click="batchDownload"
             >
-              {{ opt.label }}
+              <Download class="h-3.5 w-3.5" />
+              下载 ({{ selectedCardsCount }})
             </button>
-          </nav>
-          <span class="text-xs text-slate-400">共 {{ total }} 个</span>
+            <!-- 批量删除 -->
+            <button
+              type="button"
+              class="flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-medium text-rose-600 transition-colors hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-40"
+              :disabled="selectedCardsCount === 0"
+              @click="handleBatchDelete"
+            >
+              <Trash2 class="h-3.5 w-3.5" />
+              删除 ({{ selectedCardsCount }})
+            </button>
+          </div>
         </div>
-        <div class="flex items-center gap-3">
-          <!-- 全选 -->
-          <AppCheckbox
-            :model-value="isAllSelected()"
-            label="全选"
-            size="sm"
-            :disabled="assets.length === 0"
-            @change="handleToggleAll"
+        <div class="flex min-w-0 items-center">
+          <AppTabNav
+            :tabs="SCENARIO_OPTIONS"
+            :active-key="scenario"
+            :icons="scenarioIcons"
+            @change="changeScenario"
           />
-          <!-- 批量下载 -->
-          <button
-            type="button"
-            class="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-            :disabled="selectedCardsCount === 0"
-            @click="batchDownload"
-          >
-            <Download class="h-3.5 w-3.5" />
-            下载 ({{ selectedCardsCount }})
-          </button>
-          <!-- 批量删除 -->
-          <button
-            type="button"
-            class="flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-medium text-rose-600 transition-colors hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-40"
-            :disabled="selectedCardsCount === 0"
-            @click="handleBatchDelete"
-          >
-            <Trash2 class="h-3.5 w-3.5" />
-            删除 ({{ selectedCardsCount }})
-          </button>
         </div>
       </header>
 
