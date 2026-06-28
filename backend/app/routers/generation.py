@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_user, get_db
 from app.core.json_utils import dump_json, parse_json_or_none
-from app.core.prompt_snapshot import parse_prompt_snapshot
+from app.core.media_projection import image_task_payload, video_task_payload
 from app.core.time import to_utc_iso, utc_now
 from app.models import GenerationJob, ImageTask, User, VideoTask
 from app.schemas.response import Response, fail, success
@@ -65,51 +65,6 @@ def _default_title(scenario: str) -> str:
 
 def _task_model_for_scenario(scenario: str):
     return VideoTask if scenario == "product_video" else ImageTask
-
-
-def _image_task_payload(task: ImageTask) -> dict:
-    return {
-        "task_id": task.id,
-        "media_type": "image",
-        "type_id": task.type_id,
-        "title": task.title,
-        "sort_order": task.sort_order,
-        "status": task.status,
-        "progress": task.progress or 0,
-        "result_url": task.result_url,
-        "size": task.size,
-        "error_message": task.error_message,
-        "credit_cost": task.credit_cost,
-        "credit_refunded": bool(task.credit_refunded),
-        "replaced_by_task_id": task.replaced_by_task_id,
-        "prompt": task.prompt,
-        "prompt_snapshot": parse_prompt_snapshot(task.prompt_snapshot_json),
-        "settings_snapshot": parse_json_or_none(task.settings_snapshot_json),
-    }
-
-
-def _video_task_payload(task: VideoTask) -> dict:
-    return {
-        "task_id": task.id,
-        "media_type": "video",
-        "type_id": task.type_id,
-        "title": task.title,
-        "sort_order": task.sort_order,
-        "status": task.status,
-        "progress": task.progress or 0,
-        "result_url": task.result_url,
-        "input_mode": task.input_mode,
-        "input_images": parse_json_or_none(task.input_images_json) or [],
-        "duration": task.duration,
-        "resolution": task.resolution,
-        "aspect_ratio": task.aspect_ratio,
-        "error_message": task.error_message,
-        "credit_cost": task.credit_cost,
-        "credit_refunded": bool(task.credit_refunded),
-        "prompt": task.prompt,
-        "prompt_snapshot": parse_prompt_snapshot(task.prompt_snapshot_json),
-        "settings_snapshot": parse_json_or_none(task.settings_snapshot_json),
-    }
 
 
 @router.post("/jobs", response_model=Response)
@@ -248,9 +203,9 @@ async def get_job(
         .order_by(task_model.sort_order.asc(), task_model.created_at.asc())
     )
     if task_model is VideoTask:
-        items = [_video_task_payload(task) for task in tasks_result.scalars().all()]
+        items = [video_task_payload(task) for task in tasks_result.scalars().all()]
     else:
-        items = [_image_task_payload(task) for task in tasks_result.scalars().all()]
+        items = [image_task_payload(task) for task in tasks_result.scalars().all()]
 
     total = len(items)
     completed = sum(1 for t in items if t["status"] == TERMINAL_DONE)

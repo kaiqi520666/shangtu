@@ -1,67 +1,24 @@
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel
-from sqlalchemy import delete, func, literal, select, union_all
+from sqlalchemy import delete, func, select, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_user, get_db
+from app.core.media_projection import (
+    image_asset_select,
+    includes_image,
+    includes_video,
+    video_asset_select,
+)
 from app.core.task_state import task_state_keys
 from app.core.time import to_utc_iso
-from app.models import GenerationJob, ImageTask, User, VideoTask
+from app.models import ImageTask, User, VideoTask
 from app.schemas.response import Response, fail, success
 
 router = APIRouter(prefix="/asset", tags=["资产库"])
 
 SCENARIO_FILTER = {"product_suite", "product_image", "outfit", "free_image", "product_video"}
 PAGE_SIZE_MAX = 50
-
-
-def _image_asset_select(user_id: int, scenario: str | None):
-    if scenario == "product_video":
-        return None
-    stmt = (
-        select(
-            ImageTask.id.label("task_id"),
-            literal("image").label("media_type"),
-            ImageTask.result_url.label("result_url"),
-            ImageTask.title.label("title"),
-            ImageTask.type_id.label("type_id"),
-            func.coalesce(GenerationJob.scenario, literal("")).label("scenario"),
-            func.coalesce(GenerationJob.title, literal("")).label("job_title"),
-            ImageTask.created_at.label("created_at"),
-        )
-        .outerjoin(GenerationJob, GenerationJob.id == ImageTask.job_id)
-        .where(
-            ImageTask.user_id == user_id,
-            ImageTask.status == "done",
-            ImageTask.archived.is_(False),
-        )
-    )
-    if scenario:
-        stmt = stmt.where(ImageTask.job_id.isnot(None), GenerationJob.scenario == scenario)
-    return stmt
-
-
-def _video_asset_select(user_id: int, scenario: str | None):
-    if scenario and scenario != "product_video":
-        return None
-    return (
-        select(
-            VideoTask.id.label("task_id"),
-            literal("video").label("media_type"),
-            VideoTask.result_url.label("result_url"),
-            VideoTask.title.label("title"),
-            VideoTask.type_id.label("type_id"),
-            func.coalesce(GenerationJob.scenario, literal("product_video")).label("scenario"),
-            func.coalesce(GenerationJob.title, literal("")).label("job_title"),
-            VideoTask.created_at.label("created_at"),
-        )
-        .outerjoin(GenerationJob, GenerationJob.id == VideoTask.job_id)
-        .where(
-            VideoTask.user_id == user_id,
-            VideoTask.status == "done",
-            VideoTask.archived.is_(False),
-        )
-    )
 
 
 @router.get("/list", response_model=Response)
@@ -80,8 +37,8 @@ async def list_assets(
     selects = [
         stmt
         for stmt in (
-            _image_asset_select(current_user.id, scenario),
-            _video_asset_select(current_user.id, scenario),
+            image_asset_select(current_user.id, scenario),
+            video_asset_select(current_user.id, scenario),
         )
         if stmt is not None
     ]
@@ -142,7 +99,7 @@ async def batch_delete_assets(
 
     deleted_ids: list[str] = []
     deleted_video_ids: list[str] = []
-    if req.media_type in (None, "", "image"):
+    if includes_image(req.media_type):
         stmt = (
             delete(ImageTask)
             .where(
@@ -154,7 +111,7 @@ async def batch_delete_assets(
         )
         result = await db.execute(stmt)
         deleted_ids.extend([row[0] for row in result.all()])
-    if req.media_type in (None, "", "video"):
+    if includes_video(req.media_type):
         stmt = (
             delete(VideoTask)
             .where(
