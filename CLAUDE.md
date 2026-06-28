@@ -26,7 +26,9 @@ frontend/src/
 
 必需：`DATABASE_URL`、`REDIS_URL`、`SECRET_KEY`、`OSS_ACCESS_KEY_ID/SECRET/ENDPOINT/BUCKET_NAME`、`DASHSCOPE_URL/API_KEY`、`TOAPIS_KEY`、`ZPAY_PID/KEY`。
 
-可选：`OSS_PUBLIC_BASE_URL`（自定义 CDN 域名）、`TOAPIS_URL`（默认 `https://toapis.com`）、`IMAGE_CREDIT_COST_1K/2K/4K`（默认 1/2/4）、`CREDIT_RECHARGE_PACKAGES_JSON`（充值套餐配置）。
+可选：`OSS_PUBLIC_BASE_URL`（自定义 CDN 域名）、`TOAPIS_URL`（默认 `https://toapis.com`）。
+
+扣费价格和充值套餐不走环境变量，在管理后台「系统设置」中配置；空库使用后端代码默认值。
 
 前端只读 `VITE_API_BASE_URL`（默认 `/api`，由 vite 代理到 `127.0.0.1:8000`）。
 

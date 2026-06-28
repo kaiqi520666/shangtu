@@ -1,5 +1,3 @@
-import json
-import os
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,8 +5,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.credits import (
     DEFAULT_IMAGE_CREDIT_COSTS,
     DEFAULT_VIDEO_CREDIT_COSTS,
-    get_image_credit_costs,
-    get_video_credit_costs,
     normalize_image_resolution,
     normalize_video_resolution,
 )
@@ -125,17 +121,6 @@ def normalize_recharge_packages(
     return [item for item in packages if item["enabled"]]
 
 
-def get_env_recharge_packages(include_disabled: bool = False) -> list[dict[str, Any]]:
-    raw = os.getenv("CREDIT_RECHARGE_PACKAGES_JSON")
-    try:
-        payload = json.loads(raw) if raw else DEFAULT_RECHARGE_PACKAGES
-    except ValueError as exc:
-        raise ValueError("CREDIT_RECHARGE_PACKAGES_JSON 不是有效 JSON") from exc
-    if not isinstance(payload, list):
-        raise ValueError("CREDIT_RECHARGE_PACKAGES_JSON 必须是数组")
-    return normalize_recharge_packages(payload, include_disabled=include_disabled)
-
-
 async def get_setting(db: AsyncSession, key: str) -> SystemSetting | None:
     return await db.get(SystemSetting, key)
 
@@ -147,7 +132,7 @@ async def get_effective_image_credit_costs(db: AsyncSession) -> dict[str, int]:
         if not isinstance(parsed, dict):
             raise ValueError("数据库中的生图扣费配置不是有效对象")
         return normalize_image_credit_costs(parsed)
-    return get_image_credit_costs()
+    return normalize_image_credit_costs(DEFAULT_IMAGE_CREDIT_COSTS)
 
 
 async def get_effective_image_credit_cost(db: AsyncSession, resolution: str | None) -> int:
@@ -166,7 +151,7 @@ async def get_effective_video_credit_costs(db: AsyncSession) -> dict[str, int]:
         if not isinstance(parsed, dict):
             raise ValueError("数据库中的视频扣费配置不是有效对象")
         return normalize_video_credit_costs(parsed)
-    return get_video_credit_costs()
+    return normalize_video_credit_costs(DEFAULT_VIDEO_CREDIT_COSTS)
 
 
 async def get_effective_video_credit_cost(
@@ -194,7 +179,10 @@ async def get_effective_recharge_packages(
         if not isinstance(parsed, list):
             raise ValueError("数据库中的充值套餐配置不是有效数组")
         return normalize_recharge_packages(parsed, include_disabled=include_disabled)
-    return get_env_recharge_packages(include_disabled=include_disabled)
+    return normalize_recharge_packages(
+        DEFAULT_RECHARGE_PACKAGES,
+        include_disabled=include_disabled,
+    )
 
 
 async def upsert_setting(
