@@ -36,8 +36,8 @@ from app.schemas.response import Response, fail, success
 
 router = APIRouter(prefix="/video", tags=["商品视频"])
 
-VIDEO_INPUT_MODES = {"first_frame", "first_last_frame", "reference_images"}
-VIDEO_ASPECT_RATIOS = {"16:9", "9:16", "1:1", "4:3", "3:4", "21:9"}
+VIDEO_INPUT_MODES = {"image_to_video", "reference_to_video"}
+VIDEO_ASPECT_RATIOS = {"16:9", "9:16", "1:1", "4:3", "3:4"}
 
 
 class VideoGenerateRequest(BaseModel):
@@ -99,12 +99,10 @@ def _validate_video_inputs(input_mode: str, image_urls: list[str]) -> str | None
     if input_mode not in VIDEO_INPUT_MODES:
         return "不支持的视频素材模式"
     count = len(image_urls)
-    if input_mode == "first_frame" and count != 1:
-        return "首帧生成必须上传 1 张图片"
-    if input_mode == "first_last_frame" and count != 2:
-        return "首尾帧过渡必须上传 2 张图片"
-    if input_mode == "reference_images" and not 1 <= count <= 9:
-        return "多参考生成必须上传 1-9 张图片"
+    if input_mode == "image_to_video" and count != 1:
+        return "图生视频必须上传 1 张图片"
+    if input_mode == "reference_to_video" and not 1 <= count <= 9:
+        return "参考图生视频必须上传 1-9 张图片"
     return None
 
 
@@ -115,15 +113,10 @@ def _validate_aspect_ratio(aspect_ratio: str) -> str | None:
     return None
 
 
-def _build_image_with_roles(input_mode: str, image_urls: list[str]) -> list[dict[str, str]]:
-    if input_mode == "first_frame":
-        return [{"url": image_urls[0], "role": "first_frame"}]
-    if input_mode == "first_last_frame":
-        return [
-            {"url": image_urls[0], "role": "first_frame"},
-            {"url": image_urls[1], "role": "last_frame"},
-        ]
-    return [{"url": url, "role": "reference_image"} for url in image_urls]
+def _video_action(input_mode: str) -> str:
+    if input_mode == "image_to_video":
+        return "image-to-video"
+    return "reference-to-video"
 
 
 @router.get("/credit-costs", response_model=Response)
@@ -278,7 +271,6 @@ async def create_video_task(
         await db.rollback()
         return fail("视频任务创建失败，请稍后重试")
 
-    image_with_roles = _build_image_with_roles(req.input_mode, image_urls)
     try:
         await request.app.state.redis_pool.enqueue_job(
             "generate_video",
@@ -287,7 +279,8 @@ async def create_video_task(
             req.duration,
             aspect_ratio,
             normalized_resolution,
-            image_with_roles,
+            _video_action(req.input_mode),
+            image_urls,
         )
     except Exception:
         try:

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.json_utils import dump_json, parse_json_object
-from app.core.model_config import IMAGE_GENERATE_MODEL, QWEN_TEXT_MODEL, VIDEO_GENERATE_MODEL
+from app.core.model_config import IMAGE_GENERATE_MODEL, QWEN_TEXT_MODEL
 from app.core.prompt_snapshot import build_prompt_snapshot
 from app.core.prompt_templates import get_prompt_templates
 from app.models import GenerationJob
@@ -33,23 +33,6 @@ def compose_image_prompt(
         "【系统提示词】",
         (system_prompt or "").strip(),
         "【任务提示词】",
-        (task_prompt or "").strip(),
-        "【用户提示词】",
-        (user_prompt or "").strip(),
-    ]
-    return "\n".join(part for part in final_parts if part)
-
-
-def compose_video_prompt(
-    *,
-    system_prompt: str | None,
-    task_prompt: str | None,
-    user_prompt: str | None,
-) -> str:
-    final_parts = [
-        "【系统提示词】",
-        (system_prompt or "").strip(),
-        "【视频任务提示词】",
         (task_prompt or "").strip(),
         "【用户提示词】",
         (user_prompt or "").strip(),
@@ -201,60 +184,18 @@ async def build_video_generate_prompt(
     if not type_id:
         raise ValueError("视频生成缺少视频方向")
 
-    platform = str(settings.get("platform") or settings.get("market") or "").strip() or None
-    language = str(settings.get("language") or "").strip() or "未指定"
-    aspect_ratio = str(settings.get("aspect_ratio") or settings.get("aspectRatio") or "").strip() or "未指定"
-    resolution = str(settings.get("resolution") or "").strip() or "未指定"
-    duration = str(settings.get("duration") or "").strip() or "未指定"
-    input_mode = str(settings.get("input_mode") or settings.get("inputMode") or "").strip() or "未指定"
-
-    lookup = await get_prompt_templates(
-        db,
-        scenario="product_video",
-        purpose="video_generate",
-        platform=platform,
-        type_id=None,
-        model=VIDEO_GENERATE_MODEL,
-    )
-    system_prompt = "\n\n".join(
-        template.content.strip()
-        for template in lookup.templates
-        if template.content and template.content.strip()
-    )
     effective_user_prompt = (user_prompt or "").strip()
     if not effective_user_prompt:
         raise ValueError("请先生成并确认视频策略")
 
-    task_prompt = "\n".join(
-        line
-        for line in [
-            "【任务】生成一条电商商品短视频。",
-            f"【视频方向】{title or type_id}",
-            f"【投放市场/平台】{platform or '未指定'}",
-            f"【语言/声音】{language}",
-            f"【画面比例】{aspect_ratio}",
-            f"【清晰度】{resolution}",
-            f"【时长】{duration}秒",
-            f"【参考素材模式】{input_mode}",
-            "【强约束】保持用户上传商品图里的主体、颜色、材质、结构和核心外观一致；不要虚构品牌 Logo、认证、价格、销量或无法确认的参数；如需出现文字或配音，必须使用上述指定语言，简洁清晰。",
-        ]
-        if line
-    )
-
-    final_prompt = compose_video_prompt(
-        system_prompt=system_prompt,
-        task_prompt=task_prompt,
-        user_prompt=effective_user_prompt,
-    )
-
     return VideoPromptBuildResult(
-        final_prompt=final_prompt,
+        final_prompt=effective_user_prompt,
         prompt_snapshot=build_prompt_snapshot(
-            system=system_prompt,
-            task=task_prompt,
+            system="",
+            task="",
             user=effective_user_prompt,
-            final=final_prompt,
-            template_refs=_template_refs(lookup.templates),
+            final=effective_user_prompt,
+            template_refs=[],
         ),
     )
 

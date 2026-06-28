@@ -3,7 +3,7 @@ export const videoDemoTypes = [
     typeId: "ugc_seeding",
     title: "UGC 种草",
     subtitle: "用户视角真实分享体验",
-    inputMode: "first_frame",
+    inputMode: "image_to_video",
     uploadTitle: "上传视频开头画面",
     uploadHint: "建议上传产品在真实场景里的首帧图。",
     videoUrl: "https://youjia-bucket.oss-cn-hongkong.aliyuncs.com/system/product-video-demos/videos/ugc_seeding.mp4",
@@ -13,7 +13,7 @@ export const videoDemoTypes = [
     typeId: "short_drama",
     title: "带货短剧",
     subtitle: "短剧情节植入产品",
-    inputMode: "reference_images",
+    inputMode: "reference_to_video",
     uploadTitle: "上传产品/人物/场景参考图",
     uploadHint: "建议上传产品图、使用场景图或人物参考图。",
     videoUrl: "https://youjia-bucket.oss-cn-hongkong.aliyuncs.com/system/product-video-demos/videos/short_drama.mp4",
@@ -23,7 +23,7 @@ export const videoDemoTypes = [
     typeId: "product_demo",
     title: "产品演示",
     subtitle: "多角度展示 + 使用演示",
-    inputMode: "reference_images",
+    inputMode: "reference_to_video",
     uploadTitle: "上传产品参考图",
     uploadHint: "建议上传多张不同角度或细节图，帮助视频稳定还原产品。",
     videoUrl: "https://youjia-bucket.oss-cn-hongkong.aliyuncs.com/system/product-video-demos/videos/product_demo.mp4",
@@ -33,7 +33,7 @@ export const videoDemoTypes = [
     typeId: "product_talk",
     title: "产品口播",
     subtitle: "面对镜头讲解产品卖点",
-    inputMode: "first_frame",
+    inputMode: "image_to_video",
     uploadTitle: "上传口播首帧图",
     uploadHint: "适合上传人物持产品、产品近景或口播画面首帧。",
     videoUrl: "https://youjia-bucket.oss-cn-hongkong.aliyuncs.com/system/product-video-demos/videos/product_talk.mp4",
@@ -43,7 +43,7 @@ export const videoDemoTypes = [
     typeId: "tvc_ad",
     title: "TVC广告",
     subtitle: "品牌广告片质感",
-    inputMode: "reference_images",
+    inputMode: "reference_to_video",
     uploadTitle: "上传产品/场景参考图",
     uploadHint: "建议上传产品主图、品牌场景图和质感细节图。",
     videoUrl: "https://youjia-bucket.oss-cn-hongkong.aliyuncs.com/system/product-video-demos/videos/tvc_ad.mp4",
@@ -53,9 +53,9 @@ export const videoDemoTypes = [
     typeId: "pain_solution",
     title: "痛点解决",
     subtitle: "痛点场景到产品解决",
-    inputMode: "first_last_frame",
-    uploadTitle: "上传问题与解决画面",
-    uploadHint: "左图是问题画面，右图是产品解决后的效果画面。",
+    inputMode: "reference_to_video",
+    uploadTitle: "上传痛点与产品参考图",
+    uploadHint: "建议上传痛点场景、产品图和解决效果参考图。",
     videoUrl: "https://youjia-bucket.oss-cn-hongkong.aliyuncs.com/system/product-video-demos/videos/pain_solution.mp4",
     posterUrl: "https://youjia-bucket.oss-cn-hongkong.aliyuncs.com/system/product-video-demos/posters/pain_solution.jpg",
   },
@@ -63,9 +63,9 @@ export const videoDemoTypes = [
     typeId: "unboxing",
     title: "开箱种草",
     subtitle: "第一视角拆包惊喜体验",
-    inputMode: "first_last_frame",
-    uploadTitle: "上传未开箱与开箱后画面",
-    uploadHint: "左图是包装/未开箱，右图是开箱后产品展示。",
+    inputMode: "reference_to_video",
+    uploadTitle: "上传包装与产品参考图",
+    uploadHint: "建议上传包装、开箱后产品和使用场景参考图。",
     videoUrl: "https://youjia-bucket.oss-cn-hongkong.aliyuncs.com/system/product-video-demos/videos/unboxing.mp4",
     posterUrl: "https://youjia-bucket.oss-cn-hongkong.aliyuncs.com/system/product-video-demos/posters/unboxing.jpg",
   },
@@ -73,9 +73,9 @@ export const videoDemoTypes = [
     typeId: "reaction",
     title: "反应展示",
     subtitle: "首次使用惊喜反应",
-    inputMode: "first_last_frame",
-    uploadTitle: "上传展示前与反应画面",
-    uploadHint: "左图是使用前/展示前，右图是惊喜反应或效果后。",
+    inputMode: "reference_to_video",
+    uploadTitle: "上传产品与反应参考图",
+    uploadHint: "建议上传产品图、人物反应或使用效果参考图。",
     videoUrl: "https://youjia-bucket.oss-cn-hongkong.aliyuncs.com/system/product-video-demos/videos/reaction.mp4",
     posterUrl: "https://youjia-bucket.oss-cn-hongkong.aliyuncs.com/system/product-video-demos/posters/reaction.jpg",
   },
@@ -110,13 +110,11 @@ export const videoSizeOptions = [
 ];
 
 export const videoResolutionOptions = [
-  { value: "480p", label: "480p", subtitle: "快速预览" },
   { value: "720p", label: "720p", subtitle: "默认推荐" },
   { value: "1080p", label: "1080p", subtitle: "高清成片" },
 ];
 
 export const defaultVideoCreditCosts = {
-  "480p": 1,
   "720p": 2,
   "1080p": 4,
 };
@@ -127,7 +125,7 @@ export function getVideoDemoType(typeId) {
 
 export function getVideoCreditCost({ resolution = "720p", duration = 6, costs = defaultVideoCreditCosts } = {}) {
   const unitCost = Number(costs[resolution] ?? defaultVideoCreditCosts[resolution]);
-  const seconds = Math.max(4, Math.min(15, Number(duration || 6)));
+  const seconds = Math.max(3, Math.min(15, Number(duration || 6)));
   if (!Number.isFinite(unitCost) || unitCost <= 0) return null;
   return unitCost * seconds;
 }

@@ -5,7 +5,7 @@ import { useToast } from "@/composables/useToast.js";
 
 const settingsState = reactive({
   imageCreditCosts: { "1K": 1, "2K": 2, "4K": 4 },
-  videoCreditCosts: { "480p": 1, "720p": 2, "1080p": 4 },
+  videoCreditCosts: { "720p": 2, "1080p": 4 },
   rechargePackages: [],
   paymentConfig: {},
   loading: false,
@@ -26,7 +26,6 @@ export function useAdminSettings() {
       }
       settingsState.imageCreditCosts = { ...(result.data?.image_credit_costs || {}) };
       settingsState.videoCreditCosts = {
-        "480p": 1,
         "720p": 2,
         "1080p": 4,
         ...(result.data?.video_credit_costs || {}),
@@ -65,7 +64,6 @@ export function useAdminSettings() {
           "4K": Number(settingsState.imageCreditCosts["4K"]),
         },
         video_credit_costs: {
-          "480p": Number(settingsState.videoCreditCosts["480p"]),
           "720p": Number(settingsState.videoCreditCosts["720p"]),
           "1080p": Number(settingsState.videoCreditCosts["1080p"]),
         },

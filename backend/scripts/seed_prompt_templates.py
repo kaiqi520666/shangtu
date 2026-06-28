@@ -11,7 +11,7 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from app.core.database import Base, SessionLocal, engine  # noqa: E402
-from app.core.model_config import IMAGE_GENERATE_MODEL, QWEN_TEXT_MODEL, VIDEO_GENERATE_MODEL  # noqa: E402
+from app.core.model_config import IMAGE_GENERATE_MODEL, QWEN_TEXT_MODEL  # noqa: E402
 from app.core.prompt_templates import get_prompt_templates  # noqa: E402
 from app.core.time import utc_now  # noqa: E402
 from app.models import PromptTemplate  # noqa: E402
@@ -303,19 +303,6 @@ def _template_rows() -> list[dict]:
         },
         {
             "scenario": "product_video",
-            "purpose": "video_generate",
-            "platform": None,
-            "type_id": None,
-            "model": VIDEO_GENERATE_MODEL,
-            "name": "商品视频-生成通用规则",
-            "content": (
-                "你是专业电商短视频生成导演。必须以用户上传图片中的商品为主体，保持商品外观、颜色、材质、结构和核心特征一致。"
-                "镜头运动、人物动作、场景变化可以服务视频方向，但不要虚构品牌 Logo、认证、奖项、价格、销量、医疗功效或无法确认的参数。"
-                "输出应适合电商短视频投放和商品页展示，节奏清晰，主体稳定，避免画面漂移、商品变形、文字乱码和过度炫技。"
-            ),
-        },
-        {
-            "scenario": "product_video",
             "purpose": "strategy",
             "platform": None,
             "type_id": None,
@@ -536,9 +523,7 @@ async def delete_redundant_video_type_templates(db) -> None:
     await db.execute(
         delete(PromptTemplate).where(
             PromptTemplate.purpose == "video_generate",
-            PromptTemplate.model == VIDEO_GENERATE_MODEL,
             PromptTemplate.scenario == "product_video",
-            PromptTemplate.type_id.is_not(None),
         )
     )
     await db.execute(
@@ -645,26 +630,6 @@ async def verify_lookup() -> None:
                 f"服饰穿搭提示词模板查询缺少: {', '.join(sorted(outfit_missing))}"
             )
 
-        video = await get_prompt_templates(
-            db,
-            scenario="product_video",
-            purpose="video_generate",
-            platform="global",
-            type_id=None,
-            model=VIDEO_GENERATE_MODEL,
-        )
-        video_names = [template.name for template in video.templates]
-        video_required = {
-            "商品视频-生成通用规则",
-        }
-        video_missing = video_required - set(video_names)
-        if video_missing:
-            raise RuntimeError(
-                f"商品视频提示词模板查询缺少: {', '.join(sorted(video_missing))}"
-            )
-        if any(template.type_id for template in video.templates):
-            raise RuntimeError("商品视频生成模板不应返回 type_id 级默认提示词")
-
         video_strategy = await get_prompt_templates(
             db,
             scenario="product_video",
@@ -682,7 +647,6 @@ async def verify_lookup() -> None:
         print("suite strategy order:", " -> ".join(suite_strategy_names))
         print("outfit strategy order:", " -> ".join(outfit_strategy_names))
         print("outfit order:", " -> ".join(outfit_names))
-        print("video order:", " -> ".join(video_names))
         print("video strategy order:", " -> ".join(video_strategy_names))
 
 

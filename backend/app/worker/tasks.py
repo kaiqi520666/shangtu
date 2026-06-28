@@ -201,22 +201,28 @@ def build_create_payload(
 def build_video_create_payload(
     *,
     prompt: str,
+    action: str,
     duration: int,
     aspect_ratio: str,
     resolution: str,
-    image_with_roles: list[dict[str, str]],
-    generate_audio: bool = True,
+    image_urls: list[str],
     client_business_id: str | None = None,
 ) -> dict:
+    cleaned_urls = [url for url in image_urls if url]
+    provider_resolution = str(resolution or "").upper()
     payload: dict[str, Any] = {
         "model": VIDEO_GENERATE_MODEL,
+        "action": action,
         "prompt": prompt,
         "duration": int(duration),
         "aspect_ratio": aspect_ratio,
-        "resolution": resolution,
-        "image_with_roles": image_with_roles,
-        "generate_audio": generate_audio,
+        "resolution": provider_resolution,
+        "watermark": False,
     }
+    if action == "image-to-video":
+        payload["image_urls"] = cleaned_urls[:1]
+    else:
+        payload["reference_images"] = cleaned_urls[:9]
     if client_business_id:
         payload["client_business_id"] = client_business_id
     return payload
@@ -680,8 +686,8 @@ async def generate_video(
     duration: int,
     aspect_ratio: str,
     resolution: str,
-    image_with_roles: list[dict[str, str]],
-    generate_audio: bool = True,
+    action: str,
+    image_urls: list[str],
 ):
     redis = ctx["redis"]
 
@@ -701,11 +707,11 @@ async def generate_video(
 
         create_payload = build_video_create_payload(
             prompt=prompt,
+            action=action,
             duration=duration,
             aspect_ratio=aspect_ratio,
             resolution=resolution,
-            image_with_roles=image_with_roles,
-            generate_audio=generate_audio,
+            image_urls=image_urls,
             client_business_id=task_id,
         )
 

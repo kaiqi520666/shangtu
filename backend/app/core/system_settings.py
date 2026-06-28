@@ -164,8 +164,8 @@ async def get_effective_video_credit_cost(
     if normalized not in costs:
         supported = " / ".join(DEFAULT_VIDEO_CREDIT_COSTS.keys())
         raise ValueError(f"不支持的视频清晰度：{resolution}，请选择 {supported}")
-    if duration < 4 or duration > 15:
-        raise ValueError("视频时长必须在 4-15 秒之间")
+    if duration < 3 or duration > 15:
+        raise ValueError("视频时长必须在 3-15 秒之间")
     return int(costs[normalized]) * int(duration)
 
 

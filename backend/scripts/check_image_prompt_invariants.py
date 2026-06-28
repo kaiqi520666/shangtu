@@ -23,7 +23,6 @@ if str(ROOT_DIR) not in sys.path:
 from app.core import image_prompt_builder  # noqa: E402
 from app.core.image_prompt_builder import (  # noqa: E402
     IMAGE_GENERATE_MODEL,
-    VIDEO_GENERATE_MODEL,
     build_image_generate_prompt,
     build_video_generate_prompt,
 )
@@ -83,25 +82,13 @@ def _install_fake_lookup() -> list[dict]:
         captured.append(
             dict(scenario=scenario, purpose=purpose, platform=platform, type_id=type_id, model=model)
         )
-        if purpose == "video_generate":
-            templates = [
-                _fake_template(
-                    id="video-global",
-                    name="商品视频-生成通用规则",
-                    scenario="product_video",
-                    purpose="video_generate",
-                    model=VIDEO_GENERATE_MODEL,
-                    content=SYSTEM_RULE_MARK,
-                ),
-            ]
-        else:
-            templates = [
-                _fake_template(id="sys-global", name="生图通用主体一致规则", content=SYSTEM_RULE_MARK),
-                _fake_template(
-                    id=f"scene-{scenario}", name=f"{scenario}-生图场景规则", scenario=scenario,
-                    content=SCENE_RULE_MARK,
-                ),
-            ]
+        templates = [
+            _fake_template(id="sys-global", name="生图通用主体一致规则", content=SYSTEM_RULE_MARK),
+            _fake_template(
+                id=f"scene-{scenario}", name=f"{scenario}-生图场景规则", scenario=scenario,
+                content=SCENE_RULE_MARK,
+            ),
+        ]
         # 忠实模拟 SQL：只有按真实 type_id 查询时，库才会返回 per-type 行。
         # 当前实现应固定传 type_id=None，所以这一段永远不该触发。
         if type_id is not None:
@@ -194,7 +181,7 @@ async def _check_video(captured: list[dict]) -> None:
         "aspect_ratio": "9:16",
         "resolution": "1080p",
         "duration": 6,
-        "input_mode": "first_frame",
+        "input_mode": "image_to_video",
     }
 
     captured.clear()
@@ -207,17 +194,13 @@ async def _check_video(captured: list[dict]) -> None:
     )
 
     snapshot = result.prompt_snapshot
-    refs = snapshot["template_refs"]
-    require(len(captured) == 1, f"[product_video] 期望恰好一次模板查询，实得 {len(captured)}")
-    require(captured[0]["type_id"] is None, f"[product_video] 视频生成查询必须 type_id=None，实得 {captured[0]['type_id']!r}")
-    require(
-        captured[0]["purpose"] == "video_generate" and captured[0]["model"] == VIDEO_GENERATE_MODEL,
-        f"[product_video] 查询的 purpose/model 不对：{captured[0]}",
-    )
+    require(len(captured) == 0, f"[product_video] 不应查询隐藏生成模板，实得 {len(captured)} 次")
     require(PER_TYPE_LEAK_MARK not in result.final_prompt, "[product_video] 最终 prompt 混入了 per-type 默认提示词")
-    require(all(r["type_id"] is None for r in refs), f"[product_video] template_refs 出现了 type_id：{refs}")
-    require(strategy_content in result.final_prompt, "[product_video] 视频脚本未进入最终 prompt")
+    require(result.final_prompt == strategy_content, "[product_video] final prompt 应等于用户确认的视频脚本")
+    require(snapshot["system"] == "", "[product_video] snapshot.system 应为空")
+    require(snapshot["task"] == "", "[product_video] snapshot.task 应为空")
     require(snapshot["user"] == strategy_content, "[product_video] snapshot.user 应等于视频脚本")
+    require(snapshot["template_refs"] == [], "[product_video] 不应记录隐藏生成模板 refs")
 
     try:
         await build_video_generate_prompt(
@@ -229,7 +212,7 @@ async def _check_video(captured: list[dict]) -> None:
         )
     except ValueError as exc:
         require("请先生成并确认视频策略" in str(exc), f"视频空策略报错文案不符：{exc}")
-        print("  ✓ product_video: type_id=None / 无 per-type 泄漏 / 视频脚本必填")
+        print("  ✓ product_video: 零隐藏模板 / final 等于可见脚本 / 视频脚本必填")
         return
     raise CheckFailed("视频空 user_prompt 未被拒绝（视频策略内容应为必填）")
 

@@ -14,7 +14,7 @@ const emit = defineEmits(["update:modelValue"]);
 <template>
   <div>
     <label class="mb-1.5 block text-xs font-bold text-slate-500">视频清晰度</label>
-    <div class="grid grid-cols-3 gap-2">
+    <div class="grid grid-cols-2 gap-2">
       <button
         v-for="option in videoResolutionOptions"
         :key="option.value"

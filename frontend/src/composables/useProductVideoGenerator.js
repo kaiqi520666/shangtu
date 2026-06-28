@@ -69,9 +69,8 @@ function attachVideoStrategyBrief(snapshot, brief) {
 }
 
 function getRequiredImageMessage(inputMode, count) {
-  if (inputMode === "first_frame" && count !== 1) return "请上传 1 张首帧图";
-  if (inputMode === "first_last_frame" && count !== 2) return "请上传开始图和结束图";
-  if (inputMode === "reference_images" && (count < 1 || count > 9)) {
+  if (inputMode === "image_to_video" && count !== 1) return "请上传 1 张首帧图";
+  if (inputMode === "reference_to_video" && (count < 1 || count > 9)) {
     return "请上传 1-9 张参考图";
   }
   return "";

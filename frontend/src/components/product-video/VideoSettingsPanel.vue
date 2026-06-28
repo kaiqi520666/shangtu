@@ -53,59 +53,44 @@ const emit = defineEmits([
 
 const selectedType = computed(() => getVideoDemoType(props.settings.videoType));
 const maxUploadCount = computed(() => {
-  if (selectedType.value.inputMode === "reference_images") return 9;
-  if (selectedType.value.inputMode === "first_last_frame") return 2;
+  if (selectedType.value.inputMode === "reference_to_video") return 9;
   return 1;
 });
 const uploadAddText = computed(() => {
-  if (selectedType.value.inputMode === "first_last_frame") {
-    return props.uploadedImages.length === 0 ? "添加开始图" : "添加结束图";
-  }
-  if (selectedType.value.inputMode === "reference_images") return "添加参考图";
+  if (selectedType.value.inputMode === "reference_to_video") return "添加参考图";
   return "添加首帧图";
 });
 const uploadHintText = computed(() => {
-  if (selectedType.value.inputMode === "reference_images") return "支持 1-9 张";
-  if (selectedType.value.inputMode === "first_last_frame") return "必须上传 2 张";
+  if (selectedType.value.inputMode === "reference_to_video") return "支持 1-9 张";
   return "必须上传 1 张";
 });
 const uploadRoleText = computed(() => {
-  if (selectedType.value.inputMode === "first_frame") return "当前将作为视频开头画面生成";
-  if (selectedType.value.inputMode === "first_last_frame") return "当前将生成从开始图到结束图的变化视频";
+  if (selectedType.value.inputMode === "image_to_video") return "当前将作为视频开头画面生成";
   return "当前将参考多张图片生成视频";
 });
 const uploadRequirementText = computed(() => {
-  if (selectedType.value.inputMode === "first_frame") {
+  if (selectedType.value.inputMode === "image_to_video") {
     return "上传 1 张商品或人物首帧图，系统会从这张画面开始生成视频。";
-  }
-  if (selectedType.value.inputMode === "first_last_frame") {
-    return "上传 2 张图片：第一张作为开始画面，第二张作为结束画面。";
   }
   return "至少上传 1 张产品参考图，最多 9 张；图片越完整，产品还原越稳定。";
 });
 const uploadLimitMessage = computed(() => {
-  if (selectedType.value.inputMode === "reference_images") return "参考图最多只能上传 9 张";
-  if (selectedType.value.inputMode === "first_last_frame") return "首尾帧模式只能上传 2 张图片";
-  return "首帧模式只能上传 1 张图片";
+  if (selectedType.value.inputMode === "reference_to_video") return "参考图最多只能上传 9 张";
+  return "图生视频只能上传 1 张图片";
 });
-const showUploadPlaceholders = computed(() => selectedType.value.inputMode === "first_last_frame");
-const showMainImageAction = computed(() => !["first_frame", "first_last_frame", "reference_images"].includes(selectedType.value.inputMode));
-const badgeTextResolver = computed(() => {
-  if (selectedType.value.inputMode !== "first_last_frame") return null;
-  return (index) => (index === 0 ? "开始" : "结束");
-});
+const showUploadPlaceholders = computed(() => false);
+const showMainImageAction = computed(() => false);
+const badgeTextResolver = computed(() => null);
 const generateDisabled = computed(() => {
   if (props.strategyLoading) return true;
   if (props.uploadedImages.some((img) => img?.uploading)) return true;
-  if (selectedType.value.inputMode === "first_last_frame") return props.uploadedImages.length < 2;
   return props.uploadedImages.length < 1;
 });
 const generateText = computed(() => {
   if (props.strategyLoading) return "AI 正在生成脚本...";
   if (props.uploadedImages.some((img) => img?.uploading)) return "素材上传中...";
   if (generateDisabled.value) {
-    if (selectedType.value.inputMode === "first_last_frame") return "请上传开始图和结束图";
-    if (selectedType.value.inputMode === "reference_images") return "请至少上传 1 张参考图";
+    if (selectedType.value.inputMode === "reference_to_video") return "请至少上传 1 张参考图";
     return "请上传 1 张首帧图";
   }
   return "AI 生成视频策略";
