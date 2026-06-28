@@ -10,6 +10,7 @@ from app.core.media_projection import (
     includes_video,
     video_admin_select,
 )
+from app.core.scenarios import IMAGE_SCENARIOS, VIDEO_SCENARIOS
 from app.models import GenerationJob, ImageTask, User, VideoTask
 from app.schemas.response import Response, success
 
@@ -36,11 +37,12 @@ async def list_image_tasks(
     if status in {"pending", "processing", "done", "failed", "timeout"}:
         image_stmt = image_stmt.where(ImageTask.status == status)
         video_stmt = video_stmt.where(VideoTask.status == status)
-    if scenario in {"product_suite", "product_image", "outfit", "free_image"}:
+    if scenario in IMAGE_SCENARIOS:
         image_stmt = image_stmt.where(GenerationJob.scenario == scenario)
         video_stmt = video_stmt.where(false())
-    elif scenario == "product_video":
+    elif scenario in VIDEO_SCENARIOS:
         image_stmt = image_stmt.where(false())
+        video_stmt = video_stmt.where(VideoTask.scenario == scenario)
     if keyword:
         like = f"%{keyword.strip()}%"
         image_stmt = image_stmt.where(

@@ -38,6 +38,7 @@ const SCENARIO_LABEL_MAP = {
   outfit: '服饰穿搭',
   free_image: '自由生图',
   product_video: '商品视频',
+  free_video: '自由生视频',
 }
 
 function getScenarioLabel(card) {

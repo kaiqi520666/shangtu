@@ -464,6 +464,7 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
       },
       createTask({ item, card, settingsSnapshot: snapshot, jobId }) {
         return generateVideo({
+          scenario: "product_video",
           type_id: item.typeId,
           title: item.title,
           input_mode: item.inputMode,

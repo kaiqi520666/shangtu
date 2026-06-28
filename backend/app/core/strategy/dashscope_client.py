@@ -8,6 +8,7 @@ from app.core.strategy.parsing import _parse_json_response
 from app.core.strategy.prompts import (
     MULTI_IMAGE_ANALYSIS_RULE,
     build_free_image_optimize_prompt,
+    build_free_video_optimize_prompt,
     build_multimodal_image_content,
     build_product_prompt,
 )
@@ -102,6 +103,49 @@ async def optimize_free_image_prompt(prompt: str) -> str:
                     {
                         "type": "text",
                         "text": build_free_image_optimize_prompt(normalized_prompt[:4000]),
+                    },
+                ],
+            }
+        ],
+    }
+
+    async with httpx.AsyncClient(timeout=60) as client:
+        response = await client.post(
+            get_dashscope_endpoint(),
+            headers={"Authorization": f"Bearer {get_dashscope_api_key()}"},
+            json=payload,
+        )
+
+    if response.status_code >= 400:
+        raise RuntimeError(f"DashScope请求失败: {response.status_code} {response.text[:300]}")
+
+    result = response.json()
+    try:
+        content = result["choices"][0]["message"]["content"]
+    except (KeyError, IndexError, TypeError) as exc:
+        raise RuntimeError("DashScope响应格式异常") from exc
+
+    if not content or not content.strip():
+        raise RuntimeError("DashScope未返回有效内容")
+
+    return content.strip()
+
+
+async def optimize_free_video_prompt(prompt: str) -> str:
+    normalized_prompt = prompt.strip()
+    if not normalized_prompt:
+        raise ValueError("请输入需要优化的视频提示词")
+
+    payload = {
+        "model": QWEN_TEXT_MODEL,
+        "enable_thinking": False,
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": build_free_video_optimize_prompt(normalized_prompt[:4000]),
                     },
                 ],
             }

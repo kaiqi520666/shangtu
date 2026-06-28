@@ -62,6 +62,23 @@ def build_free_image_optimize_prompt(prompt: str) -> str:
 {prompt}"""
 
 
+def build_free_video_optimize_prompt(prompt: str) -> str:
+    return f"""你是 AI 视频生成提示词优化助手。
+请把用户输入改写成更清晰、更具体、更适合视频生成模型执行的提示词。
+
+要求：
+1. 保留用户原意，不要改变主体、人物身份、商品类型、核心动作或故事方向。
+2. 补充视频维度的信息：主体动作、镜头运动、景别变化、节奏、光线、场景氛围、画面风格。
+3. 让提示词适合 3-15 秒短视频生成，可按镜头顺序描述，但不要强行输出时间轴。
+4. 不要添加用户没有要求的品牌 Logo、文字、水印、价格、促销、认证、销量、具体参数。
+5. 不要输出解释，不要输出 Markdown，不要输出标题。
+6. 只输出优化后的提示词本身。
+7. 如果用户输入已经足够清楚，只做轻微润色。
+
+用户原始提示词：
+{prompt}"""
+
+
 def build_product_image_strategy_prompt(
     *,
     platform: str,

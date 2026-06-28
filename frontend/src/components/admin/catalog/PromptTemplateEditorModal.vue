@@ -43,6 +43,7 @@ const localForm = reactive({ ...defaultForm });
 const title = computed(() => (localForm.id ? "编辑提示词模板" : "新增提示词模板"));
 const typeIdLabel = computed(() => {
   if (localForm.scenario === "product_video") return "视频方向 type_id";
+  if (localForm.scenario === "free_video") return "自由视频类型 type_id";
   if (localForm.scenario === "product_suite") return "套图类型 type_id";
   if (localForm.scenario === "product_image") return "详情图种 type_id";
   if (localForm.scenario === "outfit") return "穿搭场景 type_id";
@@ -51,6 +52,8 @@ const typeIdLabel = computed(() => {
 const typeIdPlaceholder = computed(() => (
   localForm.scenario === "product_video"
     ? "如 product_talk；留空表示商品视频通用规则"
+    : localForm.scenario === "free_video"
+      ? "如 free_video；留空表示自由生视频通用规则"
     : "留空表示通用"
 ));
 

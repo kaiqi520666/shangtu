@@ -106,7 +106,7 @@ def video_task_payload(
         "user_email": user.email if user else None,
         "job_id": task.job_id,
         "job_title": job.title if job else None,
-        "scenario": job.scenario if job else "product_video",
+        "scenario": task.scenario,
         "type_id": task.type_id,
         "title": task.title,
         "size": f"{task.aspect_ratio}/{task.resolution}/{task.duration}s",

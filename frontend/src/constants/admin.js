@@ -54,6 +54,7 @@ export const scenarioOptions = [
   { label: "服饰穿搭", value: "outfit" },
   { label: "自由生图", value: "free_image" },
   { label: "商品视频", value: "product_video" },
+  { label: "自由生视频", value: "free_video" },
 ];
 
 export const taskMediaTypeOptions = [
@@ -162,6 +163,9 @@ export function promptTemplateScopeLabel(template = {}) {
   const typeId = template.type_id || "";
   if (template.scenario === "product_video") {
     return typeId ? `视频方向：${typeId}` : "全部视频方向";
+  }
+  if (template.scenario === "free_video") {
+    return typeId ? `自由视频类型：${typeId}` : "全部自由视频类型";
   }
   if (template.scenario === "product_suite") {
     return typeId ? `套图类型：${typeId}` : "全部套图类型";

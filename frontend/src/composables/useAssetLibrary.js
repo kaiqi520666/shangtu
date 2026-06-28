@@ -12,6 +12,7 @@ const SCENARIO_OPTIONS = [
   { value: "outfit", label: "服饰穿搭" },
   { value: "free_image", label: "自由生图" },
   { value: "product_video", label: "商品视频" },
+  { value: "free_video", label: "自由生视频" },
 ];
 
 export function useAssetLibrary() {

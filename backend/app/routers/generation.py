@@ -9,21 +9,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.deps import get_current_user, get_db
 from app.core.json_utils import dump_json, parse_json_or_none
 from app.core.media_projection import image_task_payload, video_task_payload
+from app.core.scenarios import (
+    SCENARIO_TITLE_PREFIX,
+    SUPPORTED_GENERATION_SCENARIOS,
+    VIDEO_SCENARIOS,
+)
 from app.core.task_timeout import project_task_runtime_state
 from app.core.time import to_utc_iso, utc_now
 from app.models import GenerationJob, ImageTask, User, VideoTask
 from app.schemas.response import Response, fail, success
 
 router = APIRouter(prefix="/generation", tags=["生成任务"])
-
-SUPPORTED_SCENARIOS = {"product_suite", "product_image", "outfit", "free_image", "product_video"}
-SCENARIO_TITLE_PREFIX = {
-    "product_suite": "商品套图",
-    "product_image": "商品详情图",
-    "outfit": "服饰穿搭",
-    "free_image": "自由生图",
-    "product_video": "商品视频",
-}
 
 TERMINAL_DONE = "done"
 TERMINAL_FAILED = {"failed", "timeout"}
@@ -65,7 +61,7 @@ def _default_title(scenario: str) -> str:
 
 
 def _task_model_for_scenario(scenario: str):
-    return VideoTask if scenario == "product_video" else ImageTask
+    return VideoTask if scenario in VIDEO_SCENARIOS else ImageTask
 
 
 @router.post("/jobs", response_model=Response)
@@ -74,7 +70,7 @@ async def create_job(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    if req.scenario not in SUPPORTED_SCENARIOS:
+    if req.scenario not in SUPPORTED_GENERATION_SCENARIOS:
         return fail(f"暂不支持的场景：{req.scenario}")
 
     job = GenerationJob(
@@ -109,7 +105,7 @@ async def list_jobs(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    if scenario not in SUPPORTED_SCENARIOS:
+    if scenario not in SUPPORTED_GENERATION_SCENARIOS:
         return fail(f"暂不支持的场景：{scenario}")
 
     result = await db.execute(
@@ -134,6 +130,8 @@ async def list_jobs(
     ]
     if task_model is ImageTask:
         task_conditions.append(ImageTask.replaced_by_task_id.is_(None))
+    else:
+        task_conditions.append(VideoTask.scenario == scenario)
     media_type = "video" if task_model is VideoTask else "image"
     tasks_rows = await db.execute(
         select(task_model.job_id, task_model.status, task_model.created_at).where(*task_conditions)
@@ -207,6 +205,8 @@ async def get_job(
     ]
     if task_model is ImageTask:
         task_conditions.append(ImageTask.replaced_by_task_id.is_(None))
+    else:
+        task_conditions.append(VideoTask.scenario == job.scenario)
     tasks_result = await db.execute(
         select(task_model)
         .where(*task_conditions)

@@ -9,7 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.credits import normalize_video_resolution
 from app.core.deps import get_current_user, get_db
-from app.core.strategy.dashscope_client import DashScopeConfigError
+from app.core.scenarios import VIDEO_SCENARIOS
+from app.core.strategy.dashscope_client import (
+    DashScopeConfigError,
+    optimize_free_video_prompt,
+)
 from app.core.json_utils import dump_json_or_none, parse_json_or_none
 from app.core.prompt_template_builder import build_strategy_template_prompt
 from app.core.prompt_snapshot import dump_prompt_snapshot, parse_prompt_snapshot
@@ -31,13 +35,14 @@ from app.models import GenerationJob, User, VideoTask
 from app.schemas.response import Response, fail, success
 from app.services.generation_tasks import deduct_credits_or_fail, enqueue_or_compensate
 
-router = APIRouter(prefix="/video", tags=["商品视频"])
+router = APIRouter(prefix="/video", tags=["视频生成"])
 
-VIDEO_INPUT_MODES = {"image_to_video", "reference_to_video"}
+VIDEO_INPUT_MODES = {"text_to_video", "image_to_video", "reference_to_video"}
 VIDEO_ASPECT_RATIOS = {"16:9", "9:16", "1:1", "4:3", "3:4"}
 
 
 class VideoGenerateRequest(BaseModel):
+    scenario: str = "product_video"
     type_id: str
     title: str | None = None
     input_mode: str
@@ -68,13 +73,19 @@ class VideoStrategyRequest(BaseModel):
     product_input: str = ""
 
 
+class FreeVideoOptimizeRequest(BaseModel):
+    prompt: str
+
+
 def _clean_image_urls(image_urls: list[str]) -> list[str]:
     return [str(url).strip() for url in image_urls if str(url).strip()]
 
 
-def _validate_video_inputs(input_mode: str, image_urls: list[str]) -> str | None:
+def _validate_video_inputs(input_mode: str, image_urls: list[str], *, allow_text: bool) -> str | None:
     if input_mode not in VIDEO_INPUT_MODES:
         return "不支持的视频素材模式"
+    if input_mode == "text_to_video":
+        return None if allow_text else "商品视频暂不支持文生视频模式"
     count = len(image_urls)
     if input_mode == "image_to_video" and count != 1:
         return "图生视频必须上传 1 张图片"
@@ -91,9 +102,15 @@ def _validate_aspect_ratio(aspect_ratio: str) -> str | None:
 
 
 def _video_action(input_mode: str) -> str:
+    if input_mode == "text_to_video":
+        return "text-to-video"
     if input_mode == "image_to_video":
         return "image-to-video"
     return "reference-to-video"
+
+
+def _normalize_video_scenario(raw: str | None) -> str:
+    return (raw or "product_video").strip() or "product_video"
 
 
 @router.get("/credit-costs", response_model=Response)
@@ -116,7 +133,7 @@ async def video_strategy(
 ):
     images = [item.model_dump() for item in req.images]
     image_urls = _clean_image_urls([item["url"] for item in images])
-    input_error = _validate_video_inputs(req.input_mode, image_urls)
+    input_error = _validate_video_inputs(req.input_mode, image_urls, allow_text=False)
     if input_error:
         return fail(input_error)
 
@@ -152,6 +169,21 @@ async def video_strategy(
     return success(strategy)
 
 
+@router.post("/free-video/optimize", response_model=Response)
+async def free_video_optimize(
+    req: FreeVideoOptimizeRequest,
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        content = await optimize_free_video_prompt(req.prompt)
+    except (ValueError, DashScopeConfigError, RuntimeError) as e:
+        return fail(str(e))
+    except Exception:
+        return fail("视频提示词优化失败")
+
+    return success({"prompt": content})
+
+
 @router.post("/generate", response_model=Response)
 async def create_video_task(
     req: VideoGenerateRequest,
@@ -159,8 +191,16 @@ async def create_video_task(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    scenario = _normalize_video_scenario(req.scenario)
+    if scenario not in VIDEO_SCENARIOS:
+        return fail("不支持的视频场景")
+
     image_urls = _clean_image_urls(req.image_urls)
-    input_error = _validate_video_inputs(req.input_mode, image_urls)
+    input_error = _validate_video_inputs(
+        req.input_mode,
+        image_urls,
+        allow_text=scenario == "free_video",
+    )
     if input_error:
         return fail(input_error)
 
@@ -188,7 +228,7 @@ async def create_video_task(
             select(GenerationJob).where(
                 GenerationJob.id == req.job_id,
                 GenerationJob.user_id == current_user.id,
-                GenerationJob.scenario == "product_video",
+                GenerationJob.scenario == scenario,
             )
         )
         job = job_result.scalar_one_or_none()
@@ -197,7 +237,7 @@ async def create_video_task(
 
     settings_snapshot = {
         **(req.settings_snapshot or {}),
-        "scenario": "product_video",
+        "scenario": scenario,
         "type_id": req.type_id,
         "title": req.title,
         "input_mode": req.input_mode,
@@ -230,6 +270,7 @@ async def create_video_task(
         id=task_id,
         user_id=current_user.id,
         job_id=job.id if job else None,
+        scenario=scenario,
         type_id=req.type_id,
         title=req.title,
         sort_order=req.sort_order,
@@ -343,6 +384,7 @@ async def get_video_task(
     return success(
         {
             "task_id": task.id,
+            "scenario": task.scenario,
             "status": runtime.status,
             "result_url": runtime.result_url,
             "prompt": task.prompt,

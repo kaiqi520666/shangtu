@@ -10,6 +10,7 @@ from app.core.media_projection import (
     includes_video,
     video_asset_select,
 )
+from app.core.scenarios import SUPPORTED_GENERATION_SCENARIOS
 from app.core.task_state import task_state_keys
 from app.core.time import to_utc_iso
 from app.models import ImageTask, User, VideoTask
@@ -17,7 +18,7 @@ from app.schemas.response import Response, fail, success
 
 router = APIRouter(prefix="/asset", tags=["资产库"])
 
-SCENARIO_FILTER = {"product_suite", "product_image", "outfit", "free_image", "product_video"}
+SCENARIO_FILTER = SUPPORTED_GENERATION_SCENARIOS
 PAGE_SIZE_MAX = 50
 
 

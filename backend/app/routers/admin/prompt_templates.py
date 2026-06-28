@@ -3,6 +3,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_super_admin, get_db
+from app.core.scenarios import SUPPORTED_GENERATION_SCENARIOS
 from app.core.time import utc_now
 from app.models import PromptTemplate, User
 from app.schemas.response import Response, fail, success
@@ -12,7 +13,7 @@ from .utils import audit_log, page_payload, prompt_template_payload
 
 router = APIRouter()
 
-VALID_SCENARIOS = {"product_suite", "product_image", "outfit", "free_image", "product_video"}
+VALID_SCENARIOS = SUPPORTED_GENERATION_SCENARIOS
 VALID_PURPOSES = {"image_generate", "ai_write", "strategy"}
 
 

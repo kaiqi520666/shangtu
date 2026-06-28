@@ -1,5 +1,5 @@
 <script setup>
-import { Clapperboard, HelpCircle, Image, Images, PackageCheck, ShieldCheck, Sparkles, WandSparkles } from 'lucide-vue-next'
+import { Clapperboard, Film, HelpCircle, Image, Images, PackageCheck, ShieldCheck, Sparkles, WandSparkles } from 'lucide-vue-next'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth.js'
 
@@ -9,6 +9,7 @@ const mainNavs = [
   { name: '商品视频', desc: '商品图一键生成电商短视频素材', icon: Clapperboard, to: '/generator/product-video' },
   { name: '服饰穿搭', desc: '真人模特试衣与穿搭场景生成模块', icon: WandSparkles, to: '/generator/outfit' },
   { name: '自由生图', desc: '输入提示词，自由生成或参考图片改图', icon: Sparkles, to: '/generator/free-image' },
+  { name: '自由生视频', desc: '提示词、首帧图或参考图生成视频', icon: Film, to: '/generator/free-video' },
   { name: '资产库', desc: '管理所有已生成的图片资源', icon: Images, to: '/generator/assets' },
 ]
 

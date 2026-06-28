@@ -2,6 +2,7 @@ from sqlalchemy import Integer, String, cast, func, literal, select
 
 from app.core.json_utils import parse_json_or_none
 from app.core.prompt_snapshot import parse_prompt_snapshot
+from app.core.scenarios import VIDEO_SCENARIOS
 from app.core.task_timeout import project_task_runtime_state, user_visible_task_error
 from app.core.time import to_utc_iso
 from app.models import GenerationJob, ImageTask, User, VideoTask
@@ -48,6 +49,7 @@ def video_task_payload(task: VideoTask) -> dict:
     return {
         "task_id": task.id,
         "media_type": "video",
+        "scenario": task.scenario,
         "type_id": task.type_id,
         "title": task.title,
         "sort_order": task.sort_order,
@@ -69,7 +71,7 @@ def video_task_payload(task: VideoTask) -> dict:
 
 
 def image_asset_select(user_id: int, scenario: str | None):
-    if scenario == "product_video":
+    if scenario in VIDEO_SCENARIOS:
         return None
     stmt = (
         select(
@@ -95,16 +97,16 @@ def image_asset_select(user_id: int, scenario: str | None):
 
 
 def video_asset_select(user_id: int, scenario: str | None):
-    if scenario and scenario != "product_video":
+    if scenario and scenario not in VIDEO_SCENARIOS:
         return None
-    return (
+    stmt = (
         select(
             VideoTask.id.label("task_id"),
             literal("video").label("media_type"),
             VideoTask.result_url.label("result_url"),
             VideoTask.title.label("title"),
             VideoTask.type_id.label("type_id"),
-            func.coalesce(GenerationJob.scenario, literal("product_video")).label("scenario"),
+            VideoTask.scenario.label("scenario"),
             func.coalesce(GenerationJob.title, literal("")).label("job_title"),
             VideoTask.created_at.label("created_at"),
         )
@@ -115,6 +117,9 @@ def video_asset_select(user_id: int, scenario: str | None):
             VideoTask.archived.is_(False),
         )
     )
+    if scenario:
+        stmt = stmt.where(VideoTask.scenario == scenario)
+    return stmt
 
 
 def image_admin_select():
@@ -167,7 +172,7 @@ def video_admin_select():
             User.email.label("user_email"),
             VideoTask.job_id.label("job_id"),
             GenerationJob.title.label("job_title"),
-            func.coalesce(GenerationJob.scenario, literal("product_video")).label("scenario"),
+            VideoTask.scenario.label("scenario"),
             VideoTask.type_id.label("type_id"),
             VideoTask.title.label("title"),
             size_expr.label("size"),

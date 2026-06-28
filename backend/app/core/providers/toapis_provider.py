@@ -88,12 +88,14 @@ def build_video_create_payload(
         "resolution": provider_resolution,
         "watermark": False,
     }
+    if client_business_id:
+        payload["client_business_id"] = client_business_id
+    if action == "text-to-video":
+        return payload
     if action == "image-to-video":
         payload["image_urls"] = cleaned_urls[:1]
     else:
         payload["reference_images"] = cleaned_urls[:9]
-    if client_business_id:
-        payload["client_business_id"] = client_business_id
     return payload
 
 

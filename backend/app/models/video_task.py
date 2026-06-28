@@ -13,6 +13,7 @@ class VideoTask(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     user_id: Mapped[int] = mapped_column(Integer, nullable=False)
     job_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    scenario: Mapped[str] = mapped_column(String(32), default="product_video", nullable=False)
     type_id: Mapped[str | None] = mapped_column(String(50), nullable=True)
     title: Mapped[str | None] = mapped_column(String(100), nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)

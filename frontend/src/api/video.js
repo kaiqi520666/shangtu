@@ -9,6 +9,7 @@ export function generateVideoStrategy(payload) {
 }
 
 export function generateVideo({
+  scenario = "product_video",
   type_id,
   title = null,
   input_mode,
@@ -24,6 +25,7 @@ export function generateVideo({
   return request.post(
     "/video/generate",
     {
+      scenario,
       type_id,
       title,
       input_mode,
@@ -38,6 +40,10 @@ export function generateVideo({
     },
     { timeout: 60000 },
   );
+}
+
+export function optimizeFreeVideoPrompt(prompt) {
+  return request.post("/video/free-video/optimize", { prompt }, { timeout: 120000 });
 }
 
 export function getVideoTask(taskId) {
