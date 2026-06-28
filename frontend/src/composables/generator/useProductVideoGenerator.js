@@ -12,7 +12,7 @@ import {
   useGenerationCards,
 } from "@/composables/generator/useGenerationCards.js";
 import { useCardActions } from "@/composables/useCardActions.js";
-import { useGenerationRunner } from "@/composables/generator/useGenerationRunner.js";
+import { useMediaBatchRunner } from "@/composables/generator/batch/useMediaBatchRunner.js";
 import { useGenerationStrategyFlow } from "@/composables/generator/useGenerationStrategyFlow.js";
 import { buildVideoAnalyzeImages } from "@/utils/analyzeImages.js";
 import { getApiErrorMessage } from "@/utils/apiError.js";
@@ -173,7 +173,7 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
     toast?.info?.(message);
   }
 
-  const runner = useGenerationRunner({
+  const runner = useMediaBatchRunner({
     scenario: "product_video",
     cards,
     toast,

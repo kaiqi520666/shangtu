@@ -11,7 +11,7 @@ import { getApiErrorMessage } from "@/utils/apiError.js";
 
 const TITLE_DEBOUNCE_MS = 600;
 
-export function useGenerationRunner({
+export function useMediaBatchRunner({
   scenario,
   cards,
   toast,

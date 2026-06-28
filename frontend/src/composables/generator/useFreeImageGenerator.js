@@ -6,7 +6,7 @@ import {
   createBatchFinishedHandler,
   useGenerationCards,
 } from "@/composables/generator/useGenerationCards.js";
-import { useGenerationRunner } from "@/composables/generator/useGenerationRunner.js";
+import { useMediaBatchRunner } from "@/composables/generator/batch/useMediaBatchRunner.js";
 import { useToast } from "@/composables/useToast.js";
 import {
   cloneGenerationSettingsSnapshot,
@@ -63,7 +63,7 @@ export function useFreeImageGenerator({ onJobCreated } = {}) {
     language: "",
   });
 
-  const runner = useGenerationRunner({
+  const runner = useMediaBatchRunner({
     scenario: "free_image",
     cards,
     toast,

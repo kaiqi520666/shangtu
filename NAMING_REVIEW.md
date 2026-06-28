@@ -123,7 +123,7 @@ generator 场景 composable 命名一致：
 
 需要重点拆分的目录：
 
-- `frontend/src/composables/generator/` 可继续按 `strategy`、`batch`、`restore` 拆更细子目录。
+- `frontend/src/composables/generator/` 已开始按职责拆出 `batch/`，可继续补齐 `strategy/`、`restore/` 等子目录。
 - `backend/app/core/` 有 18 个直接 `.py` 文件，还包含 `providers/`、`strategy/` 子目录。建议把业务文件移出 `core`，否则 `core` 既像基础设施层又像业务服务层。
 
 单文件体量也暴露了目录没有承接复杂度：
@@ -153,8 +153,8 @@ generator 场景 composable 命名一致：
 1. `backend/app/services/image_generation.py`
    能看出是图片生成主链路，但商品详情图、商品套图、穿搭图、自由生图的创建/重生编排都收在同一个 service。后续如果继续增长，可按场景拆成更小的 service。
 
-2. `frontend/src/composables/generator/useGenerationRunner.js`
-   名字像通用 runner，但内部默认导入 `generateImage` 和图片积分校验，同时也被视频生成器复用。建议拆成 `useGenerationJobs.js`、`useImageBatchRunner.js`、`useMediaBatchRunner.js`。
+2. `backend/app/routers/video.py`
+   名字像视频资源入口，但实际同时负责策略生成、任务创建、状态查询、软删除和下载代理。建议后续拆成 `video_strategy.py`、`video_tasks.py`、`video_downloads.py`，业务编排下沉到 service。
 
 3. `backend/app/routers/generation.py`
    名字像所有生成 API 的入口，但实际只管理 `GenerationJob` 容器；真正创建图片/视频任务在 `image.py` 和 `video.py`。建议改为 `generation_jobs.py`，前端 `api/generation.js` 也可改为 `api/generationJobs.js`。

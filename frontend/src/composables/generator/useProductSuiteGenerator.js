@@ -12,7 +12,7 @@ import {
 } from "@/composables/generator/useGenerationCards.js";
 import { useAiSellingPointsWriter } from "@/composables/useAiSellingPointsWriter.js";
 import { useCardActions } from "@/composables/useCardActions.js";
-import { useGenerationRunner } from "@/composables/generator/useGenerationRunner.js";
+import { useMediaBatchRunner } from "@/composables/generator/batch/useMediaBatchRunner.js";
 import { useGenerationStrategyFlow } from "@/composables/generator/useGenerationStrategyFlow.js";
 import { buildProductAnalyzeImages, hasUploadingImages } from "@/utils/analyzeImages.js";
 import { getApiErrorMessage } from "@/utils/apiError.js";
@@ -115,7 +115,7 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
     }),
   });
 
-  const runner = useGenerationRunner({
+  const runner = useMediaBatchRunner({
     scenario: "product_suite",
     cards,
     toast,

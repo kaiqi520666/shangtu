@@ -24,7 +24,7 @@ npm run build
 - 业务状态和副作用优先放 composable，组件保持薄。
 - 通用请求放 `src/api/`，不要在多个页面重复写同一请求逻辑。
 - 通用 UI 放 `src/components/ui/`，业务组件放对应业务目录。
-- 生成工作台优先复用 `GenerationWorkspace`、`ImageUploader`、`GenerationHistoryDrawer`、`useGenerationRunner`、`useGenerationCards`、`useCardActions`。
+- 生成工作台优先复用 `GenerationWorkspace`、`ImageUploader`、`GenerationHistoryDrawer`、`useMediaBatchRunner`、`useGenerationCards`、`useCardActions`。
 - 不为视频/图片重复写两套相同的工作台逻辑；差异只放在真正不同的卡片、输入、接口适配或媒体预览层。
 - AI 帮写统一走 `useAiSellingPointsWriter` 和 `src/utils/analyzeImages.js` 的带标签多图分析，不在场景 composable 里复制请求流程。
 - 生成参数快照统一通过 `src/utils/generationSnapshots.js` 构造、读取和克隆，不在页面里手写多套 snapshot shape。
