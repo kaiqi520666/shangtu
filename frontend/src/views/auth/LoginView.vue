@@ -47,10 +47,7 @@ async function handleLogin(payload) {
 </script>
 
 <template>
-  <AuthPageShell
-    headline="把商品视觉生产线，放进一个干净的工作台。"
-    description="登录后继续处理商品图、详情图、商品视频和资产沉淀，保持每一次生成都可追踪。"
-  >
+  <AuthPageShell>
     <AuthForm mode="login" @submit="handleLogin" />
   </AuthPageShell>
 </template>

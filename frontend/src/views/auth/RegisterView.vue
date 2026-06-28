@@ -39,10 +39,7 @@ async function handleRegister(payload) {
 </script>
 
 <template>
-  <AuthPageShell
-    headline="创建你的电商视觉工作台。"
-    description="注册后即可管理商品图片、视频生成和资产库，让内容生产从第一天开始保持清爽。"
-  >
+  <AuthPageShell>
     <AuthForm mode="register" @submit="handleRegister" />
   </AuthPageShell>
 </template>

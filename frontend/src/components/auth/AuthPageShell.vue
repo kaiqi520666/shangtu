@@ -1,17 +1,6 @@
 <script setup>
 import { Sparkles } from 'lucide-vue-next'
 
-defineProps({
-  headline: {
-    type: String,
-    required: true,
-  },
-  description: {
-    type: String,
-    required: true,
-  },
-})
-
 </script>
 
 <template>
@@ -32,10 +21,7 @@ defineProps({
     </header>
 
     <main class="relative z-10 w-full max-w-[450px]">
-      <section class="mb-6 text-center">
-        <h1 class="text-2xl font-black tracking-normal text-slate-950">{{ headline }}</h1>
-        <p class="mx-auto mt-3 max-w-sm text-sm leading-6 text-slate-500">{{ description }}</p>
-      </section>
+     
 
       <section class="rounded-[28px] border border-white/80 bg-white/90 p-6 shadow-2xl shadow-slate-900/12 backdrop-blur-xl sm:p-8">
         <slot />
