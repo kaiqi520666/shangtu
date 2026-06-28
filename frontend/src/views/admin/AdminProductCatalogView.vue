@@ -1,7 +1,7 @@
 <script setup>
 import { onMounted } from "vue";
-import AdminProductCatalogPanel from "@/components/admin/AdminProductCatalogPanel.vue";
-import ProductCatalogEditorModal from "@/components/admin/ProductCatalogEditorModal.vue";
+import AdminProductCatalogPanel from "@/components/admin/catalog/AdminProductCatalogPanel.vue";
+import ProductCatalogEditorModal from "@/components/admin/catalog/ProductCatalogEditorModal.vue";
 import { useAdminProductCatalog } from "@/composables/admin/useAdminProductCatalog.js";
 
 const {

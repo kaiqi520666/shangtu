@@ -12,7 +12,7 @@ import {
 } from "@/constants/admin.js";
 import AppCheckbox from "@/components/ui/AppCheckbox.vue";
 import AppSelect from "@/components/ui/AppSelect.vue";
-import AdminPagination from "./AdminPagination.vue";
+import AdminPagination from "../AdminPagination.vue";
 
 defineProps({
   state: {
