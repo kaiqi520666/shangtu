@@ -56,7 +56,7 @@
 
 主要问题是 routers 层承载了过多业务编排：
 
-- `backend/app/routers/image.py` 同时包含图片任务创建、任务查询、下载代理、重新生成。文件名叫 `image.py`，但实际仍接近 `image_generation_api.py + image_tasks_api.py` 的合集。
+- `backend/app/routers/image.py` 同时包含图片任务创建和重新生成。文件名叫 `image.py`，但实际仍接近 `image_generation_api.py`。
 - `backend/app/routers/video.py` 同时包含视频策略生成、视频任务创建、任务状态查询、软删除、下载代理。比 `image.py` 窄一些，但同样把业务校验、扣费、prompt 构建、入队编排放在 router。
 - `backend/app/routers/billing.py` 同时处理套餐读取、订单创建、支付网关调用、订单查询、异步通知回调、交易记录。支付 provider 编排建议下沉到 `services/billing.py` 或 `core/payment.py`。
 
@@ -118,7 +118,7 @@ generator 场景 composable 命名一致：
 
 ### 路由/函数命名是否诚实
 
-`backend/app/routers/image.py` 的文件名仍偏宽。它不只是 image CRUD，而是覆盖图片任务创建、任务查询、下载代理、重新生成。
+`backend/app/routers/image.py` 的文件名仍偏宽。它不只是 image CRUD，而是覆盖图片任务创建和重新生成。
 
 建议拆分后命名更具体：
 
@@ -169,7 +169,7 @@ generator 场景 composable 命名一致：
 容易猜错的具体例子：
 
 1. `backend/app/routers/image.py`
-   容易误以为只处理图片任务 CRUD，实际还处理创建、查询、重生、下载。建议继续拆 router 或至少改名为 `image_generation.py` 并把 task 查询/下载分离。
+   容易误以为只处理图片任务 CRUD，实际还处理创建和重生。建议继续拆 router 或至少改名为 `image_generation.py`。
 
 2. `frontend/src/composables/generator/useGenerationRunner.js`
    名字像通用 runner，但内部默认导入 `generateImage` 和图片积分校验，同时也被视频生成器复用。建议拆成 `useGenerationJobs.js`、`useImageBatchRunner.js`、`useMediaBatchRunner.js`。
@@ -179,6 +179,6 @@ generator 场景 composable 命名一致：
 
 ## 建议优先级
 
-P1：继续拆 `backend/app/routers/image.py`，把任务创建、任务 CRUD、重生/下载等职责拆到更具体的 router 或 service。
+P1：继续拆 `backend/app/routers/image.py`，把任务创建和重生职责拆到更具体的 router 或 service。
 
 P2：继续拆 `frontend/src/composables/generator/` 里的大 composable，按 `strategy`、`batch`、`restore` 等职责收敛。
