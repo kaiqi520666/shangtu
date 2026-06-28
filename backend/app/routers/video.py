@@ -153,6 +153,7 @@ async def video_strategy(
             db,
             scenario="product_video",
             platform=req.market,
+            type_id=req.type_id,
         )
         strategy = await generate_video_strategy(
             type_id=req.type_id,

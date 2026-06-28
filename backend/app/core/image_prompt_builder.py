@@ -227,13 +227,14 @@ async def build_strategy_template_prompt(
     *,
     scenario: str,
     platform: str | None,
+    type_id: str | None = None,
 ) -> str:
     lookup = await get_prompt_templates(
         db,
         scenario=scenario,
         purpose="strategy",
         platform=platform,
-        type_id=None,
+        type_id=type_id,
         model=QWEN_TEXT_MODEL,
     )
     return lookup.content.strip()

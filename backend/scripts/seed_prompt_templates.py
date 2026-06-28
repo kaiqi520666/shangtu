@@ -248,6 +248,90 @@ PLATFORM_RULES = {
 }
 
 
+PRODUCT_VIDEO_STRATEGY_RULES = [
+    {
+        "type_id": "ugc_seeding",
+        "name": "UGC种草",
+        "content": (
+            "UGC 种草方向要像真实用户分享，不要写成普通街拍或大片。提示词必须采用：真实开场钩子 → "
+            "商品/穿搭核心卖点 → 使用或上身体验 → 细节证明 → 轻推荐结尾。"
+            "可安排第一人称短口播或旁白，但不要强制人物大段讲话；如有文字或配音，要给出符合用户选择语言的具体短句。"
+            "镜头要服务转化：先让观众知道卖什么，再展示材质、版型、效果、适用场景和推荐理由。"
+        ),
+    },
+    {
+        "type_id": "short_drama",
+        "name": "带货短剧",
+        "content": (
+            "带货短剧方向必须有生活场景冲突或小剧情，不要只描述人物走动。提示词必须采用：痛点/需求开场 → "
+            "商品自然出现 → 使用或穿搭后状态变化 → 结尾记忆点。"
+            "优先使用字幕或旁白推进剧情，不要依赖多人对话；如果只有单人素材，就写成单人情境短剧。"
+            "剧情必须服务商品卖点，不能让商品变成背景道具。"
+        ),
+    },
+    {
+        "type_id": "product_demo",
+        "name": "产品演示",
+        "content": (
+            "产品演示方向必须突出功能、结构、材质或使用效果，不要生成纯氛围镜头。提示词必须采用：产品全貌 → "
+            "关键卖点展示 → 细节特写证明 → 使用场景或效果收尾。"
+            "镜头应包含中近景和特写，明确说明要展示哪些可见细节；服饰类重点写版型、面料纹理、垂坠、上身效果。"
+            "适合用字幕或旁白解释，不需要真人对镜讲话。"
+        ),
+    },
+    {
+        "type_id": "product_talk",
+        "name": "产品口播",
+        "content": (
+            "产品口播方向是强口播方向，但不要只写人物动作。提示词必须采用：人物面对镜头或口播感开场 → "
+            "1-2 个核心卖点讲解 → 商品细节插入镜头 → 简短购买理由收尾。"
+            "如果视频模型不稳定生成真实说话口型，提示词可写成口播风格旁白 + 字幕；必须给出具体口播/字幕文案。"
+            "人物只能服务商品讲解，不能抢走商品主体。"
+        ),
+    },
+    {
+        "type_id": "tvc_ad",
+        "name": "TVC广告",
+        "content": (
+            "TVC 广告方向要有品牌广告质感和转化信息，不要写成普通模特写真。提示词必须采用：高级视觉钩子 → "
+            "商品美学展示 → 质感/场景价值 → 品牌感字幕或记忆点收尾。"
+            "默认不需要真人讲话，优先音乐氛围、精致镜头运动和少量高级短字幕。"
+            "即使追求氛围，也必须清楚展示商品主体和核心卖点。"
+        ),
+    },
+    {
+        "type_id": "pain_solution",
+        "name": "痛点解决",
+        "content": (
+            "痛点解决方向必须有 before/after 转化，不要只展示好看画面。提示词必须采用：痛点或不便场景 → "
+            "商品介入 → 关键细节解释 → 解决后的轻松状态。"
+            "用字幕或旁白清楚点出痛点和解决利益；不要编造无法从图片或用户要求确认的夸张功效。"
+            "最后必须回到购买理由或适用场景。"
+        ),
+    },
+    {
+        "type_id": "unboxing",
+        "name": "开箱种草",
+        "content": (
+            "开箱种草方向必须体现拆包、第一印象和细节惊喜，不要直接变成普通展示。提示词必须采用：包装/开箱动作 → "
+            "产品露出 → 细节特写 → 上手或使用感受收尾。"
+            "如果素材没有包装图，只能写成开箱风格的产品揭示镜头，不要编造不存在的配件或包装信息。"
+            "可以用旁白或字幕表达惊喜感，不强制真人讲话。"
+        ),
+    },
+    {
+        "type_id": "reaction",
+        "name": "反应展示",
+        "content": (
+            "反应展示方向要突出首次看到或使用商品后的自然反馈，不要写成夸张表演。提示词必须采用：首次接触商品 → "
+            "试穿/试用/观察细节 → 自然反应短句 → 卖点总结收尾。"
+            "可安排一句简短口播、字幕或旁白反应，例如质感、版型、舒适度、效果惊喜；不要写长篇讲话。"
+            "反应必须围绕商品可见卖点，避免过度戏剧化。"
+        ),
+    },
+]
+
+
 def _template_rows() -> list[dict]:
     rows: list[dict] = [
         {
@@ -394,6 +478,19 @@ def _template_rows() -> list[dict]:
             ),
         },
     ]
+
+    rows.extend(
+        {
+            "scenario": "product_video",
+            "purpose": "strategy",
+            "platform": None,
+            "type_id": item["type_id"],
+            "model": QWEN_TEXT_MODEL,
+            "name": f"商品视频-{item['name']}提示词规则",
+            "content": item["content"],
+        }
+        for item in PRODUCT_VIDEO_STRATEGY_RULES
+    )
 
     for platform, rules in PLATFORM_RULES.items():
         rows.extend(
@@ -642,12 +739,19 @@ async def verify_lookup() -> None:
             scenario="product_video",
             purpose="strategy",
             platform="global",
-            type_id=None,
+            type_id="product_talk",
             model=QWEN_TEXT_MODEL,
         )
         video_strategy_names = [template.name for template in video_strategy.templates]
-        if "商品视频-提示词生成规则" not in video_strategy_names:
-            raise RuntimeError("商品视频提示词模板查询缺少: 商品视频-提示词生成规则")
+        video_required = {
+            "商品视频-提示词生成规则",
+            "商品视频-产品口播提示词规则",
+        }
+        video_missing = video_required - set(video_strategy_names)
+        if video_missing:
+            raise RuntimeError(
+                f"商品视频提示词模板查询缺少: {', '.join(sorted(video_missing))}"
+            )
 
         print("lookup order:", " -> ".join(names))
         print("fallback order:", " -> ".join(fallback_names))

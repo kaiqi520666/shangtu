@@ -23,7 +23,9 @@ if str(ROOT_DIR) not in sys.path:
 from app.core import image_prompt_builder  # noqa: E402
 from app.core.image_prompt_builder import (  # noqa: E402
     IMAGE_GENERATE_MODEL,
+    QWEN_TEXT_MODEL,
     build_image_generate_prompt,
+    build_strategy_template_prompt,
     build_video_generate_prompt,
 )
 from app.core.prompt_templates import PromptTemplateLookupResult  # noqa: E402
@@ -32,6 +34,7 @@ from app.core.prompt_templates import PromptTemplateLookupResult  # noqa: E402
 SYSTEM_RULE_MARK = "【系统规则·主体一致】"
 SCENE_RULE_MARK = "【场景规则】"
 PER_TYPE_LEAK_MARK = "【不应出现·旧的per-type默认提示词】"
+VIDEO_STRATEGY_RULE_MARK = "【视频方向规则·产品口播】"
 
 SCENARIOS = {
     "product_image": {
@@ -89,6 +92,31 @@ def _install_fake_lookup() -> list[dict]:
                 content=SCENE_RULE_MARK,
             ),
         ]
+        if scenario == "product_video" and purpose == "strategy":
+            templates = [
+                _fake_template(
+                    id="video-global",
+                    name="商品视频-提示词生成规则",
+                    scenario="product_video",
+                    purpose="strategy",
+                    model=QWEN_TEXT_MODEL,
+                    content="【视频通用规则】",
+                )
+            ]
+            if type_id == "product_talk":
+                templates.append(
+                    _fake_template(
+                        id="video-product-talk",
+                        name="商品视频-产品口播提示词规则",
+                        scenario="product_video",
+                        purpose="strategy",
+                        type_id="product_talk",
+                        model=QWEN_TEXT_MODEL,
+                        content=VIDEO_STRATEGY_RULE_MARK,
+                    )
+                )
+            content = "\n\n".join(t.content for t in templates if t.content)
+            return PromptTemplateLookupResult(templates=templates, content=content)
         # 忠实模拟 SQL：只有按真实 type_id 查询时，库才会返回 per-type 行。
         # 当前实现应固定传 type_id=None，所以这一段永远不该触发。
         if type_id is not None:
@@ -159,6 +187,21 @@ async def _check_scenario(scenario: str, cfg: dict, captured: list[dict]) -> Non
     print(f"  ✓ {scenario}: type_id=None / 无 per-type 泄漏 / 策略内容贯通")
 
 
+async def _check_video_strategy_lookup(captured: list[dict]) -> None:
+    captured.clear()
+    content = await build_strategy_template_prompt(
+        db=None,
+        scenario="product_video",
+        platform="global",
+        type_id="product_talk",
+    )
+    require(len(captured) == 1, f"[product_video] 期望恰好一次策略模板查询，实得 {len(captured)}")
+    require(captured[0]["purpose"] == "strategy", f"[product_video] 查询 purpose 不对：{captured[0]}")
+    require(captured[0]["type_id"] == "product_talk", f"[product_video] 策略查询必须传视频方向 type_id：{captured[0]}")
+    require(VIDEO_STRATEGY_RULE_MARK in content, "[product_video] 策略模板缺少当前视频方向规则")
+    print("  ✓ product_video strategy: 查询通用规则 + 当前方向规则")
+
+
 async def _check_empty_user_prompt_rejected() -> None:
     cfg = SCENARIOS["product_image"]
     job = _fake_job("product_image", cfg["settings"])
@@ -222,6 +265,7 @@ async def main() -> None:
     print("生图提示词单源回归断言：")
     for scenario, cfg in SCENARIOS.items():
         await _check_scenario(scenario, cfg, captured)
+    await _check_video_strategy_lookup(captured)
     await _check_empty_user_prompt_rejected()
     await _check_video(captured)
     print("ALL PASS")
