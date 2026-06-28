@@ -1,7 +1,7 @@
 import { computed, ref } from "vue";
 import { useToast } from "@/composables/useToast.js";
 import { useCardActions } from "@/composables/useCardActions.js";
-import { listAssets, deleteAssets } from "@/api/asset.js";
+import { listAssets, deleteAssets } from "@/api/assets.js";
 import { getImageDownloadUrl } from "@/api/image.js";
 import { getVideoDownloadUrl } from "@/api/video.js";
 

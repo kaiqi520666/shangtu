@@ -33,7 +33,7 @@
 
 建议拆成 `components/generation/workspace/`、`components/generation/cards/`、`components/generation/image/`，否则“generation” 会逐渐变成杂物筐。
 
-资产库 view 已迁到 `frontend/src/views/assets/AssetLibraryView.vue`，和 `frontend/src/components/assets/AssetCardGrid.vue`、`frontend/src/api/asset.js` 对齐。当前路由仍保留 `/generator/assets`，如果后续要让 URL 也独立，可单独改为 `/assets` 并同步侧栏。
+资产库 view 已迁到 `frontend/src/views/assets/AssetLibraryView.vue`，和 `frontend/src/components/assets/AssetCardGrid.vue`、`frontend/src/api/assets.js` 对齐。当前路由仍保留 `/generator/assets`，如果后续要让 URL 也独立，可单独改为 `/assets` 并同步侧栏。
 
 后台前端按角色聚合在 `admin` 下：
 
@@ -80,12 +80,11 @@
 - composable：camelCase + `useXxx.js`，例如 `useProductImageGenerator.js`
 - Python：snake_case，例如 `generation_prompt_builder.py`
 
-不一致点主要集中在前端 API 和通用常量：
+不一致点主要集中在前端通用常量：
 
 - `frontend/src/constants/generator.js` 同时承载商品详情图等生成器通用/业务常量，名字过泛。
-- `frontend/src/api/asset.js` 是单数，但路由和页面概念是 `assets`。
 
-建议继续拆分 `generator.js` 中的场景常量；API 文件可以统一单数资源名或复数资源名，不要 `asset`/`assets` 混用。
+建议继续拆分 `generator.js` 中的场景常量。
 
 ### 同类文件命名模式
 
@@ -197,6 +196,6 @@ P1：把 `backend/app/core/ai_generation.py`、`backend/app/core/generation_prom
 
 P2：继续拆 `frontend/src/composables/generator/` 里的大 composable，按 `strategy`、`batch`、`restore` 等职责收敛。
 
-P3：继续拆分 `frontend/src/constants/generator.js` 中的场景常量；统一 `asset`/`assets` 命名取舍。
+P3：继续拆分 `frontend/src/constants/generator.js` 中的场景常量。
 
 P3：后台 admin 目录下一次扩展前拆分 `frontend/src/components/admin/`，避免继续堆平铺组件。
