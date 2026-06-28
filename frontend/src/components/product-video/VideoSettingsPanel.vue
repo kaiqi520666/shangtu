@@ -14,7 +14,7 @@ import {
   videoLanguageOptions,
   videoMarketOptions,
   videoSizeOptions,
-} from "@/constants/productVideo.js";
+} from "@/constants/product-video.js";
 
 const props = defineProps({
   settings: {

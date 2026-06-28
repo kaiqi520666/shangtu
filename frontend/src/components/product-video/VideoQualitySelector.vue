@@ -1,5 +1,5 @@
 <script setup>
-import { videoResolutionOptions } from "@/constants/productVideo.js";
+import { videoResolutionOptions } from "@/constants/product-video.js";
 
 defineProps({
   modelValue: {

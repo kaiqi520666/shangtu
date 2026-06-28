@@ -1,6 +1,6 @@
 <script setup>
 import { Play } from "lucide-vue-next";
-import { videoDemoTypes } from "@/constants/productVideo.js";
+import { videoDemoTypes } from "@/constants/product-video.js";
 
 defineProps({
   modelValue: {

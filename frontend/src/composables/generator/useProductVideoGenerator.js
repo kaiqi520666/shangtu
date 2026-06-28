@@ -28,7 +28,7 @@ import {
   videoLanguageOptions,
   videoMarketOptions,
   videoSizeOptions,
-} from "@/constants/productVideo.js";
+} from "@/constants/product-video.js";
 
 const VIDEO_POLL_INTERVAL_MS = 3000;
 

@@ -11,7 +11,7 @@ import { useGeneratorRouteJob } from "@/composables/generator/useGeneratorRouteJ
 import { useProductVideoGenerator } from "@/composables/generator/useProductVideoGenerator.js";
 import { useConfirm } from "@/composables/useConfirm.js";
 import { useToast } from "@/composables/useToast.js";
-import { videoDemoTypes } from "@/constants/productVideo.js";
+import { videoDemoTypes } from "@/constants/product-video.js";
 
 const route = useRoute();
 const router = useRouter();

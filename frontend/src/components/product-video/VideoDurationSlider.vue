@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from "vue";
-import { getVideoCreditCost } from "@/constants/productVideo.js";
+import { getVideoCreditCost } from "@/constants/product-video.js";
 
 const props = defineProps({
   duration: {
