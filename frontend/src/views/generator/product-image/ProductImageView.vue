@@ -12,7 +12,7 @@ import { useGeneratorRouteJob } from '@/composables/generator/useGeneratorRouteJ
 import { useProductImageGenerator } from '@/composables/generator/useProductImageGenerator.js'
 import { useConfirm } from '@/composables/useConfirm.js'
 import { useToast } from '@/composables/useToast.js'
-import { productDetailPreviewSlides } from '@/constants/generator.js'
+import { productDetailPreviewSlides } from '@/constants/product-image.js'
 
 const route = useRoute()
 const router = useRouter()

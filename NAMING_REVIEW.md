@@ -80,11 +80,7 @@
 - composable：camelCase + `useXxx.js`，例如 `useProductImageGenerator.js`
 - Python：snake_case，例如 `generation_prompt_builder.py`
 
-不一致点主要集中在前端通用常量：
-
-- `frontend/src/constants/generator.js` 同时承载商品详情图等生成器通用/业务常量，名字过泛。
-
-建议继续拆分 `generator.js` 中的场景常量。
+前端常量文件名风格已基本统一；场景专属常量优先放到对应 `product-*.js` 文件，通用生成设置保留在 `frontend/src/constants/generator.js`。
 
 ### 同类文件命名模式
 
@@ -150,7 +146,7 @@ generator 场景 composable 命名一致：
 
 单文件体量也暴露了目录没有承接复杂度：
 
-- `backend/app/routers/image.py`：703 行
+- `backend/app/routers/image.py`：533 行
 - `backend/app/worker/tasks.py`：655 行
 - `frontend/src/composables/generator/useOutfitGenerator.js`：约 22KB
 - `frontend/src/composables/generator/useProductVideoGenerator.js`：约 18KB
@@ -186,7 +182,5 @@ generator 场景 composable 命名一致：
 P1：继续拆 `backend/app/routers/image.py`，把任务创建、任务 CRUD、重生/下载等职责拆到更具体的 router 或 service。
 
 P2：继续拆 `frontend/src/composables/generator/` 里的大 composable，按 `strategy`、`batch`、`restore` 等职责收敛。
-
-P3：继续拆分 `frontend/src/constants/generator.js` 中的场景常量。
 
 P3：后台 admin 目录下一次扩展前拆分 `frontend/src/components/admin/`，避免继续堆平铺组件。
