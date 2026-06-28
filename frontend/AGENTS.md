@@ -35,6 +35,7 @@ npm run build
 
 - `src/api/`：统一封装请求函数。
 - `src/composables/`：状态、副作用、生成流程和可复用业务逻辑。
+- `src/composables/generator/`：生成工作台流程、卡片、任务恢复和场景生成器 composable。
 - `src/composables/admin/`：管理后台列表和筛选状态。
 - `src/components/ui/`：通用 UI 组件。
 - `src/components/generation/`：生成工作台通用组件。

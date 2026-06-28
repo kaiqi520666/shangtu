@@ -5,7 +5,7 @@
 - 已先执行 `codegraph --help`，确认可用子命令包括 `files`、`node`、`explore`。
 - 当前 MCP 工具列表未暴露独立的 `codegraph_files` 工具，因此使用同一索引能力的 `codegraph files` CLI 获取目录树，没有使用 `ls/find`。
 - 索引统计：`frontend` 138 个文件，`backend` 73 个文件。
-- 重点抽样：`backend/app/routers/image.py`、`backend/app/routers/video.py`、`backend/app/routers/generation.py`、`backend/app/worker/tasks.py`、`frontend/src/router/routes/generator.js`、`frontend/src/api/image.js`、`frontend/src/api/video.js`、`frontend/src/composables/useGenerationRunner.js`、各 generator view。
+- 重点抽样：`backend/app/routers/image.py`、`backend/app/routers/video.py`、`backend/app/routers/generation.py`、`backend/app/worker/tasks.py`、`frontend/src/router/routes/generator.js`、`frontend/src/api/image.js`、`frontend/src/api/video.js`、`frontend/src/composables/generator/useGenerationRunner.js`、各 generator view。
 
 ## 1. 目录层次合理性
 
@@ -17,7 +17,7 @@
 
 - `frontend/src/views/generator/product-image/ProductImageView.vue`
 - `frontend/src/components/product-image/ProductImageSettingsPanel.vue`
-- `frontend/src/composables/useProductImageGenerator.js`
+- `frontend/src/composables/generator/useProductImageGenerator.js`
 - `frontend/src/constants/generator.js`
 - `frontend/src/api/image.js`
 
@@ -92,11 +92,11 @@
 
 generator 场景 composable 命名一致：
 
-- `frontend/src/composables/useFreeImageGenerator.js`
-- `frontend/src/composables/useOutfitGenerator.js`
-- `frontend/src/composables/useProductImageGenerator.js`
-- `frontend/src/composables/useProductSuiteGenerator.js`
-- `frontend/src/composables/useProductVideoGenerator.js`
+- `frontend/src/composables/generator/useFreeImageGenerator.js`
+- `frontend/src/composables/generator/useOutfitGenerator.js`
+- `frontend/src/composables/generator/useProductImageGenerator.js`
+- `frontend/src/composables/generator/useProductSuiteGenerator.js`
+- `frontend/src/composables/generator/useProductVideoGenerator.js`
 
 但这些文件实际都是页面级 orchestrator，不只是“generator”：它们通常会管理表单状态、策略生成、任务恢复、任务创建、卡片动作、历史任务。建议命名为 `useProductImageWorkspace.js` 或拆出子 composable：`useProductImageStrategy.js`、`useProductImageBatch.js`、`useProductImageRestore.js`。
 
@@ -164,7 +164,7 @@ generator 场景 composable 命名一致：
 
 需要重点拆分的扁平目录：
 
-- `frontend/src/composables/` 根目录有 17 个直接文件，既有通用能力 `useToast.js`、`useConfirm.js`，也有业务场景 `useProductVideoGenerator.js`、`useOutfitGenerator.js`。建议把场景 composable 移到 `frontend/src/composables/generator/` 或按业务拆子目录。
+- `frontend/src/composables/generator/` 已承接生成工作台 composable；后续可继续按 `strategy`、`batch`、`restore` 拆更细子目录。
 - `backend/app/core/` 有 18 个直接 `.py` 文件，还包含 `providers/`、`strategy/` 子目录。建议把业务文件移出 `core`，否则 `core` 既像基础设施层又像业务服务层。
 - `frontend/src/components/admin/` 目前 15 个文件，已经到需要关注的阈值。建议下一次新增 admin 功能前先拆子目录。
 
@@ -172,10 +172,10 @@ generator 场景 composable 命名一致：
 
 - `backend/app/routers/image.py`：703 行
 - `backend/app/worker/tasks.py`：655 行
-- `frontend/src/composables/useOutfitGenerator.js`：约 22KB
-- `frontend/src/composables/useProductVideoGenerator.js`：约 18KB
-- `frontend/src/composables/useProductSuiteGenerator.js`：约 18KB
-- `frontend/src/composables/useProductImageGenerator.js`：约 17KB
+- `frontend/src/composables/generator/useOutfitGenerator.js`：约 22KB
+- `frontend/src/composables/generator/useProductVideoGenerator.js`：约 18KB
+- `frontend/src/composables/generator/useProductSuiteGenerator.js`：约 18KB
+- `frontend/src/composables/generator/useProductImageGenerator.js`：约 17KB
 
 建议优先把“大 orchestrator” 拆成按职责命名的小 composable/service，而不是继续在同级目录新增类似文件。
 
@@ -201,7 +201,7 @@ generator 场景 composable 命名一致：
 3. `backend/app/core/ai_generation.py`
    容易误以为只做图片分析，实际包含视频策略生成和自由生图提示词优化。建议拆成更诚实的策略/分析/prompt 优化模块。
 
-4. `frontend/src/composables/useGenerationRunner.js`
+4. `frontend/src/composables/generator/useGenerationRunner.js`
    名字像通用 runner，但内部默认导入 `generateImage` 和图片积分校验，同时也被视频生成器复用。建议拆成 `useGenerationJobs.js`、`useImageBatchRunner.js`、`useMediaBatchRunner.js`。
 
 5. `backend/app/routers/generation.py`

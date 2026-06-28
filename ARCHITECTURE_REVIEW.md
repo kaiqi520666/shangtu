@@ -41,8 +41,8 @@
 - 建议：后端暴露 `/image/capabilities`，前端消费；尺寸表作为唯一来源。
 
 ### 5. 前端场景 composable 过大
-- 位置：`frontend/src/composables/useOutfitGenerator.js`（最重，兼管模特库 CRUD/上传/删除）、`useProductImageGenerator.js`、`useProductSuiteGenerator.js`、`useProductVideoGenerator.js`，均 500–700+ 行。
-- 现状：已有通用 `useGenerationRunner`/`useGenerationCards`/`useGenerationStrategyFlow`，但场景层仍是「上帝 composable」。
+- 位置：`frontend/src/composables/generator/useOutfitGenerator.js`（最重，兼管模特库 CRUD/上传/删除）、`useProductImageGenerator.js`、`useProductSuiteGenerator.js`、`useProductVideoGenerator.js`，均 500–700+ 行。
+- 现状：已有通用 `frontend/src/composables/generator/useGenerationRunner.js`、`useGenerationCards.js`、`useGenerationStrategyFlow.js`，但场景层仍是「上帝 composable」。
 - 风险：新增场景大概率复制 500+ 行结构，局部修改易破坏恢复/生成。
 - 建议：先抽 `useOutfitModels()`，再抽 `cloneUploadedImages()`/`restoreCommonImageSettings()`/`validateUploadedMainImage()`/`buildImageSnapshotPayload()` 等轻量共享工具；不急着大框架化。
 

@@ -1,6 +1,6 @@
 import { ref } from "vue";
 import { generateImage } from "@/api/image.js";
-import { ensureEnoughImageCredits } from "@/composables/useImageCreditCosts.js";
+import { ensureEnoughImageCredits } from "@/composables/generator/useImageCreditCosts.js";
 import {
   createGenerationJob,
   getGenerationJob,

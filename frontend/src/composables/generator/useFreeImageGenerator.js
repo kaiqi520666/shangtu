@@ -5,8 +5,8 @@ import { useCardActions } from "@/composables/useCardActions.js";
 import {
   createBatchFinishedHandler,
   useGenerationCards,
-} from "@/composables/useGenerationCards.js";
-import { useGenerationRunner } from "@/composables/useGenerationRunner.js";
+} from "@/composables/generator/useGenerationCards.js";
+import { useGenerationRunner } from "@/composables/generator/useGenerationRunner.js";
 import { useToast } from "@/composables/useToast.js";
 import {
   cloneGenerationSettingsSnapshot,

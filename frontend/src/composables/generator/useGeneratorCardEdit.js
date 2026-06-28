@@ -1,6 +1,6 @@
 import { ref } from "vue";
 import { deleteImageTask, regenerateImageTask } from "@/api/image.js";
-import { ensureEnoughImageCredits } from "@/composables/useImageCreditCosts.js";
+import { ensureEnoughImageCredits } from "@/composables/generator/useImageCreditCosts.js";
 import { getSnapshotQuality } from "@/utils/generationSnapshots.js";
 
 export function useGeneratorCardEdit({

@@ -9,11 +9,11 @@ import { useToast } from "@/composables/useToast.js";
 import {
   createBatchFinishedHandler,
   useGenerationCards,
-} from "@/composables/useGenerationCards.js";
+} from "@/composables/generator/useGenerationCards.js";
 import { useAiSellingPointsWriter } from "@/composables/useAiSellingPointsWriter.js";
 import { useCardActions } from "@/composables/useCardActions.js";
-import { useGenerationRunner } from "@/composables/useGenerationRunner.js";
-import { useGenerationStrategyFlow } from "@/composables/useGenerationStrategyFlow.js";
+import { useGenerationRunner } from "@/composables/generator/useGenerationRunner.js";
+import { useGenerationStrategyFlow } from "@/composables/generator/useGenerationStrategyFlow.js";
 import { buildProductAnalyzeImages, hasUploadingImages } from "@/utils/analyzeImages.js";
 import { getApiErrorMessage } from "@/utils/apiError.js";
 import {
