@@ -28,11 +28,11 @@
 
 - `frontend/src/components/generation/GenerationWorkspace.vue`
 - `frontend/src/components/generation/ImageUploader.vue`
-- `frontend/src/components/generation/GeneratedCardGrid.vue`
-- `frontend/src/components/generation/VideoGeneratedCardGrid.vue`
+- `frontend/src/components/generation/cards/GeneratedCardGrid.vue`
+- `frontend/src/components/generation/cards/VideoGeneratedCardGrid.vue`
 - `frontend/src/components/generation/ImageEditModal.vue`
 
-建议拆成 `components/generation/workspace/`、`components/generation/cards/`、`components/generation/image/`，否则“generation” 会逐渐变成杂物筐。
+已先拆出 `components/generation/cards/`；后续可继续把 workspace shell 和图片上传/编辑归到更具体的子目录，否则“generation” 仍会逐渐变成杂物筐。
 
 ### 后端
 
