@@ -3,7 +3,7 @@ import { reactive, ref, watch } from "vue";
 import { activeStatusLabel, activeStatusOptions, formatTime } from "@/constants/admin.js";
 import AppCheckbox from "@/components/ui/AppCheckbox.vue";
 import AppSelect from "@/components/ui/AppSelect.vue";
-import AdminPagination from "./AdminPagination.vue";
+import AdminPagination from "../AdminPagination.vue";
 
 const props = defineProps({
   state: {

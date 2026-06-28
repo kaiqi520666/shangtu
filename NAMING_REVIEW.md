@@ -41,7 +41,7 @@
 - `frontend/src/components/admin/*`
 - `frontend/src/composables/admin/*`
 
-后台前端按角色聚合在 `admin` 下，组件已按 `users/`、`billing/`、`catalog/`、`settings/`、`audit/` 拆分；共享分页组件保留在 `frontend/src/components/admin/AdminPagination.vue`。
+后台前端按角色聚合在 `admin` 下，组件已按 `users/`、`billing/`、`catalog/`、`settings/`、`audit/`、`outfit/` 拆分；共享分页组件保留在 `frontend/src/components/admin/AdminPagination.vue`。
 
 ### 后端
 
@@ -142,7 +142,7 @@ generator 场景 composable 命名一致：
 
 - `frontend/src/composables/generator/` 可继续按 `strategy`、`batch`、`restore` 拆更细子目录。
 - `backend/app/core/` 有 18 个直接 `.py` 文件，还包含 `providers/`、`strategy/` 子目录。建议把业务文件移出 `core`，否则 `core` 既像基础设施层又像业务服务层。
-- `frontend/src/components/admin/` 目前 15 个文件，已经到需要关注的阈值。建议下一次新增 admin 功能前先拆子目录。
+- `frontend/src/components/admin/` 已按资源拆出主要子目录，根目录保留共享分页、概览和图片任务面板。
 
 单文件体量也暴露了目录没有承接复杂度：
 
@@ -182,5 +182,3 @@ generator 场景 composable 命名一致：
 P1：继续拆 `backend/app/routers/image.py`，把任务创建、任务 CRUD、重生/下载等职责拆到更具体的 router 或 service。
 
 P2：继续拆 `frontend/src/composables/generator/` 里的大 composable，按 `strategy`、`batch`、`restore` 等职责收敛。
-
-P3：后台 admin 目录下一次扩展前拆分 `frontend/src/components/admin/`，避免继续堆平铺组件。

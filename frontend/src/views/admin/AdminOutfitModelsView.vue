@@ -1,7 +1,7 @@
 <script setup>
 import { onMounted } from "vue";
-import AdminOutfitModelsPanel from "@/components/admin/AdminOutfitModelsPanel.vue";
-import OutfitModelEditorModal from "@/components/admin/OutfitModelEditorModal.vue";
+import AdminOutfitModelsPanel from "@/components/admin/outfit/AdminOutfitModelsPanel.vue";
+import OutfitModelEditorModal from "@/components/admin/outfit/OutfitModelEditorModal.vue";
 import { useAdminOutfitModels } from "@/composables/admin/useAdminOutfitModels.js";
 
 const {
