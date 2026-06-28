@@ -307,10 +307,10 @@ def _template_rows() -> list[dict]:
             "platform": None,
             "type_id": None,
             "model": QWEN_TEXT_MODEL,
-            "name": "商品视频-策略生成规则",
+            "name": "商品视频-提示词生成规则",
             "content": (
                 "你是资深电商短视频脚本策划和视觉导演。请结合用户上传的视频素材图、用户选择的视频方向和补充要求，"
-                "生成一条可编辑的商品视频脚本策略。只输出 JSON，不要 markdown；items 固定 1 条；"
+                "生成一条可编辑的商品视频提示词。只输出 JSON，不要 markdown；items 固定 1 条；"
                 "所有字段必须用中文撰写，最终成片文字或配音会按用户选择语言呈现。content 必须按用户选择的视频时长规划镜头节奏，"
                 "拆成 2-4 个时间段，并明确成片文字/配音语言要求。脚本应在 content 内覆盖开场、镜头运动、卖点呈现、画面风格和避免事项，"
                 "保持商品主体、颜色、材质、结构和核心外观一致。"
@@ -522,6 +522,13 @@ async def delete_redundant_image_type_templates(db) -> None:
 async def delete_redundant_video_type_templates(db) -> None:
     await db.execute(
         delete(PromptTemplate).where(
+            PromptTemplate.scenario == "product_video",
+            PromptTemplate.purpose == "strategy",
+            PromptTemplate.name == "商品视频-策略生成规则",
+        )
+    )
+    await db.execute(
+        delete(PromptTemplate).where(
             PromptTemplate.purpose == "video_generate",
             PromptTemplate.scenario == "product_video",
         )
@@ -639,8 +646,8 @@ async def verify_lookup() -> None:
             model=QWEN_TEXT_MODEL,
         )
         video_strategy_names = [template.name for template in video_strategy.templates]
-        if "商品视频-策略生成规则" not in video_strategy_names:
-            raise RuntimeError("商品视频策略模板查询缺少: 商品视频-策略生成规则")
+        if "商品视频-提示词生成规则" not in video_strategy_names:
+            raise RuntimeError("商品视频提示词模板查询缺少: 商品视频-提示词生成规则")
 
         print("lookup order:", " -> ".join(names))
         print("fallback order:", " -> ".join(fallback_names))

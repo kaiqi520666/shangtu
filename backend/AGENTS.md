@@ -39,7 +39,7 @@ uv run python scripts/seed_product_catalog.py
 - 单任务参数事实来源是 `settings_snapshot_json`；接口返回和前端恢复都应使用该快照。
 - 单图重生创建新 `ImageTask`，旧任务只写 `replaced_by_task_id` 指向新任务；工作台查询过滤旧版本。
 - 图片、视频积分扣费都必须把本次实际扣费写入任务 `credit_cost`，失败退款只走 `credit_refunded` 幂等标记。
-- 商品图提示词通过 `prompt_templates` + `app/core/image_prompt_builder.py` 组装；商品视频生成只使用用户确认的可见脚本，视频策略生成才走 `prompt_templates`。
+- 商品图提示词通过 `prompt_templates` + `app/core/image_prompt_builder.py` 组装；商品视频生成只使用用户确认的可见提示词，视频提示词生成才走 `prompt_templates`。
 - 生成链路使用 `app/core/model_config.py` 读取模型名，不在业务代码里散落硬编码模型字符串。
 
 ## 目录约定

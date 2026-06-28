@@ -87,13 +87,13 @@ const generateDisabled = computed(() => {
   return props.uploadedImages.length < 1;
 });
 const generateText = computed(() => {
-  if (props.strategyLoading) return "AI 正在生成脚本...";
+  if (props.strategyLoading) return "AI 正在生成提示词...";
   if (props.uploadedImages.some((img) => img?.uploading)) return "素材上传中...";
   if (generateDisabled.value) {
     if (selectedType.value.inputMode === "reference_to_video") return "请至少上传 1 张参考图";
     return "请上传 1 张首帧图";
   }
-  return "AI 生成视频策略";
+  return "AI 生成视频提示词";
 });
 
 function updateSetting(key, value) {

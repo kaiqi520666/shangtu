@@ -186,7 +186,7 @@ async def build_video_generate_prompt(
 
     effective_user_prompt = (user_prompt or "").strip()
     if not effective_user_prompt:
-        raise ValueError("请先生成并确认视频策略")
+        raise ValueError("请先生成并确认视频提示词")
 
     return VideoPromptBuildResult(
         final_prompt=effective_user_prompt,

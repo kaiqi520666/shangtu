@@ -174,7 +174,7 @@ async def _check_empty_user_prompt_rejected() -> None:
 
 
 async def _check_video(captured: list[dict]) -> None:
-    strategy_content = "【视频脚本】开场展示商品核心画面，镜头推进到细节，最后呈现使用场景。"
+    prompt_content = "【视频提示词】开场展示商品核心画面，镜头推进到细节，最后呈现使用场景。"
     settings = {
         "platform": "global",
         "language": "english",
@@ -189,17 +189,17 @@ async def _check_video(captured: list[dict]) -> None:
         db=None,
         type_id="ugc_seeding",
         title="UGC种草",
-        user_prompt=strategy_content,
+        user_prompt=prompt_content,
         settings=settings,
     )
 
     snapshot = result.prompt_snapshot
     require(len(captured) == 0, f"[product_video] 不应查询隐藏生成模板，实得 {len(captured)} 次")
     require(PER_TYPE_LEAK_MARK not in result.final_prompt, "[product_video] 最终 prompt 混入了 per-type 默认提示词")
-    require(result.final_prompt == strategy_content, "[product_video] final prompt 应等于用户确认的视频脚本")
+    require(result.final_prompt == prompt_content, "[product_video] final prompt 应等于用户确认的视频提示词")
     require(snapshot["system"] == "", "[product_video] snapshot.system 应为空")
     require(snapshot["task"] == "", "[product_video] snapshot.task 应为空")
-    require(snapshot["user"] == strategy_content, "[product_video] snapshot.user 应等于视频脚本")
+    require(snapshot["user"] == prompt_content, "[product_video] snapshot.user 应等于视频提示词")
     require(snapshot["template_refs"] == [], "[product_video] 不应记录隐藏生成模板 refs")
 
     try:
@@ -211,10 +211,10 @@ async def _check_video(captured: list[dict]) -> None:
             settings=settings,
         )
     except ValueError as exc:
-        require("请先生成并确认视频策略" in str(exc), f"视频空策略报错文案不符：{exc}")
-        print("  ✓ product_video: 零隐藏模板 / final 等于可见脚本 / 视频脚本必填")
+        require("请先生成并确认视频提示词" in str(exc), f"视频空提示词报错文案不符：{exc}")
+        print("  ✓ product_video: 零隐藏模板 / final 等于可见提示词 / 视频提示词必填")
         return
-    raise CheckFailed("视频空 user_prompt 未被拒绝（视频策略内容应为必填）")
+    raise CheckFailed("视频空 user_prompt 未被拒绝（视频提示词内容应为必填）")
 
 
 async def main() -> None:

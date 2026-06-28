@@ -353,7 +353,7 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
       return;
     }
     if (hasRunningTasks.value) {
-      toast?.info?.("当前视频任务还在生成中，请稍后再生成脚本策略");
+      toast?.info?.("当前视频任务还在生成中，请稍后再生成视频提示词");
       return;
     }
 
@@ -374,14 +374,14 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
       });
 
       if (result.code !== 0) {
-        toast?.error?.(result.message || "视频策略生成失败，请稍后重试");
+        toast?.error?.(result.message || "视频提示词生成失败，请稍后重试");
         setStrategyStep("config");
         return;
       }
 
       const items = Array.isArray(result.data?.items) ? result.data.items : [];
       if (items.length === 0) {
-        toast?.error?.("AI 未返回有效视频策略");
+        toast?.error?.("AI 未返回有效视频提示词");
         setStrategyStep("config");
         return;
       }
@@ -398,7 +398,7 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
       if (status === 401) {
         toast?.error?.("登录已过期，请重新登录");
       } else {
-        toast?.error?.(error.response?.data?.message || "视频策略生成失败，请稍后重试");
+        toast?.error?.(error.response?.data?.message || "视频提示词生成失败，请稍后重试");
       }
       setStrategyStep("config");
     }
@@ -406,7 +406,7 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
 
   async function confirmStrategyAndGenerate() {
     if (!canGenerateWithStrategy.value) {
-      toast?.info?.(strategyDirty.value ? "配置已变化，请重新生成视频策略" : "请先生成视频策略");
+      toast?.info?.(strategyDirty.value ? "配置已变化，请重新生成视频提示词" : "请先生成视频提示词");
       return;
     }
     await generateProductVideo();
@@ -431,7 +431,7 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
     }
     const videoScript = getConfirmedVideoScript();
     if (!videoScript) {
-      toast?.info?.("请先生成并确认视频策略");
+      toast?.info?.("请先生成并确认视频提示词");
       return;
     }
 

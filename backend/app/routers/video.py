@@ -169,7 +169,7 @@ async def video_strategy(
     except (ValueError, DashScopeConfigError, RuntimeError) as e:
         return fail(str(e))
     except Exception:
-        return fail("视频策略生成失败")
+        return fail("视频提示词生成失败")
 
     return success(strategy)
 

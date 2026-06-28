@@ -276,7 +276,7 @@ def build_video_strategy_prompt(
 ) -> str:
     base_prompt = template_prompt.strip() if template_prompt else "你是资深电商短视频脚本策划和视觉导演。"
     return f"""{base_prompt}
-请结合用户上传的视频素材图、用户选择的视频方向和补充要求，生成一条可编辑的商品视频脚本策略。
+请结合用户上传的视频素材图、用户选择的视频方向和补充要求，生成一条可编辑的商品视频提示词。
 
 视频方向：{name or type_id}
 素材模式：{input_mode or '未指定'}
@@ -292,15 +292,15 @@ def build_video_strategy_prompt(
 1. 只输出 JSON，不要 markdown，不要解释，不要代码块。
 2. items 固定 1 条，id 必须等于 {json.dumps(type_id, ensure_ascii=False)}。
 3. 所有 JSON 字段都必须用中文撰写；最终成片如需文字或配音，会按“最终成片文字/配音语言”翻译呈现。
-4. content 是给用户编辑和后续生视频 prompt 使用的完整脚本，必须按 {duration} 秒时长规划镜头节奏，建议拆成 2-4 个时间段（如 0-2 秒、2-4 秒、4-{duration} 秒）。
+4. content 是给用户编辑并直接发送给视频模型的最终提示词，必须按 {duration} 秒时长规划镜头节奏，建议拆成 2-4 个时间段（如 0-2 秒、2-4 秒、4-{duration} 秒）。
 5. content 里要明确写出：成片如需出现文字或配音，必须使用“{language or '中文'}”；如果用户选择纯音乐无口播，则不要安排口播，只保留画面文字或无文字镜头。
 6. content 要覆盖开场、镜头运动、卖点呈现、画面风格和避免事项，但不要拆成多个 JSON 字段。
 7. 不要编造品牌 Logo、认证、价格、销量、型号、具体参数；如果素材和补充要求中没有明确依据，只做谨慎表达。
-8. 策略要适合电商短视频，节奏清晰，主体稳定，商品外观一致，避免无意义镜头和过度夸张表达。
+8. 提示词要适合电商短视频，节奏清晰，主体稳定，商品外观一致，避免无意义镜头和过度夸张表达。
 
 JSON 格式：
 {{
-  "brief": "一句话概括本次视频脚本方向",
+  "brief": "一句话概括本次视频提示词方向",
   "items": [
     {{
       "id": "{type_id}",
@@ -698,7 +698,7 @@ def _normalize_video_strategy_response(parsed: dict, selected_item: dict) -> dic
         "name": selected_item["name"],
         "content": content or _fallback_video_content(selected_item),
     }
-    brief = _stringify_content(parsed.get("brief")) or f"已生成「{selected_item['name']}」视频脚本策略。"
+    brief = _stringify_content(parsed.get("brief")) or f"已生成「{selected_item['name']}」视频提示词。"
     return {"brief": brief, "items": [item]}
 
 
@@ -867,7 +867,7 @@ async def generate_video_strategy(
 ) -> dict:
     normalized_type_id = str(type_id or "").strip()
     if not normalized_type_id:
-        raise ValueError("视频策略缺少视频方向")
+        raise ValueError("视频提示词缺少视频方向")
     selected_item = {
         "id": normalized_type_id,
         "name": str(name or "").strip() or normalized_type_id,
