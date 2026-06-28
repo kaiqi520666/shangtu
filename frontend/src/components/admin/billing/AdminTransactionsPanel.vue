@@ -1,7 +1,7 @@
 <script setup>
 import { formatTime, transactionTypeLabel, transactionTypeOptions } from "@/constants/admin.js";
 import AppSelect from "@/components/ui/AppSelect.vue";
-import AdminPagination from "./AdminPagination.vue";
+import AdminPagination from "../AdminPagination.vue";
 
 defineProps({
   state: {
