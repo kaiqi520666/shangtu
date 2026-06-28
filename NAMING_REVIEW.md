@@ -55,9 +55,8 @@
 `backend/app/worker/tasks.py` 同时实现 image/video 两条 worker 链路、上游错误归一化、DB 更新、退款、Redis 状态同步。建议拆成：
 
 - `backend/app/worker/image_tasks.py`
-- `backend/app/worker/video_tasks.py`
 
-其中上游错误归一化已拆到 `backend/app/worker/provider_errors.py`，DB 状态同步和幂等退款已拆到 `backend/app/worker/task_state_sync.py`，失败/超时终态处理已拆到 `backend/app/worker/task_failures.py`。
+其中视频 worker 主链路已拆到 `backend/app/worker/video_tasks.py`，上游错误归一化已拆到 `backend/app/worker/provider_errors.py`，DB 状态同步和幂等退款已拆到 `backend/app/worker/task_state_sync.py`，失败/超时终态处理已拆到 `backend/app/worker/task_failures.py`。
 
 ## 2. 命名一致性
 
@@ -163,6 +162,6 @@ generator 场景 composable 命名一致：
 
 P2：继续拆 `frontend/src/composables/generator/` 里的场景级大 composable，优先把各场景内部的恢复、策略生成、批量生成辅助函数继续下沉到已建立的职责目录。
 
-P2：继续拆 `backend/app/worker/tasks.py`，优先分离 image/video worker 主链路。
+P2：继续拆 `backend/app/worker/tasks.py`，把图片 worker 主链路迁到 `backend/app/worker/image_tasks.py`，让 `tasks.py` 仅保留兼容聚合入口。
 
 P3：确认 `GenerationJob` 与 `ImageTask`/`VideoTask` 命名边界后，再考虑 `backend/app/routers/generation.py`、`frontend/src/api/generation.js` 的 job 化改名。
