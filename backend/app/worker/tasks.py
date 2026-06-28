@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 from sqlalchemy import select, update
 
 from app.core.database import SessionLocal
-from app.core.oss import ALLOWED_IMAGE_TYPES, ALLOWED_VIDEO_TYPES, upload_image_bytes, upload_video_bytes
+from app.core.generated_media_storage import materialize_to_oss, materialize_video_to_oss
 from app.core.providers.toapis_provider import (
     MAX_WAIT_SECONDS,
     POLL_INTERVAL_SECONDS,
@@ -36,9 +36,6 @@ load_dotenv()
 # 主动剥离代理环境变量，防止 Windows 走代理失败
 for _proxy_key in ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"):
     os.environ.pop(_proxy_key, None)
-
-DEFAULT_GENERATED_CONTENT_TYPE = "image/png"
-DEFAULT_GENERATED_VIDEO_CONTENT_TYPE = "video/mp4"
 
 
 async def update_task_in_db(
@@ -129,73 +126,6 @@ async def fetch_video_task_user_id(task_id: str) -> int | None:
             select(VideoTask.user_id).where(VideoTask.id == task_id)
         )
         return result.scalar_one_or_none()
-
-
-def normalize_content_type(raw: str | None) -> str:
-    if not raw:
-        return DEFAULT_GENERATED_CONTENT_TYPE
-    main = raw.split(";", 1)[0].strip().lower()
-    if main == "image/jpg":
-        main = "image/jpeg"
-    if main in ALLOWED_IMAGE_TYPES:
-        return main
-    return DEFAULT_GENERATED_CONTENT_TYPE
-
-
-def normalize_video_content_type(raw: str | None, url: str | None = None) -> str:
-    if raw:
-        main = raw.split(";", 1)[0].strip().lower()
-        if main in ALLOWED_VIDEO_TYPES:
-            return main
-    url_lower = (url or "").lower()
-    if url_lower.endswith(".webm"):
-        return "video/webm"
-    if url_lower.endswith(".mov"):
-        return "video/quicktime"
-    if url_lower.endswith(".mkv"):
-        return "video/x-matroska"
-    return DEFAULT_GENERATED_VIDEO_CONTENT_TYPE
-
-
-async def materialize_to_oss(
-    *,
-    user_id: int,
-    url: str,
-    client: httpx.AsyncClient,
-):
-    download = await client.get(url)
-    download.raise_for_status()
-    content_bytes = download.content
-    content_type = normalize_content_type(download.headers.get("content-type"))
-
-    return await upload_image_bytes(
-        user_id=user_id,
-        content=content_bytes,
-        content_type=content_type,
-        source="generated",
-    )
-
-
-async def materialize_video_to_oss(
-    *,
-    user_id: int,
-    url: str,
-    client: httpx.AsyncClient,
-):
-    download = await client.get(url)
-    download.raise_for_status()
-    content_bytes = download.content
-    content_type = normalize_video_content_type(
-        download.headers.get("content-type"),
-        url,
-    )
-
-    return await upload_video_bytes(
-        user_id=user_id,
-        content=content_bytes,
-        content_type=content_type,
-        source="generated-videos",
-    )
 
 
 async def _set_progress(redis, task_id: str, value: int) -> None:
