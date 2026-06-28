@@ -1,7 +1,7 @@
 import uuid
 
 import httpx
-from fastapi import APIRouter, Depends, File, Request, UploadFile
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select, update
@@ -19,7 +19,6 @@ from app.core.generation_prompt_builder import (
     build_image_generate_prompt,
 )
 from app.core.json_utils import dump_json_or_none, parse_json_or_none
-from app.core.oss import OssConfigError, upload_image_bytes
 from app.core.product_catalog import get_catalog
 from app.core.prompt_template_builder import (
     build_ai_write_prompt,
@@ -49,9 +48,11 @@ from app.models import GenerationJob, ImageTask, User
 from app.schemas.response import Response, fail, success
 from app.services.generation_tasks import deduct_credits_or_fail, enqueue_or_compensate
 from app.routers.image_catalog import router as image_catalog_router
+from app.routers.image_uploads import router as image_uploads_router
 
 router = APIRouter(prefix="/image", tags=["生图"])
 router.include_router(image_catalog_router)
+router.include_router(image_uploads_router)
 
 IMAGE_PROMPT_STRATEGIES = {
     "product_suite": {"use_template": True},
@@ -142,35 +143,6 @@ def _compose_prompt_from_snapshot(prompt_snapshot: dict, user_prompt: str) -> st
             user_prompt.strip(),
         ]
         if part
-    )
-
-
-@router.post("/upload", response_model=Response)
-async def upload_image(
-    file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user),
-):
-    try:
-        content = await file.read()
-        uploaded = await upload_image_bytes(
-            user_id=current_user.id,
-            content=content,
-            content_type=file.content_type or "",
-        )
-    except (ValueError, OssConfigError) as e:
-        return fail(str(e))
-    except Exception:
-        return fail("图片上传失败")
-    finally:
-        await file.close()
-
-    return success(
-        {
-            "url": uploaded.url,
-            "object_key": uploaded.object_key,
-            "content_type": uploaded.content_type,
-            "size": uploaded.size,
-        }
     )
 
 
