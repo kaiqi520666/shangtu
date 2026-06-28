@@ -8,7 +8,7 @@ Shangtu（商图）：AI 驱动的电商商品图批量生成 SaaS。后端 Fast
 
 ```text
 backend/app/
-├── core/      # auth.py / database.py / deps.py / oss.py / image_analyzer.py
+├── core/      # auth.py / database.py / deps.py / oss.py / ai_generation.py
 ├── models/    # SQLAlchemy 模型，新增模型必须在 models/__init__.py 导出
 ├── routers/   # auth.py / image.py / generation.py / admin/ ...
 ├── worker/    # settings.py (WorkerSettings) / tasks.py (generate_image)
@@ -38,6 +38,6 @@ frontend/src/
 
 ## 已知的坑
 
-- DashScope 模型 `qwen3.6-flash` 依赖 `enable_thinking=False` 关闭思考模式（`backend/app/core/image_analyzer.py`）；换模型先确认这个参数还兼容。
+- DashScope 模型 `qwen3.6-flash` 依赖 `enable_thinking=False` 关闭思考模式（`backend/app/core/strategy/dashscope_client.py`）；换模型先确认这个参数还兼容。
 - 前端不要在组件里直接读 `localStorage`，统一走 `useAuth`。
 - `DELETE /admin/outfit-models/{id}` 只删 DB 记录，不清理 OSS 上的图片文件，孤立文件需要人工/脚本定期清理。

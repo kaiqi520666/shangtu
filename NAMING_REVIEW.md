@@ -60,7 +60,7 @@
 - `backend/app/routers/video.py` 同时包含视频策略生成、视频任务创建、任务状态查询、软删除、下载代理。比 `image.py` 窄一些，但同样把业务校验、扣费、prompt 构建、入队编排放在 router。
 - `backend/app/routers/billing.py` 同时处理套餐读取、订单创建、支付网关调用、订单查询、异步通知回调、交易记录。支付 provider 编排建议下沉到 `services/billing.py` 或 `core/payment.py`。
 
-`backend/app/core/` 职责也偏宽：既有 `database.py`、`deps.py`、`time.py` 这类基础设施，也有 `image_analyzer.py`、`image_prompt_builder.py`、`product_catalog.py` 这类业务域逻辑。建议后续拆出 `backend/app/domains/` 或 `backend/app/services/` 来放商品图、视频、资产、计费等业务编排，`core` 保留基础能力和 provider 封装。
+`backend/app/core/` 职责也偏宽：既有 `database.py`、`deps.py`、`time.py` 这类基础设施，也有 `ai_generation.py`、`generation_prompt_builder.py`、`product_catalog.py` 这类业务域逻辑。建议后续拆出 `backend/app/domains/` 或 `backend/app/services/` 来放商品图、视频、资产、计费等业务编排，`core` 保留基础能力和 provider 封装。
 
 `backend/app/worker/tasks.py` 同时实现 image/video 两条 worker 链路、上游错误归一化、DB 更新、退款、Redis 状态同步。建议拆成：
 
@@ -78,7 +78,7 @@
 - Vue 组件：PascalCase，例如 `ProductImageView.vue`、`GenerationWorkspace.vue`
 - 前端目录：kebab-case，例如 `product-image`、`product-video`、`free-image`
 - composable：camelCase + `useXxx.js`，例如 `useProductImageGenerator.js`
-- Python：snake_case，例如 `image_prompt_builder.py`
+- Python：snake_case，例如 `generation_prompt_builder.py`
 
 不一致点主要集中在前端业务常量和 API：
 
@@ -147,9 +147,9 @@ generator 场景 composable 命名一致：
 
 `backend/app/routers/video.py` 可接受，但 `create_video_task` 比 image 的 `create_task` 更清楚。建议 image 侧至少把函数改为 `create_image_task`、`get_image_task`、`delete_image_task`，先让命名真实反映职责。
 
-`backend/app/core/image_analyzer.py` 命名偏窄，里面不仅分析图片，还生成图片策略、视频策略、优化自由生图提示词。建议改为 `ai_generation_strategy.py` 或拆成 `image_analysis.py`、`strategy_generation.py`、`prompt_optimization.py`。
+`backend/app/core/ai_generation.py` 比原文件名更诚实，但仍承载图片分析、图片策略、视频策略、自由生图 prompt 优化。后续可以继续拆成 `image_analysis.py`、`strategy_generation.py`、`prompt_optimization.py`。
 
-`backend/app/core/image_prompt_builder.py` 同样偏窄，因为它包含 `build_video_generate_prompt`。建议改为 `prompt_builder.py` 或拆成 `image_prompt_builder.py`、`video_prompt_builder.py`、`strategy_prompt_builder.py`。
+`backend/app/core/generation_prompt_builder.py` 比原文件名更通用，但仍同时包含图片生成、视频生成、AI 文案、策略模板 prompt 构建。后续可以继续按图片生成、视频生成、策略模板三类 prompt 构建职责拆分。
 
 ## 3. 目录嵌套深度与扁平度
 
@@ -188,7 +188,7 @@ generator 场景 composable 命名一致：
 - 穿搭图：`frontend/src/views/generator/outfit/OutfitView.vue`
 - 自由生图：`frontend/src/views/generator/free-image/FreeImageView.vue`
 
-但后端会更容易猜错：商品详情图、商品套图、穿搭图、自由生图都集中在 `backend/app/routers/image.py` 和 `backend/app/core/image_prompt_builder.py`，而不是各自有 `product_image.py`、`product_suite.py`、`free_image.py` 路由或 service。
+但后端会更容易猜错：商品详情图、商品套图、穿搭图、自由生图都集中在 `backend/app/routers/image.py` 和 `backend/app/core/generation_prompt_builder.py`，而不是各自有 `product_image.py`、`product_suite.py`、`free_image.py` 路由或 service。
 
 容易猜错的具体例子：
 
@@ -198,7 +198,7 @@ generator 场景 composable 命名一致：
 2. `backend/app/routers/image.py`
    容易误以为只处理图片任务 CRUD，实际还处理 AI 分析、策略生成、目录、自由生图提示词优化、重生、下载。建议拆 router 或至少改名为 `image_generation.py` 并把 upload/catalog/strategy 分离。
 
-3. `backend/app/core/image_analyzer.py`
+3. `backend/app/core/ai_generation.py`
    容易误以为只做图片分析，实际包含视频策略生成和自由生图提示词优化。建议拆成更诚实的策略/分析/prompt 优化模块。
 
 4. `frontend/src/composables/useGenerationRunner.js`
@@ -211,7 +211,7 @@ generator 场景 composable 命名一致：
 
 P1：先处理命名最不诚实、职责最宽的后端文件。优先拆 `backend/app/routers/image.py`，或至少把函数名从 `create_task/get_task/delete_task` 改为 `create_image_task/get_image_task/delete_image_task`。
 
-P1：把 `backend/app/core/image_analyzer.py`、`backend/app/core/image_prompt_builder.py` 中的视频/策略/prompt 职责拆出或改名，避免 core 文件名误导调用方。
+P1：把 `backend/app/core/ai_generation.py`、`backend/app/core/generation_prompt_builder.py` 中的视频/策略/prompt 职责继续拆出，避免 core 文件继续变成业务合集。
 
 P2：将 `frontend/src/composables/` 里的场景 generator composable 移入 `frontend/src/composables/generator/`，并按 `strategy`、`batch`、`restore` 拆大文件。
 

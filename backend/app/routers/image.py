@@ -9,13 +9,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.credits import normalize_image_resolution
 from app.core.deps import get_current_user, get_db
-from app.core.image_analyzer import (
+from app.core.ai_generation import (
     DashScopeConfigError,
     analyze_product_image,
     generate_image_strategy,
     optimize_free_image_prompt,
 )
-from app.core.image_prompt_builder import (
+from app.core.generation_prompt_builder import (
     build_ai_write_prompt,
     build_image_generate_prompt,
     build_strategy_template_prompt,
