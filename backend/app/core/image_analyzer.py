@@ -5,9 +5,9 @@ import re
 import httpx
 from dotenv import load_dotenv
 
-load_dotenv()
+from app.core.model_config import QWEN_TEXT_MODEL
 
-DASHSCOPE_MODEL = "qwen3.6-flash"
+load_dotenv()
 
 
 class DashScopeConfigError(RuntimeError):
@@ -329,7 +329,7 @@ async def analyze_product_image(
     content.append({"type": "text", "text": final_prompt})
 
     payload = {
-        "model": DASHSCOPE_MODEL,
+        "model": QWEN_TEXT_MODEL,
         "enable_thinking": False,
         "messages": [
             {
@@ -367,7 +367,7 @@ async def optimize_free_image_prompt(prompt: str) -> str:
         raise ValueError("请输入需要优化的提示词")
 
     payload = {
-        "model": DASHSCOPE_MODEL,
+        "model": QWEN_TEXT_MODEL,
         "enable_thinking": False,
         "messages": [
             {
@@ -712,7 +712,7 @@ async def _request_dashscope_strategy_json(*, images: list[dict], prompt: str) -
     )
 
     payload = {
-        "model": DASHSCOPE_MODEL,
+        "model": QWEN_TEXT_MODEL,
         "enable_thinking": False,
         "messages": [
             {

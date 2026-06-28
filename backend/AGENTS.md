@@ -10,8 +10,7 @@
 - PostgreSQL
 - Redis + arq worker
 - 阿里云 OSS
-- ToAPIS：`gpt-image-2`、`seedance-2`
-- DashScope：`qwen3.6-flash`
+- ToAPIS / DashScope 模型名由 `.env` 配置：`IMAGE_GENERATE_MODEL`、`VIDEO_GENERATE_MODEL`、`QWEN_TEXT_MODEL`
 
 ## 常用命令
 
@@ -41,6 +40,7 @@ uv run python scripts/seed_product_catalog.py
 - 单图重生创建新 `ImageTask`，旧任务只写 `replaced_by_task_id` 指向新任务；工作台查询过滤旧版本。
 - 图片、视频积分扣费都必须把本次实际扣费写入任务 `credit_cost`，失败退款只走 `credit_refunded` 幂等标记。
 - 商品图和商品视频提示词通过 `prompt_templates` + `app/core/image_prompt_builder.py` 组装，不在 router 或 worker 里硬编码大段业务提示词。
+- 生成链路使用 `app/core/model_config.py` 读取模型名，不在业务代码里散落硬编码模型字符串。
 
 ## 目录约定
 

@@ -11,6 +11,7 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from app.core.database import Base, SessionLocal, engine  # noqa: E402
+from app.core.model_config import IMAGE_GENERATE_MODEL, QWEN_TEXT_MODEL, VIDEO_GENERATE_MODEL  # noqa: E402
 from app.core.prompt_templates import get_prompt_templates  # noqa: E402
 from app.core.time import utc_now  # noqa: E402
 from app.models import PromptTemplate  # noqa: E402
@@ -254,7 +255,7 @@ def _template_rows() -> list[dict]:
             "purpose": "image_generate",
             "platform": None,
             "type_id": None,
-            "model": "gpt-image-2",
+            "model": IMAGE_GENERATE_MODEL,
             "name": "生图通用主体一致规则",
             "content": (
                 "你是专业电商商品图生成助手。必须以用户提供的参考商品图为主体，保持商品的款式、颜色、材质、"
@@ -268,7 +269,7 @@ def _template_rows() -> list[dict]:
             "purpose": "image_generate",
             "platform": None,
             "type_id": None,
-            "model": "gpt-image-2",
+            "model": IMAGE_GENERATE_MODEL,
             "name": "商品套图-生图场景规则",
             "content": (
                 "生成一张电商商品套图素材。根据当前图类型完成对应画面，不要生成整张详情长图；"
@@ -280,7 +281,7 @@ def _template_rows() -> list[dict]:
             "purpose": "image_generate",
             "platform": None,
             "type_id": None,
-            "model": "gpt-image-2",
+            "model": IMAGE_GENERATE_MODEL,
             "name": "商品详情图-生图场景规则",
             "content": (
                 "生成一张电商商品详情页模块图，不要生成整张长详情页。画面应有清晰模块主题、合理信息层级，"
@@ -292,7 +293,7 @@ def _template_rows() -> list[dict]:
             "purpose": "image_generate",
             "platform": None,
             "type_id": None,
-            "model": "gpt-image-2",
+            "model": IMAGE_GENERATE_MODEL,
             "name": "服饰穿搭-生图场景规则",
             "content": (
                 "生成一张电商服饰穿搭图。必须同时参考用户上传的服装图和选择的模特图：服装的颜色、版型、材质、"
@@ -305,7 +306,7 @@ def _template_rows() -> list[dict]:
             "purpose": "video_generate",
             "platform": None,
             "type_id": None,
-            "model": "seedance-2",
+            "model": VIDEO_GENERATE_MODEL,
             "name": "商品视频-生成通用规则",
             "content": (
                 "你是专业电商短视频生成导演。必须以用户上传图片中的商品为主体，保持商品外观、颜色、材质、结构和核心特征一致。"
@@ -318,7 +319,7 @@ def _template_rows() -> list[dict]:
             "purpose": "strategy",
             "platform": None,
             "type_id": None,
-            "model": "qwen3.6-flash",
+            "model": QWEN_TEXT_MODEL,
             "name": "商品视频-策略生成规则",
             "content": (
                 "你是资深电商短视频脚本策划和视觉导演。请结合用户上传的视频素材图、用户选择的视频方向和补充要求，"
@@ -333,7 +334,7 @@ def _template_rows() -> list[dict]:
             "purpose": "ai_write",
             "platform": None,
             "type_id": None,
-            "model": "qwen3.6-flash",
+            "model": QWEN_TEXT_MODEL,
             "name": "AI帮写-通用读图规则",
             "content": (
                 "你是电商商品图分析助手。请根据图片内容识别商品类型、外观、材质、用途、适用人群、核心卖点，"
@@ -345,7 +346,7 @@ def _template_rows() -> list[dict]:
             "purpose": "ai_write",
             "platform": None,
             "type_id": None,
-            "model": "qwen3.6-flash",
+            "model": QWEN_TEXT_MODEL,
             "name": "商品套图-AI帮写输出格式",
             "content": (
                 "请严格按以下格式输出，不要输出 markdown，不要输出解释，不要输出多余标题。\n\n"
@@ -357,7 +358,7 @@ def _template_rows() -> list[dict]:
             "purpose": "ai_write",
             "platform": None,
             "type_id": None,
-            "model": "qwen3.6-flash",
+            "model": QWEN_TEXT_MODEL,
             "name": "商品详情图-AI帮写输出格式",
             "content": (
                 "请严格按以下格式输出，不要输出 markdown，不要输出解释，不要输出多余标题。内容要便于后续拆成详情页模块。\n\n"
@@ -369,7 +370,7 @@ def _template_rows() -> list[dict]:
             "purpose": "strategy",
             "platform": None,
             "type_id": None,
-            "model": "qwen3.6-flash",
+            "model": QWEN_TEXT_MODEL,
             "name": "商品详情图-策略生成规则",
             "content": (
                 "你是资深电商详情页策划和视觉总监。请结合用户上传的商品图片、用户填写的商品卖点要求，"
@@ -382,7 +383,7 @@ def _template_rows() -> list[dict]:
             "purpose": "strategy",
             "platform": None,
             "type_id": None,
-            "model": "qwen3.6-flash",
+            "model": QWEN_TEXT_MODEL,
             "name": "商品套图-策略生成规则",
             "content": (
                 "你是资深电商商品套图策划和视觉总监。请结合用户上传的商品图片、用户填写的商品卖点要求，"
@@ -396,7 +397,7 @@ def _template_rows() -> list[dict]:
             "purpose": "strategy",
             "platform": None,
             "type_id": None,
-            "model": "qwen3.6-flash",
+            "model": QWEN_TEXT_MODEL,
             "name": "服饰穿搭-策略生成规则",
             "content": (
                 "你是资深电商服饰穿搭摄影策划和视觉总监。请结合用户上传的服装图、模特参考图和拍摄场景，"
@@ -415,7 +416,7 @@ def _template_rows() -> list[dict]:
                     "purpose": "image_generate",
                     "platform": platform,
                     "type_id": None,
-                    "model": "gpt-image-2",
+                    "model": IMAGE_GENERATE_MODEL,
                     "name": f"{platform}-生图平台规则",
                     "content": rules["image_generate"],
                 },
@@ -424,7 +425,7 @@ def _template_rows() -> list[dict]:
                     "purpose": "ai_write",
                     "platform": platform,
                     "type_id": None,
-                    "model": "qwen3.6-flash",
+                    "model": QWEN_TEXT_MODEL,
                     "name": f"{platform}-AI帮写平台规则",
                     "content": rules["ai_write"],
                 },
@@ -433,7 +434,7 @@ def _template_rows() -> list[dict]:
                     "purpose": "strategy",
                     "platform": platform,
                     "type_id": None,
-                    "model": "qwen3.6-flash",
+                    "model": QWEN_TEXT_MODEL,
                     "name": f"{platform}-详情图策略平台规则",
                     "content": rules["strategy"],
                 },
@@ -524,7 +525,7 @@ async def delete_redundant_image_type_templates(db) -> None:
     await db.execute(
         delete(PromptTemplate).where(
             PromptTemplate.purpose == "image_generate",
-            PromptTemplate.model == "gpt-image-2",
+            PromptTemplate.model == IMAGE_GENERATE_MODEL,
             PromptTemplate.scenario.in_(["product_image", "product_suite", "outfit"]),
             PromptTemplate.type_id.is_not(None),
         )
@@ -535,7 +536,7 @@ async def delete_redundant_video_type_templates(db) -> None:
     await db.execute(
         delete(PromptTemplate).where(
             PromptTemplate.purpose == "video_generate",
-            PromptTemplate.model == "seedance-2",
+            PromptTemplate.model == VIDEO_GENERATE_MODEL,
             PromptTemplate.scenario == "product_video",
             PromptTemplate.type_id.is_not(None),
         )
@@ -553,9 +554,9 @@ async def verify_lookup() -> None:
     async with SessionLocal() as db:
         for platform in PLATFORM_RULES:
             for purpose, model, scenario in (
-                ("image_generate", "gpt-image-2", None),
-                ("ai_write", "qwen3.6-flash", None),
-                ("strategy", "qwen3.6-flash", "product_image"),
+                ("image_generate", IMAGE_GENERATE_MODEL, None),
+                ("ai_write", QWEN_TEXT_MODEL, None),
+                ("strategy", QWEN_TEXT_MODEL, "product_image"),
             ):
                 check = await get_prompt_templates(
                     db,
@@ -574,7 +575,7 @@ async def verify_lookup() -> None:
             purpose="image_generate",
             platform="亚马逊",
             type_id=None,
-            model="gpt-image-2",
+            model=IMAGE_GENERATE_MODEL,
         )
         names = [template.name for template in result.templates]
         required = {
@@ -592,7 +593,7 @@ async def verify_lookup() -> None:
             purpose="image_generate",
             platform="不存在的平台",
             type_id=None,
-            model="gpt-image-2",
+            model=IMAGE_GENERATE_MODEL,
         )
         fallback_names = [template.name for template in fallback.templates]
         if "亚马逊-生图平台规则" in fallback_names:
@@ -606,7 +607,7 @@ async def verify_lookup() -> None:
             purpose="strategy",
             platform="亚马逊",
             type_id=None,
-            model="qwen3.6-flash",
+            model=QWEN_TEXT_MODEL,
         )
         suite_strategy_names = [template.name for template in suite_strategy.templates]
         if "商品套图-策略生成规则" not in suite_strategy_names:
@@ -618,7 +619,7 @@ async def verify_lookup() -> None:
             purpose="strategy",
             platform="亚马逊",
             type_id=None,
-            model="qwen3.6-flash",
+            model=QWEN_TEXT_MODEL,
         )
         outfit_strategy_names = [template.name for template in outfit_strategy.templates]
         if "服饰穿搭-策略生成规则" not in outfit_strategy_names:
@@ -630,7 +631,7 @@ async def verify_lookup() -> None:
             purpose="image_generate",
             platform="亚马逊",
             type_id=None,
-            model="gpt-image-2",
+            model=IMAGE_GENERATE_MODEL,
         )
         outfit_names = [template.name for template in outfit.templates]
         outfit_required = {
@@ -650,7 +651,7 @@ async def verify_lookup() -> None:
             purpose="video_generate",
             platform="global",
             type_id=None,
-            model="seedance-2",
+            model=VIDEO_GENERATE_MODEL,
         )
         video_names = [template.name for template in video.templates]
         video_required = {
@@ -670,7 +671,7 @@ async def verify_lookup() -> None:
             purpose="strategy",
             platform="global",
             type_id=None,
-            model="qwen3.6-flash",
+            model=QWEN_TEXT_MODEL,
         )
         video_strategy_names = [template.name for template in video_strategy.templates]
         if "商品视频-策略生成规则" not in video_strategy_names:

@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 from sqlalchemy import select, update
 
 from app.core.database import SessionLocal
+from app.core.model_config import IMAGE_GENERATE_MODEL, VIDEO_GENERATE_MODEL
 from app.core.oss import ALLOWED_IMAGE_TYPES, ALLOWED_VIDEO_TYPES, upload_image_bytes, upload_video_bytes
 
 load_dotenv()
@@ -185,7 +186,7 @@ def build_create_payload(
 ) -> dict:
     reference_urls = [url for url in (image_urls or []) if url]
     payload: dict[str, Any] = {
-        "model": "gpt-image-2",
+        "model": IMAGE_GENERATE_MODEL,
         "prompt": prompt,
         "n": 1,
         "size": ratio,
@@ -208,7 +209,7 @@ def build_video_create_payload(
     client_business_id: str | None = None,
 ) -> dict:
     payload: dict[str, Any] = {
-        "model": "seedance-2",
+        "model": VIDEO_GENERATE_MODEL,
         "prompt": prompt,
         "duration": int(duration),
         "aspect_ratio": aspect_ratio,

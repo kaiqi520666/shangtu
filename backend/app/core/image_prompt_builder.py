@@ -5,13 +5,10 @@ from dataclasses import dataclass
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.json_utils import dump_json, parse_json_object
+from app.core.model_config import IMAGE_GENERATE_MODEL, QWEN_TEXT_MODEL, VIDEO_GENERATE_MODEL
 from app.core.prompt_snapshot import build_prompt_snapshot
 from app.core.prompt_templates import get_prompt_templates
 from app.models import GenerationJob
-
-IMAGE_GENERATE_MODEL = "gpt-image-2"
-VIDEO_GENERATE_MODEL = "seedance-2"
-QWEN_TEXT_MODEL = "qwen3.6-flash"
 
 
 @dataclass(slots=True)
