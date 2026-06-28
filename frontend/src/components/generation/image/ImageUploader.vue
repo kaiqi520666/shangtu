@@ -321,7 +321,7 @@ function shouldShowBadge(index) {
         v-if="images.length < maxCount"
         role="button"
         tabindex="0"
-        class="flex aspect-square cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed p-2 transition-all duration-300"
+        class="flex aspect-square cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed px-3 py-4 transition-all duration-300"
         :class="
           dragOver
             ? 'border-primary bg-primary/10 shadow-sm'
@@ -337,22 +337,22 @@ function shouldShowBadge(index) {
         <ImagePlus class="mb-1 h-5 w-5 text-slate-400" />
         <span class="text-center text-xs font-semibold text-slate-500">拖拽到此处</span>
         <span class="mt-0.5 text-center text-xs text-slate-400">{{ hintText }}</span>
-        <div class="mt-3 flex w-full flex-col gap-1.5">
+        <div class="mt-3 grid w-full grid-cols-2 gap-1.5">
           <button
             type="button"
-            class="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-bold text-slate-600 shadow-sm transition-colors hover:border-primary/30 hover:bg-primary/5 hover:text-primary"
+            class="rounded-md border border-slate-200 bg-white/90 px-2 py-1 text-xs font-bold text-slate-600 shadow-sm transition-colors hover:border-primary/30 hover:bg-primary/5 hover:text-primary"
             @click.stop="triggerFileInput"
           >
-            本地上传
+            上传
           </button>
           <button
             type="button"
-            class="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-bold text-slate-600 shadow-sm transition-colors hover:border-primary/30 hover:bg-primary/5 hover:text-primary"
+            class="rounded-md border border-slate-200 bg-white/90 px-2 py-1 text-xs font-bold text-slate-600 shadow-sm transition-colors hover:border-primary/30 hover:bg-primary/5 hover:text-primary"
             @click.stop="openAssetPicker"
           >
-            <span class="inline-flex items-center gap-1">
+            <span class="inline-flex items-center gap-0.5 whitespace-nowrap">
               <FolderOpen class="h-3.5 w-3.5" />
-              资产库选择
+              资产库
             </span>
           </button>
         </div>
