@@ -75,6 +75,8 @@ def build_video_create_payload(
     aspect_ratio: str,
     resolution: str,
     image_urls: list[str],
+    input_video_url: str | None = None,
+    audio_setting: str = "auto",
     client_business_id: str | None = None,
 ) -> dict:
     cleaned_urls = [url for url in image_urls if url]
@@ -91,6 +93,14 @@ def build_video_create_payload(
     if client_business_id:
         payload["client_business_id"] = client_business_id
     if action == "text-to-video":
+        return payload
+    if action == "video-edit":
+        payload.pop("duration", None)
+        payload.pop("aspect_ratio", None)
+        payload["url"] = str(input_video_url or "").strip()
+        payload["audio_setting"] = audio_setting
+        if cleaned_urls:
+            payload["reference_images"] = cleaned_urls[:5]
         return payload
     if action == "image-to-video":
         payload["image_urls"] = cleaned_urls[:1]

@@ -20,6 +20,8 @@ class VideoTask(Base):
     prompt: Mapped[str] = mapped_column(Text, nullable=False)
     input_mode: Mapped[str] = mapped_column(String(32), nullable=False)
     input_images_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    input_video_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    audio_setting: Mapped[str | None] = mapped_column(String(20), nullable=True)
     duration: Mapped[int] = mapped_column(Integer, nullable=False)
     resolution: Mapped[str] = mapped_column(String(20), nullable=False)
     aspect_ratio: Mapped[str] = mapped_column(String(20), nullable=False)

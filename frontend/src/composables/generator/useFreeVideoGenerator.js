@@ -42,9 +42,24 @@ function serializeImages(images) {
   }));
 }
 
+function serializeVideo(video) {
+  if (!video) return null;
+  return {
+    id: video.id,
+    url: video.url,
+    objectKey: video.objectKey,
+    contentType: video.contentType,
+    size: video.size,
+    previewUrl: video.url || video.previewUrl,
+    source: video.source || "",
+    assetTaskId: video.assetTaskId || "",
+  };
+}
+
 export function useFreeVideoGenerator({ onJobCreated } = {}) {
   const toast = useToast();
   const uploadedImages = ref([]);
+  const uploadedVideo = ref(null);
   const mainImageIndex = ref(0);
   const optimizing = ref(false);
   const creditCosts = ref({ ...defaultVideoCreditCosts });
@@ -54,6 +69,7 @@ export function useFreeVideoGenerator({ onJobCreated } = {}) {
     duration: 5,
     resolution: "720p",
     aspectRatio: "9:16",
+    audioSetting: "auto",
   });
 
   const cards = useGenerationCards({
@@ -95,12 +111,14 @@ export function useFreeVideoGenerator({ onJobCreated } = {}) {
     mediaUnit: "个",
     resetSceneState() {
       uploadedImages.value = [];
+      uploadedVideo.value = null;
       mainImageIndex.value = 0;
       settings.inputMode = "text_to_video";
       settings.prompt = "";
       settings.duration = 5;
       settings.resolution = "720p";
       settings.aspectRatio = "9:16";
+      settings.audioSetting = "auto";
     },
     applyJobData(data) {
       restoreFreeVideoJobData(data);
@@ -158,6 +176,7 @@ export function useFreeVideoGenerator({ onJobCreated } = {}) {
 
   const hasPrompt = computed(() => settings.prompt.trim().length > 0);
   const hasUploadingImages = computed(() => uploadedImages.value.some((img) => img?.uploading));
+  const hasUploadingVideo = computed(() => Boolean(uploadedVideo.value?.uploading));
   const hasRunningTasks = computed(() => runningCount.value > 0 || creatingBatch.value || generating.value);
   const estimatedCredits = computed(() =>
     getVideoCreditCost({
@@ -170,10 +189,13 @@ export function useFreeVideoGenerator({ onJobCreated } = {}) {
     () => settings.inputMode === "text_to_video" && hasPrompt.value && !optimizing.value,
   );
   const canGenerate = computed(
-    () => hasPrompt.value && !hasUploadingImages.value && !creatingBatch.value,
+    () => hasPrompt.value && !hasUploadingImages.value && !hasUploadingVideo.value && !creatingBatch.value,
   );
   const selectedVideoLabel = computed(
-    () => `${settings.resolution} / ${settings.aspectRatio} / ${settings.duration}秒`,
+    () =>
+      settings.inputMode === "video_edit"
+        ? `${settings.resolution} / 参考视频比例 / ${settings.duration}秒`
+        : `${settings.resolution} / ${settings.aspectRatio} / ${settings.duration}秒`,
   );
 
   async function loadCreditCosts() {
@@ -202,6 +224,7 @@ export function useFreeVideoGenerator({ onJobCreated } = {}) {
     if (typeof scene.duration === "number") settings.duration = scene.duration;
     if (typeof scene.resolution === "string") settings.resolution = scene.resolution;
     if (typeof scene.aspectRatio === "string") settings.aspectRatio = scene.aspectRatio;
+    if (typeof scene.audioSetting === "string") settings.audioSetting = scene.audioSetting;
     if (typeof data.input_text === "string") settings.prompt = data.input_text;
 
     if (Array.isArray(data.source_images)) {
@@ -212,6 +235,14 @@ export function useFreeVideoGenerator({ onJobCreated } = {}) {
     } else {
       uploadedImages.value = [];
     }
+    if (data.source_video?.url) {
+      uploadedVideo.value = {
+        ...data.source_video,
+        previewUrl: data.source_video.previewUrl || data.source_video.url,
+      };
+    } else {
+      uploadedVideo.value = null;
+    }
     mainImageIndex.value = 0;
   }
 
@@ -219,12 +250,17 @@ export function useFreeVideoGenerator({ onJobCreated } = {}) {
     const prompt = settings.prompt.trim();
     if (!prompt) return "请输入视频提示词";
     if (hasUploadingImages.value) return "素材还在上传中，请稍等";
+    if (hasUploadingVideo.value) return "参考视频还在上传中，请稍等";
     const imageCount = uploadedImages.value.filter((img) => img?.url).length;
     if (settings.inputMode === "image_to_video" && imageCount !== 1) {
       return "图生视频必须上传 1 张首帧图";
     }
     if (settings.inputMode === "reference_to_video" && (imageCount < 1 || imageCount > 9)) {
       return "参考图生视频必须上传 1-9 张图片";
+    }
+    if (settings.inputMode === "video_edit") {
+      if (!uploadedVideo.value?.url) return "爆款复刻必须选择 1 条参考视频";
+      if (imageCount > 5) return "爆款复刻最多只能选择 5 张参考图";
     }
     return "";
   }
@@ -276,6 +312,7 @@ export function useFreeVideoGenerator({ onJobCreated } = {}) {
         duration: settings.duration,
         resolution: settings.resolution,
         aspectRatio: settings.aspectRatio,
+        audioSetting: settings.audioSetting,
       },
     });
   }
@@ -329,6 +366,7 @@ export function useFreeVideoGenerator({ onJobCreated } = {}) {
     const title = makeFreeVideoTitle(prompt);
     const settingsSnapshot = createSettingsSnapshot(prompt);
     const imageUrls = uploadedImages.value.map((img) => img?.url).filter(Boolean);
+    const inputVideoUrl = uploadedVideo.value?.url || "";
     const queue = [{ id: "free_video", title, prompt }];
 
     await enqueueMediaBatch({
@@ -336,6 +374,7 @@ export function useFreeVideoGenerator({ onJobCreated } = {}) {
       snapshotPayload: {
         settings: settingsSnapshot,
         source_images: serializeImages(uploadedImages.value),
+        source_video: uploadedVideo.value ? serializeVideo(uploadedVideo.value) : null,
         input_text: prompt,
         structure: [{ id: "free_video", title, prompt }],
       },
@@ -358,6 +397,8 @@ export function useFreeVideoGenerator({ onJobCreated } = {}) {
           title: item.title,
           input_mode: settings.inputMode,
           image_urls: imageUrls,
+          input_video_url: inputVideoUrl || null,
+          audio_setting: settings.audioSetting,
           user_prompt: item.prompt,
           duration: settings.duration,
           resolution: settings.resolution,
@@ -412,6 +453,7 @@ export function useFreeVideoGenerator({ onJobCreated } = {}) {
   return {
     settings,
     uploadedImages,
+    uploadedVideo,
     mainImageIndex,
     optimizing,
     creditCosts,

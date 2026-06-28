@@ -14,6 +14,18 @@ defineProps({
     type: Boolean,
     default: false,
   },
+  localButtonText: {
+    type: String,
+    default: "本地上传",
+  },
+  assetButtonText: {
+    type: String,
+    default: "资产库选择",
+  },
+  icon: {
+    type: [Object, Function],
+    default: () => ImagePlus,
+  },
 });
 
 const emit = defineEmits(["upload", "asset", "drag-over", "drag-leave", "drop"]);
@@ -33,7 +45,7 @@ const emit = defineEmits(["upload", "asset", "drag-over", "drag-leave", "drop"])
   >
     <div class="flex items-center gap-3 rounded-xl bg-slate-50 px-3 py-3">
       <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-primary shadow-sm">
-        <ImagePlus class="h-5 w-5" />
+        <component :is="icon" class="h-5 w-5" />
       </div>
       <div class="min-w-0 flex-1">
         <p class="truncate text-sm font-black text-slate-800">{{ actionText }}</p>
@@ -47,8 +59,8 @@ const emit = defineEmits(["upload", "asset", "drag-over", "drag-leave", "drop"])
         class="inline-flex h-11 min-w-0 items-center justify-center gap-2 rounded-xl border border-primary/20 bg-primary px-3 text-xs font-black text-white shadow-sm transition-colors hover:bg-primary/90"
         @click="emit('upload')"
       >
-        <ImagePlus class="h-4 w-4 shrink-0" />
-        <span class="truncate">本地上传</span>
+        <component :is="icon" class="h-4 w-4 shrink-0" />
+        <span class="truncate">{{ localButtonText }}</span>
       </button>
       <button
         type="button"
@@ -56,7 +68,7 @@ const emit = defineEmits(["upload", "asset", "drag-over", "drag-leave", "drop"])
         @click="emit('asset')"
       >
         <FolderOpen class="h-4 w-4 shrink-0" />
-        <span class="truncate">资产库选择</span>
+        <span class="truncate">{{ assetButtonText }}</span>
       </button>
     </div>
   </div>

@@ -58,6 +58,8 @@ def video_task_payload(task: VideoTask) -> dict:
         "result_url": runtime.result_url,
         "input_mode": task.input_mode,
         "input_images": parse_json_or_none(task.input_images_json) or [],
+        "input_video_url": task.input_video_url,
+        "audio_setting": task.audio_setting,
         "duration": task.duration,
         "resolution": task.resolution,
         "aspect_ratio": task.aspect_ratio,

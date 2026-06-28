@@ -23,6 +23,14 @@ export const freeVideoInputModes = [
     addText: "添加参考图",
     hintText: "支持 1-9 张",
   },
+  {
+    value: "video_edit",
+    label: "爆款复刻",
+    description: "参考爆款节奏生成原创版本",
+    uploadTitle: "参考图",
+    addText: "添加参考图",
+    hintText: "可选，最多 5 张",
+  },
 ];
 
 export const freeVideoRatioOptions = [
@@ -31,6 +39,11 @@ export const freeVideoRatioOptions = [
   { value: "1:1", label: "1:1", description: "方形视频" },
   { value: "4:3", label: "4:3", description: "横向内容" },
   { value: "3:4", label: "3:4", description: "竖向内容" },
+];
+
+export const freeVideoAudioOptions = [
+  { value: "auto", label: "AI 自动处理", description: "由模型重组声音策略" },
+  { value: "origin", label: "保留原声", description: "尽量沿用参考视频声音" },
 ];
 
 export function getFreeVideoInputMode(mode) {

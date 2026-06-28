@@ -8,12 +8,23 @@ export function generateVideoStrategy(payload) {
   return request.post("/video/strategy", payload, { timeout: 120000 });
 }
 
+export function uploadVideo(file) {
+  const formData = new FormData();
+  formData.append("file", file);
+  return request.post("/video/upload", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+    timeout: 120000,
+  });
+}
+
 export function generateVideo({
   scenario = "product_video",
   type_id,
   title = null,
   input_mode,
   image_urls = [],
+  input_video_url = null,
+  audio_setting = "auto",
   user_prompt = null,
   duration,
   resolution,
@@ -30,6 +41,8 @@ export function generateVideo({
       title,
       input_mode,
       image_urls,
+      input_video_url,
+      audio_setting,
       user_prompt,
       duration,
       resolution,

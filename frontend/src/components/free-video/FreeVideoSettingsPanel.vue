@@ -5,9 +5,11 @@ import AppSelect from "@/components/ui/AppSelect.vue";
 import GeneratorActionFooter from "@/components/generation/workspace/GeneratorActionFooter.vue";
 import GeneratorSidePanelShell from "@/components/generation/workspace/GeneratorSidePanelShell.vue";
 import ImageUploader from "@/components/generation/image/ImageUploader.vue";
+import VideoUploader from "@/components/generation/video/VideoUploader.vue";
 import VideoDurationSlider from "@/components/product-video/VideoDurationSlider.vue";
 import VideoQualitySelector from "@/components/product-video/VideoQualitySelector.vue";
 import {
+  freeVideoAudioOptions,
   freeVideoInputModes,
   freeVideoRatioOptions,
   getFreeVideoInputMode,
@@ -21,6 +23,10 @@ const props = defineProps({
   uploadedImages: {
     type: Array,
     required: true,
+  },
+  uploadedVideo: {
+    type: Object,
+    default: null,
   },
   mainImageIndex: {
     type: Number,
@@ -59,6 +65,7 @@ const props = defineProps({
 const emit = defineEmits([
   "update:settings",
   "update:uploadedImages",
+  "update:uploadedVideo",
   "update:mainImageIndex",
   "notify",
   "optimize",
@@ -66,15 +73,22 @@ const emit = defineEmits([
 ]);
 
 const selectedMode = computed(() => getFreeVideoInputMode(props.settings.inputMode));
+const isVideoEditMode = computed(() => props.settings.inputMode === "video_edit");
 const showUploader = computed(() => props.settings.inputMode !== "text_to_video");
-const maxUploadCount = computed(() => (props.settings.inputMode === "reference_to_video" ? 9 : 1));
-const uploadLimitMessage = computed(() =>
-  props.settings.inputMode === "reference_to_video"
-    ? "参考图最多只能上传 9 张"
-    : "图生视频只能上传 1 张首帧图",
-);
+const maxUploadCount = computed(() => {
+  if (props.settings.inputMode === "reference_to_video") return 9;
+  if (props.settings.inputMode === "video_edit") return 5;
+  return 1;
+});
+const uploadLimitMessage = computed(() => {
+  if (props.settings.inputMode === "reference_to_video") return "参考图最多只能上传 9 张";
+  if (props.settings.inputMode === "video_edit") return "爆款复刻最多只能选择 5 张参考图";
+  return "图生视频只能上传 1 张首帧图";
+});
 const primaryText = computed(() => {
   if (!props.settings.prompt.trim()) return "请输入视频提示词";
+  if (props.uploadedVideo?.uploading) return "参考视频上传中...";
+  if (isVideoEditMode.value && !props.uploadedVideo?.url) return "请选择爆款参考视频";
   if (props.uploadedImages.some((img) => img?.uploading)) return "素材上传中...";
   if (props.creatingBatch) return "正在创建任务...";
   if (props.hasRunningTasks) return "追加生成";
@@ -91,11 +105,12 @@ function updateSetting(key, value) {
 function updateInputMode(mode) {
   emit("update:settings", {
     ...props.settings,
-    inputMode: mode,
-  });
-  emit("update:uploadedImages", []);
-  emit("update:mainImageIndex", 0);
-}
+      inputMode: mode,
+    });
+    emit("update:uploadedImages", []);
+    emit("update:uploadedVideo", null);
+    emit("update:mainImageIndex", 0);
+  }
 </script>
 
 <template>
@@ -127,6 +142,16 @@ function updateInputMode(mode) {
         </div>
       </div>
     </section>
+
+    <VideoUploader
+      v-if="isVideoEditMode"
+      :video="uploadedVideo"
+      title="爆款参考视频"
+      add-text="添加参考视频"
+      hint-text="必须选择 1 条爆款参考视频"
+      @update:video="emit('update:uploadedVideo', $event)"
+      @notify="emit('notify', $event)"
+    />
 
     <ImageUploader
       v-if="showUploader"
@@ -169,13 +194,25 @@ function updateInputMode(mode) {
         ></textarea>
       </div>
 
-      <div>
+      <div v-if="!isVideoEditMode">
         <label class="mb-1.5 block text-xs font-bold text-slate-500">视频比例</label>
         <AppSelect
           :model-value="settings.aspectRatio"
           :options="freeVideoRatioOptions"
           @update:model-value="updateSetting('aspectRatio', $event)"
         />
+      </div>
+
+      <div v-if="isVideoEditMode">
+        <label class="mb-1.5 block text-xs font-bold text-slate-500">声音处理</label>
+        <AppSelect
+          :model-value="settings.audioSetting"
+          :options="freeVideoAudioOptions"
+          @update:model-value="updateSetting('audioSetting', $event)"
+        />
+        <p class="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold leading-relaxed text-amber-700">
+          爆款复刻会参考原视频比例，时长仅用于本次积分预估与扣费。
+        </p>
       </div>
 
       <VideoDurationSlider
