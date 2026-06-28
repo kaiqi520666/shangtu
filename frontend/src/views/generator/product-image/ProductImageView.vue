@@ -91,6 +91,8 @@ function closePreview() {
       :ai-loading="generator.aiLoading.value"
       :can-generate="generator.canGenerate.value"
       :can-generate-strategy="generator.canGenerateStrategy.value"
+      :strategy-dirty="generator.strategyDirty.value"
+      :strategy-count="generator.moduleContents.value.length"
       :creating-batch="generator.creatingBatch.value"
       :has-running-tasks="generator.hasRunningTasks.value"
       :generating="generator.generating.value"

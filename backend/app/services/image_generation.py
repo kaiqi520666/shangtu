@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.credits import normalize_image_resolution
 from app.core.generation_prompt_builder import build_image_generate_prompt
-from app.core.json_utils import dump_json_or_none
+from app.core.json_utils import dump_json_or_none, parse_json_or_none
 from app.core.prompt_snapshot import (
     build_prompt_snapshot,
     dump_prompt_snapshot,
@@ -142,6 +142,10 @@ async def create_image_generation_task(
             return None, fail("任务不存在")
         if job.scenario not in IMAGE_PROMPT_STRATEGIES:
             return None, fail("任务类型不匹配")
+        if job.scenario == "product_image":
+            structure = parse_json_or_none(job.structure_json)
+            if not isinstance(structure, list) or not structure:
+                return None, fail("请先生成并确认详情图方案")
 
     task_id = str(uuid.uuid4())
     try:

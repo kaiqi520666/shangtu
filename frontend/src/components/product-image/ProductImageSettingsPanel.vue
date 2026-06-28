@@ -44,6 +44,14 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  strategyDirty: {
+    type: Boolean,
+    default: false,
+  },
+  strategyCount: {
+    type: Number,
+    default: 0,
+  },
   creatingBatch: {
     type: Boolean,
     default: false,
@@ -92,15 +100,19 @@ const generateButtonText = computed(() => {
   if (props.catalogLoading) return "图种目录加载中...";
   if (props.selectedModules.length === 0) return "请至少选择一个生成图种";
   if (props.creatingBatch) return "正在创建任务...";
-  if (props.hasRunningTasks) return `追加生成详情图 (${props.selectedModules.length}项)`;
-  return `生成详情图 (${props.selectedModules.length}项)`;
+  if (props.strategyCount === 0) return "请先生成详情图方案";
+  if (props.strategyDirty) return "请先更新详情图方案";
+  if (props.hasRunningTasks) return `追加生成详情图 (${props.strategyCount}张)`;
+  return `开始生成详情图 (${props.strategyCount}张)`;
 });
 
 const strategyButtonText = computed(() => {
-  if (props.strategyLoading) return "AI 正在生成策略...";
+  if (props.strategyLoading) return "AI 正在生成方案...";
   if (props.catalogLoading) return "图种目录加载中...";
-  if (props.hasRunningTasks) return "生成中暂不可改策略";
-  return "AI 生成策略";
+  if (props.hasRunningTasks) return "生成中暂不可改方案";
+  if (props.strategyCount > 0 && props.strategyDirty) return "更新详情图方案";
+  if (props.strategyCount > 0) return "重新生成详情图方案";
+  return "生成详情图方案";
 });
 
 </script>

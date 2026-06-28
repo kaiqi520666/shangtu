@@ -178,7 +178,7 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
       availableModules.value.length > 0 &&
       !catalogLoading.value &&
       !creatingBatch.value &&
-      !strategyLoading.value,
+      canGenerateWithStrategy.value,
   );
   const canGenerateStrategy = computed(
     () =>
@@ -334,7 +334,11 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
 
   async function confirmStrategyAndGenerate() {
     if (moduleContents.value.length === 0) {
-      toast.info("请先生成模块策略");
+      toast.info("请先生成详情图方案");
+      return;
+    }
+    if (strategyDirty.value) {
+      toast.info("配置已变化，请先更新详情图方案");
       return;
     }
 
@@ -357,6 +361,14 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
     }
     if (!settings.productInput.trim()) {
       toast.info("请填写商品卖点与要求");
+      return;
+    }
+    if (moduleContents.value.length === 0) {
+      toast.info("请先生成详情图方案");
+      return;
+    }
+    if (strategyDirty.value) {
+      toast.info("配置已变化，请先更新详情图方案");
       return;
     }
 
@@ -438,27 +450,15 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
   }
 
   function getActiveStrategyModuleIds() {
-    return moduleContents.value.length > 0
-      ? moduleContents.value.map((module) => module.id).filter(Boolean)
-      : selectedModules.value;
+    return moduleContents.value.map((module) => module.id).filter(Boolean);
   }
 
   function buildProductImageQueue() {
-    if (moduleContents.value.length > 0) {
-      return moduleContents.value.map((item, index) => ({
-        ...item,
-        moduleName: item.moduleName || getModuleName(item.id),
-        content: item.content || "",
-        strategy: item.strategy || getModuleStrategy(item.id),
-        index: index + 1,
-      }));
-    }
-
-    return selectedModules.value.map((moduleId, index) => ({
-      id: moduleId,
-      moduleName: getModuleName(moduleId),
-      content: getModuleStrategy(moduleId),
-      strategy: getModuleStrategy(moduleId),
+    return moduleContents.value.map((item, index) => ({
+      ...item,
+      moduleName: item.moduleName || getModuleName(item.id),
+      content: item.content || "",
+      strategy: item.strategy || "",
       index: index + 1,
     }));
   }
