@@ -2,12 +2,18 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_user, get_db
+from app.core.providers.toapis_provider import TOAPIS_SIZE_TABLE
 from app.core.product_catalog import get_all_catalog
 from app.core.system_settings import get_effective_image_credit_costs
 from app.models import User
 from app.schemas.response import Response, fail, success
 
 router = APIRouter()
+
+
+@router.get("/capabilities", response_model=Response)
+async def image_capabilities():
+    return success({"resolution_map": TOAPIS_SIZE_TABLE})
 
 
 @router.get("/catalog", response_model=Response)

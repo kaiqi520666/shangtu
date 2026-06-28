@@ -1,5 +1,10 @@
 import request from "./request.js";
 
+function buildPublicApiUrl(path) {
+  const baseURL = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/$/, "");
+  return `${baseURL}${path}`;
+}
+
 export function uploadImage(file) {
   const formData = new FormData();
   formData.append("file", file);
@@ -53,6 +58,16 @@ export function getImageCreditCosts() {
 
 export function getImageCatalog() {
   return request.get("/image/catalog", { timeout: 15000 });
+}
+
+export async function getImageCapabilities() {
+  const response = await fetch(buildPublicApiUrl("/image/capabilities"), {
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) {
+    throw new Error(`获取图片能力失败: ${response.status}`);
+  }
+  return response.json();
 }
 
 export function generateImage({

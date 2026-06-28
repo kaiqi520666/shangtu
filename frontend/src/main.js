@@ -5,13 +5,24 @@ import { createPinia } from 'pinia'
 import piniaPluginPersistedstate from 'pinia-plugin-persistedstate'
 
 import App from './App.vue'
+import { initImageCapabilities } from './constants/generator.js'
 import router from './router'
 
-const app = createApp(App)
+async function bootstrap() {
+  const app = createApp(App)
 
-const pinia = createPinia()
-pinia.use(piniaPluginPersistedstate)
-app.use(pinia)
-app.use(router)
+  const pinia = createPinia()
+  pinia.use(piniaPluginPersistedstate)
+  app.use(pinia)
+  app.use(router)
 
-app.mount('#app')
+  try {
+    await initImageCapabilities()
+  } catch (error) {
+    console.error('图片能力加载失败', error)
+  }
+
+  app.mount('#app')
+}
+
+bootstrap()

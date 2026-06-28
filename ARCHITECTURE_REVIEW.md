@@ -26,11 +26,6 @@
 - 风险：接第二个图片/视频供应商时仍要在 worker 里加分支，而不是新增一个 adapter 实现。
 - 建议：定义 `ImageGenerationProvider` / `VideoGenerationProvider` 接口（`create` / `poll` / `extract_result` / `supported_sizes`），ToAPIS 作为默认实现。
 
-### 4. 前后端能力配置仍手动双写
-- 位置：`backend/app/core/providers/toapis_provider.py:TOAPIS_SIZE_TABLE`、`frontend/src/constants/generator.js:resolutionMap`。
-- 风险：一端新增比例/4K，另一端未同步 → 前端可选但后端失败，或反之。
-- 建议：后端暴露 `/image/capabilities`，前端消费；尺寸表作为唯一来源。
-
 ### 5. 前端场景 composable 过大
 - 位置：`frontend/src/composables/generator/useOutfitGenerator.js`（最重，兼管模特库 CRUD/上传/删除）、`useProductImageGenerator.js`、`useProductSuiteGenerator.js`、`useProductVideoGenerator.js`，均 500–700+ 行。
 - 现状：已有通用 `frontend/src/composables/generator/batch/useMediaBatchRunner.js`、`frontend/src/composables/generator/useGenerationCards.js`、`frontend/src/composables/generator/strategy/useGenerationStrategyFlow.js`，但场景层仍是「上帝 composable」。

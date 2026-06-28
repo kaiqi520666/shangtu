@@ -1,3 +1,7 @@
+import { reactive } from "vue";
+
+import { getImageCapabilities } from "@/api/image.js";
+
 export const platformOptions = [
   { value: '亚马逊', label: '亚马逊' },
   { value: '淘宝天猫1688', label: '淘宝天猫1688' },
@@ -31,27 +35,32 @@ export const languageOptions = [
   { value: '无文字', label: '无文字' },
 ]
 
-export const ratioOptions = [
-  { value: '1:1', label: '1:1', description: '正方形' },
-  { value: '3:2', label: '3:2', description: '横图' },
-  { value: '2:3', label: '2:3', description: '竖图' },
-  { value: '4:3', label: '4:3', description: '横图' },
-  { value: '3:4', label: '3:4', description: '竖图' },
-  { value: '5:4', label: '5:4', description: '横图' },
-  { value: '4:5', label: '4:5', description: '竖图' },
-  { value: '16:9', label: '16:9', description: '横图' },
-  { value: '9:16', label: '9:16', description: '竖图' },
-  { value: '2:1', label: '2:1', description: '横幅' },
-  { value: '1:2', label: '1:2', description: '长竖图' },
-  { value: '21:9', label: '21:9', description: '横图' },
-  { value: '9:21', label: '9:21', description: '长竖图' },
-]
+const ratioOptionRegistry = {
+  '1:1': { label: '1:1', description: '正方形' },
+  '3:2': { label: '3:2', description: '横图' },
+  '2:3': { label: '2:3', description: '竖图' },
+  '4:3': { label: '4:3', description: '横图' },
+  '3:4': { label: '3:4', description: '竖图' },
+  '5:4': { label: '5:4', description: '横图' },
+  '4:5': { label: '4:5', description: '竖图' },
+  '16:9': { label: '16:9', description: '横图' },
+  '9:16': { label: '9:16', description: '竖图' },
+  '2:1': { label: '2:1', description: '横幅' },
+  '1:2': { label: '1:2', description: '长竖图' },
+  '21:9': { label: '21:9', description: '横图' },
+  '9:21': { label: '9:21', description: '长竖图' },
+}
 
-export const qualityOptions = [
-  { value: '1K', title: '1K', subtitle: '更快' },
-  { value: '2K', title: '2K', subtitle: '推荐' },
-  { value: '4K', title: '4K', subtitle: '更精细' },
-]
+const qualityOptionRegistry = {
+  '1K': { title: '1K', subtitle: '更快' },
+  '2K': { title: '2K', subtitle: '推荐' },
+  '4K': { title: '4K', subtitle: '更精细' },
+}
+
+const qualityOrder = ['1K', '2K', '4K']
+
+export const ratioOptions = reactive([])
+export const qualityOptions = reactive([])
 
 export const defaultImageCreditCosts = {
   '1K': 1,
@@ -59,65 +68,103 @@ export const defaultImageCreditCosts = {
   '4K': 4,
 }
 
-export const resolutionMap = {
-  '1:1': {
-    '1K': [1024, 1024],
-    '2K': [2048, 2048],
-  },
-  '3:2': {
-    '1K': [1536, 1024],
-    '2K': [2048, 1360],
-  },
-  '2:3': {
-    '1K': [1024, 1536],
-    '2K': [1360, 2048],
-  },
-  '4:3': {
-    '1K': [1024, 768],
-    '2K': [2048, 1536],
-  },
-  '3:4': {
-    '1K': [768, 1024],
-    '2K': [1536, 2048],
-  },
-  '5:4': {
-    '1K': [1280, 1024],
-    '2K': [2560, 2048],
-  },
-  '4:5': {
-    '1K': [1024, 1280],
-    '2K': [2048, 2560],
-  },
-  '16:9': {
-    '1K': [1536, 864],
-    '2K': [2048, 1152],
-    '4K': [3840, 2160],
-  },
-  '9:16': {
-    '1K': [864, 1536],
-    '2K': [1152, 2048],
-    '4K': [2160, 3840],
-  },
-  '2:1': {
-    '1K': [2048, 1024],
-    '2K': [2688, 1344],
-    '4K': [3840, 1920],
-  },
-  '1:2': {
-    '1K': [1024, 2048],
-    '2K': [1344, 2688],
-    '4K': [1920, 3840],
-  },
-  '21:9': {
-    '1K': [2016, 864],
-    '2K': [2688, 1152],
-    '4K': [3840, 1648],
-  },
-  '9:21': {
-    '1K': [864, 2016],
-    '2K': [1152, 2688],
-    '4K': [1648, 3840],
-  },
+export const resolutionMap = reactive({})
+
+let imageCapabilitiesLoaded = false
+let imageCapabilitiesPromise = null
+
+function replaceReactiveArray(target, next) {
+  target.splice(0, target.length, ...next)
+}
+
+function replaceReactiveMap(target, next) {
+  Object.keys(target).forEach((key) => {
+    delete target[key]
+  })
+  Object.entries(next).forEach(([key, value]) => {
+    target[key] = value
+  })
+}
+
+function sortQualities(qualities) {
+  return [...qualities].sort((left, right) => {
+    const leftIndex = qualityOrder.indexOf(left)
+    const rightIndex = qualityOrder.indexOf(right)
+    if (leftIndex === -1 && rightIndex === -1) return left.localeCompare(right)
+    if (leftIndex === -1) return 1
+    if (rightIndex === -1) return -1
+    return leftIndex - rightIndex
+  })
+}
+
+function buildRatioOptions(nextMap) {
+  return Object.keys(nextMap).map((ratio) => {
+    const meta = ratioOptionRegistry[ratio] || {}
+    return {
+      value: ratio,
+      label: meta.label || ratio,
+      description: meta.description || '',
+    }
+  })
+}
+
+function buildQualityOptions(nextMap) {
+  const supported = new Set()
+  Object.values(nextMap).forEach((qualityMap) => {
+    Object.keys(qualityMap).forEach((quality) => supported.add(quality))
+  })
+  return sortQualities([...supported]).map((quality) => {
+    const meta = qualityOptionRegistry[quality] || {}
+    return {
+      value: quality,
+      title: meta.title || quality,
+      subtitle: meta.subtitle || '',
+    }
+  })
+}
+
+function normalizeCapabilityMap(rawMap) {
+  const nextMap = {}
+  Object.entries(rawMap || {}).forEach(([ratio, qualities]) => {
+    if (!qualities || typeof qualities !== 'object') return
+    const normalizedQualities = {}
+    Object.entries(qualities).forEach(([quality, dims]) => {
+      if (!Array.isArray(dims) || dims.length < 2) return
+      const width = Number(dims[0])
+      const height = Number(dims[1])
+      if (!Number.isFinite(width) || !Number.isFinite(height)) return
+      normalizedQualities[normalizeImageQuality(quality)] = [width, height]
+    })
+    if (Object.keys(normalizedQualities).length > 0) {
+      nextMap[ratio] = normalizedQualities
+    }
+  })
+  return nextMap
+}
+
+export function applyImageCapabilities(rawMap) {
+  const nextMap = normalizeCapabilityMap(rawMap)
+  replaceReactiveMap(resolutionMap, nextMap)
+  replaceReactiveArray(ratioOptions, buildRatioOptions(nextMap))
+  replaceReactiveArray(qualityOptions, buildQualityOptions(nextMap))
+}
+
+export async function initImageCapabilities() {
+  if (imageCapabilitiesLoaded) return
+  if (!imageCapabilitiesPromise) {
+    imageCapabilitiesPromise = (async () => {
+      const result = await getImageCapabilities()
+      if (result.code !== 0) {
+        throw new Error(result.message || '图片能力加载失败')
+      }
+      applyImageCapabilities(result.data?.resolution_map || {})
+      imageCapabilitiesLoaded = true
+    })().catch((error) => {
+      imageCapabilitiesPromise = null
+      throw error
+    })
+  }
+  return imageCapabilitiesPromise
 }
 
 export function getSupportedQualities(ratio) {
@@ -156,21 +203,26 @@ export function getImageBatchCreditCost({ quality = '1K', count = 1, costs } = {
 
 export function formatImageLabel({ ratio = '1:1', quality = '1K' } = {}) {
   const ratioOption = ratioOptions.find((option) => option.value === ratio) || ratioOptions[0]
-  const effectiveQuality = resolveQuality(ratioOption.value, quality) || quality
-  const dims = resolutionMap[ratioOption.value]?.[effectiveQuality]
+  const ratioValue = ratioOption?.value || ratio
+  const ratioLabel = ratioOption?.label || ratio
+  const effectiveQuality = resolveQuality(ratioValue, quality) || quality
+  const dims = resolutionMap[ratioValue]?.[effectiveQuality]
   if (!dims) {
-    return `${effectiveQuality} / ${ratioOption.label}`
+    return `${effectiveQuality} / ${ratioLabel}`
   }
   const [width, height] = dims
-  return `${effectiveQuality} / ${ratioOption.label} / ${width}x${height}`
+  return `${effectiveQuality} / ${ratioLabel} / ${width}x${height}`
 }
 
 export function createDefaultGenerationSettings(overrides = {}) {
+  const defaultRatio = ratioOptions[0]?.value || '1:1'
+  const baseRatio = overrides.ratio || defaultRatio
+  const defaultQuality = resolveQuality(baseRatio, overrides.quality || '1K') || overrides.quality || '1K'
   return {
     platform: '亚马逊',
     language: '中文',
-    ratio: '1:1',
-    quality: '1K',
+    ratio: baseRatio,
+    quality: defaultQuality,
     productInput: '',
     ...overrides,
   }
