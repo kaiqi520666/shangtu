@@ -7,6 +7,7 @@ import {
   promptPurposeLabel,
   promptPurposeOptions,
   promptScenarioOptions,
+  promptTemplateScopeLabel,
   scenarioLabel,
 } from "@/constants/admin.js";
 import AppCheckbox from "@/components/ui/AppCheckbox.vue";
@@ -26,7 +27,7 @@ const emit = defineEmits(["apply-filter", "change-page", "create", "edit", "togg
 <template>
   <section class="space-y-4">
     <div class="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-      <input v-model="state.keyword" type="text" class="min-w-72 rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none" placeholder="搜索名称、内容、平台、type_id" @keyup.enter="emit('apply-filter')" />
+      <input v-model="state.keyword" type="text" class="min-w-72 rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none" placeholder="搜索名称、内容、平台" @keyup.enter="emit('apply-filter')" />
       <div class="w-36">
         <AppSelect v-model="state.scenario" :options="promptScenarioOptions" @update:model-value="emit('apply-filter')" />
       </div>
@@ -36,6 +37,7 @@ const emit = defineEmits(["apply-filter", "change-page", "create", "edit", "togg
       <div class="w-40">
         <AppSelect v-model="state.model" :options="promptModelOptions" @update:model-value="emit('apply-filter')" />
       </div>
+      <input v-model="state.type_id" type="text" class="w-44 rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none" placeholder="方向 / 图种 type_id" @keyup.enter="emit('apply-filter')" />
       <div class="w-32">
         <AppSelect v-model="state.active" :options="activeStatusOptions" @update:model-value="emit('apply-filter')" />
       </div>
@@ -67,11 +69,11 @@ const emit = defineEmits(["apply-filter", "change-page", "create", "edit", "togg
           <tr v-for="template in state.items" v-else :key="template.id" class="border-t border-slate-100 align-top">
             <td class="px-4 py-3">
               <p class="font-bold text-slate-800">{{ template.name }}</p>
-              <p class="mt-0.5 text-slate-400">v{{ template.version }} · {{ promptPurposeLabel(template.purpose) }}</p>
+              <p class="mt-0.5 text-slate-400">v{{ template.version }} · {{ promptPurposeLabel(template.purpose, template.scenario) }}</p>
             </td>
             <td class="px-4 py-3 text-slate-600">
               <p>{{ scenarioLabel(template.scenario) }}</p>
-              <p class="mt-0.5 text-slate-400">{{ template.platform || '全部平台' }} / {{ template.type_id || '全部图种' }}</p>
+              <p class="mt-0.5 text-slate-400">{{ template.platform || '全部平台' }} / {{ promptTemplateScopeLabel(template) }}</p>
             </td>
             <td class="px-4 py-3 text-slate-600">{{ template.model }}</td>
             <td class="px-4 py-3">

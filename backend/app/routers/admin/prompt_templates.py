@@ -12,7 +12,7 @@ from .utils import audit_log, page_payload, prompt_template_payload
 
 router = APIRouter()
 
-VALID_SCENARIOS = {"product_suite", "product_image", "outfit", "free_image"}
+VALID_SCENARIOS = {"product_suite", "product_image", "outfit", "free_image", "product_video"}
 VALID_PURPOSES = {"image_generate", "ai_write", "strategy"}
 
 
@@ -23,6 +23,7 @@ async def list_prompt_templates(
     scenario: str | None = None,
     purpose: str | None = None,
     model: str | None = None,
+    type_id: str | None = None,
     active: str | None = None,
     keyword: str | None = None,
     current_admin: User = Depends(get_current_super_admin),
@@ -40,6 +41,12 @@ async def list_prompt_templates(
         conditions.append(PromptTemplate.purpose == purpose)
     if model:
         conditions.append(PromptTemplate.model == model.strip())
+    if type_id:
+        cleaned_type_id = type_id.strip()
+        if cleaned_type_id == "__global__":
+            conditions.append(PromptTemplate.type_id.is_(None))
+        elif cleaned_type_id:
+            conditions.append(PromptTemplate.type_id == cleaned_type_id)
     if active in {"true", "false"}:
         conditions.append(PromptTemplate.active == (active == "true"))
     if keyword:

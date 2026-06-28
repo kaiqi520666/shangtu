@@ -27,6 +27,7 @@ export function useAdminPromptTemplates() {
     scenario: "",
     purpose: "",
     model: "",
+    type_id: "",
     active: "",
   }));
   const editorOpen = ref(false);
@@ -41,6 +42,7 @@ export function useAdminPromptTemplates() {
         scenario: state.scenario || undefined,
         purpose: state.purpose || undefined,
         model: state.model || undefined,
+        type_id: state.type_id || undefined,
         active: state.active || undefined,
       },
       "加载提示词模板失败",

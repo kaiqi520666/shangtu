@@ -96,7 +96,7 @@ export const promptPurposeOptions = [
   { label: "全部用途", value: "" },
   { label: "生图", value: "image_generate" },
   { label: "AI帮写", value: "ai_write" },
-  { label: "详情策略", value: "strategy" },
+  { label: "策略/提示词", value: "strategy" },
 ];
 
 export const promptModelOptions = [
@@ -152,9 +152,27 @@ export function productCatalogScenarioLabel(scenario) {
   return match?.label || scenario || "-";
 }
 
-export function promptPurposeLabel(purpose) {
+export function promptPurposeLabel(purpose, scenario = "") {
+  if (scenario === "product_video" && purpose === "strategy") return "视频提示词生成";
   const match = promptPurposeOptions.find((option) => option.value === purpose);
   return match?.label || purpose || "-";
+}
+
+export function promptTemplateScopeLabel(template = {}) {
+  const typeId = template.type_id || "";
+  if (template.scenario === "product_video") {
+    return typeId ? `视频方向：${typeId}` : "全部视频方向";
+  }
+  if (template.scenario === "product_suite") {
+    return typeId ? `套图类型：${typeId}` : "全部套图类型";
+  }
+  if (template.scenario === "product_image") {
+    return typeId ? `详情图种：${typeId}` : "全部详情图种";
+  }
+  if (template.scenario === "outfit") {
+    return typeId ? `穿搭场景：${typeId}` : "全部穿搭场景";
+  }
+  return typeId ? `type_id：${typeId}` : "全部类型";
 }
 
 export function activeStatusLabel(active) {

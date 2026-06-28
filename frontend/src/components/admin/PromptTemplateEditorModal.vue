@@ -41,6 +41,18 @@ const emit = defineEmits(["close", "submit"]);
 
 const localForm = reactive({ ...defaultForm });
 const title = computed(() => (localForm.id ? "编辑提示词模板" : "新增提示词模板"));
+const typeIdLabel = computed(() => {
+  if (localForm.scenario === "product_video") return "视频方向 type_id";
+  if (localForm.scenario === "product_suite") return "套图类型 type_id";
+  if (localForm.scenario === "product_image") return "详情图种 type_id";
+  if (localForm.scenario === "outfit") return "穿搭场景 type_id";
+  return "方向 / 图种 type_id";
+});
+const typeIdPlaceholder = computed(() => (
+  localForm.scenario === "product_video"
+    ? "如 product_talk；留空表示商品视频通用规则"
+    : "留空表示通用"
+));
 
 watch(
   () => props.open,
@@ -108,8 +120,8 @@ function submit() {
           <input v-model="localForm.platform" type="text" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-primary" placeholder="留空表示通用" />
         </label>
         <label class="block">
-          <span class="text-xs font-bold text-slate-600">图种/模块 type_id</span>
-          <input v-model="localForm.type_id" type="text" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-primary" placeholder="留空表示通用" />
+          <span class="text-xs font-bold text-slate-600">{{ typeIdLabel }}</span>
+          <input v-model="localForm.type_id" type="text" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-primary" :placeholder="typeIdPlaceholder" />
         </label>
       </div>
 
