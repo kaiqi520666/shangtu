@@ -4,7 +4,7 @@ import { ImagePlus, LoaderCircle, Sparkles } from "lucide-vue-next";
 import AppSelect from "@/components/ui/AppSelect.vue";
 import GeneratorActionFooter from "@/components/generation/GeneratorActionFooter.vue";
 import GeneratorSidePanelShell from "@/components/generation/GeneratorSidePanelShell.vue";
-import ImageUploader from "@/components/generation/ImageUploader.vue";
+import ImageUploader from "@/components/generation/image/ImageUploader.vue";
 import {
   isQualitySupported,
   qualityOptions,

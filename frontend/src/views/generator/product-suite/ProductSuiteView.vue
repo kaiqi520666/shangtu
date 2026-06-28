@@ -1,6 +1,6 @@
 <script setup>
 import { useRoute, useRouter } from 'vue-router'
-import ImageEditModal from '@/components/generation/ImageEditModal.vue'
+import ImageEditModal from '@/components/generation/image/ImageEditModal.vue'
 import GenerationHistoryDrawer from '@/components/generation/GenerationHistoryDrawer.vue'
 import GenerationPreviewModal from '@/components/generation/GenerationPreviewModal.vue'
 import GenerationWorkspace from '@/components/generation/GenerationWorkspace.vue'

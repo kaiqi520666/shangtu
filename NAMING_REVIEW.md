@@ -27,12 +27,12 @@
 `frontend/src/components/generation/` 放的是跨场景生成工作台组件，但里面同时有通用 shell、图片 uploader、图片卡片、视频卡片、编辑弹窗：
 
 - `frontend/src/components/generation/GenerationWorkspace.vue`
-- `frontend/src/components/generation/ImageUploader.vue`
+- `frontend/src/components/generation/image/ImageUploader.vue`
 - `frontend/src/components/generation/cards/GeneratedCardGrid.vue`
 - `frontend/src/components/generation/cards/VideoGeneratedCardGrid.vue`
-- `frontend/src/components/generation/ImageEditModal.vue`
+- `frontend/src/components/generation/image/ImageEditModal.vue`
 
-已先拆出 `components/generation/cards/`；后续可继续把 workspace shell 和图片上传/编辑归到更具体的子目录，否则“generation” 仍会逐渐变成杂物筐。
+已先拆出 `components/generation/cards/` 和 `components/generation/image/`；后续可继续把 workspace shell 归到更具体的子目录，否则“generation” 仍会逐渐变成杂物筐。
 
 ### 后端
 

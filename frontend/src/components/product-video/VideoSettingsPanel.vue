@@ -3,7 +3,7 @@ import { computed } from "vue";
 import { WandSparkles } from "lucide-vue-next";
 import GeneratorActionFooter from "@/components/generation/GeneratorActionFooter.vue";
 import GeneratorSidePanelShell from "@/components/generation/GeneratorSidePanelShell.vue";
-import ImageUploader from "@/components/generation/ImageUploader.vue";
+import ImageUploader from "@/components/generation/image/ImageUploader.vue";
 import AppSelect from "@/components/ui/AppSelect.vue";
 import VideoDurationSlider from "@/components/product-video/VideoDurationSlider.vue";
 import VideoQualitySelector from "@/components/product-video/VideoQualitySelector.vue";
