@@ -1,5 +1,5 @@
 <script setup>
-import { ImagePlus, Layers3, ShieldCheck, Sparkles } from 'lucide-vue-next'
+import { Sparkles } from 'lucide-vue-next'
 
 defineProps({
   headline: {
@@ -12,11 +12,6 @@ defineProps({
   },
 })
 
-const signals = [
-  { icon: ImagePlus, label: '商品图', value: '套图 / 详情' },
-  { icon: Sparkles, label: '生成流', value: '策略 / 直出' },
-  { icon: Layers3, label: '资产库', value: '统一沉淀' },
-]
 </script>
 
 <template>
@@ -36,35 +31,8 @@ const signals = [
       </div>
     </header>
 
-    <aside
-      class="pointer-events-none absolute left-8 top-1/2 hidden w-64 -translate-y-1/2 rounded-2xl border border-white/70 bg-white/70 p-5 shadow-2xl shadow-slate-900/8 backdrop-blur-xl xl:block"
-    >
-      <div class="mb-5 flex items-center gap-2 text-xs font-bold text-primary">
-        <ShieldCheck class="h-4 w-4" />
-        专业内容生产台
-      </div>
-      <h2 class="text-xl font-black leading-tight text-slate-950">{{ headline }}</h2>
-      <p class="mt-3 text-xs leading-6 text-slate-500">{{ description }}</p>
-    </aside>
-
-    <aside class="pointer-events-none absolute right-8 top-1/2 hidden w-56 -translate-y-1/2 space-y-3 xl:block">
-      <div
-        v-for="signal in signals"
-        :key="signal.label"
-        class="flex items-center gap-3 rounded-2xl border border-white/70 bg-white/70 p-4 shadow-xl shadow-slate-900/7 backdrop-blur-xl"
-      >
-        <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-950 text-primary">
-          <component :is="signal.icon" class="h-4 w-4" />
-        </div>
-        <div>
-          <p class="text-xs font-bold text-slate-400">{{ signal.label }}</p>
-          <p class="mt-0.5 text-sm font-black text-slate-900">{{ signal.value }}</p>
-        </div>
-      </div>
-    </aside>
-
     <main class="relative z-10 w-full max-w-[450px]">
-      <section class="mb-6 text-center xl:hidden">
+      <section class="mb-6 text-center">
         <h1 class="text-2xl font-black tracking-normal text-slate-950">{{ headline }}</h1>
         <p class="mx-auto mt-3 max-w-sm text-sm leading-6 text-slate-500">{{ description }}</p>
       </section>
