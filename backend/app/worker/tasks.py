@@ -38,7 +38,14 @@ for _proxy_key in ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"):
     os.environ.pop(_proxy_key, None)
 
 
-async def update_task_in_db(
+def _task_model(media_type: str):
+    from app.models import ImageTask, VideoTask
+
+    return ImageTask if media_type == "image" else VideoTask
+
+
+async def update_generation_task_in_db(
+    media_type: str,
     task_id: str,
     *,
     status: str | None = None,
@@ -47,7 +54,7 @@ async def update_task_in_db(
     progress: int | None = None,
     provider_task_id: str | None = None,
 ) -> None:
-    from app.models import ImageTask
+    model = _task_model(media_type)
 
     values: dict[str, Any] = {}
     if status is not None:
@@ -66,11 +73,31 @@ async def update_task_in_db(
 
     async with SessionLocal() as session:
         await session.execute(
-            update(ImageTask)
-            .where(ImageTask.id == task_id)
+            update(model)
+            .where(model.id == task_id)
             .values(**values)
         )
         await session.commit()
+
+
+async def update_task_in_db(
+    task_id: str,
+    *,
+    status: str | None = None,
+    result_url: str | None = None,
+    error_message: str | None = None,
+    progress: int | None = None,
+    provider_task_id: str | None = None,
+) -> None:
+    await update_generation_task_in_db(
+        "image",
+        task_id,
+        status=status,
+        result_url=result_url,
+        error_message=error_message,
+        progress=progress,
+        provider_task_id=provider_task_id,
+    )
 
 
 async def update_video_task_in_db(
@@ -82,50 +109,33 @@ async def update_video_task_in_db(
     progress: int | None = None,
     provider_task_id: str | None = None,
 ) -> None:
-    from app.models import VideoTask
+    await update_generation_task_in_db(
+        "video",
+        task_id,
+        status=status,
+        result_url=result_url,
+        error_message=error_message,
+        progress=progress,
+        provider_task_id=provider_task_id,
+    )
 
-    values: dict[str, Any] = {}
-    if status is not None:
-        values["status"] = status
-    if result_url is not None:
-        values["result_url"] = result_url
-    if error_message is not None:
-        values["error_message"] = error_message
-    if progress is not None:
-        values["progress"] = max(0, min(100, int(progress)))
-    if provider_task_id is not None:
-        values["provider_task_id"] = provider_task_id
 
-    if not values:
-        return
+async def fetch_generation_task_user_id(media_type: str, task_id: str) -> int | None:
+    model = _task_model(media_type)
 
     async with SessionLocal() as session:
-        await session.execute(
-            update(VideoTask)
-            .where(VideoTask.id == task_id)
-            .values(**values)
+        result = await session.execute(
+            select(model.user_id).where(model.id == task_id)
         )
-        await session.commit()
+        return result.scalar_one_or_none()
 
 
 async def fetch_task_user_id(task_id: str) -> int | None:
-    from app.models import ImageTask
-
-    async with SessionLocal() as session:
-        result = await session.execute(
-            select(ImageTask.user_id).where(ImageTask.id == task_id)
-        )
-        return result.scalar_one_or_none()
+    return await fetch_generation_task_user_id("image", task_id)
 
 
 async def fetch_video_task_user_id(task_id: str) -> int | None:
-    from app.models import VideoTask
-
-    async with SessionLocal() as session:
-        result = await session.execute(
-            select(VideoTask.user_id).where(VideoTask.id == task_id)
-        )
-        return result.scalar_one_or_none()
+    return await fetch_generation_task_user_id("video", task_id)
 
 
 async def _set_progress(redis, task_id: str, value: int) -> None:
@@ -183,18 +193,20 @@ def normalize_provider_error(message: str | None, media_type: str = "image") -> 
     return copy["default"]
 
 
-async def refund_task_credit(task_id: str) -> bool:
+async def refund_generation_credit(media_type: str, task_id: str) -> bool:
     """幂等退款：按任务实际扣费退回积分，已退过直接 no-op。返回是否本次执行了退款。"""
-    from app.models import ImageTask, User
+    from app.models import User
+
+    model = _task_model(media_type)
 
     async with SessionLocal() as session:
         async with session.begin():
             task_row = await session.execute(
                 select(
-                    ImageTask.user_id,
-                    ImageTask.credit_cost,
-                    ImageTask.credit_refunded,
-                ).where(ImageTask.id == task_id).with_for_update()
+                    model.user_id,
+                    model.credit_cost,
+                    model.credit_refunded,
+                ).where(model.id == task_id).with_for_update()
             )
             row = task_row.first()
             if not row:
@@ -209,80 +221,52 @@ async def refund_task_credit(task_id: str) -> bool:
                 )
             )
             await session.execute(
-                update(ImageTask).where(ImageTask.id == task_id).values(
+                update(model).where(model.id == task_id).values(
                     credit_refunded=True
                 )
             )
     return True
+
+
+async def refund_task_credit(task_id: str) -> bool:
+    return await refund_generation_credit("image", task_id)
 
 
 async def refund_video_task_credit(task_id: str) -> bool:
-    """幂等退款：按视频任务实际扣费退回积分，已退过直接 no-op。"""
-    from app.models import User, VideoTask
+    return await refund_generation_credit("video", task_id)
 
-    async with SessionLocal() as session:
-        async with session.begin():
-            task_row = await session.execute(
-                select(
-                    VideoTask.user_id,
-                    VideoTask.credit_cost,
-                    VideoTask.credit_refunded,
-                ).where(VideoTask.id == task_id).with_for_update()
-            )
-            row = task_row.first()
-            if not row:
-                return False
-            user_id, credit_cost, refunded = row
-            if refunded:
-                return False
-            refund_amount = max(1, int(credit_cost or 1))
-            await session.execute(
-                update(User).where(User.id == user_id).values(
-                    credits=User.credits + refund_amount
-                )
-            )
-            await session.execute(
-                update(VideoTask).where(VideoTask.id == task_id).values(
-                    credit_refunded=True
-                )
-            )
-    return True
+
+async def _mark_terminal(
+    redis,
+    media_type: str,
+    task_id: str,
+    raw_message: str,
+    *,
+    status: str,
+) -> None:
+    label = "task" if media_type == "image" else "video task"
+    print(f"[{label} {task_id}] {status} (raw): {raw_message}")
+    friendly = normalize_provider_error(raw_message, media_type=media_type)
+    await update_generation_task_in_db(media_type, task_id, status=status, error_message=friendly)
+    await refund_generation_credit(media_type, task_id)
+    await set_task_error(redis, media_type, task_id, friendly)
+    await set_task_status(redis, media_type, task_id, status, ttl=3600)
 
 
 async def _mark_failed(redis, task_id: str, raw_message: str) -> None:
-    print(f"[task {task_id}] failed (raw): {raw_message}")
-    friendly = normalize_provider_error(raw_message)
-    await update_task_in_db(task_id, status="failed", error_message=friendly)
-    await refund_task_credit(task_id)
-    await set_task_error(redis, "image", task_id, friendly)
-    await set_task_status(redis, "image", task_id, "failed", ttl=3600)
+    await _mark_terminal(redis, "image", task_id, raw_message, status="failed")
 
 
 async def _mark_timeout(redis, task_id: str, raw_message: str) -> None:
-    print(f"[task {task_id}] timeout (raw): {raw_message}")
-    friendly = normalize_provider_error(raw_message)
-    await update_task_in_db(task_id, status="timeout", error_message=friendly)
-    await refund_task_credit(task_id)
-    await set_task_error(redis, "image", task_id, friendly)
-    await set_task_status(redis, "image", task_id, "timeout", ttl=3600)
+    await _mark_terminal(redis, "image", task_id, raw_message, status="timeout")
 
 
 async def _mark_video_failed(redis, task_id: str, raw_message: str) -> None:
-    print(f"[video task {task_id}] failed (raw): {raw_message}")
-    friendly = normalize_provider_error(raw_message, media_type="video")
-    await update_video_task_in_db(task_id, status="failed", error_message=friendly)
-    await refund_video_task_credit(task_id)
-    await set_task_error(redis, "video", task_id, friendly)
-    await set_task_status(redis, "video", task_id, "failed", ttl=3600)
+    await _mark_terminal(redis, "video", task_id, raw_message, status="failed")
 
 
 async def _mark_video_timeout(redis, task_id: str, raw_message: str) -> None:
-    print(f"[video task {task_id}] timeout (raw): {raw_message}")
-    friendly = normalize_provider_error(raw_message, media_type="video")
-    await update_video_task_in_db(task_id, status="timeout", error_message=friendly)
-    await refund_video_task_credit(task_id)
-    await set_task_error(redis, "video", task_id, friendly)
-    await set_task_status(redis, "video", task_id, "timeout", ttl=3600)
+    await _mark_terminal(redis, "video", task_id, raw_message, status="timeout")
 
 
 async def generate_image(
