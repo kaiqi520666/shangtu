@@ -139,6 +139,7 @@ function updateInputMode(mode) {
       alt-text="自由生视频素材"
       main-badge-text="素材"
       :limit-message="uploadLimitMessage"
+      :show-placeholders="false"
       @update:images="emit('update:uploadedImages', $event)"
       @update:main-index="emit('update:mainImageIndex', $event)"
       @notify="emit('notify', $event)"
