@@ -7,7 +7,7 @@ import GenerationWorkspace from "@/components/generation/GenerationWorkspace.vue
 import GeneratorLayout from "@/components/layout/GeneratorLayout.vue";
 import ProductVideoStrategyReviewPanel from "@/components/product-video/ProductVideoStrategyReviewPanel.vue";
 import VideoSettingsPanel from "@/components/product-video/VideoSettingsPanel.vue";
-import { useGeneratorRouteJob } from "@/composables/generator/useGeneratorRouteJob.js";
+import { useGeneratorRouteJob } from "@/composables/generator/restore/useGeneratorRouteJob.js";
 import { useProductVideoGenerator } from "@/composables/generator/useProductVideoGenerator.js";
 import { useConfirm } from "@/composables/useConfirm.js";
 import { useToast } from "@/composables/useToast.js";

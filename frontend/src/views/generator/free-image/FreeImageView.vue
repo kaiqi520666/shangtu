@@ -7,7 +7,7 @@ import GenerationWorkspace from '@/components/generation/GenerationWorkspace.vue
 import GeneratorLayout from '@/components/layout/GeneratorLayout.vue'
 import FreeImageSettingsPanel from '@/components/free-image/FreeImageSettingsPanel.vue'
 import { useGeneratorCardEdit } from '@/composables/generator/useGeneratorCardEdit.js'
-import { useGeneratorRouteJob } from '@/composables/generator/useGeneratorRouteJob.js'
+import { useGeneratorRouteJob } from '@/composables/generator/restore/useGeneratorRouteJob.js'
 import { useFreeImageGenerator } from '@/composables/generator/useFreeImageGenerator.js'
 import { useConfirm } from '@/composables/useConfirm.js'
 import { useToast } from '@/composables/useToast.js'

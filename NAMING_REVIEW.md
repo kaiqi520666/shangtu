@@ -123,7 +123,7 @@ generator 场景 composable 命名一致：
 
 需要重点拆分的目录：
 
-- `frontend/src/composables/generator/` 已开始按职责拆出 `batch/`、`strategy/`，可继续补齐 `restore/` 等子目录。
+- `frontend/src/composables/generator/` 已按职责拆出 `batch/`、`strategy/`、`restore/`；剩余问题集中在各场景 `useXxxGenerator.js` 仍然偏大。
 - `backend/app/core/` 有 18 个直接 `.py` 文件，还包含 `providers/`、`strategy/` 子目录。建议把业务文件移出 `core`，否则 `core` 既像基础设施层又像业务服务层。
 
 单文件体量也暴露了目录没有承接复杂度：
@@ -161,7 +161,7 @@ generator 场景 composable 命名一致：
 
 ## 建议优先级
 
-P2：继续拆 `frontend/src/composables/generator/` 里的大 composable，按 `strategy`、`batch`、`restore` 等职责收敛。
+P2：继续拆 `frontend/src/composables/generator/` 里的场景级大 composable，优先把各场景内部的恢复、策略生成、批量生成辅助函数继续下沉到已建立的职责目录。
 
 P2：拆 `backend/app/worker/tasks.py`，优先分离 image/video worker 链路和 provider 错误归一化。
 
