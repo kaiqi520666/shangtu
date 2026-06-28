@@ -278,7 +278,7 @@ async def image_credit_costs(
 
 
 @router.post("/generate", response_model=Response)
-async def create_task(
+async def create_image_task(
     req: GenerateRequest,
     request: Request,
     current_user: User = Depends(get_current_user),
@@ -399,7 +399,7 @@ async def create_task(
 
 
 @router.get("/task/{task_id}", response_model=Response)
-async def get_task(
+async def get_image_task(
     task_id: str,
     request: Request,
     current_user: User = Depends(get_current_user),
@@ -490,7 +490,7 @@ async def download_task_image(
 
 
 @router.get("/tasks", response_model=Response)
-async def get_tasks(
+async def list_image_tasks(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -507,7 +507,7 @@ async def get_tasks(
 
 
 @router.delete("/task/{task_id}", response_model=Response)
-async def delete_task(
+async def delete_image_task(
     task_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -540,7 +540,7 @@ class RegenerateRequest(BaseModel):
 
 
 @router.post("/task/{task_id}/regenerate", response_model=Response)
-async def regenerate_task(
+async def regenerate_image_task(
     task_id: str,
     req: RegenerateRequest,
     request: Request,
