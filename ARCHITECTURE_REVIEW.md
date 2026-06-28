@@ -25,8 +25,8 @@
 
 ### 6. OSS 失败不可恢复 + 存储无中性接口
 - 位置：`backend/app/core/generated_media_storage.py:materialize_to_oss/materialize_video_to_oss`、`backend/app/core/oss.py:OssConfigError` 与调用方。
-- 现状：下载 provider 结果后上传 OSS，任一异常即任务失败 + 退款，用户无法复用已生成的 provider 结果重试上传；存储仍直接绑定 Aliyun `oss2`，异常名/语义泄漏到业务层。
-- 建议：失败时至少记录 `provider_task_id` 和原始 `final_url`（短期存 error/context JSON）供后台补偿；新增中性 `StorageConfigError`/`upload_media_bytes()`，Aliyun OSS 作为默认实现。
+- 现状：OSS 上传失败时已补记 `provider_task_id` 和 provider 原始 `final_url` 到 `error_message` 供后台补偿；但存储仍直接绑定 Aliyun `oss2`，异常名/语义泄漏到业务层。
+- 建议：新增中性 `StorageConfigError`/`upload_media_bytes()`，Aliyun OSS 作为默认实现。
 
 
 ### 8. 启动时自动建表

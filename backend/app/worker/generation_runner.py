@@ -20,6 +20,7 @@ from app.core.providers.toapis_provider import (
     fetch_generation,
 )
 from app.core.task_state import set_task_result, set_task_status
+from app.worker.task_state_sync import build_compensation_error_message
 
 logger = logging.getLogger("app.worker.generation_runner")
 
@@ -274,12 +275,26 @@ async def run_generation_task(
                     if config.mark_failed is not None and config.download_failure_message is not None:
                         await config.mark_failed(redis, task_id, config.download_failure_message(exc))
                     return
+                error_message = (
+                    config.upload_failure_message(exc)
+                    if config.upload_failure_message is not None
+                    else "OSS 上传失败"
+                )
+                if config.update_task is not None:
+                    await config.update_task(
+                        task_id,
+                        error_message=build_compensation_error_message(
+                            error_message,
+                            provider_task_id=provider_task_id,
+                            final_url=final_url,
+                        ),
+                    )
                 task_logger.exception(
-                    config.upload_failure_message(exc) if config.upload_failure_message is not None else "OSS 上传失败",
+                    error_message,
                     extra=_media_log_extra(config.media_type, task_id),
                 )
                 if config.mark_failed is not None and config.upload_failure_message is not None:
-                    await config.mark_failed(redis, task_id, config.upload_failure_message(exc))
+                    await config.mark_failed(redis, task_id, error_message)
                 return
 
         await _finalize_success(redis, task_id, uploaded, config)

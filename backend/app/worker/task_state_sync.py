@@ -1,3 +1,4 @@
+import json
 from typing import Any
 
 from sqlalchemy import select, update
@@ -9,6 +10,22 @@ def task_model(media_type: str):
     from app.models import ImageTask, VideoTask
 
     return ImageTask if media_type == "image" else VideoTask
+
+
+def build_compensation_error_message(
+    user_message: str,
+    *,
+    provider_task_id: str | None = None,
+    final_url: str | None = None,
+) -> str:
+    payload = {
+        "message": user_message,
+        "compensation": {
+            "provider_task_id": provider_task_id or "",
+            "final_url": final_url or "",
+        },
+    }
+    return json.dumps(payload, ensure_ascii=False)
 
 
 async def update_generation_task_in_db(

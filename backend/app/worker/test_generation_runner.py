@@ -1,4 +1,5 @@
 import asyncio
+import json
 import unittest
 from types import SimpleNamespace
 
@@ -197,6 +198,18 @@ class GenerationRunnerTest(unittest.IsolatedAsyncioTestCase):
         )
         await run_generation_task(self.ctx, "task-5", config=config)
         self.assertEqual(self.failed_calls, [("task-5", "upload failed: oss down")])
+        update_entry = next(
+            kwargs
+            for task_id, kwargs in self.update_calls
+            if task_id == "task-5" and "error_message" in kwargs
+        )
+        payload = json.loads(update_entry["error_message"])
+        self.assertEqual(payload["message"], "upload failed: oss down")
+        self.assertEqual(payload["compensation"]["provider_task_id"], "provider-4")
+        self.assertEqual(
+            payload["compensation"]["final_url"],
+            "https://provider.example.com/final.png",
+        )
 
     async def test_download_failure(self):
         async def create_generation_fn(client, *, media, payload):
