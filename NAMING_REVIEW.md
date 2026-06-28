@@ -60,7 +60,7 @@
 - `backend/app/routers/video.py` 同时包含视频策略生成、视频任务创建、任务状态查询、软删除、下载代理。比 `image.py` 窄一些，但同样把业务校验、扣费、prompt 构建、入队编排放在 router。
 - `backend/app/routers/billing.py` 同时处理套餐读取、订单创建、支付网关调用、订单查询、异步通知回调、交易记录。支付 provider 编排建议下沉到 `services/billing.py` 或 `core/payment.py`。
 
-`backend/app/core/` 职责也偏宽：既有 `database.py`、`deps.py`、`time.py` 这类基础设施，也有 `ai_generation.py`、`generation_prompt_builder.py`、`product_catalog.py` 这类业务域逻辑。建议后续拆出 `backend/app/domains/` 或 `backend/app/services/` 来放商品图、视频、资产、计费等业务编排，`core` 保留基础能力和 provider 封装。
+`backend/app/core/` 职责也偏宽：既有 `database.py`、`deps.py`、`time.py` 这类基础设施，也有 `image_strategy_generation.py`、`generation_prompt_builder.py`、`product_catalog.py` 这类业务域逻辑。建议后续拆出 `backend/app/domains/` 或 `backend/app/services/` 来放商品图、视频、资产、计费等业务编排，`core` 保留基础能力和 provider 封装。
 
 `backend/app/worker/tasks.py` 同时实现 image/video 两条 worker 链路、上游错误归一化、DB 更新、退款、Redis 状态同步。建议拆成：
 
@@ -129,8 +129,6 @@ generator 场景 composable 命名一致：
 - `backend/app/routers/image_generation.py`
 - `backend/app/routers/image_tasks.py`
 
-`backend/app/core/ai_generation.py` 仍承载商品详情图、商品套图、服饰穿搭三类图片策略生成。后续如果策略继续增长，可以改名为 `image_strategy_generation.py` 或继续按场景拆分。
-
 `backend/app/core/generation_prompt_builder.py` 已聚焦图片生成 prompt 构建。后续如果图片 prompt 继续增长，可以按商品详情图、套图、穿搭继续拆分。
 
 ## 3. 目录嵌套深度与扁平度
@@ -185,9 +183,7 @@ generator 场景 composable 命名一致：
 
 ## 建议优先级
 
-P1：继续拆 `backend/app/routers/image.py`，把上传、策略、任务 CRUD、重生/下载等职责拆到更具体的 router 或 service。
-
-P1：继续拆 `backend/app/core/ai_generation.py` 或将其改名为 `image_strategy_generation.py`，让文件名更诚实地表达图片策略生成职责。
+P1：继续拆 `backend/app/routers/image.py`，把任务创建、任务 CRUD、重生/下载等职责拆到更具体的 router 或 service。
 
 P2：继续拆 `frontend/src/composables/generator/` 里的大 composable，按 `strategy`、`batch`、`restore` 等职责收敛。
 

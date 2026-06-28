@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.ai_generation import generate_image_strategy
 from app.core.deps import get_current_user, get_db
+from app.core.image_strategy_generation import generate_image_strategy
 from app.core.product_catalog import get_catalog
 from app.core.prompt_template_builder import (
     build_ai_write_prompt,
