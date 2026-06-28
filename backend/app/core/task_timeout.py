@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 
+from app.core.json_utils import parse_json_object
 from app.core.providers.toapis_provider import (
     MAX_WAIT_SECONDS,
     POLL_INTERVAL_SECONDS,
@@ -20,6 +21,14 @@ class ProjectedTaskRuntimeState:
     error_message: str | None
     progress: int
     result_url: str | None
+
+
+def user_visible_task_error(error_message: str | None) -> str | None:
+    if not error_message:
+        return error_message
+    payload = parse_json_object(error_message)
+    message = payload.get("message")
+    return message if isinstance(message, str) and message else error_message
 
 
 def stale_timeout_seconds(media_type: str) -> int:
@@ -65,7 +74,7 @@ def project_task_runtime_state(
 ) -> ProjectedTaskRuntimeState:
     normalized_status = status or "pending"
     normalized_progress = int(progress or 0)
-    normalized_error = error_message
+    normalized_error = user_visible_task_error(error_message)
     if is_stale_processing_task(
         media_type,
         status=normalized_status,

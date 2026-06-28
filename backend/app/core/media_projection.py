@@ -2,8 +2,8 @@ from sqlalchemy import Integer, String, cast, func, literal, select
 
 from app.core.json_utils import parse_json_or_none
 from app.core.prompt_snapshot import parse_prompt_snapshot
+from app.core.task_timeout import project_task_runtime_state, user_visible_task_error
 from app.core.time import to_utc_iso
-from app.core.task_timeout import project_task_runtime_state
 from app.models import GenerationJob, ImageTask, User, VideoTask
 
 
@@ -214,7 +214,7 @@ def admin_task_payload(row) -> dict:
         "credit_cost": row["credit_cost"],
         "credit_refunded": row["credit_refunded"],
         "result_url": row["result_url"],
-        "error_message": row["error_message"],
+        "error_message": user_visible_task_error(row["error_message"]),
         "archived": row["archived"],
         "created_at": to_utc_iso(row["created_at"]),
     }

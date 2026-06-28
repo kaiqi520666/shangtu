@@ -20,14 +20,13 @@ from app.core.providers.toapis_provider import (
     fetch_generation,
 )
 from app.core.task_state import set_task_result, set_task_status
-from app.worker.task_state_sync import build_compensation_error_message
 
 logger = logging.getLogger("app.worker.generation_runner")
 
 SetProgressFn = Callable[[Any, str, int], Awaitable[None]]
 UpdateTaskFn = Callable[..., Awaitable[None]]
 FetchUserIdFn = Callable[[str], Awaitable[int | None]]
-MarkTerminalFn = Callable[[Any, str, str], Awaitable[None]]
+MarkTerminalFn = Callable[..., Awaitable[None]]
 PayloadBuilderFn = Callable[[], dict[str, Any]]
 MaterializeFn = Callable[..., Awaitable[Any]]
 IsDownloadErrorFn = Callable[[Exception], bool]
@@ -162,9 +161,9 @@ async def run_generation_task(
         await _mark_processing(redis, task_id, config)
 
         if not TOAPIS_KEY:
-          if config.mark_failed is not None and config.config_missing_message is not None:
-              await config.mark_failed(redis, task_id, config.config_missing_message())
-          return
+            if config.mark_failed is not None and config.config_missing_message is not None:
+                await config.mark_failed(redis, task_id, config.config_missing_message())
+            return
 
         user_id = await config.fetch_user_id(task_id) if config.fetch_user_id is not None else None
         if not user_id:
@@ -280,21 +279,18 @@ async def run_generation_task(
                     if config.upload_failure_message is not None
                     else "OSS 上传失败"
                 )
-                if config.update_task is not None:
-                    await config.update_task(
-                        task_id,
-                        error_message=build_compensation_error_message(
-                            error_message,
-                            provider_task_id=provider_task_id,
-                            final_url=final_url,
-                        ),
-                    )
                 task_logger.exception(
                     error_message,
                     extra=_media_log_extra(config.media_type, task_id),
                 )
-                if config.mark_failed is not None and config.upload_failure_message is not None:
-                    await config.mark_failed(redis, task_id, error_message)
+                if config.mark_failed is not None:
+                    await config.mark_failed(
+                        redis,
+                        task_id,
+                        error_message,
+                        provider_task_id=provider_task_id,
+                        final_url=final_url,
+                    )
                 return
 
         await _finalize_success(redis, task_id, uploaded, config)
