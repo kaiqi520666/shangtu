@@ -26,13 +26,13 @@ from app.core.system_settings import (
 from app.core.task_state import merge_task_state
 from app.core.time import to_utc_iso, utc_now
 from app.core.user_credits import (
-    deduct_user_credits,
     get_user_credits,
     insufficient_credits_message,
     refund_user_credits,
 )
 from app.models import GenerationJob, User, VideoTask
 from app.schemas.response import Response, fail, success
+from app.services.generation_tasks import deduct_credits_or_fail, enqueue_or_compensate
 
 router = APIRouter(prefix="/video", tags=["商品视频"])
 
@@ -220,11 +220,13 @@ async def create_video_task(
     except ValueError as exc:
         return fail(str(exc))
 
-    remaining_credits = await deduct_user_credits(db, current_user.id, credit_cost)
-    if remaining_credits is None:
-        await db.rollback()
-        latest_credits = await get_user_credits(db, current_user.id)
-        return fail(insufficient_credits_message(credit_cost, latest_credits))
+    remaining_credits, fail_response = await deduct_credits_or_fail(
+        db,
+        current_user.id,
+        credit_cost,
+    )
+    if fail_response is not None:
+        return fail_response
 
     task_id = str(uuid.uuid4())
     task = VideoTask(
@@ -252,9 +254,18 @@ async def create_video_task(
         await db.rollback()
         return fail("视频任务创建失败，请稍后重试")
 
-    try:
-        await request.app.state.redis_pool.enqueue_job(
-            "generate_video",
+    async def mark_video_task_failed(_refunded_credits: int) -> None:
+        await db.execute(
+            update(VideoTask)
+            .where(VideoTask.id == task_id)
+            .values(status="failed", credit_refunded=True)
+        )
+
+    enqueue_fail = await enqueue_or_compensate(
+        get_redis_pool=lambda: request.app.state.redis_pool,
+        db=db,
+        job_name="generate_video",
+        job_args=(
             task_id,
             built_prompt.final_prompt,
             req.duration,
@@ -262,29 +273,17 @@ async def create_video_task(
             normalized_resolution,
             _video_action(req.input_mode),
             image_urls,
-        )
-    except Exception:
-        try:
-            refunded_credits = await refund_user_credits(
-                db, current_user.id, credit_cost
-            )
-            await db.execute(
-                update(VideoTask)
-                .where(VideoTask.id == task_id)
-                .values(status="failed", credit_refunded=True)
-            )
-            await db.commit()
-        except Exception:
-            await db.rollback()
-            refunded_credits = remaining_credits
-        return fail(
-            "视频任务入队失败，请稍后重试",
-            data={
-                "task_id": task_id,
-                "credits": refunded_credits,
-                "credit_cost": credit_cost,
-            },
-        )
+        ),
+        user_id=current_user.id,
+        credit_cost=credit_cost,
+        remaining_credits=remaining_credits,
+        refund_credits=refund_user_credits,
+        mark_failed=mark_video_task_failed,
+        failure_message="视频任务入队失败，请稍后重试",
+        failure_data={"task_id": task_id},
+    )
+    if enqueue_fail is not None:
+        return enqueue_fail
 
     if job is not None and job.status != "generating":
         try:

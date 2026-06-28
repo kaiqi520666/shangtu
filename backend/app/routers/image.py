@@ -40,13 +40,13 @@ from app.core.task_state import (
 )
 from app.core.time import to_utc_iso, utc_now
 from app.core.user_credits import (
-    deduct_user_credits as _deduct_user_credits,
     get_user_credits as _get_user_credits,
     insufficient_credits_message as _insufficient_credits_message,
     refund_user_credits as _refund_user_credits,
 )
 from app.models import GenerationJob, ImageTask, User
 from app.schemas.response import Response, fail, success
+from app.services.generation_tasks import deduct_credits_or_fail, enqueue_or_compensate
 
 router = APIRouter(prefix="/image", tags=["生图"])
 
@@ -317,11 +317,13 @@ async def create_task(
         return fail(str(exc))
 
     # 原子扣积分 + 建任务同一事务，避免并发超扣和一致性漂移
-    remaining_credits = await _deduct_user_credits(db, current_user.id, credit_cost)
-    if remaining_credits is None:
-        await db.rollback()
-        latest_credits = await _get_user_credits(db, current_user.id)
-        return fail(_insufficient_credits_message(credit_cost, latest_credits))
+    remaining_credits, fail_response = await deduct_credits_or_fail(
+        db,
+        current_user.id,
+        credit_cost,
+    )
+    if fail_response is not None:
+        return fail_response
 
     task = ImageTask(
         id=task_id,
@@ -347,37 +349,34 @@ async def create_task(
     reference_image_urls = [url for url in (req.image_urls or []) if url]
 
     # 入队失败：标记任务 failed 并退回积分，避免用户被扣却没活
-    try:
-        await request.app.state.redis_pool.enqueue_job(
-            "generate_image",
+    async def mark_task_failed(_refunded_credits: int) -> None:
+        await db.execute(
+            update(ImageTask)
+            .where(ImageTask.id == task_id)
+            .values(status="failed", credit_refunded=True)
+        )
+
+    enqueue_fail = await enqueue_or_compensate(
+        get_redis_pool=lambda: request.app.state.redis_pool,
+        db=db,
+        job_name="generate_image",
+        job_args=(
             task_id,
             final_prompt,
             req.ratio,
             normalized_resolution,
             reference_image_urls,
-        )
-    except Exception:
-        try:
-            refunded_credits = await _refund_user_credits(
-                db, current_user.id, credit_cost
-            )
-            await db.execute(
-                update(ImageTask)
-                .where(ImageTask.id == task_id)
-                .values(status="failed", credit_refunded=True)
-            )
-            await db.commit()
-        except Exception:
-            await db.rollback()
-            refunded_credits = remaining_credits
-        return fail(
-            "任务入队失败，请稍后重试",
-            data={
-                "task_id": task_id,
-                "credits": refunded_credits,
-                "credit_cost": credit_cost,
-            },
-        )
+        ),
+        user_id=current_user.id,
+        credit_cost=credit_cost,
+        remaining_credits=remaining_credits,
+        refund_credits=_refund_user_credits,
+        mark_failed=mark_task_failed,
+        failure_message="任务入队失败，请稍后重试",
+        failure_data={"task_id": task_id},
+    )
+    if enqueue_fail is not None:
+        return enqueue_fail
 
     if job is not None and job.status != "generating":
         try:
@@ -621,11 +620,13 @@ async def regenerate_task(
     new_task_id = str(uuid.uuid4())
 
     # 原子扣积分 + 新建重生任务 + 标记旧任务被替换，放在同一事务
-    remaining_credits = await _deduct_user_credits(db, current_user.id, credit_cost)
-    if remaining_credits is None:
-        await db.rollback()
-        latest_credits = await _get_user_credits(db, current_user.id)
-        return fail(_insufficient_credits_message(credit_cost, latest_credits))
+    remaining_credits, fail_response = await deduct_credits_or_fail(
+        db,
+        current_user.id,
+        credit_cost,
+    )
+    if fail_response is not None:
+        return fail_response
 
     new_task = ImageTask(
         id=new_task_id,
@@ -654,45 +655,42 @@ async def regenerate_task(
 
     # 入队 worker
     # TODO: 后续用 generation_attempts 做严格幂等退款
-    try:
-        redis = request.app.state.redis_pool
+    async def reset_regenerate_task_state(redis) -> None:
         await clear_task_state_fields(redis, "image", new_task_id, ("result", "error"))
         await set_task_status(redis, "image", new_task_id, "pending", ttl=7200)
         await set_task_progress(redis, "image", new_task_id, 0)
 
-        await redis.enqueue_job(
-            "generate_image",
+    # 入队失败：退积分 + 标记新任务 failed + 恢复旧任务在工作台可见
+    async def mark_regenerate_failed(_refunded_credits: int) -> None:
+        task.replaced_by_task_id = None
+        new_task.status = "failed"
+        new_task.error_message = "任务入队失败"
+        new_task.credit_refunded = True
+        new_task.archived = True
+        new_task.archived_at = utc_now()
+
+    enqueue_fail = await enqueue_or_compensate(
+        get_redis_pool=lambda: request.app.state.redis_pool,
+        db=db,
+        job_name="generate_image",
+        job_args=(
             new_task_id,
             new_prompt,
             ratio,
             normalized_resolution,
             [old_result_url],  # 使用当前已生成图作为参考图
-        )
-    except Exception:
-        # 入队失败：退积分 + 标记新任务 failed + 恢复旧任务在工作台可见
-        try:
-            refunded_credits = await _refund_user_credits(
-                db, current_user.id, credit_cost
-            )
-            task.replaced_by_task_id = None
-            new_task.status = "failed"
-            new_task.error_message = "任务入队失败"
-            new_task.credit_refunded = True
-            new_task.archived = True
-            new_task.archived_at = utc_now()
-            await db.commit()
-        except Exception:
-            await db.rollback()
-            refunded_credits = remaining_credits
-        return fail(
-            "任务入队失败，请稍后重试",
-            data={
-                "task_id": new_task_id,
-                "source_task_id": task_id,
-                "credits": refunded_credits,
-                "credit_cost": credit_cost,
-            },
-        )
+        ),
+        user_id=current_user.id,
+        credit_cost=credit_cost,
+        remaining_credits=remaining_credits,
+        refund_credits=_refund_user_credits,
+        mark_failed=mark_regenerate_failed,
+        failure_message="任务入队失败，请稍后重试",
+        failure_data={"task_id": new_task_id, "source_task_id": task_id},
+        before_enqueue=reset_regenerate_task_state,
+    )
+    if enqueue_fail is not None:
+        return enqueue_fail
 
     return success(
         {
