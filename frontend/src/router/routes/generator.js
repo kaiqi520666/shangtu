@@ -31,6 +31,6 @@ export const generatorRoutes = [
   {
     path: "/generator/assets",
     name: "assets",
-    component: () => import("@/views/generator/assets/AssetLibraryView.vue"),
+    component: () => import("@/views/assets/AssetLibraryView.vue"),
   },
 ];
