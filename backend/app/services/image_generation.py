@@ -15,6 +15,7 @@ from app.core.prompt_snapshot import (
     parse_prompt_snapshot,
 )
 from app.core.system_settings import get_effective_image_credit_cost
+from app.core.scenarios import SCENARIO_TITLE_PREFIX
 from app.core.task_state import (
     clear_task_state_fields,
     set_task_progress,
@@ -69,6 +70,25 @@ class ImageRegenerateResult:
     source_task_id: str
     credits: int
     credit_cost: int
+
+
+def _image_consume_note(
+    *,
+    job: GenerationJob | None,
+    payload: ImageGeneratePayload,
+    resolution: str,
+    regenerate: bool = False,
+) -> str:
+    scenario = job.scenario if job else "free_image"
+    scenario_label = SCENARIO_TITLE_PREFIX.get(scenario, "生图")
+    title = (payload.title or "").strip()
+    parts = [scenario_label]
+    if title:
+        parts.append(title)
+    parts.append(resolution)
+    if regenerate:
+        parts.append("重生")
+    return " · ".join(parts)
 
 
 def _compose_prompt_from_snapshot(prompt_snapshot: dict, user_prompt: str) -> str:
@@ -162,6 +182,11 @@ async def create_image_generation_task(
         db,
         current_user.id,
         credit_cost,
+        note=_image_consume_note(
+            job=job,
+            payload=payload,
+            resolution=normalized_resolution,
+        ),
     )
     if fail_response is not None:
         return None, fail_response
@@ -214,6 +239,7 @@ async def create_image_generation_task(
         mark_failed=mark_task_failed,
         failure_message="任务入队失败，请稍后重试",
         failure_data={"task_id": task_id},
+        refund_note=f"图片任务入队失败退回 · {task_id}",
     )
     if enqueue_fail is not None:
         return None, enqueue_fail
@@ -320,6 +346,22 @@ async def regenerate_image_generation_task(
         db,
         current_user.id,
         credit_cost,
+        note=_image_consume_note(
+            job=source_job,
+            payload=ImageGeneratePayload(
+                user_prompt=requested_user_prompt,
+                image_urls=[old_result_url],
+                ratio=ratio,
+                resolution=normalized_resolution,
+                settings_snapshot=None,
+                job_id=task.job_id,
+                type_id=task.type_id,
+                title=task.title,
+                sort_order=task.sort_order,
+            ),
+            resolution=normalized_resolution,
+            regenerate=True,
+        ),
     )
     if fail_response is not None:
         return None, fail_response
@@ -380,6 +422,7 @@ async def regenerate_image_generation_task(
         mark_failed=mark_regenerate_failed,
         failure_message="任务入队失败，请稍后重试",
         failure_data={"task_id": new_task_id, "source_task_id": task_id},
+        refund_note=f"图片重生入队失败退回 · {new_task_id}",
         before_enqueue=reset_regenerate_task_state,
     )
     if enqueue_fail is not None:

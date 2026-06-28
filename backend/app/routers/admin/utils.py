@@ -3,13 +3,14 @@ import json
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.credit_transactions import transaction_payload
 from app.core.json_utils import parse_json_or_none
+from app.core.pagination import page_payload
 from app.core.task_timeout import user_visible_task_error
 from app.core.time import to_utc_iso
 from app.models import (
     AdminAuditLog,
     CreditOrder,
-    CreditTransaction,
     GenerationJob,
     ImageTask,
     OutfitModel,
@@ -49,20 +50,6 @@ def order_payload(order: CreditOrder, user: User | None = None) -> dict:
         "error_message": order.error_message,
         "created_at": to_utc_iso(order.created_at),
         "paid_at": to_utc_iso(order.paid_at),
-    }
-
-
-def transaction_payload(tx: CreditTransaction, user: User | None = None) -> dict:
-    return {
-        "id": tx.id,
-        "user_id": tx.user_id,
-        "user_email": user.email if user else None,
-        "order_id": tx.order_id,
-        "type": tx.type,
-        "credits_delta": tx.credits_delta,
-        "balance_after": tx.balance_after,
-        "note": tx.note,
-        "created_at": to_utc_iso(tx.created_at),
     }
 
 
@@ -184,15 +171,6 @@ def audit_log_payload(log: AdminAuditLog, actor: User | None = None) -> dict:
         "target_id": log.target_id,
         "detail": parse_json_or_none(log.detail_json) or {},
         "created_at": to_utc_iso(log.created_at),
-    }
-
-
-def page_payload(items: list[dict], total: int, page: int, page_size: int) -> dict:
-    return {
-        "items": items,
-        "total": total,
-        "page": page,
-        "page_size": page_size,
     }
 
 

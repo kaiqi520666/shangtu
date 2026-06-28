@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.credits import normalize_video_resolution
 from app.core.deps import get_current_user, get_db
 from app.core.oss import OssConfigError, upload_video_bytes
-from app.core.scenarios import VIDEO_SCENARIOS
+from app.core.scenarios import SCENARIO_TITLE_PREFIX, VIDEO_SCENARIOS
 from app.core.strategy.dashscope_client import (
     DashScopeConfigError,
     optimize_free_video_prompt,
@@ -137,6 +137,33 @@ def _video_action(input_mode: str) -> str:
     if input_mode == "video_edit":
         return "video-edit"
     return "reference-to-video"
+
+
+def _video_input_mode_label(input_mode: str) -> str:
+    labels = {
+        "text_to_video": "文生视频",
+        "image_to_video": "图生视频",
+        "reference_to_video": "参考图生视频",
+        "video_edit": "爆款复刻",
+    }
+    return labels.get(input_mode, input_mode)
+
+
+def _video_consume_note(
+    *,
+    scenario: str,
+    title: str | None,
+    input_mode: str,
+    resolution: str,
+    duration: int,
+) -> str:
+    scenario_label = SCENARIO_TITLE_PREFIX.get(scenario, "视频生成")
+    parts = [scenario_label]
+    clean_title = (title or "").strip()
+    if clean_title:
+        parts.append(clean_title)
+    parts.extend([_video_input_mode_label(input_mode), resolution, f"{duration}秒"])
+    return " · ".join(parts)
 
 
 def _normalize_video_scenario(raw: str | None) -> str:
@@ -329,6 +356,13 @@ async def create_video_task(
         db,
         current_user.id,
         credit_cost,
+        note=_video_consume_note(
+            scenario=scenario,
+            title=req.title,
+            input_mode=req.input_mode,
+            resolution=normalized_resolution,
+            duration=req.duration,
+        ),
     )
     if fail_response is not None:
         return fail_response
@@ -391,6 +425,7 @@ async def create_video_task(
         mark_failed=mark_video_task_failed,
         failure_message="视频任务入队失败，请稍后重试",
         failure_data={"task_id": task_id},
+        refund_note=f"视频任务入队失败退回 · {task_id}",
     )
     if enqueue_fail is not None:
         return enqueue_fail

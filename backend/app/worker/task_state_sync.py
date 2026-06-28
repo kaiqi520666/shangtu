@@ -4,6 +4,7 @@ from typing import Any
 from sqlalchemy import select, update
 
 from app.core.database import SessionLocal
+from app.core.user_credits import add_credit_transaction
 
 
 def task_model(media_type: str):
@@ -144,14 +145,23 @@ async def refund_generation_credit(media_type: str, task_id: str) -> bool:
             if refunded:
                 return False
             refund_amount = max(1, int(credit_cost or 1))
-            await session.execute(
+            balance_after = await session.scalar(
                 update(User).where(User.id == user_id).values(
                     credits=User.credits + refund_amount
-                )
+                ).returning(User.credits)
             )
             await session.execute(
                 update(model).where(model.id == task_id).values(
                     credit_refunded=True
                 )
+            )
+            media_label = "视频" if media_type == "video" else "图片"
+            add_credit_transaction(
+                session,
+                user_id=user_id,
+                tx_type="refund",
+                credits_delta=refund_amount,
+                balance_after=int(balance_after or 0),
+                note=f"{media_label}任务失败退回 · {task_id}",
             )
     return True

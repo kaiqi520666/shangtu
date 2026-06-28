@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ChevronDown, LogOut, Settings, UserRound, WalletCards } from 'lucide-vue-next'
+import { ChevronDown, LogOut, ReceiptText, UserRound, WalletCards } from 'lucide-vue-next'
 import { useRechargeModal } from '@/composables/useRechargeModal.js'
 import { useAuthStore } from '@/stores/auth.js'
 
@@ -27,6 +27,11 @@ function handleLogout() {
 function handleRecharge() {
   open.value = false
   openRechargeModal()
+}
+
+function goAccount(path) {
+  open.value = false
+  router.push(path)
 }
 
 function handleClickOutside(event) {
@@ -75,13 +80,13 @@ onBeforeUnmount(() => {
           <WalletCards class="h-4 w-4 text-primary" />
           积分充值 · 当前 {{ credits }} 点
         </button>
-        <button type="button" class="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-medium text-slate-600 hover:bg-slate-50">
-          <Settings class="h-4 w-4 text-slate-400" />
-          账号设置
-        </button>
-        <button type="button" class="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-medium text-slate-600 hover:bg-slate-50">
+        <button type="button" class="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-medium text-slate-600 hover:bg-slate-50" @click="goAccount('/account/profile')">
           <UserRound class="h-4 w-4 text-slate-400" />
-          个人资料
+          账号中心
+        </button>
+        <button type="button" class="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-medium text-slate-600 hover:bg-slate-50" @click="goAccount('/account/credits')">
+          <ReceiptText class="h-4 w-4 text-slate-400" />
+          积分明细
         </button>
       </div>
 

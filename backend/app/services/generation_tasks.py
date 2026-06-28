@@ -12,7 +12,7 @@ from app.schemas.response import Response, fail
 
 FailureMarker = Callable[[int], Awaitable[None]]
 BeforeEnqueue = Callable[[Any], Awaitable[None]]
-RefundCredits = Callable[[AsyncSession, int, int], Awaitable[int]]
+RefundCredits = Callable[[AsyncSession, int, int, str | None], Awaitable[int]]
 RedisPoolGetter = Callable[[], Any]
 
 
@@ -20,8 +20,9 @@ async def deduct_credits_or_fail(
     db: AsyncSession,
     user_id: int,
     cost: int,
+    note: str | None = None,
 ) -> tuple[int | None, Response | None]:
-    remaining_credits = await deduct_user_credits(db, user_id, cost)
+    remaining_credits = await deduct_user_credits(db, user_id, cost, note=note)
     if remaining_credits is None:
         await db.rollback()
         latest_credits = await get_user_credits(db, user_id)
@@ -42,6 +43,7 @@ async def enqueue_or_compensate(
     mark_failed: FailureMarker,
     failure_message: str,
     failure_data: dict[str, Any],
+    refund_note: str | None = None,
     before_enqueue: BeforeEnqueue | None = None,
 ) -> Response | None:
     try:
@@ -51,7 +53,7 @@ async def enqueue_or_compensate(
         await redis_pool.enqueue_job(job_name, *job_args)
     except Exception:
         try:
-            refunded_credits = await refund_credits(db, user_id, credit_cost)
+            refunded_credits = await refund_credits(db, user_id, credit_cost, refund_note)
             await mark_failed(refunded_credits)
             await db.commit()
         except Exception:

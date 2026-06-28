@@ -10,7 +10,7 @@ from fastapi.requests import Request
 from fastapi.responses import JSONResponse
 
 from app.core.database import Base, engine
-from app.routers import admin, asset, auth, billing, generation, image_generation, outfit, video
+from app.routers import account, admin, asset, auth, billing, generation, image_generation, outfit, video
 from app.schemas.response import fail
 import app.models
 
@@ -49,6 +49,7 @@ async def handle_unexpected_exception(request: Request, exc: Exception):
     )
 
 app.include_router(admin.router)
+app.include_router(account.router)
 app.include_router(auth.router)
 app.include_router(billing.router)
 app.include_router(image_generation.router)

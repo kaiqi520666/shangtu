@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import create_token, hash_password, verify_password
 from app.core.deps import get_current_user, get_db
+from app.core.time import to_utc_iso
 from app.models import User
 from app.schemas.response import Response, fail, success
 
@@ -30,6 +31,7 @@ def _user_payload(user: User) -> dict:
         "credits": user.credits,
         "role": user.role,
         "status": user.status,
+        "created_at": to_utc_iso(user.created_at),
     }
 
 

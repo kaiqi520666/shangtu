@@ -24,6 +24,7 @@ function normalizeUser(payload, currentUser = null) {
     role,
     status,
     plan: payload.plan || currentUser?.plan || "SaaS Pro",
+    created_at: payload.created_at || currentUser?.created_at || "",
   };
 }
 

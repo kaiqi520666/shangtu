@@ -2,20 +2,21 @@
 import { createRouter, createWebHistory } from "vue-router";
 import { getCurrentUser } from "@/api/auth.js";
 import { useAuthStore } from "@/stores/auth.js";
+import { accountRoutes } from "./routes/account.js";
 import { adminRoutes } from "./routes/admin.js";
 import { generatorRoutes } from "./routes/generator.js";
 import { publicRoutes } from "./routes/public.js";
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
-  routes: [...publicRoutes, ...generatorRoutes, ...adminRoutes],
+  routes: [...publicRoutes, ...generatorRoutes, ...accountRoutes, ...adminRoutes],
 });
 
 let profileSynced = false;
 
 router.beforeEach(async (to) => {
   const authStore = useAuthStore();
-  const requiresAuth = to.path.startsWith("/generator") || to.path.startsWith("/admin");
+  const requiresAuth = to.path.startsWith("/generator") || to.path.startsWith("/account") || to.path.startsWith("/admin");
   if (requiresAuth && !authStore.isAuthenticated) {
     return {
       path: "/login",
