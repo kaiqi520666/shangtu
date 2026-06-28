@@ -426,7 +426,7 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
         items: normalizedItems,
         snapshot: inputSnapshot,
       });
-      toast.success("穿搭策略已生成，可编辑后继续出图");
+      toast.success("穿搭方案已生成，可编辑后继续出图");
     } catch (error) {
       toast.error(getApiErrorMessage(error, "穿搭策略生成失败，请稍后重试"));
       setStrategyStep("config");
@@ -435,7 +435,11 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
 
   async function confirmStrategyAndGenerate() {
     if (outfitStrategyItems.value.length === 0) {
-      toast.info("请先生成穿搭策略");
+      toast.info("请先生成穿搭方案");
+      return;
+    }
+    if (strategyDirty.value) {
+      toast.info("配置已变化，请先更新穿搭方案");
       return;
     }
 
@@ -502,7 +506,7 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
         return createGenerationCard({
           typeId: item.id,
           strategyTitle: item.name,
-          strategyContent: item.content || item.fidelity || item.strategy,
+          strategyContent: item.content || item.strategy,
           sortOrder,
           batchRunId,
           settingsSnapshot,
@@ -543,7 +547,7 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
       ...item,
       id: item.id,
       name: item.name || getSceneName(item.id),
-      content: composeOutfitStrategyContent(item),
+      content: item.content || item.strategy || getSceneStrategy(item.id),
       strategy: item.strategy || getSceneStrategy(item.id),
       index: index + 1,
     }));
@@ -552,20 +556,9 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
   function buildUserPromptForItem(item) {
     const lines = [
       `【拍摄场景】${item.name}`,
-      item.strategy ? `【场景策略】${item.strategy}` : "",
-      item.pose ? `【模特姿态】${item.pose}` : "",
-      item.camera ? `【镜头角度】${item.camera}` : "",
-      item.fidelity ? `【服装保真约束】${item.fidelity}` : "",
-      item.atmosphere ? `【画面氛围】${item.atmosphere}` : "",
-      item.content ? `【完整策略】${item.content}` : "",
+      item.content ? `【穿搭方案】${item.content}` : "",
     ];
     return lines.filter(Boolean).join("\n");
-  }
-
-  function composeOutfitStrategyContent(item) {
-    const content = (item.content || "").trim();
-    if (content) return content;
-    return [item.pose, item.camera, item.fidelity, item.atmosphere].filter(Boolean).join("\n");
   }
 
   function normalizeOutfitStrategyItems(items) {
@@ -574,16 +567,21 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
       const fidelity =
         item.fidelity ||
         "服装保真约束：保持上传服装的颜色、版型、材质、图案、长度、领口、袖型、廓形和核心外观一致，不换款不改款。";
+      const content = [
+        item.content,
+        item.pose && `模特姿态：${item.pose}`,
+        item.camera && `镜头角度：${item.camera}`,
+        fidelity,
+        item.atmosphere && `画面氛围：${item.atmosphere}`,
+      ]
+        .filter(Boolean)
+        .join("\n");
       return {
         id: item.id || scene.id || `outfit-${index + 1}`,
         name: item.name || scene.label || `场景 ${index + 1}`,
         description: item.description || scene.description || "",
         strategy: item.strategy || scene.strategy || "",
-        pose: item.pose || "",
-        camera: item.camera || "",
-        fidelity,
-        atmosphere: item.atmosphere || "",
-        content: item.content || [item.pose, item.camera, fidelity, item.atmosphere].filter(Boolean).join("\n"),
+        content,
       };
     });
   }

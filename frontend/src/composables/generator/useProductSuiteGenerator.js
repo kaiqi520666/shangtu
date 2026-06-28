@@ -344,6 +344,10 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
       toast.info("请先生成套图策略");
       return;
     }
+    if (strategyDirty.value) {
+      toast.info("配置已变化，请先更新套图策略");
+      return;
+    }
 
     await generateSuiteImages();
   }

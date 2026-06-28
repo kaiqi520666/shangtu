@@ -40,10 +40,6 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
-  generating: {
-    type: Boolean,
-    default: false,
-  },
   strategyLoading: {
     type: Boolean,
     default: false,
@@ -52,15 +48,7 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
-  generatedCount: {
-    type: Number,
-    default: 0,
-  },
   totalCount: {
-    type: Number,
-    default: 0,
-  },
-  jobTotal: {
     type: Number,
     default: 0,
   },

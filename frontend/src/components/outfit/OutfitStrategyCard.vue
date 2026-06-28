@@ -57,36 +57,11 @@ function updateField(key, value) {
       </button>
     </div>
 
-    <div class="grid gap-2" :class="compact ? 'grid-cols-1' : 'grid-cols-2'">
-      <textarea
-        :value="item.pose"
-        rows="3"
-        class="resize-none rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs leading-relaxed text-slate-700 outline-none transition-colors placeholder:text-slate-400 focus:border-primary focus:bg-white focus:ring-1 focus:ring-primary"
-        placeholder="模特姿态"
-        @input="updateField('pose', $event.target.value)"
-      ></textarea>
-      <textarea
-        :value="item.camera"
-        rows="3"
-        class="resize-none rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs leading-relaxed text-slate-700 outline-none transition-colors placeholder:text-slate-400 focus:border-primary focus:bg-white focus:ring-1 focus:ring-primary"
-        placeholder="镜头角度"
-        @input="updateField('camera', $event.target.value)"
-      ></textarea>
-    </div>
-
-    <textarea
-      :value="item.fidelity"
-      rows="3"
-      class="mt-2 w-full resize-none rounded-xl border border-amber-200 bg-amber-50/60 p-3 text-xs leading-relaxed text-amber-900 outline-none transition-colors placeholder:text-amber-400 focus:border-amber-400 focus:bg-white focus:ring-1 focus:ring-amber-300"
-      placeholder="服装保真约束：颜色、版型、材质、图案、长度、领口、袖型、廓形等必须保持一致"
-      @input="updateField('fidelity', $event.target.value)"
-    ></textarea>
-
     <textarea
       :value="item.content"
-      :rows="compact ? 5 : 6"
-      class="mt-2 w-full resize-none rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs leading-relaxed text-slate-700 outline-none transition-colors placeholder:text-slate-400 focus:border-primary focus:bg-white focus:ring-1 focus:ring-primary"
-      placeholder="完整穿搭策略，可补充场景氛围、动作节奏和画面注意事项"
+      :rows="compact ? 7 : 9"
+      class="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs leading-relaxed text-slate-700 outline-none transition-colors placeholder:text-slate-400 focus:border-primary focus:bg-white focus:ring-1 focus:ring-primary"
+      placeholder="编辑该场景的完整穿搭方案"
       @input="updateField('content', $event.target.value)"
     ></textarea>
   </article>

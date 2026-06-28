@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from "vue";
-import { LoaderCircle, Sparkles, WandSparkles } from "lucide-vue-next";
+import { LoaderCircle, Sparkles } from "lucide-vue-next";
 import GeneratorActionFooter from "@/components/generation/workspace/GeneratorActionFooter.vue";
 import GeneratorSidePanelShell from "@/components/generation/workspace/GeneratorSidePanelShell.vue";
 import ImageUploader from "@/components/generation/image/ImageUploader.vue";
@@ -36,21 +36,9 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
-  canGenerate: {
-    type: Boolean,
-    default: false,
-  },
   canGenerateStrategy: {
     type: Boolean,
     default: false,
-  },
-  strategyDirty: {
-    type: Boolean,
-    default: false,
-  },
-  strategyCount: {
-    type: Number,
-    default: 0,
   },
   creatingBatch: {
     type: Boolean,
@@ -60,17 +48,9 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
-  generating: {
-    type: Boolean,
-    default: false,
-  },
   strategyLoading: {
     type: Boolean,
     default: false,
-  },
-  generatedCount: {
-    type: Number,
-    default: 0,
   },
   selectedImageLabel: {
     type: String,
@@ -88,31 +68,20 @@ const emit = defineEmits([
   "update:mainImageIndex",
   "update:selectedModules",
   "notify",
-  "generate",
   "generate-strategy",
 ]);
 
 const hasGenerationSource = computed(
   () => props.uploadedImages.length > 0 && props.settings.productInput.trim().length > 0,
 );
-const generateButtonText = computed(() => {
+const primaryText = computed(() => {
   if (!hasGenerationSource.value) return "请先上传产品图并填写商品卖点与要求";
   if (props.catalogLoading) return "图种目录加载中...";
   if (props.selectedModules.length === 0) return "请至少选择一个生成图种";
-  if (props.creatingBatch) return "正在创建任务...";
-  if (props.strategyCount === 0) return "请先生成详情图方案";
-  if (props.strategyDirty) return "请先更新详情图方案";
-  if (props.hasRunningTasks) return `追加生成详情图 (${props.strategyCount}张)`;
-  return `开始生成详情图 (${props.strategyCount}张)`;
-});
-
-const strategyButtonText = computed(() => {
   if (props.strategyLoading) return "AI 正在生成方案...";
-  if (props.catalogLoading) return "图种目录加载中...";
   if (props.hasRunningTasks) return "生成中暂不可改方案";
-  if (props.strategyCount > 0 && props.strategyDirty) return "更新详情图方案";
-  if (props.strategyCount > 0) return "重新生成详情图方案";
-  return "生成详情图方案";
+  if (props.creatingBatch) return "正在创建任务...";
+  return `生成详情图方案（${props.selectedModules.length}张）`;
 });
 
 </script>
@@ -141,28 +110,15 @@ const strategyButtonText = computed(() => {
       @update:selected="emit('update:selectedModules', $event)"
     />
 
-    <section class="border-t border-slate-100 p-5">
-      <button
-        type="button"
-        class="flex w-full items-center justify-center gap-2 rounded-xl border border-primary/20 bg-primary/5 px-4 py-2.5 text-xs font-bold text-primary transition-colors hover:border-primary/40 hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
-        :disabled="!canGenerateStrategy"
-        @click="emit('generate-strategy')"
-      >
-        <LoaderCircle v-if="strategyLoading" class="h-4 w-4 animate-spin" />
-        <Sparkles v-else class="h-4 w-4" />
-        {{ strategyButtonText }}
-      </button>
-    </section>
-
     <template #footer>
       <GeneratorActionFooter
-        :primary-text="generateButtonText"
-        :primary-disabled="!canGenerate"
-        @primary="emit('generate')"
+        :primary-text="primaryText"
+        :primary-disabled="!canGenerateStrategy"
+        @primary="emit('generate-strategy')"
       >
         <template #primary-icon>
-          <LoaderCircle v-if="creatingBatch" class="h-4 w-4 animate-spin" />
-          <WandSparkles v-else class="h-4 w-4" />
+          <LoaderCircle v-if="strategyLoading || creatingBatch" class="h-4 w-4 animate-spin" />
+          <Sparkles v-else class="h-4 w-4" />
         </template>
       </GeneratorActionFooter>
     </template>

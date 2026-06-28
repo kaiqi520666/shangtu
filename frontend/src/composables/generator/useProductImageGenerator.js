@@ -171,15 +171,6 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
   const totalCount = computed(() =>
     moduleContents.value.length > 0 ? moduleContents.value.length : selectedModules.value.length,
   );
-  const canGenerate = computed(
-    () =>
-      hasGenerationSource.value &&
-      selectedModules.value.length > 0 &&
-      availableModules.value.length > 0 &&
-      !catalogLoading.value &&
-      !creatingBatch.value &&
-      canGenerateWithStrategy.value,
-  );
   const canGenerateStrategy = computed(
     () =>
       hasGenerationSource.value &&
@@ -545,7 +536,6 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
     genLogs,
     outputCards,
     zoomCard,
-    canGenerate,
     canGenerateStrategy,
     strategyLoading,
     strategyPanelVisible,
@@ -563,7 +553,6 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
     getModuleStrategy,
     triggerStrategyGeneration,
     confirmStrategyAndGenerate,
-    generateProductImages,
     updateModuleContent,
     reorderModuleContents,
     removeModuleContent,

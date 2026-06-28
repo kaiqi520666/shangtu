@@ -89,15 +89,10 @@ function closePreview() {
       :modules="generator.availableModules.value"
       :catalog-loading="generator.catalogLoading.value"
       :ai-loading="generator.aiLoading.value"
-      :can-generate="generator.canGenerate.value"
       :can-generate-strategy="generator.canGenerateStrategy.value"
-      :strategy-dirty="generator.strategyDirty.value"
-      :strategy-count="generator.moduleContents.value.length"
       :creating-batch="generator.creatingBatch.value"
       :has-running-tasks="generator.hasRunningTasks.value"
-      :generating="generator.generating.value"
       :strategy-loading="generator.strategyLoading.value"
-      :generated-count="generator.generatedCount.value"
       :selected-image-label="generator.selectedImageLabel.value"
       :generate-selling-points="generator.generateSellingPointsWithAI"
       @update:settings="Object.assign(generator.settings, $event)"
@@ -105,7 +100,6 @@ function closePreview() {
       @update:main-image-index="generator.mainImageIndex.value = $event"
       @update:selected-modules="generator.selectedModules.value = $event"
       @notify="generator.showNotice"
-      @generate="generator.generateProductImages"
       @generate-strategy="generator.triggerStrategyGeneration"
     />
 
