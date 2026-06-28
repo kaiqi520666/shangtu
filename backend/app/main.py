@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 
 from app.core.database import Base, engine
-from app.routers import admin, asset, auth, billing, generation, image, outfit, video
+from app.routers import admin, asset, auth, billing, generation, image_generation, outfit, video
 import app.models
 
 load_dotenv()
@@ -31,7 +31,7 @@ app = FastAPI(title="ShangTu API", lifespan=lifespan)
 app.include_router(admin.router)
 app.include_router(auth.router)
 app.include_router(billing.router)
-app.include_router(image.router)
+app.include_router(image_generation.router)
 app.include_router(generation.router)
 app.include_router(asset.router)
 app.include_router(outfit.router)
