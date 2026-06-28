@@ -118,7 +118,7 @@ generator 场景 composable 命名一致：
 
 ### 路由/函数命名是否诚实
 
-`backend/app/routers/image_generation.py` 负责图片任务创建和重新生成。后续如果重生逻辑继续增长，可以再拆出 `image_regeneration.py`。
+`backend/app/routers/image_generation.py` 已把图片任务创建编排下沉到 `backend/app/services/image_generation.py`，当前仍保留重新生成接口。后续如果重生逻辑继续增长，可以再拆出 `image_regeneration.py` 或 service。
 
 `backend/app/core/generation_prompt_builder.py` 已聚焦图片生成 prompt 构建。后续如果图片 prompt 继续增长，可以按商品详情图、套图、穿搭继续拆分。
 
@@ -141,7 +141,7 @@ generator 场景 composable 命名一致：
 
 单文件体量也暴露了目录没有承接复杂度：
 
-- `backend/app/routers/image_generation.py`：395 行
+- `backend/app/routers/image_generation.py`：约 300 行
 - `backend/app/worker/tasks.py`：655 行
 - `frontend/src/composables/generator/useOutfitGenerator.js`：约 22KB
 - `frontend/src/composables/generator/useProductVideoGenerator.js`：约 18KB
@@ -164,7 +164,7 @@ generator 场景 composable 命名一致：
 容易猜错的具体例子：
 
 1. `backend/app/routers/image_generation.py`
-   能看出是图片生成主链路，但商品套图、商品详情图、穿搭图、自由生图仍在同一入口下。后续可按场景拆 service，而不是继续把场景分支堆在 router。
+   能看出是图片生成主链路，但重新生成逻辑仍在 router 内。后续可继续下沉到 service，而不是把任务状态、扣费、入队补偿都堆在 router。
 
 2. `frontend/src/composables/generator/useGenerationRunner.js`
    名字像通用 runner，但内部默认导入 `generateImage` 和图片积分校验，同时也被视频生成器复用。建议拆成 `useGenerationJobs.js`、`useImageBatchRunner.js`、`useMediaBatchRunner.js`。
@@ -174,6 +174,6 @@ generator 场景 composable 命名一致：
 
 ## 建议优先级
 
-P1：继续拆 `backend/app/routers/image_generation.py`，把任务创建和重生职责下沉到更具体的 service。
+P1：继续拆 `backend/app/routers/image_generation.py`，把重生职责下沉到更具体的 service。
 
 P2：继续拆 `frontend/src/composables/generator/` 里的大 composable，按 `strategy`、`batch`、`restore` 等职责收敛。

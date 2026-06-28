@@ -1,16 +1,10 @@
-import uuid
-
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.credits import normalize_image_resolution
 from app.core.deps import get_current_user, get_db
-from app.core.generation_prompt_builder import (
-    build_image_generate_prompt,
-)
-from app.core.json_utils import dump_json_or_none
 from app.core.prompt_snapshot import (
     build_prompt_snapshot,
     dump_prompt_snapshot,
@@ -32,6 +26,11 @@ from app.core.user_credits import (
 from app.models import GenerationJob, ImageTask, User
 from app.schemas.response import Response, fail, success
 from app.services.generation_tasks import deduct_credits_or_fail, enqueue_or_compensate
+from app.services.image_generation import (
+    IMAGE_PROMPT_STRATEGIES,
+    ImageGeneratePayload,
+    create_image_generation_task,
+)
 from app.routers.image_catalog import router as image_catalog_router
 from app.routers.image_strategy import router as image_strategy_router
 from app.routers.image_tasks import router as image_tasks_router
@@ -43,14 +42,6 @@ router.include_router(image_strategy_router)
 router.include_router(image_tasks_router)
 router.include_router(image_uploads_router)
 
-IMAGE_PROMPT_STRATEGIES = {
-    "product_suite": {"use_template": True},
-    "product_image": {"use_template": True},
-    "outfit": {"use_template": True},
-    "free_image": {"use_template": False},
-}
-
-
 class GenerateRequest(BaseModel):
     user_prompt: str | None = None
     image_urls: list[str] = Field(default_factory=list)
@@ -61,34 +52,6 @@ class GenerateRequest(BaseModel):
     type_id: str | None = None
     title: str | None = None
     sort_order: int = 0
-
-
-async def _build_image_task_prompt(
-    *,
-    db: AsyncSession,
-    job: GenerationJob | None,
-    req: GenerateRequest,
-) -> tuple[str, dict]:
-    user_prompt = (req.user_prompt or "").strip()
-    if job is None:
-        if not user_prompt:
-            raise ValueError("请输入提示词")
-        return user_prompt, build_prompt_snapshot(user=user_prompt, final=user_prompt)
-
-    strategy = IMAGE_PROMPT_STRATEGIES[job.scenario]
-    if not strategy["use_template"]:
-        if not user_prompt:
-            raise ValueError("请输入提示词")
-        return user_prompt, build_prompt_snapshot(user=user_prompt, final=user_prompt)
-
-    built_prompt = await build_image_generate_prompt(
-        db,
-        job=job,
-        type_id=req.type_id,
-        title=req.title,
-        user_prompt=user_prompt,
-    )
-    return built_prompt.final_prompt, built_prompt.prompt_snapshot
 
 
 def _compose_prompt_from_snapshot(prompt_snapshot: dict, user_prompt: str) -> str:
@@ -113,116 +76,30 @@ async def create_image_task(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    try:
-        credit_cost = await get_effective_image_credit_cost(db, req.resolution)
-    except ValueError as exc:
-        return fail(str(exc))
-    normalized_resolution = normalize_image_resolution(req.resolution)
-    if current_user.credits < credit_cost:
-        return fail(_insufficient_credits_message(credit_cost, current_user.credits))
-
-    job: GenerationJob | None = None
-    if req.job_id:
-        job_result = await db.execute(
-            select(GenerationJob).where(
-                GenerationJob.id == req.job_id,
-                GenerationJob.user_id == current_user.id,
-            )
-        )
-        job = job_result.scalar_one_or_none()
-        if not job:
-            return fail("任务不存在")
-        if job.scenario not in IMAGE_PROMPT_STRATEGIES:
-            return fail("任务类型不匹配")
-
-    task_id = str(uuid.uuid4())
-    try:
-        final_prompt, prompt_snapshot = await _build_image_task_prompt(
-            db=db,
-            job=job,
-            req=req,
-        )
-    except ValueError as exc:
-        return fail(str(exc))
-
-    # 原子扣积分 + 建任务同一事务，避免并发超扣和一致性漂移
-    remaining_credits, fail_response = await deduct_credits_or_fail(
-        db,
-        current_user.id,
-        credit_cost,
-    )
-    if fail_response is not None:
-        return fail_response
-
-    task = ImageTask(
-        id=task_id,
-        user_id=current_user.id,
-        prompt=final_prompt,
-        size=f"{req.ratio}/{normalized_resolution}",
-        status="pending",
-        job_id=req.job_id,
-        type_id=req.type_id,
-        title=req.title,
-        sort_order=req.sort_order,
-        prompt_snapshot_json=dump_prompt_snapshot(prompt_snapshot),
-        settings_snapshot_json=dump_json_or_none(req.settings_snapshot),
-        credit_cost=credit_cost,
-    )
-    db.add(task)
-    try:
-        await db.commit()
-    except Exception:
-        await db.rollback()
-        return fail("任务创建失败，请稍后重试")
-
-    reference_image_urls = [url for url in (req.image_urls or []) if url]
-
-    # 入队失败：标记任务 failed 并退回积分，避免用户被扣却没活
-    async def mark_task_failed(_refunded_credits: int) -> None:
-        await db.execute(
-            update(ImageTask)
-            .where(ImageTask.id == task_id)
-            .values(status="failed", credit_refunded=True)
-        )
-
-    enqueue_fail = await enqueue_or_compensate(
-        get_redis_pool=lambda: request.app.state.redis_pool,
+    result, failure = await create_image_generation_task(
         db=db,
-        job_name="generate_image",
-        job_args=(
-            task_id,
-            final_prompt,
-            req.ratio,
-            normalized_resolution,
-            reference_image_urls,
+        current_user=current_user,
+        payload=ImageGeneratePayload(
+            user_prompt=req.user_prompt,
+            image_urls=req.image_urls,
+            ratio=req.ratio,
+            resolution=req.resolution,
+            settings_snapshot=req.settings_snapshot,
+            job_id=req.job_id,
+            type_id=req.type_id,
+            title=req.title,
+            sort_order=req.sort_order,
         ),
-        user_id=current_user.id,
-        credit_cost=credit_cost,
-        remaining_credits=remaining_credits,
-        refund_credits=_refund_user_credits,
-        mark_failed=mark_task_failed,
-        failure_message="任务入队失败，请稍后重试",
-        failure_data={"task_id": task_id},
+        get_redis_pool=lambda: request.app.state.redis_pool,
     )
-    if enqueue_fail is not None:
-        return enqueue_fail
-
-    if job is not None and job.status != "generating":
-        try:
-            await db.execute(
-                update(GenerationJob)
-                .where(GenerationJob.id == job.id)
-                .values(status="generating")
-            )
-            await db.commit()
-        except Exception:
-            await db.rollback()
+    if failure is not None:
+        return failure
 
     return success(
         {
-            "task_id": task_id,
-            "credits": remaining_credits,
-            "credit_cost": credit_cost,
+            "task_id": result.task_id,
+            "credits": result.credits,
+            "credit_cost": result.credit_cost,
         }
     )
 
