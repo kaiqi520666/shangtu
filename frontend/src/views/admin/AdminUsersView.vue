@@ -1,7 +1,7 @@
 <script setup>
 import { onMounted } from "vue";
-import AdjustCreditsModal from "@/components/admin/AdjustCreditsModal.vue";
-import AdminUsersPanel from "@/components/admin/AdminUsersPanel.vue";
+import AdjustCreditsModal from "@/components/admin/users/AdjustCreditsModal.vue";
+import AdminUsersPanel from "@/components/admin/users/AdminUsersPanel.vue";
 import { useAdminUsers } from "@/composables/admin/useAdminUsers.js";
 
 const {
