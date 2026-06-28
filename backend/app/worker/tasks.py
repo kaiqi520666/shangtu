@@ -1,5 +1,4 @@
 import asyncio
-import json
 import os
 import time
 import traceback
@@ -12,6 +11,7 @@ from sqlalchemy import select, update
 from app.core.database import SessionLocal
 from app.core.model_config import IMAGE_GENERATE_MODEL, VIDEO_GENERATE_MODEL
 from app.core.oss import ALLOWED_IMAGE_TYPES, ALLOWED_VIDEO_TYPES, upload_image_bytes, upload_video_bytes
+from app.core.task_state import set_task_error, set_task_progress, set_task_result, set_task_status
 
 load_dotenv()
 
@@ -356,15 +356,11 @@ async def materialize_video_to_oss(
 
 
 async def _set_progress(redis, task_id: str, value: int) -> None:
-    await redis.set(
-        f"task:{task_id}:progress", str(max(0, min(100, value))), ex=7200
-    )
+    await set_task_progress(redis, "image", task_id, value)
 
 
 async def _set_video_progress(redis, task_id: str, value: int) -> None:
-    await redis.set(
-        f"video_task:{task_id}:progress", str(max(0, min(100, value))), ex=7200
-    )
+    await set_task_progress(redis, "video", task_id, value)
 
 
 PROVIDER_ERROR_COPY = {
@@ -485,8 +481,8 @@ async def _mark_failed(redis, task_id: str, raw_message: str) -> None:
     friendly = normalize_provider_error(raw_message)
     await update_task_in_db(task_id, status="failed", error_message=friendly)
     await refund_task_credit(task_id)
-    await redis.set(f"task:{task_id}:error", friendly, ex=3600)
-    await redis.set(f"task:{task_id}:status", "failed", ex=3600)
+    await set_task_error(redis, "image", task_id, friendly)
+    await set_task_status(redis, "image", task_id, "failed", ttl=3600)
 
 
 async def _mark_timeout(redis, task_id: str, raw_message: str) -> None:
@@ -494,8 +490,8 @@ async def _mark_timeout(redis, task_id: str, raw_message: str) -> None:
     friendly = normalize_provider_error(raw_message)
     await update_task_in_db(task_id, status="timeout", error_message=friendly)
     await refund_task_credit(task_id)
-    await redis.set(f"task:{task_id}:error", friendly, ex=3600)
-    await redis.set(f"task:{task_id}:status", "timeout", ex=3600)
+    await set_task_error(redis, "image", task_id, friendly)
+    await set_task_status(redis, "image", task_id, "timeout", ttl=3600)
 
 
 async def _mark_video_failed(redis, task_id: str, raw_message: str) -> None:
@@ -503,8 +499,8 @@ async def _mark_video_failed(redis, task_id: str, raw_message: str) -> None:
     friendly = normalize_provider_error(raw_message, media_type="video")
     await update_video_task_in_db(task_id, status="failed", error_message=friendly)
     await refund_video_task_credit(task_id)
-    await redis.set(f"video_task:{task_id}:error", friendly, ex=3600)
-    await redis.set(f"video_task:{task_id}:status", "failed", ex=3600)
+    await set_task_error(redis, "video", task_id, friendly)
+    await set_task_status(redis, "video", task_id, "failed", ttl=3600)
 
 
 async def _mark_video_timeout(redis, task_id: str, raw_message: str) -> None:
@@ -512,8 +508,8 @@ async def _mark_video_timeout(redis, task_id: str, raw_message: str) -> None:
     friendly = normalize_provider_error(raw_message, media_type="video")
     await update_video_task_in_db(task_id, status="timeout", error_message=friendly)
     await refund_video_task_credit(task_id)
-    await redis.set(f"video_task:{task_id}:error", friendly, ex=3600)
-    await redis.set(f"video_task:{task_id}:status", "timeout", ex=3600)
+    await set_task_error(redis, "video", task_id, friendly)
+    await set_task_status(redis, "video", task_id, "timeout", ttl=3600)
 
 
 async def generate_image(
@@ -527,7 +523,7 @@ async def generate_image(
     redis = ctx["redis"]
 
     try:
-        await redis.set(f"task:{task_id}:status", "processing", ex=7200)
+        await set_task_status(redis, "image", task_id, "processing", ttl=7200)
         await _set_progress(redis, task_id, 0)
         await update_task_in_db(task_id, status="processing", progress=0)
 
@@ -663,13 +659,9 @@ async def generate_image(
             result_url=uploaded.url,
             progress=100,
         )
-        await redis.set(
-            f"task:{task_id}:result",
-            json.dumps({"url": uploaded.url}),
-            ex=86400,
-        )
+        await set_task_result(redis, "image", task_id, uploaded.url)
         await _set_progress(redis, task_id, 100)
-        await redis.set(f"task:{task_id}:status", "done", ex=86400)
+        await set_task_status(redis, "image", task_id, "done", ttl=86400)
 
     except httpx.TimeoutException:
         await _mark_timeout(redis, task_id, "请求 ToAPIS 超时")
@@ -692,7 +684,7 @@ async def generate_video(
     redis = ctx["redis"]
 
     try:
-        await redis.set(f"video_task:{task_id}:status", "processing", ex=7200)
+        await set_task_status(redis, "video", task_id, "processing", ttl=7200)
         await _set_video_progress(redis, task_id, 0)
         await update_video_task_in_db(task_id, status="processing", progress=0)
 
@@ -839,13 +831,9 @@ async def generate_video(
             result_url=uploaded.url,
             progress=100,
         )
-        await redis.set(
-            f"video_task:{task_id}:result",
-            json.dumps({"url": uploaded.url}),
-            ex=86400,
-        )
+        await set_task_result(redis, "video", task_id, uploaded.url)
         await _set_video_progress(redis, task_id, 100)
-        await redis.set(f"video_task:{task_id}:status", "done", ex=86400)
+        await set_task_status(redis, "video", task_id, "done", ttl=86400)
 
     except httpx.TimeoutException:
         await _mark_video_timeout(redis, task_id, "请求 ToAPIS 视频服务超时")

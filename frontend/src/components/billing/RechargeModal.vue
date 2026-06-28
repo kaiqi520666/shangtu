@@ -6,6 +6,7 @@ import { createBillingOrder, getBillingOrder, getBillingPackages } from "@/api/b
 import AppModal from "@/components/ui/AppModal.vue";
 import { useAuthStore } from "@/stores/auth.js";
 import { useToast } from "@/composables/useToast.js";
+import { getApiErrorMessage } from "@/utils/apiError.js";
 
 const props = defineProps({
   open: {
@@ -67,8 +68,7 @@ async function loadPackages() {
     imageCreditCosts.value = result.data?.image_credit_costs || {};
     selectedPackageId.value = packages.value[0]?.id || "";
   } catch (error) {
-    const status = error.response?.status;
-    toast.error(status === 401 ? "登录已过期，请重新登录" : "加载充值套餐失败");
+    toast.error(getApiErrorMessage(error, "加载充值套餐失败"));
   } finally {
     loadingPackages.value = false;
   }
@@ -155,8 +155,7 @@ async function createOrder() {
     await refreshQr(result.data);
     startPolling();
   } catch (error) {
-    const status = error.response?.status;
-    toast.error(status === 401 ? "登录已过期，请重新登录" : "创建支付订单失败");
+    toast.error(getApiErrorMessage(error, "创建支付订单失败"));
   } finally {
     creatingOrder.value = false;
   }

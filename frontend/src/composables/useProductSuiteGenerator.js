@@ -15,6 +15,7 @@ import { useCardActions } from "@/composables/useCardActions.js";
 import { useGenerationRunner } from "@/composables/useGenerationRunner.js";
 import { useGenerationStrategyFlow } from "@/composables/useGenerationStrategyFlow.js";
 import { buildProductAnalyzeImages, hasUploadingImages } from "@/utils/analyzeImages.js";
+import { getApiErrorMessage } from "@/utils/apiError.js";
 import {
   cloneGenerationSettingsSnapshot,
   createGenerationSettingsSnapshot,
@@ -333,12 +334,7 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
       });
       toast.success("套图策略已生成，可编辑后继续出图");
     } catch (error) {
-      const status = error.response?.status;
-      if (status === 401) {
-        toast.error("登录已过期，请重新登录");
-      } else {
-        toast.error(error.response?.data?.message || "套图策略生成失败，请稍后重试");
-      }
+      toast.error(getApiErrorMessage(error, "套图策略生成失败，请稍后重试"));
       setStrategyStep("config");
     }
   }

@@ -15,6 +15,7 @@ import { useGenerationStrategyFlow } from "@/composables/useGenerationStrategyFl
 import { useAiSellingPointsWriter } from "@/composables/useAiSellingPointsWriter.js";
 import { useToast } from "@/composables/useToast.js";
 import { buildProductAnalyzeImages, hasUploadingImages } from "@/utils/analyzeImages.js";
+import { getApiErrorMessage } from "@/utils/apiError.js";
 import {
   cloneGenerationSettingsSnapshot,
   createGenerationSettingsSnapshot,
@@ -326,12 +327,7 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
       });
       toast.success("模块策略已生成，可编辑后继续出图");
     } catch (error) {
-      const status = error.response?.status;
-      if (status === 401) {
-        toast.error("登录已过期，请重新登录");
-      } else {
-        toast.error(error.response?.data?.message || "模块策略生成失败，请稍后重试");
-      }
+      toast.error(getApiErrorMessage(error, "模块策略生成失败，请稍后重试"));
       setStrategyStep("config");
     }
   }

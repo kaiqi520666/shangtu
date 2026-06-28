@@ -7,6 +7,7 @@ import {
   listGenerationJobs,
   updateGenerationJob,
 } from "@/api/generation.js";
+import { getApiErrorMessage } from "@/utils/apiError.js";
 
 const TITLE_DEBOUNCE_MS = 600;
 
@@ -77,12 +78,7 @@ export function useGenerationRunner({
       onJobCreated?.(currentJobId.value);
       return currentJobId.value;
     } catch (error) {
-      const status = error.response?.status;
-      if (status === 401) {
-        toast.error("登录已过期，请重新登录");
-      } else {
-        toast.error(error.response?.data?.message || "创建任务失败");
-      }
+      toast.error(getApiErrorMessage(error, "创建任务失败"));
       return "";
     }
   }
@@ -118,12 +114,7 @@ export function useGenerationRunner({
       }
       historyTasks.value = result.data || [];
     } catch (error) {
-      const status = error.response?.status;
-      if (status === 401) {
-        toast.error("登录已过期，请重新登录");
-      } else {
-        toast.error(error.response?.data?.message || "加载历史任务失败");
-      }
+      toast.error(getApiErrorMessage(error, "加载历史任务失败"));
       historyTasks.value = [];
     } finally {
       historyLoading.value = false;
@@ -172,12 +163,7 @@ export function useGenerationRunner({
       }
       return true;
     } catch (error) {
-      const status = error.response?.status;
-      if (status === 401) {
-        toast.error("登录已过期，请重新登录");
-      } else {
-        toast.error(error.response?.data?.message || "任务不存在或无权限访问");
-      }
+      toast.error(getApiErrorMessage(error, "任务不存在或无权限访问"));
       return false;
     } finally {
       jobLoading.value = false;
@@ -272,11 +258,7 @@ export function useGenerationRunner({
       startPollingCard(card);
       return { ok: true, message: "" };
     } catch (error) {
-      const status = error.response?.status;
-      const message =
-        status === 401
-          ? "登录已过期，请重新登录"
-          : error.response?.data?.message || "任务创建失败";
+      const message = getApiErrorMessage(error, "任务创建失败");
       return markTaskCreateFailed({ card, item, message, insertCards, getFailLogName });
     }
   }
@@ -383,12 +365,7 @@ export function useGenerationRunner({
       return true;
     } catch (error) {
       if (error?.response) {
-        const status = error.response?.status;
-        if (status === 401) {
-          toast.error("登录已过期，请重新登录");
-        } else {
-          toast.error(error.response?.data?.message || saveErrorMessage);
-        }
+        toast.error(getApiErrorMessage(error, saveErrorMessage));
       } else {
         toast.error("任务创建失败，请稍后重试");
       }

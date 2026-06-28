@@ -22,6 +22,7 @@ import {
   getSnapshotScene,
 } from "@/utils/generationSnapshots.js";
 import { buildOutfitAnalyzeImages, hasUploadingImages } from "@/utils/analyzeImages.js";
+import { getApiErrorMessage } from "@/utils/apiError.js";
 import { useCatalogStore } from "@/stores/catalog.js";
 
 function cloneUploadedImages(images) {
@@ -233,12 +234,7 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
         selectedModelId.value = modelLibrary.value[0].id;
       }
     } catch (error) {
-      const status = error.response?.status;
-      if (status === 401) {
-        toast.error("登录已过期，请重新登录");
-      } else {
-        toast.error(error.response?.data?.message || "加载模特失败");
-      }
+      toast.error(getApiErrorMessage(error, "加载模特失败"));
       modelLibrary.value = [];
       selectedModelId.value = "";
     } finally {
@@ -261,12 +257,7 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
       selectedModelId.value = model.id;
       toast.success("模特已上传");
     } catch (error) {
-      const status = error.response?.status;
-      if (status === 401) {
-        toast.error("登录已过期，请重新登录");
-      } else {
-        toast.error(error.response?.data?.message || "模特上传失败");
-      }
+      toast.error(getApiErrorMessage(error, "模特上传失败"));
     } finally {
       modelUploading.value = false;
     }
@@ -293,12 +284,7 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
       }
       toast.success("模特已删除");
     } catch (error) {
-      const status = error.response?.status;
-      if (status === 401) {
-        toast.error("登录已过期，请重新登录");
-      } else {
-        toast.error(error.response?.data?.message || "删除模特失败");
-      }
+      toast.error(getApiErrorMessage(error, "删除模特失败"));
     } finally {
       modelDeletingId.value = "";
     }
@@ -442,12 +428,7 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
       });
       toast.success("穿搭策略已生成，可编辑后继续出图");
     } catch (error) {
-      const status = error.response?.status;
-      if (status === 401) {
-        toast.error("登录已过期，请重新登录");
-      } else {
-        toast.error(error.response?.data?.message || "穿搭策略生成失败，请稍后重试");
-      }
+      toast.error(getApiErrorMessage(error, "穿搭策略生成失败，请稍后重试"));
       setStrategyStep("config");
     }
   }

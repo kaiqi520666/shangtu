@@ -1,4 +1,3 @@
-import json
 import uuid
 
 import httpx
@@ -24,6 +23,7 @@ from app.core.system_settings import (
     get_effective_video_credit_cost,
     get_effective_video_credit_costs,
 )
+from app.core.task_state import merge_task_state
 from app.core.time import to_utc_iso, utc_now
 from app.core.user_credits import (
     deduct_user_credits,
@@ -69,26 +69,6 @@ class VideoStrategyRequest(BaseModel):
     duration: int = 6
     aspect_ratio: str = "9:16"
     product_input: str = ""
-
-
-def _redis_str(value) -> str | None:
-    if value is None:
-        return None
-    return value.decode() if isinstance(value, bytes) else str(value)
-
-
-def _parse_redis_result_url(value) -> str | None:
-    raw = _redis_str(value)
-    if not raw:
-        return None
-    try:
-        parsed = json.loads(raw)
-    except (TypeError, ValueError):
-        return None
-    if not isinstance(parsed, dict):
-        return None
-    url = parsed.get("url")
-    return url if isinstance(url, str) and url else None
 
 
 def _clean_image_urls(image_urls: list[str]) -> list[str]:
@@ -343,58 +323,24 @@ async def get_video_task(
     if not task:
         return fail("视频任务不存在")
 
-    status = task.status
-    result_url = task.result_url
-    error_message: str | None = task.error_message
-    progress: int = task.progress or 0
-
     redis_pool = getattr(request.app.state, "redis_pool", None)
-    if redis_pool is not None:
-        try:
-            async with redis_pool.pipeline() as pipe:
-                pipe.get(f"video_task:{task_id}:status")
-                pipe.get(f"video_task:{task_id}:error")
-                pipe.get(f"video_task:{task_id}:progress")
-                pipe.get(f"video_task:{task_id}:result")
-                live_status, live_error, live_progress, live_result = await pipe.execute()
-
-            live_status_str = _redis_str(live_status) if live_status else None
-            if live_status_str:
-                if task.status in ("pending", "processing"):
-                    if live_status_str != "done":
-                        status = live_status_str
-                else:
-                    status = live_status_str
-
-            if live_error:
-                error_message = _redis_str(live_error)
-            if live_progress:
-                try:
-                    progress = max(0, min(100, int(_redis_str(live_progress))))
-                except (TypeError, ValueError):
-                    pass
-
-            redis_result_url = _parse_redis_result_url(live_result)
-            if redis_result_url:
-                result_url = redis_result_url
-
-            if live_status_str == "done" and task.status in ("pending", "processing"):
-                status = "done" if redis_result_url else "processing"
-        except Exception:
-            pass
-
-    if status == "done" and not result_url:
-        status = "processing"
-    if status == "done":
-        progress = 100
+    state = await merge_task_state(
+        redis_pool,
+        "video",
+        task_id,
+        db_status=task.status,
+        db_result_url=task.result_url,
+        db_error_message=task.error_message,
+        db_progress=task.progress,
+    )
 
     latest_credits = await get_user_credits(db, current_user.id)
 
     return success(
         {
             "task_id": task.id,
-            "status": status,
-            "result_url": result_url,
+            "status": state.status,
+            "result_url": state.result_url,
             "prompt": task.prompt,
             "prompt_snapshot": parse_prompt_snapshot(task.prompt_snapshot_json),
             "settings_snapshot": parse_json_or_none(task.settings_snapshot_json),
@@ -404,8 +350,8 @@ async def get_video_task(
             "resolution": task.resolution,
             "aspect_ratio": task.aspect_ratio,
             "created_at": to_utc_iso(task.created_at),
-            "error_message": error_message,
-            "progress": progress,
+            "error_message": state.error_message,
+            "progress": state.progress,
             "credit_cost": task.credit_cost,
             "credits": latest_credits,
         }

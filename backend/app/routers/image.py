@@ -1,4 +1,3 @@
-import json
 import uuid
 
 import httpx
@@ -32,6 +31,12 @@ from app.core.prompt_snapshot import (
 from app.core.system_settings import (
     get_effective_image_credit_cost,
     get_effective_image_credit_costs,
+)
+from app.core.task_state import (
+    clear_task_state_fields,
+    merge_task_state,
+    set_task_progress,
+    set_task_status,
 )
 from app.core.time import to_utc_iso, utc_now
 from app.core.user_credits import (
@@ -92,26 +97,6 @@ class StrategyRequest(BaseModel):
 
 class FreeImageOptimizeRequest(BaseModel):
     prompt: str
-
-
-def _redis_str(value) -> str | None:
-    if value is None:
-        return None
-    return value.decode() if isinstance(value, bytes) else str(value)
-
-
-def _parse_redis_result_url(value) -> str | None:
-    raw = _redis_str(value)
-    if not raw:
-        return None
-    try:
-        parsed = json.loads(raw)
-    except (TypeError, ValueError):
-        return None
-    if not isinstance(parsed, dict):
-        return None
-    url = parsed.get("url")
-    return url if isinstance(url, str) and url else None
 
 
 async def _build_image_task_prompt(
@@ -431,76 +416,30 @@ async def get_task(
     if not task:
         return fail("任务不存在")
 
-    status = task.status
-    result_url = task.result_url
-    error_message: str | None = task.error_message
-    progress: int = task.progress or 0
     redis_pool = getattr(request.app.state, "redis_pool", None)
-    if redis_pool is not None:
-        try:
-            async with redis_pool.pipeline() as pipe:
-                pipe.get(f"task:{task_id}:status")
-                pipe.get(f"task:{task_id}:error")
-                pipe.get(f"task:{task_id}:progress")
-                pipe.get(f"task:{task_id}:result")
-                live_status, live_error, live_progress, live_result = await pipe.execute()
-
-            live_status_str: str | None = None
-            if live_status:
-                live_status_str = _redis_str(live_status)
-                # 防止 Redis 残留的旧 done 覆盖 DB 的 pending/processing
-                if task.status in ("pending", "processing"):
-                    if live_status_str != "done":
-                        status = live_status_str
-                    # live_status_str == "done" 时，下面会尝试取 Redis result 验证
-                else:
-                    status = live_status_str
-
-            if live_error:
-                error_message = _redis_str(live_error)
-            if live_progress:
-                try:
-                    progress = max(0, min(100, int(_redis_str(live_progress))))
-                except (TypeError, ValueError):
-                    pass
-
-            # 读取 Redis result —— 无论 DB result_url 是否有值都要尝试
-            # 重新生成场景下 DB result_url 是旧图，需要用 Redis 的新 result 覆盖
-            redis_result_url = _parse_redis_result_url(live_result)
-            if redis_result_url:
-                result_url = redis_result_url
-
-            # 如果 Redis 报告 done 且 DB 还是 pending/processing，需要验证有新 result
-            if live_status_str == "done" and task.status in ("pending", "processing"):
-                # 只有拿到了本轮新 result 才认可 done
-                if redis_result_url:
-                    status = "done"
-                else:
-                    status = "processing"
-        except Exception:
-            pass
-
-    # 兜底：Redis 已写入 status=done 但 DB 还没更新 result_url 时，降级为 processing，
-    # 让前端继续轮询，避免出现 done + result_url=null 的不一致。
-    if status == "done" and not result_url:
-        status = "processing"
-
-    if status == "done":
-        progress = 100
+    state = await merge_task_state(
+        redis_pool,
+        "image",
+        task_id,
+        db_status=task.status,
+        db_result_url=task.result_url,
+        db_error_message=task.error_message,
+        db_progress=task.progress,
+    )
 
     latest_credits = await _get_user_credits(db, current_user.id)
 
     return success(
         {
-            "status": status,
-            "result_url": result_url,
+            "status": state.status,
+            "result_url": state.result_url,
             "size": task.size,
             "prompt": task.prompt,
             "prompt_snapshot": parse_prompt_snapshot(task.prompt_snapshot_json),
             "settings_snapshot": parse_json_or_none(task.settings_snapshot_json),
             "created_at": to_utc_iso(task.created_at),
-            "error_message": error_message,
-            "progress": progress,
+            "error_message": state.error_message,
+            "progress": state.progress,
             "credit_cost": task.credit_cost,
             "credits": latest_credits,
         }
@@ -717,10 +656,9 @@ async def regenerate_task(
     # TODO: 后续用 generation_attempts 做严格幂等退款
     try:
         redis = request.app.state.redis_pool
-        await redis.delete(f"task:{new_task_id}:result")
-        await redis.delete(f"task:{new_task_id}:error")
-        await redis.set(f"task:{new_task_id}:status", "pending", ex=7200)
-        await redis.set(f"task:{new_task_id}:progress", "0", ex=7200)
+        await clear_task_state_fields(redis, "image", new_task_id, ("result", "error"))
+        await set_task_status(redis, "image", new_task_id, "pending", ttl=7200)
+        await set_task_progress(redis, "image", new_task_id, 0)
 
         await redis.enqueue_job(
             "generate_image",

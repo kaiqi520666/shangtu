@@ -4,6 +4,7 @@ from sqlalchemy import delete, func, literal, select, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_user, get_db
+from app.core.task_state import task_state_keys
 from app.core.time import to_utc_iso
 from app.models import GenerationJob, ImageTask, User, VideoTask
 from app.schemas.response import Response, fail, success
@@ -173,19 +174,9 @@ async def batch_delete_assets(
             redis = request.app.state.redis_pool
             keys_to_del = []
             for task_id in deleted_ids:
-                keys_to_del.extend([
-                    f"task:{task_id}:status",
-                    f"task:{task_id}:result",
-                    f"task:{task_id}:error",
-                    f"task:{task_id}:progress",
-                ])
+                keys_to_del.extend(task_state_keys("image", task_id))
             for task_id in deleted_video_ids:
-                keys_to_del.extend([
-                    f"video_task:{task_id}:status",
-                    f"video_task:{task_id}:result",
-                    f"video_task:{task_id}:error",
-                    f"video_task:{task_id}:progress",
-                ])
+                keys_to_del.extend(task_state_keys("video", task_id))
             if keys_to_del:
                 await redis.delete(*keys_to_del)
         except Exception:
