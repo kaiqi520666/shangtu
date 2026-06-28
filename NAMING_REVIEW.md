@@ -52,12 +52,6 @@
 
 `backend/app/core/` 职责也偏宽：既有 `database.py`、`deps.py`、`time.py` 这类基础设施，也有 `image_strategy_generation.py`、`generation_prompt_builder.py`、`product_catalog.py`、`video_strategy_generation.py` 这类业务域逻辑。建议后续继续把业务编排移入 `backend/app/services/`，`core` 保留基础能力和 provider 封装。
 
-`backend/app/worker/tasks.py` 同时实现 image/video 两条 worker 链路、上游错误归一化、DB 更新、退款、Redis 状态同步。建议拆成：
-
-- `backend/app/worker/image_tasks.py`
-
-其中视频 worker 主链路已拆到 `backend/app/worker/video_tasks.py`，上游错误归一化已拆到 `backend/app/worker/provider_errors.py`，DB 状态同步和幂等退款已拆到 `backend/app/worker/task_state_sync.py`，失败/超时终态处理已拆到 `backend/app/worker/task_failures.py`。
-
 ## 2. 命名一致性
 
 ### 文件名风格
@@ -128,7 +122,8 @@ generator 场景 composable 命名一致：
 单文件体量也暴露了目录没有承接复杂度：
 
 - `backend/app/services/image_generation.py`：约 390 行
-- `backend/app/worker/tasks.py`：655 行
+- `backend/app/worker/image_tasks.py`：约 210 行
+- `backend/app/worker/video_tasks.py`：约 235 行
 - `frontend/src/composables/generator/useOutfitGenerator.js`：约 720 行
 - `frontend/src/composables/generator/useProductVideoGenerator.js`：约 600 行
 - `frontend/src/composables/generator/useProductSuiteGenerator.js`：约 580 行
@@ -161,7 +156,5 @@ generator 场景 composable 命名一致：
 ## 建议优先级
 
 P2：继续拆 `frontend/src/composables/generator/` 里的场景级大 composable，优先把各场景内部的恢复、策略生成、批量生成辅助函数继续下沉到已建立的职责目录。
-
-P2：继续拆 `backend/app/worker/tasks.py`，把图片 worker 主链路迁到 `backend/app/worker/image_tasks.py`，让 `tasks.py` 仅保留兼容聚合入口。
 
 P3：确认 `GenerationJob` 与 `ImageTask`/`VideoTask` 命名边界后，再考虑 `backend/app/routers/generation.py`、`frontend/src/api/generation.js` 的 job 化改名。
