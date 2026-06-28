@@ -65,8 +65,7 @@ function closeHistoryDrawer() {
       :estimated-credits="video.estimatedCredits.value"
       @back="video.backToConfig"
       @confirm="video.confirmStrategyAndGenerate"
-      @update-item="video.updateVideoStrategyItem"
-      @reorder-items="video.reorderVideoStrategyItems"
+      @update-script="video.updateVideoScript"
     />
 
     <VideoSettingsPanel

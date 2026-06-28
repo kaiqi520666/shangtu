@@ -147,7 +147,6 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
     resetStrategy,
     setStrategyStep,
     updateStrategyItem,
-    reorderStrategyItems: reorderVideoStrategyItems,
     backToConfig,
   } = strategyFlow;
 
@@ -389,11 +388,11 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
 
       const normalizedItems = normalizeVideoStrategyItems(items);
       setStrategyResult({
-        brief: result.data?.brief || `已生成「${selectedType.value.title}」视频脚本策略。`,
+        brief: result.data?.brief || `已生成「${selectedType.value.title}」视频提示词。`,
         items: normalizedItems,
         snapshot: inputSnapshot,
       });
-      toast?.success?.("视频脚本策略已生成，可编辑后继续出片");
+      toast?.success?.("视频提示词已生成，可编辑后继续出片");
     } catch (error) {
       const status = error.response?.status;
       if (status === 401) {
@@ -454,7 +453,7 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
         input_text: settings.productInput,
         structure: videoStrategyItems.value,
       },
-      initialLogs: [`[${selectedType.title}] 创建视频任务`, "读取视频脚本策略与平台规范..."],
+      initialLogs: [`[${selectedType.title}] 创建视频任务`, "读取视频提示词与平台规范..."],
       repeatLog: `[${selectedType.title}] 创建视频任务`,
       buildSettingsSnapshot: () => settingsSnapshot,
       createCard({ item, sortOrder, batchRunId, settingsSnapshot: snapshot }) {
@@ -518,8 +517,8 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
     });
   }
 
-  function updateVideoStrategyItem(index, patch) {
-    updateStrategyItem(index, patch);
+  function updateVideoScript(content) {
+    updateStrategyItem(0, { content });
   }
 
   function getConfirmedVideoScript() {
@@ -590,8 +589,7 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
     showNotice,
     triggerStrategyGeneration,
     confirmStrategyAndGenerate,
-    updateVideoStrategyItem,
-    reorderVideoStrategyItems,
+    updateVideoScript,
     backToConfig,
     generateProductVideo,
     createNewTask,
