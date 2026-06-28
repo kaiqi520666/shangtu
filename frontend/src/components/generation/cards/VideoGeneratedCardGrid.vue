@@ -148,6 +148,12 @@ function getCardMetaText(card, fallbackPlatform, fallbackLanguage, fallbackVideo
           <span class="text-xs font-semibold text-slate-500">
             {{ card.status === 'processing' ? '生成中...' : '排队中...' }}
           </span>
+          <span
+            v-if="card.stalledWarning"
+            class="max-w-[11rem] px-4 text-center text-[11px] font-medium leading-snug text-amber-600"
+          >
+            {{ card.stalledWarning }}
+          </span>
         </div>
       </div>
 

@@ -130,6 +130,12 @@ function getCardMetaText(card, fallbackPlatform, fallbackLanguage, fallbackImage
           <span class="text-xs font-semibold text-slate-500">
             {{ card.status === 'processing' ? '生成中...' : '排队中...' }}
           </span>
+          <span
+            v-if="card.stalledWarning"
+            class="max-w-[11rem] text-center text-[11px] font-medium leading-snug text-amber-600"
+          >
+            {{ card.stalledWarning }}
+          </span>
         </div>
         <!-- 重新生成遮罩：有旧图 + 正在生成 -->
         <div v-if="isRegenerating(card)" class="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-white/70 backdrop-blur-[2px]">

@@ -18,6 +18,7 @@ from app.core.system_settings import (
     get_effective_video_credit_costs,
 )
 from app.core.task_state import merge_task_state
+from app.core.task_timeout import project_task_runtime_state
 from app.core.time import to_utc_iso, utc_now
 from app.core.user_credits import (
     get_user_credits,
@@ -328,14 +329,22 @@ async def get_video_task(
         db_error_message=task.error_message,
         db_progress=task.progress,
     )
+    runtime = project_task_runtime_state(
+        "video",
+        status=state.status,
+        error_message=state.error_message,
+        progress=state.progress,
+        result_url=state.result_url,
+        created_at=task.created_at,
+    )
 
     latest_credits = await get_user_credits(db, current_user.id)
 
     return success(
         {
             "task_id": task.id,
-            "status": state.status,
-            "result_url": state.result_url,
+            "status": runtime.status,
+            "result_url": runtime.result_url,
             "prompt": task.prompt,
             "prompt_snapshot": parse_prompt_snapshot(task.prompt_snapshot_json),
             "settings_snapshot": parse_json_or_none(task.settings_snapshot_json),
@@ -345,8 +354,8 @@ async def get_video_task(
             "resolution": task.resolution,
             "aspect_ratio": task.aspect_ratio,
             "created_at": to_utc_iso(task.created_at),
-            "error_message": state.error_message,
-            "progress": state.progress,
+            "error_message": runtime.error_message,
+            "progress": runtime.progress,
             "credit_cost": task.credit_cost,
             "credits": latest_credits,
         }

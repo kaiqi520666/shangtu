@@ -8,6 +8,7 @@ from app.core.deps import get_current_user, get_db
 from app.core.json_utils import parse_json_or_none
 from app.core.prompt_snapshot import parse_prompt_snapshot
 from app.core.task_state import merge_task_state
+from app.core.task_timeout import project_task_runtime_state
 from app.core.time import to_utc_iso, utc_now
 from app.core.user_credits import get_user_credits
 from app.models import ImageTask, User
@@ -43,20 +44,28 @@ async def get_image_task(
         db_error_message=task.error_message,
         db_progress=task.progress,
     )
+    runtime = project_task_runtime_state(
+        "image",
+        status=state.status,
+        error_message=state.error_message,
+        progress=state.progress,
+        result_url=state.result_url,
+        created_at=task.created_at,
+    )
 
     latest_credits = await get_user_credits(db, current_user.id)
 
     return success(
         {
-            "status": state.status,
-            "result_url": state.result_url,
+            "status": runtime.status,
+            "result_url": runtime.result_url,
             "size": task.size,
             "prompt": task.prompt,
             "prompt_snapshot": parse_prompt_snapshot(task.prompt_snapshot_json),
             "settings_snapshot": parse_json_or_none(task.settings_snapshot_json),
             "created_at": to_utc_iso(task.created_at),
-            "error_message": state.error_message,
-            "progress": state.progress,
+            "error_message": runtime.error_message,
+            "progress": runtime.progress,
             "credit_cost": task.credit_cost,
             "credits": latest_credits,
         }

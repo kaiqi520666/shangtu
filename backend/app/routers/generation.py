@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.deps import get_current_user, get_db
 from app.core.json_utils import dump_json, parse_json_or_none
 from app.core.media_projection import image_task_payload, video_task_payload
+from app.core.task_timeout import project_task_runtime_state
 from app.core.time import to_utc_iso, utc_now
 from app.models import GenerationJob, ImageTask, User, VideoTask
 from app.schemas.response import Response, fail, success
@@ -133,20 +134,29 @@ async def list_jobs(
     ]
     if task_model is ImageTask:
         task_conditions.append(ImageTask.replaced_by_task_id.is_(None))
+    media_type = "video" if task_model is VideoTask else "image"
     tasks_rows = await db.execute(
-        select(task_model.job_id, task_model.status).where(*task_conditions)
+        select(task_model.job_id, task_model.status, task_model.created_at).where(*task_conditions)
     )
     stats: dict[str, dict[str, int]] = {
         jid: {"total": 0, "completed": 0, "failed": 0} for jid in job_ids
     }
-    for job_id, status in tasks_rows.all():
+    for job_id, status, created_at in tasks_rows.all():
         bucket = stats.get(job_id)
         if not bucket:
             continue
+        projected = project_task_runtime_state(
+            media_type,
+            status=status,
+            error_message=None,
+            progress=0,
+            result_url=None,
+            created_at=created_at,
+        )
         bucket["total"] += 1
-        if status == TERMINAL_DONE:
+        if projected.status == TERMINAL_DONE:
             bucket["completed"] += 1
-        elif status in TERMINAL_FAILED:
+        elif projected.status in TERMINAL_FAILED:
             bucket["failed"] += 1
 
     items = [

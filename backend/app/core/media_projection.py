@@ -3,21 +3,30 @@ from sqlalchemy import Integer, String, cast, func, literal, select
 from app.core.json_utils import parse_json_or_none
 from app.core.prompt_snapshot import parse_prompt_snapshot
 from app.core.time import to_utc_iso
+from app.core.task_timeout import project_task_runtime_state
 from app.models import GenerationJob, ImageTask, User, VideoTask
 
 
 def image_task_payload(task: ImageTask) -> dict:
+    runtime = project_task_runtime_state(
+        "image",
+        status=task.status,
+        error_message=task.error_message,
+        progress=task.progress,
+        result_url=task.result_url,
+        created_at=task.created_at,
+    )
     return {
         "task_id": task.id,
         "media_type": "image",
         "type_id": task.type_id,
         "title": task.title,
         "sort_order": task.sort_order,
-        "status": task.status,
-        "progress": task.progress or 0,
-        "result_url": task.result_url,
+        "status": runtime.status,
+        "progress": runtime.progress,
+        "result_url": runtime.result_url,
         "size": task.size,
-        "error_message": task.error_message,
+        "error_message": runtime.error_message,
         "credit_cost": task.credit_cost,
         "credit_refunded": bool(task.credit_refunded),
         "replaced_by_task_id": task.replaced_by_task_id,
@@ -28,21 +37,29 @@ def image_task_payload(task: ImageTask) -> dict:
 
 
 def video_task_payload(task: VideoTask) -> dict:
+    runtime = project_task_runtime_state(
+        "video",
+        status=task.status,
+        error_message=task.error_message,
+        progress=task.progress,
+        result_url=task.result_url,
+        created_at=task.created_at,
+    )
     return {
         "task_id": task.id,
         "media_type": "video",
         "type_id": task.type_id,
         "title": task.title,
         "sort_order": task.sort_order,
-        "status": task.status,
-        "progress": task.progress or 0,
-        "result_url": task.result_url,
+        "status": runtime.status,
+        "progress": runtime.progress,
+        "result_url": runtime.result_url,
         "input_mode": task.input_mode,
         "input_images": parse_json_or_none(task.input_images_json) or [],
         "duration": task.duration,
         "resolution": task.resolution,
         "aspect_ratio": task.aspect_ratio,
-        "error_message": task.error_message,
+        "error_message": runtime.error_message,
         "credit_cost": task.credit_cost,
         "credit_refunded": bool(task.credit_refunded),
         "prompt": task.prompt,

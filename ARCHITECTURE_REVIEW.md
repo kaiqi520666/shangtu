@@ -40,11 +40,6 @@
 - 建议：失败时至少记录 `provider_task_id` 和原始 `final_url`（短期存 error/context JSON）供后台补偿；新增中性 `StorageConfigError`/`upload_media_bytes()`，Aliyun OSS 作为默认实现。
 
 
-### 7. Redis 与 DB 双写无强一致保证
-- 位置：`backend/app/worker/image_tasks.py` / `backend/app/worker/video_tasks.py` 写 DB + Redis；router 经 `backend/app/core/task_state.py:merge_task_state` 合并读取；`backend/app/routers/asset.py:batch_delete_assets` best effort 清 Redis。
-- 现状：「先 DB 后 Redis」+ 合并读取已是正确补丁，但状态仍是双写，Redis 过期/丢失时短期状态可能不一致，前端轮询异常被吞掉只表现为卡住。
-- 建议：以 DB 为最终状态源，Redis 仅作进度缓存；进度长时间不变时给出可见错误或加后台超时扫描。
-
 ### 8. 启动时自动建表
 - 位置：`backend/app/main.py:lifespan` 的 `Base.metadata.create_all`。
 - 现状：与应用启动耦合，MVP 可接受。

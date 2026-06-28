@@ -2,6 +2,7 @@ import { computed, ref, reactive } from "vue";
 import { getImageTask } from "@/api/image.js";
 
 const DEFAULT_POLL_INTERVAL_MS = 5000;
+const DEFAULT_STALL_WARNING_MS = 60000;
 const TERMINAL_STATUSES = new Set(["done", "failed", "timeout"]);
 
 function preloadImage(url) {
@@ -80,6 +81,7 @@ export function createBatchFinishedHandler({
 export function useGenerationCards({
   getTask = getImageTask,
   pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
+  stallWarningMs = DEFAULT_STALL_WARNING_MS,
   mediaLabel = "",
   preloadResult = true,
   onCardDone,
@@ -121,6 +123,8 @@ export function useGenerationCards({
   function startPollingCard(card) {
     if (!card.taskId) return;
     stopPollingCard(card.id);
+    card.lastProgressAt = Date.now();
+    card.stalledWarning = "";
     const timer = window.setInterval(() => {
       pollCardOnce(card).catch(() => {});
     }, pollIntervalMs);
@@ -149,7 +153,14 @@ export function useGenerationCards({
       const data = result.data || {};
       const status = data.status || "processing";
       const resultUrl = data.result_url || "";
+      const now = Date.now();
+      const previousStatus = card.status;
+      const previousProgress = typeof card.progress === "number" ? card.progress : 0;
+      let taskAdvanced = status !== previousStatus;
       if (typeof data.progress === "number") {
+        if (data.progress !== previousProgress) {
+          taskAdvanced = true;
+        }
         card.progress = data.progress;
       }
       if (typeof data.credit_cost === "number") {
@@ -185,12 +196,14 @@ export function useGenerationCards({
           card.dataUrl = resultUrl;
           card.previousResultUrl = "";
           card.status = "done";
+          card.stalledWarning = "";
           genLogs.value.push(`[${logPrefix(card)}] 已完成`);
           genLogs.value.push(`已完成 ${generatedCount.value}/${jobTotal.value}`);
           onCardDone?.(card);
         }
       } else if (status === "failed" || status === "timeout") {
         card.status = status;
+        card.stalledWarning = "";
         const fallbackMessage =
           status === "timeout"
             ? `${mediaLabel}生成超时`
@@ -204,6 +217,13 @@ export function useGenerationCards({
       } else {
         // processing 或 done 但 result_url 仍未落库（worker 写入竞态/降级）
         card.status = status === "done" ? "processing" : status;
+        if (taskAdvanced) {
+          card.lastProgressAt = now;
+          card.stalledWarning = "";
+        } else if (!card.stalledWarning && now - (card.lastProgressAt || now) >= stallWarningMs) {
+          card.stalledWarning = `${mediaLabel || "任务"}长时间无进展，继续等待中...`;
+          genLogs.value.push(`[${logPrefix(card)}] ${card.stalledWarning}`);
+        }
       }
 
       maybeFinishBatch(card.batchRunId);
@@ -291,6 +311,9 @@ export function useGenerationCards({
       creditRefunded: false,
       userPrompt: userPrompt || "",
       settingsSnapshot: settingsSnapshot || null,
+      progress: 0,
+      stalledWarning: "",
+      lastProgressAt: 0,
     });
   }
 
@@ -313,6 +336,9 @@ export function useGenerationCards({
       settingsSnapshot: resolveSettingsSnapshot(
         extra.settingsSnapshot ?? item.settings_snapshot,
       ),
+      progress: typeof item.progress === "number" ? item.progress : 0,
+      stalledWarning: "",
+      lastProgressAt: 0,
     });
   }
 
