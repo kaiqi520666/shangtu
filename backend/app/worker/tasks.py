@@ -1,7 +1,7 @@
 import asyncio
+import logging
 import os
 import time
-import traceback
 from typing import Any
 
 import httpx
@@ -30,6 +30,8 @@ from app.core.providers.toapis_provider import (
     validate_size,
 )
 from app.core.task_state import set_task_error, set_task_progress, set_task_result, set_task_status
+
+logger = logging.getLogger("app.worker.tasks")
 
 load_dotenv()
 
@@ -244,8 +246,13 @@ async def _mark_terminal(
     *,
     status: str,
 ) -> None:
-    label = "task" if media_type == "image" else "video task"
-    print(f"[{label} {task_id}] {status} (raw): {raw_message}")
+    logger.warning(
+        "generation %s %s (raw): %s",
+        media_type,
+        status,
+        raw_message,
+        extra={"task_id": task_id, "media_type": media_type, "status": status},
+    )
     friendly = normalize_provider_error(raw_message, media_type=media_type)
     await update_generation_task_in_db(media_type, task_id, status=status, error_message=friendly)
     await refund_generation_credit(media_type, task_id)
@@ -320,7 +327,11 @@ async def generate_image(
                 await _mark_failed(redis, task_id, f"ToAPIS 创建响应解析失败: {e}")
                 return
 
-            print(f"toapis 创建响应: {create_result}")
+            logger.debug(
+                "toapis 创建响应: %s",
+                create_result,
+                extra={"task_id": task_id, "media_type": "image"},
+            )
 
             provider_task_id = extract_provider_task_id(create_result)
             if not provider_task_id:
@@ -347,10 +358,26 @@ async def generate_image(
                         provider_task_id=provider_task_id,
                     )
                 except httpx.HTTPError as e:
-                    print(f"轮询 ToAPIS 异常: {e}")
+                    logger.warning(
+                        "轮询 ToAPIS 异常: %s",
+                        e,
+                        extra={
+                            "task_id": task_id,
+                            "media_type": "image",
+                            "provider_task_id": provider_task_id,
+                        },
+                    )
                     continue
                 except ValueError as e:
-                    print(f"ToAPIS 轮询响应解析失败: {e}")
+                    logger.warning(
+                        "ToAPIS 轮询响应解析失败: %s",
+                        e,
+                        extra={
+                            "task_id": task_id,
+                            "media_type": "image",
+                            "provider_task_id": provider_task_id,
+                        },
+                    )
                     continue
 
                 provider_status = extract_provider_status(poll_result)
@@ -396,7 +423,11 @@ async def generate_image(
                 await _mark_failed(redis, task_id, f"下载生成图失败: {e}")
                 return
             except Exception as e:
-                traceback.print_exc()
+                logger.exception(
+                    "OSS 上传失败: %s",
+                    e,
+                    extra={"task_id": task_id, "media_type": "image"},
+                )
                 await _mark_failed(redis, task_id, f"OSS 上传失败: {e}")
                 return
 
@@ -414,8 +445,11 @@ async def generate_image(
     except httpx.TimeoutException:
         await _mark_timeout(redis, task_id, "请求 ToAPIS 超时")
     except Exception as e:
-        print(f"任务失败详细错误: {e}")
-        traceback.print_exc()
+        logger.exception(
+            "任务失败详细错误: %s",
+            e,
+            extra={"task_id": task_id, "media_type": "image"},
+        )
         await _mark_failed(redis, task_id, str(e))
 
 
@@ -471,11 +505,20 @@ async def generate_video(
                         detail = (resp.text or "")[:500]
                     except Exception:
                         detail = ""
-                    print(f"toapis 视频创建失败 status={resp.status_code} body={detail}")
+                    logger.warning(
+                        "toapis 视频创建失败 status=%s body=%s",
+                        resp.status_code,
+                        detail,
+                        extra={"task_id": task_id, "media_type": "video"},
+                    )
                     reason = f"{e} | {detail}" if detail else str(e)
                 else:
                     reason = f"{type(e).__name__}: {e!r}"
-                    print(f"toapis 视频创建传输层错误 {reason}")
+                    logger.warning(
+                        "toapis 视频创建传输层错误 %s",
+                        reason,
+                        extra={"task_id": task_id, "media_type": "video"},
+                    )
                 await _mark_video_failed(
                     redis,
                     task_id,
@@ -486,7 +529,11 @@ async def generate_video(
                 await _mark_video_failed(redis, task_id, f"ToAPIS 视频创建响应解析失败: {e}")
                 return
 
-            print(f"toapis 视频创建响应: {create_result}")
+            logger.debug(
+                "toapis 视频创建响应: %s",
+                create_result,
+                extra={"task_id": task_id, "media_type": "video"},
+            )
 
             provider_task_id = extract_provider_task_id(create_result)
             if not provider_task_id:
@@ -513,10 +560,26 @@ async def generate_video(
                         provider_task_id=provider_task_id,
                     )
                 except httpx.HTTPError as e:
-                    print(f"轮询 ToAPIS 视频异常: {e}")
+                    logger.warning(
+                        "轮询 ToAPIS 视频异常: %s",
+                        e,
+                        extra={
+                            "task_id": task_id,
+                            "media_type": "video",
+                            "provider_task_id": provider_task_id,
+                        },
+                    )
                     continue
                 except ValueError as e:
-                    print(f"ToAPIS 视频轮询响应解析失败: {e}")
+                    logger.warning(
+                        "ToAPIS 视频轮询响应解析失败: %s",
+                        e,
+                        extra={
+                            "task_id": task_id,
+                            "media_type": "video",
+                            "provider_task_id": provider_task_id,
+                        },
+                    )
                     continue
 
                 provider_status = extract_provider_status(poll_result)
@@ -562,7 +625,11 @@ async def generate_video(
                 await _mark_video_failed(redis, task_id, f"下载生成视频失败: {e}")
                 return
             except Exception as e:
-                traceback.print_exc()
+                logger.exception(
+                    "视频上传 OSS 失败: %s",
+                    e,
+                    extra={"task_id": task_id, "media_type": "video"},
+                )
                 await _mark_video_failed(redis, task_id, f"视频上传 OSS 失败: {e}")
                 return
 
@@ -579,6 +646,9 @@ async def generate_video(
     except httpx.TimeoutException:
         await _mark_video_timeout(redis, task_id, "请求 ToAPIS 视频服务超时")
     except Exception as e:
-        print(f"视频任务失败详细错误: {e}")
-        traceback.print_exc()
+        logger.exception(
+            "视频任务失败详细错误: %s",
+            e,
+            extra={"task_id": task_id, "media_type": "video"},
+        )
         await _mark_video_failed(redis, task_id, str(e))

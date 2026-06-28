@@ -1,3 +1,4 @@
+import logging
 import os
 
 from arq.connections import RedisSettings
@@ -6,6 +7,10 @@ from dotenv import load_dotenv
 from app.worker.tasks import generate_image, generate_video
 
 load_dotenv()
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+)
 
 
 class WorkerSettings:
