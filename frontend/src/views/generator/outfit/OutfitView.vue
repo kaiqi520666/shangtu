@@ -1,9 +1,9 @@
 <script setup>
 import { useRoute, useRouter } from 'vue-router'
 import ImageEditModal from '@/components/generation/image/ImageEditModal.vue'
-import GenerationHistoryDrawer from '@/components/generation/GenerationHistoryDrawer.vue'
-import GenerationPreviewModal from '@/components/generation/GenerationPreviewModal.vue'
-import GenerationWorkspace from '@/components/generation/GenerationWorkspace.vue'
+import GenerationHistoryDrawer from '@/components/generation/workspace/GenerationHistoryDrawer.vue'
+import GenerationPreviewModal from '@/components/generation/workspace/GenerationPreviewModal.vue'
+import GenerationWorkspace from '@/components/generation/workspace/GenerationWorkspace.vue'
 import GeneratorLayout from '@/components/layout/GeneratorLayout.vue'
 import OutfitSettingsPanel from '@/components/outfit/OutfitSettingsPanel.vue'
 import OutfitStrategyReviewPanel from '@/components/outfit/OutfitStrategyReviewPanel.vue'

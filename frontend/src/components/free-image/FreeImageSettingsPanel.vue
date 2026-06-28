@@ -2,8 +2,8 @@
 import { computed, watch } from "vue";
 import { ImagePlus, LoaderCircle, Sparkles } from "lucide-vue-next";
 import AppSelect from "@/components/ui/AppSelect.vue";
-import GeneratorActionFooter from "@/components/generation/GeneratorActionFooter.vue";
-import GeneratorSidePanelShell from "@/components/generation/GeneratorSidePanelShell.vue";
+import GeneratorActionFooter from "@/components/generation/workspace/GeneratorActionFooter.vue";
+import GeneratorSidePanelShell from "@/components/generation/workspace/GeneratorSidePanelShell.vue";
 import ImageUploader from "@/components/generation/image/ImageUploader.vue";
 import {
   isQualitySupported,

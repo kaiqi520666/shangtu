@@ -1,9 +1,9 @@
 <script setup>
 import { onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import GenerationHistoryDrawer from "@/components/generation/GenerationHistoryDrawer.vue";
-import GenerationPreviewModal from "@/components/generation/GenerationPreviewModal.vue";
-import GenerationWorkspace from "@/components/generation/GenerationWorkspace.vue";
+import GenerationHistoryDrawer from "@/components/generation/workspace/GenerationHistoryDrawer.vue";
+import GenerationPreviewModal from "@/components/generation/workspace/GenerationPreviewModal.vue";
+import GenerationWorkspace from "@/components/generation/workspace/GenerationWorkspace.vue";
 import GeneratorLayout from "@/components/layout/GeneratorLayout.vue";
 import ProductVideoStrategyReviewPanel from "@/components/product-video/ProductVideoStrategyReviewPanel.vue";
 import VideoSettingsPanel from "@/components/product-video/VideoSettingsPanel.vue";

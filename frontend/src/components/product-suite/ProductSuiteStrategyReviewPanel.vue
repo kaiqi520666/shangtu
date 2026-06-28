@@ -1,5 +1,5 @@
 <script setup>
-import StrategyReviewShell from "@/components/generation/StrategyReviewShell.vue";
+import StrategyReviewShell from "@/components/generation/workspace/StrategyReviewShell.vue";
 import ProductSuiteStrategyCard from "@/components/product-suite/ProductSuiteStrategyCard.vue";
 
 const props = defineProps({

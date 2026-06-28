@@ -1,8 +1,8 @@
 <script setup>
 import { Clock3, Download, ImageIcon, Plus, RefreshCw } from 'lucide-vue-next'
 import GeneratedCardGrid from '@/components/generation/cards/GeneratedCardGrid.vue'
-import GeneratorPreviewShowcase from '@/components/generation/GeneratorPreviewShowcase.vue'
-import GeneratorWorkspaceShell from '@/components/generation/GeneratorWorkspaceShell.vue'
+import GeneratorPreviewShowcase from '@/components/generation/workspace/GeneratorPreviewShowcase.vue'
+import GeneratorWorkspaceShell from '@/components/generation/workspace/GeneratorWorkspaceShell.vue'
 import VideoGeneratedCardGrid from '@/components/generation/cards/VideoGeneratedCardGrid.vue'
 
 defineProps({
