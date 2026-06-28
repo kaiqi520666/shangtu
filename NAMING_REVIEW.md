@@ -57,7 +57,7 @@
 - `backend/app/worker/image_tasks.py`
 - `backend/app/worker/video_tasks.py`
 
-其中上游错误归一化已拆到 `backend/app/worker/provider_errors.py`，DB 状态同步和幂等退款已拆到 `backend/app/worker/task_state_sync.py`。
+其中上游错误归一化已拆到 `backend/app/worker/provider_errors.py`，DB 状态同步和幂等退款已拆到 `backend/app/worker/task_state_sync.py`，失败/超时终态处理已拆到 `backend/app/worker/task_failures.py`。
 
 ## 2. 命名一致性
 

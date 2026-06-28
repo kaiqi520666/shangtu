@@ -26,13 +26,16 @@ from app.core.providers.toapis_provider import (
     fetch_generation,
     validate_size,
 )
-from app.core.task_state import set_task_error, set_task_progress, set_task_result, set_task_status
-from app.worker.provider_errors import normalize_provider_error
+from app.core.task_state import set_task_progress, set_task_result, set_task_status
+from app.worker.task_failures import (
+    mark_failed as _mark_failed,
+    mark_timeout as _mark_timeout,
+    mark_video_failed as _mark_video_failed,
+    mark_video_timeout as _mark_video_timeout,
+)
 from app.worker.task_state_sync import (
     fetch_task_user_id,
     fetch_video_task_user_id,
-    refund_generation_credit,
-    update_generation_task_in_db,
     update_task_in_db,
     update_video_task_in_db,
 )
@@ -52,44 +55,6 @@ async def _set_progress(redis, task_id: str, value: int) -> None:
 
 async def _set_video_progress(redis, task_id: str, value: int) -> None:
     await set_task_progress(redis, "video", task_id, value)
-
-
-async def _mark_terminal(
-    redis,
-    media_type: str,
-    task_id: str,
-    raw_message: str,
-    *,
-    status: str,
-) -> None:
-    logger.warning(
-        "generation %s %s (raw): %s",
-        media_type,
-        status,
-        raw_message,
-        extra={"task_id": task_id, "media_type": media_type, "status": status},
-    )
-    friendly = normalize_provider_error(raw_message, media_type=media_type)
-    await update_generation_task_in_db(media_type, task_id, status=status, error_message=friendly)
-    await refund_generation_credit(media_type, task_id)
-    await set_task_error(redis, media_type, task_id, friendly)
-    await set_task_status(redis, media_type, task_id, status, ttl=3600)
-
-
-async def _mark_failed(redis, task_id: str, raw_message: str) -> None:
-    await _mark_terminal(redis, "image", task_id, raw_message, status="failed")
-
-
-async def _mark_timeout(redis, task_id: str, raw_message: str) -> None:
-    await _mark_terminal(redis, "image", task_id, raw_message, status="timeout")
-
-
-async def _mark_video_failed(redis, task_id: str, raw_message: str) -> None:
-    await _mark_terminal(redis, "video", task_id, raw_message, status="failed")
-
-
-async def _mark_video_timeout(redis, task_id: str, raw_message: str) -> None:
-    await _mark_terminal(redis, "video", task_id, raw_message, status="timeout")
 
 
 async def generate_image(
