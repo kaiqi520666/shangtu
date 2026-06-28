@@ -1,0 +1,208 @@
+# 命名与分层评审
+
+## 审阅来源
+
+- 已先执行 `codegraph --help`，确认可用子命令包括 `files`、`node`、`explore`。
+- 当前 MCP 工具列表未暴露独立的 `codegraph_files` 工具，因此使用同一索引能力的 `codegraph files` CLI 获取目录树，没有使用 `ls/find`。
+- 索引统计：`frontend` 138 个文件，`backend` 73 个文件。
+- 重点抽样：`backend/app/routers/image.py`、`backend/app/routers/video.py`、`backend/app/routers/generation.py`、`backend/app/worker/tasks.py`、`frontend/src/router/routes/generator.js`、`frontend/src/api/image.js`、`frontend/src/api/video.js`、`frontend/src/composables/generator/useGenerationRunner.js`、各 generator view。
+
+## 1. 目录层次合理性
+
+### 前端
+
+整体顶层目录清晰：`views` 管页面入口，`components` 管 UI 组件，`composables` 管状态和副作用，`api` 管请求，`stores` 管 Pinia，全局工具在 `utils`。新人从 `frontend/src/router/routes/generator.js` 可以快速跳到商品套图、详情图、视频、穿搭、自由生图页面。
+
+主要问题是“技术类型目录 + 业务领域目录”混用后，单个业务的代码分散过多：
+
+- `frontend/src/views/generator/product-image/ProductImageView.vue`
+- `frontend/src/components/product-image/ProductImageSettingsPanel.vue`
+- `frontend/src/composables/generator/useProductImageGenerator.js`
+- `frontend/src/constants/generator.js`
+- `frontend/src/api/image.js`
+
+这些文件共同构成商品详情图业务，但不在同一业务模块下。当前规模还能接受；如果继续增长，建议以业务域收敛二级结构，例如保留顶层技术目录的同时，把 composable/constants 也按 `product-image`、`product-video`、`outfit` 子目录拆开。
+
+`frontend/src/components/generation/` 放的是跨场景生成工作台组件，但里面同时有通用 shell、图片 uploader、图片卡片、视频卡片、编辑弹窗：
+
+- `frontend/src/components/generation/GenerationWorkspace.vue`
+- `frontend/src/components/generation/ImageUploader.vue`
+- `frontend/src/components/generation/GeneratedCardGrid.vue`
+- `frontend/src/components/generation/VideoGeneratedCardGrid.vue`
+- `frontend/src/components/generation/ImageEditModal.vue`
+
+建议拆成 `components/generation/workspace/`、`components/generation/cards/`、`components/generation/image/`，否则“generation” 会逐渐变成杂物筐。
+
+`frontend/src/views/generator/assets/AssetLibraryView.vue` 放在 generator 路由下，但资产库是生成结果资产管理，不是某个生成器本身。对应组件在 `frontend/src/components/assets/AssetCardGrid.vue`、API 在 `frontend/src/api/asset.js`，命名已经把它当独立资产域。建议迁到 `frontend/src/views/assets/AssetLibraryView.vue`，路由也改为 `/assets` 或在侧栏仍展示但文件位置独立。
+
+后台前端按角色聚合在 `admin` 下：
+
+- `frontend/src/views/admin/*`
+- `frontend/src/components/admin/*`
+- `frontend/src/composables/admin/*`
+
+这个规则统一，但 `frontend/src/components/admin/` 已有 15 个文件，接近需要拆分的边界。建议后续按资源拆子目录：`users/`、`billing/`、`catalog/`、`settings/`、`audit/`。
+
+### 后端
+
+后端顶层技术分层基本清楚：
+
+- `backend/app/routers/`：FastAPI 路由
+- `backend/app/core/`：领域逻辑、基础设施、provider、策略生成
+- `backend/app/models/`：SQLAlchemy model
+- `backend/app/schemas/`：全局 response schema
+- `backend/app/services/`：目前只有任务入队/扣费事务 helper
+- `backend/app/worker/`：异步生成任务
+
+主要问题是 routers 层承载了过多业务编排：
+
+- `backend/app/routers/image.py` 同时包含图片上传、AI 图片分析、图片策略生成、目录读取、积分价格读取、图片任务创建、任务查询、下载代理、重新生成。文件名叫 `image.py`，但实际是 `image_generation_api.py + image_assets_api.py + image_strategy_api.py` 的合集。
+- `backend/app/routers/video.py` 同时包含视频策略生成、视频任务创建、任务状态查询、软删除、下载代理。比 `image.py` 窄一些，但同样把业务校验、扣费、prompt 构建、入队编排放在 router。
+- `backend/app/routers/billing.py` 同时处理套餐读取、订单创建、支付网关调用、订单查询、异步通知回调、交易记录。支付 provider 编排建议下沉到 `services/billing.py` 或 `core/payment.py`。
+
+`backend/app/core/` 职责也偏宽：既有 `database.py`、`deps.py`、`time.py` 这类基础设施，也有 `ai_generation.py`、`generation_prompt_builder.py`、`product_catalog.py` 这类业务域逻辑。建议后续拆出 `backend/app/domains/` 或 `backend/app/services/` 来放商品图、视频、资产、计费等业务编排，`core` 保留基础能力和 provider 封装。
+
+`backend/app/worker/tasks.py` 同时实现 image/video 两条 worker 链路、上游错误归一化、DB 更新、退款、Redis 状态同步。建议拆成：
+
+- `backend/app/worker/image_tasks.py`
+- `backend/app/worker/video_tasks.py`
+- `backend/app/worker/task_state_sync.py`
+- `backend/app/worker/provider_errors.py`
+
+## 2. 命名一致性
+
+### 文件名风格
+
+当前风格基本符合语言习惯：
+
+- Vue 组件：PascalCase，例如 `ProductImageView.vue`、`GenerationWorkspace.vue`
+- 前端目录：kebab-case，例如 `product-image`、`product-video`、`free-image`
+- composable：camelCase + `useXxx.js`，例如 `useProductImageGenerator.js`
+- Python：snake_case，例如 `generation_prompt_builder.py`
+
+不一致点主要集中在前端业务常量和 API：
+
+- `frontend/src/constants/productSuite.js`、`frontend/src/constants/productVideo.js` 使用 camelCase 文件名，但对应目录是 `product-suite`、`product-video`。
+- `frontend/src/constants/generator.js` 同时承载商品详情图等生成器通用/业务常量，名字过泛。
+- `frontend/src/api/asset.js` 是单数，但路由和页面概念是 `assets`：`frontend/src/views/generator/assets/AssetLibraryView.vue`。
+
+建议前端业务常量跟目录统一为 kebab-case：`product-suite.js`、`product-video.js`；API 文件可以统一单数资源名或复数资源名，不要 `asset`/`assets` 混用。
+
+### 同类文件命名模式
+
+generator 场景 composable 命名一致：
+
+- `frontend/src/composables/generator/useFreeImageGenerator.js`
+- `frontend/src/composables/generator/useOutfitGenerator.js`
+- `frontend/src/composables/generator/useProductImageGenerator.js`
+- `frontend/src/composables/generator/useProductSuiteGenerator.js`
+- `frontend/src/composables/generator/useProductVideoGenerator.js`
+
+但这些文件实际都是页面级 orchestrator，不只是“generator”：它们通常会管理表单状态、策略生成、任务恢复、任务创建、卡片动作、历史任务。建议命名为 `useProductImageWorkspace.js` 或拆出子 composable：`useProductImageStrategy.js`、`useProductImageBatch.js`、`useProductImageRestore.js`。
+
+后台 admin 前端命名非常一致，`AdminXxxView.vue`、`AdminXxxPanel.vue`、`useAdminXxx.js` 能快速建立映射。后端 `backend/app/routers/admin/*.py` 也基本按资源命名，规则清楚。
+
+### 前后端概念对齐
+
+存在 `generation/job/task` 三套概念混用：
+
+- 前端 API：`frontend/src/api/generation.js` 使用 `createGenerationJob`、`listGenerationJobs`
+- 后端模型：`backend/app/models/generation_job.py` 使用 `GenerationJob`
+- 图片/视频模型：`backend/app/models/image_task.py`、`backend/app/models/video_task.py`
+- 页面文案和函数常用“任务”：`currentTaskTitle`、`historyTasks`、`createNewTask`
+
+建议明确概念边界：`GenerationJob` 表示工作区/一次生成批次容器，`ImageTask`/`VideoTask` 表示单个媒体生成任务。前端变量可以改为 `currentJobTitle`、`historyJobs`，避免 UI 代码里 job/task 互换。
+
+`scenario`、`type_id`、`module`、`structure` 也有轻微混用：
+
+- 商品详情图前端叫 module：`selectedModules`、`StrategyModuleCard.vue`
+- 后端接口统一用 `type_id` 和 `structure`
+- 套图前端叫 structure：`SuiteStructureConfigurator.vue`
+- 视频前端叫 type：`VideoTypeSelector.vue`
+
+建议补一份短命名约定：场景用 `scenario`，业务子类型用 `typeId`，详情图模块用 `moduleId`，套图结构用 `structure`，不要在同一层接口里把 `type_id` 同时代表模块、视频方向、场景。
+
+### 路由/函数命名是否诚实
+
+`backend/app/routers/image.py` 的文件名仍偏宽。它不只是 image CRUD，而是覆盖图片上传、AI 图片分析、图片策略生成、目录读取、积分价格读取、图片任务创建、任务查询、下载代理、重新生成。函数名已经补上 image 前缀，但 router 文件仍可继续拆分。
+
+建议拆分后命名更具体：
+
+- `backend/app/routers/image_uploads.py`
+- `backend/app/routers/image_generation.py`
+- `backend/app/routers/image_strategy.py`
+- `backend/app/routers/image_tasks.py`
+
+`backend/app/core/ai_generation.py` 比原文件名更诚实，但仍承载图片分析、图片策略、视频策略、自由生图 prompt 优化。后续可以继续拆成 `image_analysis.py`、`strategy_generation.py`、`prompt_optimization.py`。
+
+`backend/app/core/generation_prompt_builder.py` 比原文件名更通用，但仍同时包含图片生成、视频生成、AI 文案、策略模板 prompt 构建。后续可以继续按图片生成、视频生成、策略模板三类 prompt 构建职责拆分。
+
+## 3. 目录嵌套深度与扁平度
+
+前端最深的常规路径是 4 层业务嵌套：
+
+- `frontend/src/views/generator/product-image/ProductImageView.vue`
+- `frontend/src/views/generator/product-video/ProductVideoView.vue`
+- `frontend/src/views/generator/product-suite/ProductSuiteView.vue`
+- `frontend/src/views/generator/free-image/FreeImageView.vue`
+
+这个深度可以接受，因为 `views/generator/<scenario>` 能直接表达路由归属。真正的问题不是过深，而是同一业务在 `views/components/composables/constants/api` 横向分散。
+
+需要重点拆分的扁平目录：
+
+- `frontend/src/composables/generator/` 已承接生成工作台 composable；后续可继续按 `strategy`、`batch`、`restore` 拆更细子目录。
+- `backend/app/core/` 有 18 个直接 `.py` 文件，还包含 `providers/`、`strategy/` 子目录。建议把业务文件移出 `core`，否则 `core` 既像基础设施层又像业务服务层。
+- `frontend/src/components/admin/` 目前 15 个文件，已经到需要关注的阈值。建议下一次新增 admin 功能前先拆子目录。
+
+单文件体量也暴露了目录没有承接复杂度：
+
+- `backend/app/routers/image.py`：703 行
+- `backend/app/worker/tasks.py`：655 行
+- `frontend/src/composables/generator/useOutfitGenerator.js`：约 22KB
+- `frontend/src/composables/generator/useProductVideoGenerator.js`：约 18KB
+- `frontend/src/composables/generator/useProductSuiteGenerator.js`：约 18KB
+- `frontend/src/composables/generator/useProductImageGenerator.js`：约 17KB
+
+建议优先把“大 orchestrator” 拆成按职责命名的小 composable/service，而不是继续在同级目录新增类似文件。
+
+## 4. 新人可读性
+
+仅凭目录结构，新人能较快猜到前端图片/视频页面：
+
+- 图片详情图：`frontend/src/views/generator/product-image/ProductImageView.vue`
+- 商品视频：`frontend/src/views/generator/product-video/ProductVideoView.vue`
+- 穿搭图：`frontend/src/views/generator/outfit/OutfitView.vue`
+- 自由生图：`frontend/src/views/generator/free-image/FreeImageView.vue`
+
+但后端会更容易猜错：商品详情图、商品套图、穿搭图、自由生图都集中在 `backend/app/routers/image.py` 和 `backend/app/core/generation_prompt_builder.py`，而不是各自有 `product_image.py`、`product_suite.py`、`free_image.py` 路由或 service。
+
+容易猜错的具体例子：
+
+1. `frontend/src/views/generator/assets/AssetLibraryView.vue`
+   容易误以为资产库是 generator 的一个生成场景。建议迁到 `frontend/src/views/assets/AssetLibraryView.vue`，路由仍可在生成器侧栏展示。
+
+2. `backend/app/routers/image.py`
+   容易误以为只处理图片任务 CRUD，实际还处理 AI 分析、策略生成、目录、自由生图提示词优化、重生、下载。建议拆 router 或至少改名为 `image_generation.py` 并把 upload/catalog/strategy 分离。
+
+3. `backend/app/core/ai_generation.py`
+   容易误以为只做图片分析，实际包含视频策略生成和自由生图提示词优化。建议拆成更诚实的策略/分析/prompt 优化模块。
+
+4. `frontend/src/composables/generator/useGenerationRunner.js`
+   名字像通用 runner，但内部默认导入 `generateImage` 和图片积分校验，同时也被视频生成器复用。建议拆成 `useGenerationJobs.js`、`useImageBatchRunner.js`、`useMediaBatchRunner.js`。
+
+5. `backend/app/routers/generation.py`
+   名字像所有生成 API 的入口，但实际只管理 `GenerationJob` 容器；真正创建图片/视频任务在 `image.py` 和 `video.py`。建议改为 `generation_jobs.py`，前端 `api/generation.js` 也可改为 `api/generationJobs.js`。
+
+## 建议优先级
+
+P1：继续拆 `backend/app/routers/image.py`，把上传、策略、任务 CRUD、重生/下载等职责拆到更具体的 router 或 service。
+
+P1：把 `backend/app/core/ai_generation.py`、`backend/app/core/generation_prompt_builder.py` 中的视频/策略/prompt 职责继续拆出，避免 core 文件继续变成业务合集。
+
+P2：继续拆 `frontend/src/composables/generator/` 里的大 composable，按 `strategy`、`batch`、`restore` 等职责收敛。
+
+P2：将资产库从 `views/generator/assets` 移到独立 `views/assets`，使页面位置与 `api/asset.js`、`components/assets` 对齐。
+
+P3：统一前端业务常量文件命名，优先把 `productSuite.js`、`productVideo.js` 改为与目录一致的 kebab-case，或反过来制定 JS 文件统一 camelCase 规则。
+
+P3：后台 admin 目录下一次扩展前拆分 `frontend/src/components/admin/`，避免继续堆平铺组件。
