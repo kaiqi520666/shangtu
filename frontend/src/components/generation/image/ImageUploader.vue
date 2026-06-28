@@ -1,9 +1,11 @@
 <script setup>
-import { computed, ref } from "vue";
-import { CheckCircle2, FolderOpen, ImagePlus, LoaderCircle, Trash2, X } from "lucide-vue-next";
-import { uploadImage } from "@/api/image.js";
+import { X } from "lucide-vue-next";
 import AssetPickerModal from "@/components/assets/AssetPickerModal.vue";
+import ImageUploadAddTile from "@/components/generation/image/ImageUploadAddTile.vue";
+import ImageUploadItem from "@/components/generation/image/ImageUploadItem.vue";
+import ImageUploadSourcePanel from "@/components/generation/image/ImageUploadSourcePanel.vue";
 import AppModal from "@/components/ui/AppModal.vue";
+import { useImageUploader } from "@/composables/generator/useImageUploader.js";
 
 const props = defineProps({
   images: {
@@ -58,168 +60,25 @@ const props = defineProps({
 
 const emit = defineEmits(["update:images", "update:mainIndex", "notify"]);
 
-const fileInput = ref(null);
-const dragOver = ref(false);
-const previewImage = ref(null);
-const assetPickerOpen = ref(false);
-const placeholderCount = computed(() => {
-  if (!props.showPlaceholders) return 0;
-  return Math.max(0, props.maxCount - props.images.length - 1);
-});
-const remainingCount = computed(() => Math.max(0, props.maxCount - props.images.length));
-
-function triggerFileInput() {
-  fileInput.value?.click();
-}
-
-function openAssetPicker() {
-  if (remainingCount.value <= 0) {
-    emit("notify", props.limitMessage);
-    return;
-  }
-  assetPickerOpen.value = true;
-}
-
-function handleFileChange(event) {
-  processFiles(Array.from(event.target.files || []));
-  event.target.value = "";
-}
-
-function handleDrop(event) {
-  dragOver.value = false;
-  processFiles(Array.from(event.dataTransfer.files || []));
-}
-
-function readPreview(file) {
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onload = (e) => resolve(e.target.result);
-    reader.readAsDataURL(file);
-  });
-}
-
-async function processFiles(files) {
-  const imageFiles = files.filter((file) => file.type.startsWith("image/"));
-  const limit = props.maxCount - props.images.length;
-
-  if (limit <= 0) {
-    emit("notify", props.limitMessage);
-    return;
-  }
-
-  const toProcess = imageFiles.slice(0, limit);
-  if (imageFiles.length > toProcess.length) {
-    emit("notify", `已达到 ${props.maxCount} 张上限，多余图片未添加`);
-  }
-
-  // 先并行生成本地预览，立刻塞入占位项
-  const previews = await Promise.all(toProcess.map((file) => readPreview(file)));
-
-  const placeholders = toProcess.map((file, index) => ({
-    id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${index}`,
-    previewUrl: previews[index],
-    url: "",
-    objectKey: "",
-    contentType: file.type,
-    size: file.size,
-    uploading: true,
-    error: "",
-  }));
-
-  emit("update:images", [...props.images, ...placeholders]);
-
-  // 逐一上传，回填 OSS 信息
-  await Promise.all(
-    toProcess.map(async (file, index) => {
-      const localId = placeholders[index].id;
-      try {
-        const result = await uploadImage(file);
-        if (result.code !== 0) {
-          patchImage(localId, { uploading: false, error: result.message || "图片上传失败" });
-          emit("notify", result.message || "图片上传失败");
-          return;
-        }
-        patchImage(localId, {
-          uploading: false,
-          error: "",
-          url: result.data.url,
-          objectKey: result.data.object_key,
-          contentType: result.data.content_type,
-          size: result.data.size,
-        });
-      } catch (error) {
-        const status = error.response?.status;
-        if (status === 401) {
-          emit("notify", "登录已过期，请重新登录");
-        } else {
-          emit("notify", error.response?.data?.message || "图片上传失败");
-        }
-        patchImage(localId, { uploading: false, error: "图片上传失败" });
-      }
-    }),
-  );
-}
-
-function patchImage(localId, patch) {
-  const next = props.images.map((item) =>
-    item && item.id === localId ? { ...item, ...patch } : item,
-  );
-  emit("update:images", next);
-}
-
-function removeImage(index) {
-  const nextImages = props.images.filter((_, imageIndex) => imageIndex !== index);
-  emit("update:images", nextImages);
-
-  if (props.mainIndex >= nextImages.length) {
-    emit("update:mainIndex", Math.max(0, nextImages.length - 1));
-  } else if (index < props.mainIndex) {
-    emit("update:mainIndex", props.mainIndex - 1);
-  }
-}
-
-function clearImages() {
-  emit("update:images", []);
-  emit("update:mainIndex", 0);
-  previewImage.value = null;
-}
-
-function addAssetImages(assets) {
-  const limit = remainingCount.value;
-  if (limit <= 0) {
-    emit("notify", props.limitMessage);
-    return;
-  }
-  const selected = assets.slice(0, limit);
-  if (assets.length > selected.length) {
-    emit("notify", `已达到 ${props.maxCount} 张上限，多余图片未添加`);
-  }
-  const nextImages = selected.map((asset) => ({
-    id: `asset_${asset.taskId || asset.id}`,
-    previewUrl: asset.url,
-    url: asset.url,
-    objectKey: "",
-    contentType: "",
-    size: 0,
-    uploading: false,
-    error: "",
-    source: "asset",
-    assetTaskId: asset.taskId || asset.id,
-  }));
-  emit("update:images", [...props.images, ...nextImages]);
-  assetPickerOpen.value = false;
-}
-
-function getPreview(img) {
-  if (!img) return "";
-  if (typeof img === "string") return img;
-  return img.previewUrl || img.url || "";
-}
-
-function openPreview(img) {
-  if (!getPreview(img)) return;
-  previewImage.value = img;
-}
+const {
+  addAssetImages,
+  assetPickerOpen,
+  clearImages,
+  dragOver,
+  fileInput,
+  getPreview,
+  handleDrop,
+  handleFileChange,
+  openAssetPicker,
+  openPreview,
+  placeholderCount,
+  previewImage,
+  remainingCount,
+  removeImage,
+  triggerFileInput,
+  uploadActionText,
+  uploadHintDescription,
+} = useImageUploader(props, emit);
 
 function getBadgeText(index) {
   return props.badgeTextResolver ? props.badgeTextResolver(index) : props.mainBadgeText;
@@ -243,14 +102,6 @@ function shouldShowBadge(index) {
       </label>
       <div class="flex shrink-0 items-center gap-2">
         <button
-          type="button"
-          class="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-bold text-slate-500 shadow-sm transition-colors hover:border-primary/30 hover:bg-primary/5 hover:text-primary"
-          @click="openAssetPicker"
-        >
-          <FolderOpen class="h-3.5 w-3.5" />
-          资产库
-        </button>
-        <button
           v-if="images.length > 0"
           type="button"
           class="text-xs text-slate-400 transition-colors hover:text-rose-500"
@@ -270,87 +121,46 @@ function shouldShowBadge(index) {
       @change="handleFileChange"
     />
 
-    <div class="grid grid-cols-3 gap-3">
-      <div
+    <ImageUploadSourcePanel
+      v-if="images.length === 0"
+      :action-text="uploadActionText"
+      :hint-text="uploadHintDescription"
+      :drag-over="dragOver"
+      @upload="triggerFileInput"
+      @asset="openAssetPicker"
+      @drag-over="dragOver = true"
+      @drag-leave="dragOver = false"
+      @drop="handleDrop"
+    />
+
+    <div v-else class="grid grid-cols-3 gap-3">
+      <ImageUploadItem
         v-for="(img, index) in images"
         :key="img?.id || `${getPreview(img)}-${index}`"
-        class="group relative flex aspect-square cursor-zoom-in items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50 p-1 shadow-inner"
-        @click="openPreview(img)"
-      >
-        <img
-          :src="getPreview(img)"
-          class="max-h-full max-w-full rounded-lg object-contain transition-transform duration-300 group-hover:scale-105"
-          :alt="altText"
-        />
+        :image="img"
+        :preview-url="getPreview(img)"
+        :index="index"
+        :alt-text="altText"
+        :show-main-action="showMainAction"
+        :is-main="index === mainIndex"
+        :show-badge="shouldShowBadge(index)"
+        :badge-text="getBadgeText(index)"
+        @preview="openPreview(img)"
+        @set-main="emit('update:mainIndex', index)"
+        @remove="removeImage(index)"
+      />
 
-        <div
-          v-if="img?.uploading"
-          class="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-white/70 text-xs font-semibold text-primary"
-        >
-          <LoaderCircle class="h-5 w-5 animate-spin" />
-          <span>上传中...</span>
-        </div>
-        <div
-          v-else-if="img?.error"
-          class="absolute inset-x-0 bottom-0 bg-rose-500/85 px-2 py-1 text-center text-xs text-white"
-        >
-          {{ img.error }}
-        </div>
-
-        <div
-          class="absolute inset-0 flex items-center justify-center gap-1.5 bg-slate-900/60 opacity-0 transition-opacity group-hover:opacity-100"
-        >
-          <button
-            v-if="showMainAction"
-            type="button"
-            class="rounded border border-slate-100 bg-white p-1.5 text-xs text-slate-800 shadow transition-colors hover:bg-slate-100"
-            :class="index === mainIndex ? 'border-primary text-primary' : ''"
-            title="设为渲染主图"
-            @click.stop="emit('update:mainIndex', index)"
-          >
-            <CheckCircle2 class="h-3.5 w-3.5" />
-          </button>
-          <button
-            type="button"
-            class="rounded border border-slate-100 bg-white p-1.5 text-rose-500 shadow transition-colors hover:bg-rose-50"
-            title="删除"
-            @click.stop="removeImage(index)"
-          >
-            <Trash2 class="h-3.5 w-3.5" />
-          </button>
-        </div>
-        <span
-          v-if="shouldShowBadge(index)"
-          class="absolute bottom-1 right-1 rounded bg-primary px-1.5 py-0.5 text-xs font-bold text-white shadow-sm"
-        >
-          {{ getBadgeText(index) }}
-        </span>
-      </div>
-
-      <div
+      <ImageUploadAddTile
         v-if="images.length < maxCount"
-        role="button"
-        tabindex="0"
-        class="flex aspect-square cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed px-3 py-4 transition-all duration-300"
-        :class="
-          dragOver
-            ? 'border-primary bg-primary/10 shadow-sm'
-            : 'border-slate-300 bg-slate-50 hover:border-slate-400 hover:bg-slate-100/50'
-        "
-        @click="triggerFileInput"
-        @keydown.enter.prevent="triggerFileInput"
-        @keydown.space.prevent="triggerFileInput"
-        @dragover.prevent="dragOver = true"
-        @dragleave.prevent="dragOver = false"
-        @drop.prevent="handleDrop"
-      >
-        <ImagePlus class="mb-1 h-5 w-5 text-slate-400" />
-        <span class="text-center text-xs font-semibold text-slate-500">拖拽到此处</span>
-        <span class="mt-0.5 text-center text-xs text-slate-400">{{ hintText }}</span>
-        <span class="mt-2 rounded-full bg-white px-2.5 py-1 text-xs font-bold text-slate-500 shadow-sm">
-          点击上传
-        </span>
-      </div>
+        :action-text="uploadActionText"
+        :hint-text="uploadHintDescription"
+        :drag-over="dragOver"
+        @upload="triggerFileInput"
+        @asset="openAssetPicker"
+        @drag-over="dragOver = true"
+        @drag-leave="dragOver = false"
+        @drop="handleDrop"
+      />
 
       <div
         v-for="slotIndex in placeholderCount"
