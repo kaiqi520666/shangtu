@@ -9,10 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.credits import normalize_video_resolution
 from app.core.deps import get_current_user, get_db
-from app.core.ai_generation import (
-    DashScopeConfigError,
-    generate_video_strategy,
-)
+from app.core.strategy.dashscope_client import DashScopeConfigError
 from app.core.generation_prompt_builder import (
     build_strategy_template_prompt,
 )
@@ -30,6 +27,7 @@ from app.core.user_credits import (
     refund_user_credits,
 )
 from app.core.video_prompt_builder import build_video_generate_prompt
+from app.core.video_strategy_generation import generate_video_strategy
 from app.models import GenerationJob, User, VideoTask
 from app.schemas.response import Response, fail, success
 from app.services.generation_tasks import deduct_credits_or_fail, enqueue_or_compensate
