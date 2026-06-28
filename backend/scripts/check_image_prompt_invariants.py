@@ -26,9 +26,9 @@ from app.core.generation_prompt_builder import (  # noqa: E402
     QWEN_TEXT_MODEL,
     build_image_generate_prompt,
     build_strategy_template_prompt,
-    build_video_generate_prompt,
 )
 from app.core.prompt_templates import PromptTemplateLookupResult  # noqa: E402
+from app.core.video_prompt_builder import build_video_generate_prompt  # noqa: E402
 
 
 SYSTEM_RULE_MARK = "【系统规则·主体一致】"

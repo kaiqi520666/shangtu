@@ -15,7 +15,6 @@ from app.core.ai_generation import (
 )
 from app.core.generation_prompt_builder import (
     build_strategy_template_prompt,
-    build_video_generate_prompt,
 )
 from app.core.json_utils import dump_json_or_none, parse_json_or_none
 from app.core.prompt_snapshot import dump_prompt_snapshot, parse_prompt_snapshot
@@ -30,6 +29,7 @@ from app.core.user_credits import (
     insufficient_credits_message,
     refund_user_credits,
 )
+from app.core.video_prompt_builder import build_video_generate_prompt
 from app.models import GenerationJob, User, VideoTask
 from app.schemas.response import Response, fail, success
 from app.services.generation_tasks import deduct_credits_or_fail, enqueue_or_compensate

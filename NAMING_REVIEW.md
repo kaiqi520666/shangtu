@@ -133,7 +133,7 @@ generator 场景 composable 命名一致：
 
 `backend/app/core/ai_generation.py` 仍承载图片分析、图片策略、视频策略、自由生图 prompt 优化。后续可以继续拆成 `image_analysis.py`、`strategy_generation.py`、`prompt_optimization.py`。
 
-`backend/app/core/generation_prompt_builder.py` 仍同时包含图片生成、视频生成、AI 文案、策略模板 prompt 构建。后续可以继续按图片生成、视频生成、策略模板三类 prompt 构建职责拆分。
+`backend/app/core/generation_prompt_builder.py` 仍同时包含图片生成、AI 文案、策略模板 prompt 构建。后续可以继续按图片生成、AI 文案、策略模板三类 prompt 构建职责拆分。
 
 ## 3. 目录嵌套深度与扁平度
 
@@ -172,7 +172,7 @@ generator 场景 composable 命名一致：
 - 穿搭图：`frontend/src/views/generator/outfit/OutfitView.vue`
 - 自由生图：`frontend/src/views/generator/free-image/FreeImageView.vue`
 
-但后端会更容易猜错：商品详情图、商品套图、穿搭图、自由生图都集中在 `backend/app/routers/image.py` 和 `backend/app/core/generation_prompt_builder.py`，而不是各自有 `product_image.py`、`product_suite.py`、`free_image.py` 路由或 service。
+但后端会更容易猜错：商品详情图、商品套图、穿搭图、自由生图都集中在 `backend/app/routers/image.py`，而不是各自有 `product_image.py`、`product_suite.py`、`free_image.py` 路由或 service。
 
 容易猜错的具体例子：
 
@@ -192,7 +192,7 @@ generator 场景 composable 命名一致：
 
 P1：继续拆 `backend/app/routers/image.py`，把上传、策略、任务 CRUD、重生/下载等职责拆到更具体的 router 或 service。
 
-P1：把 `backend/app/core/ai_generation.py`、`backend/app/core/generation_prompt_builder.py` 中的视频/策略/prompt 职责继续拆出，避免 core 文件继续变成业务合集。
+P1：把 `backend/app/core/ai_generation.py`、`backend/app/core/generation_prompt_builder.py` 中的策略/prompt 职责继续拆出，避免 core 文件继续变成业务合集。
 
 P2：继续拆 `frontend/src/composables/generator/` 里的大 composable，按 `strategy`、`batch`、`restore` 等职责收敛。
 
