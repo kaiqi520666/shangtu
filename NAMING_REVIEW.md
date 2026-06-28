@@ -41,7 +41,7 @@
 - `frontend/src/components/admin/*`
 - `frontend/src/composables/admin/*`
 
-这个规则统一，但 `frontend/src/components/admin/` 仍有较多平铺文件。已拆出 `users/`、`billing/`、`catalog/`，建议后续继续按资源拆子目录：`settings/`、`audit/`。
+这个规则统一，但 `frontend/src/components/admin/` 仍有较多平铺文件。已拆出 `users/`、`billing/`、`catalog/`、`settings/`，建议后续继续按资源拆子目录：`audit/`。
 
 ### 后端
 
