@@ -1,5 +1,31 @@
 @import "tailwindcss";
 @import "../styles/theme.css";
+
+@layer base {
+  button:not(:disabled),
+  a[href],
+  summary,
+  [role="button"]:not([aria-disabled="true"]),
+  [role="link"]:not([aria-disabled="true"]),
+  [role="menuitem"]:not([aria-disabled="true"]),
+  [role="tab"]:not([aria-disabled="true"]),
+  [role="option"]:not([aria-disabled="true"]),
+  select:not(:disabled),
+  input[type="checkbox"]:not(:disabled),
+  input[type="radio"]:not(:disabled),
+  input[type="range"]:not(:disabled),
+  input[type="file"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  select:disabled,
+  input:disabled,
+  [aria-disabled="true"] {
+    cursor: not-allowed;
+  }
+}
+
 .is-chosen {
   @apply ring-2 ring-primary/20;
 }
