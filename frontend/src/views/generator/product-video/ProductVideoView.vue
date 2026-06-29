@@ -19,6 +19,7 @@ const confirm = useConfirm();
 const toast = useToast();
 const video = useProductVideoGenerator({
   toast,
+  confirm,
   onJobCreated(jobId) {
     router.replace(`/generator/product-video/${jobId}`);
   },

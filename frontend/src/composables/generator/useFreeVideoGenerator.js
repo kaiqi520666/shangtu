@@ -56,7 +56,7 @@ function serializeVideo(video) {
   };
 }
 
-export function useFreeVideoGenerator({ onJobCreated } = {}) {
+export function useFreeVideoGenerator({ confirm, onJobCreated } = {}) {
   const toast = useToast();
   const uploadedImages = ref([]);
   const uploadedVideo = ref(null);
@@ -424,6 +424,15 @@ export function useFreeVideoGenerator({ onJobCreated } = {}) {
       outputCards.value = outputCards.value.filter((item) => item.id !== card?.id);
       return;
     }
+
+    const ok = await confirm?.open?.({
+      title: "删除视频",
+      message: "确定删除这个视频吗？视频不会立即从存储中物理删除。",
+      confirmText: "删除",
+      cancelText: "取消",
+      tone: "danger",
+    });
+    if (ok === false) return;
 
     try {
       const result = await deleteVideoTask(card.taskId);

@@ -16,6 +16,7 @@ const router = useRouter();
 const confirm = useConfirm();
 const toast = useToast();
 const generator = useFreeVideoGenerator({
+  confirm,
   onJobCreated(jobId) {
     router.replace(`/generator/free-video/${jobId}`);
   },

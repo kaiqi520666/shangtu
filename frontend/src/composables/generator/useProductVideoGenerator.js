@@ -77,7 +77,7 @@ function getRequiredImageMessage(inputMode, count) {
   return "";
 }
 
-export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
+export function useProductVideoGenerator({ toast, confirm, onJobCreated } = {}) {
   const settings = reactive({
     videoType: videoDemoTypes[0].typeId,
     inputMode: videoDemoTypes[0].inputMode,
@@ -528,6 +528,15 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
       outputCards.value = outputCards.value.filter((item) => item.id !== card?.id);
       return;
     }
+
+    const ok = await confirm?.open?.({
+      title: "删除视频",
+      message: "确定删除这个视频吗？视频不会立即从存储中物理删除。",
+      confirmText: "删除",
+      cancelText: "取消",
+      tone: "danger",
+    });
+    if (ok === false) return;
 
     try {
       const result = await deleteVideoTask(card.taskId);
