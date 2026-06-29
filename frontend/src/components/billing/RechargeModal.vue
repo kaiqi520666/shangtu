@@ -227,26 +227,26 @@ onBeforeUnmount(() => {
       </div>
     </template>
 
-    <div v-if="!currentOrder" class="min-h-0 space-y-3 overflow-y-auto bg-white p-4">
-      <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+    <div v-if="!currentOrder" class="min-h-0 space-y-3 overflow-y-auto bg-gradient-to-b from-slate-50/70 to-white p-4">
+      <div class="rounded-2xl border border-slate-200/80 bg-white px-4 py-3 shadow-sm">
         <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div class="flex items-center gap-3">
-            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-950 text-emerald-300">
+            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100">
               <ShieldCheck class="h-4 w-4" />
             </div>
             <div>
-              <p class="text-xs font-black text-slate-500">微信支付 · 实时到账</p>
+              <p class="text-xs font-black text-emerald-700">微信支付 · 实时到账</p>
               <p class="text-xl font-black text-slate-950">当前 {{ formatCredits(authStore.credits) }} 点</p>
             </div>
           </div>
-          <div class="grid gap-2 text-xs font-bold text-slate-600 sm:grid-cols-2 lg:w-[520px]">
-            <div class="rounded-lg bg-white px-3 py-2 shadow-sm">
-              <p class="text-[11px] font-black text-slate-400">图片</p>
-              <p class="mt-1">1K {{ imageCreditCosts["1K"] || "-" }}/张 · 2K {{ imageCreditCosts["2K"] || "-" }}/张 · 4K {{ imageCreditCosts["4K"] || "-" }}/张</p>
+          <div class="grid gap-2 text-xs font-bold text-slate-600 sm:grid-cols-2 lg:w-[560px]">
+            <div class="rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2">
+              <p class="text-[11px] font-black text-slate-400">图片生成</p>
+              <p class="mt-1 text-slate-700">1K {{ imageCreditCosts["1K"] || "-" }}/张 · 2K {{ imageCreditCosts["2K"] || "-" }}/张 · 4K {{ imageCreditCosts["4K"] || "-" }}/张</p>
             </div>
-            <div class="rounded-lg bg-white px-3 py-2 shadow-sm">
-              <p class="text-[11px] font-black text-slate-400">视频</p>
-              <p class="mt-1">720p {{ videoCreditCosts["720p"] || "-" }}/秒 · 1080p {{ videoCreditCosts["1080p"] || "-" }}/秒</p>
+            <div class="rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2">
+              <p class="text-[11px] font-black text-slate-400">视频生成</p>
+              <p class="mt-1 text-slate-700">720p {{ videoCreditCosts["720p"] || "-" }}/秒 · 1080p {{ videoCreditCosts["1080p"] || "-" }}/秒</p>
             </div>
           </div>
         </div>
@@ -263,12 +263,12 @@ onBeforeUnmount(() => {
           :key="pkg.id"
           type="button"
           class="group relative flex min-h-[112px] flex-col items-center justify-center rounded-2xl border px-4 py-4 text-center transition-all duration-200"
-          :class="selectedPackageId === pkg.id ? 'border-emerald-400 bg-slate-950 text-white shadow-[0_14px_34px_rgba(15,23,42,0.22)] ring-1 ring-emerald-300' : 'border-slate-300 bg-slate-950 text-white hover:border-emerald-300 hover:shadow-[0_12px_28px_rgba(15,23,42,0.16)]'"
+          :class="selectedPackageId === pkg.id ? 'border-emerald-400 bg-emerald-50/80 text-slate-950 shadow-[0_14px_34px_rgba(16,185,129,0.16)] ring-1 ring-emerald-200' : 'border-slate-200 bg-white text-slate-950 shadow-sm hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-[0_14px_32px_rgba(15,23,42,0.10)]'"
           @click="selectedPackageId = pkg.id"
         >
-          <CheckCircle2 v-if="selectedPackageId === pkg.id" class="absolute right-3 top-3 h-4 w-4 text-emerald-300" />
-          <p class="text-xl font-black tracking-normal">{{ formatCredits(pkg.credits) }} 积分</p>
-          <p class="mt-2 text-sm font-bold text-slate-300">{{ formatMoney(pkg.amount_cents) }}</p>
+          <CheckCircle2 v-if="selectedPackageId === pkg.id" class="absolute right-3 top-3 h-4 w-4 text-emerald-500" />
+          <p class="text-xl font-black tracking-normal text-slate-950">{{ formatCredits(pkg.credits) }} 积分</p>
+          <p class="mt-2 text-sm font-bold text-slate-500">{{ formatMoney(pkg.amount_cents) }}</p>
         </button>
       </div>
 
