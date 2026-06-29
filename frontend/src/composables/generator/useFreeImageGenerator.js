@@ -111,6 +111,7 @@ export function useFreeImageGenerator({ onJobCreated } = {}) {
 
   const {
     zoomCard,
+    downloading,
     selectedCards,
     selectedCardsCount,
     toggleCardSelection,
@@ -311,6 +312,7 @@ export function useFreeImageGenerator({ onJobCreated } = {}) {
     genLogs,
     outputCards,
     zoomCard,
+    downloading,
     selectedCards,
     selectedCardsCount,
     totalCount,

@@ -1,5 +1,5 @@
 <script setup>
-import { Download, Trash2 } from 'lucide-vue-next'
+import { Download, LoaderCircle, Trash2 } from 'lucide-vue-next'
 import AppCheckbox from '@/components/ui/AppCheckbox.vue'
 
 defineProps({
@@ -10,6 +10,10 @@ defineProps({
   scenarioLabel: {
     type: Function,
     default: () => '',
+  },
+  downloading: {
+    type: Boolean,
+    default: false,
   },
 })
 
@@ -90,10 +94,13 @@ function formatDate(isoStr) {
         <button
           type="button"
           class="ml-2 flex shrink-0 items-center gap-1 text-xs font-bold text-primary hover:text-secondary"
+          :class="downloading || card.downloading ? 'cursor-not-allowed opacity-60' : ''"
+          :disabled="downloading || card.downloading"
           @click="emit('download-card', card)"
         >
-          下载
-          <Download class="h-3 w-3" />
+          {{ card.downloading ? '准备中' : '下载' }}
+          <LoaderCircle v-if="card.downloading" class="h-3 w-3 animate-spin" />
+          <Download v-else class="h-3 w-3" />
         </button>
       </div>
     </article>

@@ -167,6 +167,7 @@ export function useFreeVideoGenerator({ onJobCreated } = {}) {
   });
 
   const {
+    downloading,
     selectedCardsCount,
     toggleCardSelection,
     toggleSelectAllCards,
@@ -476,6 +477,7 @@ export function useFreeVideoGenerator({ onJobCreated } = {}) {
     generatedCount,
     failedCount,
     jobTotal,
+    downloading,
     selectedCardsCount,
     loadCreditCosts,
     updateSettings,

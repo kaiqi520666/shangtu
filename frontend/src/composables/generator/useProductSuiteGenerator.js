@@ -163,6 +163,7 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
 
   const {
     zoomCard,
+    downloading,
     selectedCards,
     selectedCardsCount,
     toggleCardSelection,
@@ -540,6 +541,7 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
     genLogs,
     outputCards,
     zoomCard,
+    downloading,
     currentJobId,
     currentTaskTitle,
     historyTasks,

@@ -117,6 +117,7 @@ function closePreview() {
       :job-total="suite.jobTotal.value"
       :gen-logs="suite.genLogs.value"
       :selected-cards-count="suite.selectedCardsCount.value"
+      :downloading="suite.downloading.value"
       :selected-image-label="suite.selectedImageLabel.value"
       :get-module-name="suite.getStructureName"
       title-badge="本次套图任务"

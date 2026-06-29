@@ -157,6 +157,7 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
 
   const {
     zoomCard,
+    downloading,
     selectedCards,
     selectedCardsCount,
     toggleCardSelection,
@@ -536,6 +537,7 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
     genLogs,
     outputCards,
     zoomCard,
+    downloading,
     canGenerateStrategy,
     strategyLoading,
     strategyPanelVisible,

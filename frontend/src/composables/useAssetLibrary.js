@@ -43,6 +43,7 @@ export function useAssetLibrary() {
 
   const {
     zoomCard,
+    downloading,
     selectedCards,
     selectedCardsCount,
     toggleCardSelection,
@@ -151,6 +152,7 @@ export function useAssetLibrary() {
     totalPages,
     // 选择/下载
     zoomCard,
+    downloading,
     selectedCards,
     selectedCardsCount,
     toggleCardSelection,

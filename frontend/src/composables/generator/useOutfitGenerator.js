@@ -160,6 +160,7 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
 
   const {
     zoomCard,
+    downloading,
     selectedCards,
     selectedCardsCount,
     toggleCardSelection,
@@ -664,6 +665,7 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
     genLogs,
     outputCards,
     zoomCard,
+    downloading,
     selectedModel,
     canGenerateStrategy,
     selectedCards,

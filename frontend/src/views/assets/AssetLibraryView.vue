@@ -141,11 +141,12 @@ onMounted(() => {
             <button
               type="button"
               class="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-              :disabled="selectedCardsCount === 0"
+              :disabled="selectedCardsCount === 0 || downloading"
               @click="batchDownload"
             >
-              <Download class="h-3.5 w-3.5" />
-              下载 ({{ selectedCardsCount }})
+              <LoaderCircle v-if="downloading" class="h-3.5 w-3.5 animate-spin" />
+              <Download v-else class="h-3.5 w-3.5" />
+              {{ downloading ? '下载中...' : `下载 (${selectedCardsCount})` }}
             </button>
             <!-- 批量删除 -->
             <button
@@ -189,6 +190,7 @@ onMounted(() => {
           v-else
           :cards="assets"
           :scenario-label="getScenarioLabel"
+          :downloading="downloading"
           @toggle-card="toggleCardSelection"
           @download-card="downloadAsset"
           @zoom-card="handleZoom"

@@ -96,6 +96,7 @@ function closeHistoryDrawer() {
       :job-total="video.jobTotal.value"
       :gen-logs="video.genLogs.value"
       :selected-cards-count="video.selectedCardsCount.value"
+      :downloading="video.downloading.value"
       selected-image-label="商品视频"
       :get-module-name="video.getVideoModuleName"
       empty-title="商品视频示例"

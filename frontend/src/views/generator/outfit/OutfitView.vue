@@ -135,6 +135,7 @@ async function handleDeleteModel(modelId) {
       :job-total="outfit.jobTotal.value"
       :gen-logs="outfit.genLogs.value"
       :selected-cards-count="outfit.selectedCardsCount.value"
+      :downloading="outfit.downloading.value"
       :selected-image-label="outfit.selectedImageLabel.value"
       :get-module-name="outfit.getSceneName"
       title-badge="本次穿搭任务"

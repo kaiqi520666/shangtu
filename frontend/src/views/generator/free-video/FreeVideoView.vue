@@ -85,6 +85,7 @@ function closeHistoryDrawer() {
       :job-total="generator.jobTotal.value"
       :gen-logs="generator.genLogs.value"
       :selected-cards-count="generator.selectedCardsCount.value"
+      :downloading="generator.downloading.value"
       selected-image-label="自由生视频"
       :get-module-name="generator.getModuleName"
       title-badge="本次自由生视频"

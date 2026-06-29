@@ -99,6 +99,7 @@ function closePreview() {
       :job-total="generator.jobTotal.value"
       :gen-logs="generator.genLogs.value"
       :selected-cards-count="generator.selectedCardsCount.value"
+      :downloading="generator.downloading.value"
       :selected-image-label="generator.selectedImageLabel.value"
       :get-module-name="generator.getModuleName"
       title-badge="本次自由生图"

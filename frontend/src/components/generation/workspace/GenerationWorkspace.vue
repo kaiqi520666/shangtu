@@ -54,6 +54,10 @@ defineProps({
     type: Number,
     default: 0,
   },
+  downloading: {
+    type: Boolean,
+    default: false,
+  },
   selectedImageLabel: {
     type: String,
     required: true,
@@ -140,9 +144,15 @@ const emit = defineEmits([
               <span class="text-xs text-slate-300">/</span>
               <button type="button" class="text-xs font-semibold text-slate-500 hover:text-slate-700" @click="emit('select-all-cards', false)">全不选</button>
             </div>
-            <button type="button" class="flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-1.5 text-xs font-bold text-white shadow-md transition-all hover:bg-secondary" @click="emit('batch-download')">
-              <Download class="h-3.5 w-3.5 stroke-[2.5]" />
-              批量下载 ({{ selectedCardsCount }}{{ mediaUnit }})
+            <button
+              type="button"
+              class="flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-1.5 text-xs font-bold text-white shadow-md transition-all hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-60"
+              :disabled="selectedCardsCount === 0 || downloading"
+              @click="emit('batch-download')"
+            >
+              <RefreshCw v-if="downloading" class="h-3.5 w-3.5 animate-spin stroke-[2.5]" />
+              <Download v-else class="h-3.5 w-3.5 stroke-[2.5]" />
+              {{ downloading ? '打包中...' : `批量下载 (${selectedCardsCount}${mediaUnit})` }}
             </button>
             <div class="h-4 w-px bg-slate-200"></div>
           </template>
@@ -230,6 +240,7 @@ const emit = defineEmits([
           :language="settings.language"
           :video-label="selectedImageLabel"
           :get-module-name="getModuleName"
+          :downloading="downloading"
           @toggle-card="emit('toggle-card', $event)"
           @download-card="emit('download-card', $event)"
           @zoom-card="emit('zoom-card', $event)"
@@ -242,6 +253,7 @@ const emit = defineEmits([
           :language="settings.language"
           :image-label="selectedImageLabel"
           :get-module-name="getModuleName"
+          :downloading="downloading"
           @toggle-card="emit('toggle-card', $event)"
           @download-card="emit('download-card', $event)"
           @edit-card="emit('edit-card', $event)"

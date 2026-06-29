@@ -26,6 +26,10 @@ defineProps({
     type: Function,
     required: true,
   },
+  downloading: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 const emit = defineEmits(['toggle-card', 'download-card', 'zoom-card', 'delete-card'])
@@ -43,7 +47,7 @@ function shortFailReason(card) {
 }
 
 function canDownload(card) {
-  return card.status === 'done' && Boolean(card.dataUrl)
+  return card.status === 'done' && Boolean(card.dataUrl) && !card.downloading
 }
 
 function handleDownload(card) {
@@ -173,10 +177,12 @@ function getCardMetaText(card, fallbackPlatform, fallbackLanguage, fallbackVideo
             type="button"
             class="flex shrink-0 items-center gap-1 text-xs"
             :class="canDownload(card) ? 'font-bold text-primary hover:text-secondary' : 'cursor-not-allowed font-semibold text-slate-300'"
+            :disabled="downloading || card.downloading || !canDownload(card)"
             @click.stop="handleDownload(card)"
           >
-            下载视频
-            <Download class="h-3 w-3" />
+            {{ card.downloading ? '准备中...' : '下载视频' }}
+            <LoaderCircle v-if="card.downloading" class="h-3 w-3 animate-spin" />
+            <Download v-else class="h-3 w-3" />
           </button>
           <span v-else class="shrink-0 text-xs font-medium text-slate-400">
             {{ card.status === 'processing' ? '生成中...' : '排队中...' }}

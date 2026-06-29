@@ -239,6 +239,7 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
   });
 
   const {
+    downloading,
     selectedCardsCount,
     toggleCardSelection,
     toggleSelectAllCards,
@@ -580,6 +581,7 @@ export function useProductVideoGenerator({ toast, onJobCreated } = {}) {
     generatedCount,
     failedCount,
     jobTotal,
+    downloading,
     selectedCardsCount,
     loadCreditCosts,
     updateSettings,
