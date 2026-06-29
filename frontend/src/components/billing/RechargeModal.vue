@@ -213,7 +213,7 @@ onBeforeUnmount(() => {
 <template>
   <AppModal
     :open="open"
-    panel-class="w-full max-w-3xl border-slate-200/80 shadow-[0_28px_90px_rgba(15,23,42,0.32)]"
+    panel-class="w-full max-w-5xl border-slate-200/80 shadow-[0_28px_90px_rgba(15,23,42,0.32)]"
     @close="closeModal"
   >
     <template #header>
@@ -228,29 +228,30 @@ onBeforeUnmount(() => {
       </div>
     </template>
 
-    <div v-if="!currentOrder" class="space-y-5 bg-white p-5 sm:p-6">
-      <div class="overflow-hidden rounded-2xl border border-slate-900 bg-slate-950 shadow-[0_18px_50px_rgba(15,23,42,0.22)]">
-        <div class="flex flex-col gap-5 p-5 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <div class="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[11px] font-bold text-emerald-200">
-              <ShieldCheck class="h-3.5 w-3.5" />
-              微信支付 · 实时到账
+    <div v-if="!currentOrder" class="min-h-0 space-y-2.5 overflow-y-auto bg-white p-4">
+      <div class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+        <div class="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
+          <div class="flex items-center gap-3">
+            <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-950 text-emerald-300">
+              <ShieldCheck class="h-4 w-4" />
             </div>
-            <p class="mt-4 text-sm font-semibold text-slate-300">当前可用积分</p>
-            <p class="mt-1 text-4xl font-black tracking-normal text-white">{{ authStore.credits }} <span class="text-base text-slate-300">点</span></p>
+            <div>
+              <p class="text-xs font-black text-slate-500">微信支付 · 实时到账</p>
+              <p class="text-base font-black text-slate-950">当前 {{ authStore.credits }} 点</p>
+            </div>
           </div>
-          <div class="grid grid-cols-3 gap-2 text-center text-[11px] font-bold text-slate-200 sm:w-64">
-            <div class="rounded-xl border border-white/10 bg-white/10 px-2 py-2">
-              <p class="text-emerald-200">1K</p>
-              <p class="mt-1 text-white">高清图</p>
+          <div class="grid grid-cols-3 gap-1.5 text-center text-[10px] font-bold text-slate-500 sm:w-72">
+            <div class="rounded-lg bg-white px-2 py-1 shadow-sm">
+              <p class="text-emerald-600">1K</p>
+              <p>{{ imageCreditCosts["1K"] || "-" }} 积分/张</p>
             </div>
-            <div class="rounded-xl border border-white/10 bg-white/10 px-2 py-2">
-              <p class="text-emerald-200">2K</p>
-              <p class="mt-1 text-white">精修图</p>
+            <div class="rounded-lg bg-white px-2 py-1 shadow-sm">
+              <p class="text-emerald-600">2K</p>
+              <p>{{ imageCreditCosts["2K"] || "-" }} 积分/张</p>
             </div>
-            <div class="rounded-xl border border-white/10 bg-white/10 px-2 py-2">
-              <p class="text-emerald-200">4K</p>
-              <p class="mt-1 text-white">商详图</p>
+            <div class="rounded-lg bg-white px-2 py-1 shadow-sm">
+              <p class="text-emerald-600">4K</p>
+              <p>{{ imageCreditCosts["4K"] || "-" }} 积分/张</p>
             </div>
           </div>
         </div>
@@ -261,46 +262,45 @@ onBeforeUnmount(() => {
         正在加载套餐...
       </div>
 
-      <div v-else-if="packages.length" class="grid gap-3 md:grid-cols-3">
+      <div v-else-if="packages.length" class="grid gap-2 sm:grid-cols-3">
         <button
           v-for="pkg in packages"
           :key="pkg.id"
           type="button"
-          class="group relative min-h-[280px] rounded-2xl border p-5 text-left transition-all duration-200"
-          :class="selectedPackageId === pkg.id ? 'border-emerald-400 bg-emerald-50/70 shadow-[0_18px_42px_rgba(16,185,129,0.16)] ring-1 ring-emerald-200' : 'border-slate-200 bg-white shadow-sm hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_16px_40px_rgba(15,23,42,0.10)]'"
+          class="group relative flex min-h-[120px] flex-col justify-between rounded-xl border px-3 py-2.5 text-left transition-all duration-200"
+          :class="selectedPackageId === pkg.id ? 'border-emerald-400 bg-emerald-50/80 shadow-[0_12px_30px_rgba(16,185,129,0.14)] ring-1 ring-emerald-200' : 'border-slate-200 bg-white shadow-sm hover:border-slate-300 hover:shadow-[0_12px_28px_rgba(15,23,42,0.08)]'"
           @click="selectedPackageId = pkg.id"
         >
-          <span
-            v-if="pkg.badge"
-            class="absolute right-4 top-4 inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-black text-emerald-700"
-          >
-            <Sparkles class="h-3 w-3" />
-            {{ pkg.badge }}
-          </span>
-          <p class="pr-20 text-sm font-black text-slate-950">{{ pkg.name }}</p>
-          <div class="mt-6">
-            <p class="text-4xl font-black tracking-normal text-emerald-600">{{ pkg.credits }}</p>
-            <p class="mt-1 text-xs font-bold text-slate-400">积分额度</p>
-          </div>
-          <div class="mt-5 flex items-end justify-between border-t border-slate-200 pt-4">
-            <div>
-              <p class="text-[11px] font-semibold text-slate-400">支付金额</p>
-              <p class="mt-1 text-xl font-black text-slate-950">{{ formatMoney(pkg.amount_cents) }}</p>
+          <div>
+            <div class="flex items-start justify-between gap-2">
+              <div class="min-w-0">
+                <p class="truncate text-xs font-black text-slate-500">{{ pkg.name }}</p>
+                <p class="text-xl font-black tracking-normal text-emerald-600">{{ pkg.credits }}</p>
+              </div>
+              <span
+                v-if="pkg.badge"
+                class="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-black text-emerald-700"
+              >
+                <Sparkles class="h-2.5 w-2.5" />
+                {{ pkg.badge }}
+              </span>
+              <CheckCircle2 v-else-if="selectedPackageId === pkg.id" class="h-4 w-4 shrink-0 text-emerald-500" />
             </div>
+            <p class="text-base font-black text-slate-950">{{ formatMoney(pkg.amount_cents) }}</p>
           </div>
-          <div class="mt-4 space-y-2 text-xs font-semibold text-slate-600">
-            <p class="flex items-center justify-between rounded-lg bg-white/70 px-3 py-2">
-              <span>1K 生图</span>
-              <span class="font-black text-slate-950">约 {{ imageCountText(pkg, "1K") }} 张</span>
-            </p>
-            <p class="flex items-center justify-between rounded-lg bg-white/70 px-3 py-2">
-              <span>2K 生图</span>
-              <span class="font-black text-slate-950">约 {{ imageCountText(pkg, "2K") }} 张</span>
-            </p>
-            <p class="flex items-center justify-between rounded-lg bg-white/70 px-3 py-2">
-              <span>4K 生图</span>
-              <span class="font-black text-slate-950">约 {{ imageCountText(pkg, "4K") }} 张</span>
-            </p>
+          <div class="mt-1.5 grid grid-cols-3 gap-1 rounded-lg bg-slate-50 p-1 text-center text-[10px] font-bold text-slate-500">
+            <div class="rounded-md bg-white px-1 py-0.5">
+              <p>1K</p>
+              <p class="text-slate-950">{{ imageCountText(pkg, "1K") }}张</p>
+            </div>
+            <div class="rounded-md bg-white px-1 py-0.5">
+              <p>2K</p>
+              <p class="text-slate-950">{{ imageCountText(pkg, "2K") }}张</p>
+            </div>
+            <div class="rounded-md bg-white px-1 py-0.5">
+              <p>4K</p>
+              <p class="text-slate-950">{{ imageCountText(pkg, "4K") }}张</p>
+            </div>
           </div>
         </button>
       </div>
@@ -311,7 +311,7 @@ onBeforeUnmount(() => {
 
       <button
         type="button"
-        class="flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-950 px-4 py-3.5 text-sm font-black text-white shadow-[0_14px_34px_rgba(15,23,42,0.24)] transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+        class="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-black text-white shadow-[0_12px_28px_rgba(15,23,42,0.20)] transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
         :disabled="!selectedPackage || creatingOrder"
         @click="createOrder"
       >
