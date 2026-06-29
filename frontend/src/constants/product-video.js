@@ -1,3 +1,7 @@
+import { defaultVideoCreditCosts } from "@/constants/billing.js";
+
+export { defaultVideoCreditCosts };
+
 export const videoDemoTypes = [
   {
     typeId: "ugc_seeding",
@@ -113,11 +117,6 @@ export const videoResolutionOptions = [
   { value: "720p", label: "720p", subtitle: "默认推荐" },
   { value: "1080p", label: "1080p", subtitle: "高清成片" },
 ];
-
-export const defaultVideoCreditCosts = {
-  "720p": 2,
-  "1080p": 4,
-};
 
 export function getVideoDemoType(typeId) {
   return videoDemoTypes.find((item) => item.typeId === typeId) || videoDemoTypes[0];

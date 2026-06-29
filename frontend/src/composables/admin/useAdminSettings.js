@@ -2,10 +2,15 @@ import { reactive } from "vue";
 import { getAdminSettings, updateAdminSettings } from "@/api/admin.js";
 import { useAdminAuditLogs } from "@/composables/admin/useAdminAuditLogs.js";
 import { useToast } from "@/composables/useToast.js";
+import {
+  defaultImageCreditCosts,
+  defaultRechargePackage,
+  defaultVideoCreditCosts,
+} from "@/constants/billing.js";
 
 const settingsState = reactive({
-  imageCreditCosts: { "1K": 1, "2K": 2, "4K": 4 },
-  videoCreditCosts: { "720p": 2, "1080p": 4 },
+  imageCreditCosts: { ...defaultImageCreditCosts },
+  videoCreditCosts: { ...defaultVideoCreditCosts },
   rechargePackages: [],
   paymentConfig: {},
   loading: false,
@@ -26,8 +31,7 @@ export function useAdminSettings() {
       }
       settingsState.imageCreditCosts = { ...(result.data?.image_credit_costs || {}) };
       settingsState.videoCreditCosts = {
-        "720p": 2,
-        "1080p": 4,
+        ...defaultVideoCreditCosts,
         ...(result.data?.video_credit_costs || {}),
       };
       settingsState.rechargePackages = (result.data?.recharge_packages || []).map((item) => ({ ...item }));
@@ -43,8 +47,8 @@ export function useAdminSettings() {
     settingsState.rechargePackages.push({
       id: `p_${Date.now()}`,
       name: "新套餐",
-      credits: 100,
-      amount_cents: 990,
+      credits: defaultRechargePackage.credits,
+      amount_cents: defaultRechargePackage.amount_cents,
       badge: "",
       enabled: true,
     });

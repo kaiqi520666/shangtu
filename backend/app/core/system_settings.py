@@ -17,35 +17,75 @@ SETTING_RECHARGE_PACKAGES = "credit_recharge_packages"
 
 DEFAULT_RECHARGE_PACKAGES: list[dict[str, Any]] = [
     {
-        "id": "p_001",
-        "name": "测试包",
-        "credits": 1,
-        "amount_cents": 1,
-        "badge": "测试",
-        "enabled": True,
-    },
-    {
-        "id": "p_100",
-        "name": "体验包",
-        "credits": 100,
-        "amount_cents": 990,
+        "id": "p_1000",
+        "name": "1000 积分",
+        "credits": 1000,
+        "amount_cents": 3500,
         "badge": "",
         "enabled": True,
     },
     {
-        "id": "p_500",
-        "name": "标准包",
-        "credits": 500,
-        "amount_cents": 3990,
-        "badge": "推荐",
+        "id": "p_2000",
+        "name": "2000 积分",
+        "credits": 2000,
+        "amount_cents": 7000,
+        "badge": "",
         "enabled": True,
     },
     {
-        "id": "p_1000",
-        "name": "进阶包",
-        "credits": 1000,
-        "amount_cents": 6990,
-        "badge": "高性价比",
+        "id": "p_4000",
+        "name": "4000 积分",
+        "credits": 4000,
+        "amount_cents": 14000,
+        "badge": "",
+        "enabled": True,
+    },
+    {
+        "id": "p_10000",
+        "name": "10000 积分",
+        "credits": 10000,
+        "amount_cents": 35000,
+        "badge": "",
+        "enabled": True,
+    },
+    {
+        "id": "p_20000",
+        "name": "20000 积分",
+        "credits": 20000,
+        "amount_cents": 70000,
+        "badge": "",
+        "enabled": True,
+    },
+    {
+        "id": "p_40000",
+        "name": "40000 积分",
+        "credits": 40000,
+        "amount_cents": 140000,
+        "badge": "",
+        "enabled": True,
+    },
+    {
+        "id": "p_100000",
+        "name": "100000 积分",
+        "credits": 100000,
+        "amount_cents": 350000,
+        "badge": "",
+        "enabled": True,
+    },
+    {
+        "id": "p_200000",
+        "name": "200000 积分",
+        "credits": 200000,
+        "amount_cents": 700000,
+        "badge": "",
+        "enabled": True,
+    },
+    {
+        "id": "p_2000000",
+        "name": "2000000 积分",
+        "credits": 2000000,
+        "amount_cents": 7000000,
+        "badge": "",
         "enabled": True,
     },
 ]
@@ -200,3 +240,45 @@ async def upsert_setting(
     row.updated_by_user_id = actor_user_id
     db.add(row)
     return row
+
+
+async def seed_default_billing_settings(
+    db: AsyncSession,
+    *,
+    overwrite: bool = False,
+    actor_user_id: int | None = None,
+) -> dict[str, str]:
+    entries = [
+        (
+            SETTING_IMAGE_CREDIT_COSTS,
+            normalize_image_credit_costs(DEFAULT_IMAGE_CREDIT_COSTS),
+            "生图分辨率扣费配置",
+        ),
+        (
+            SETTING_VIDEO_CREDIT_COSTS,
+            normalize_video_credit_costs(DEFAULT_VIDEO_CREDIT_COSTS),
+            "商品视频每秒扣费配置",
+        ),
+        (
+            SETTING_RECHARGE_PACKAGES,
+            normalize_recharge_packages(DEFAULT_RECHARGE_PACKAGES, include_disabled=True),
+            "积分充值套餐配置",
+        ),
+    ]
+    results: dict[str, str] = {}
+    for key, value, description in entries:
+        row = await get_setting(db, key)
+        if row is None:
+            row = SystemSetting(key=key, value_json=dump_json(value))
+            results[key] = "inserted"
+        elif overwrite:
+            row.value_json = dump_json(value)
+            results[key] = "updated"
+        else:
+            results[key] = "skipped"
+            continue
+
+        row.description = description
+        row.updated_by_user_id = actor_user_id
+        db.add(row)
+    return results

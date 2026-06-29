@@ -1,12 +1,12 @@
 DEFAULT_IMAGE_CREDIT_COSTS: dict[str, int] = {
-    "1K": 1,
-    "2K": 2,
-    "4K": 4,
+    "1K": 9,
+    "2K": 12,
+    "4K": 15,
 }
 
 DEFAULT_VIDEO_CREDIT_COSTS: dict[str, int] = {
-    "720p": 2,
-    "1080p": 4,
+    "720p": 36,
+    "1080p": 64,
 }
 
 

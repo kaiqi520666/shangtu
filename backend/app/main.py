@@ -9,7 +9,8 @@ from fastapi import FastAPI
 from fastapi.requests import Request
 from fastapi.responses import JSONResponse
 
-from app.core.database import Base, engine
+from app.core.database import Base, SessionLocal, engine
+from app.core.system_settings import seed_default_billing_settings
 from app.routers import account, admin, asset, auth, billing, generation, image_generation, outfit, video
 from app.schemas.response import fail
 import app.models
@@ -23,6 +24,10 @@ logger = logging.getLogger("app.api")
 async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+    async with SessionLocal() as db:
+        await seed_default_billing_settings(db)
+        await db.commit()
 
     app.state.redis_pool = await create_pool(
         RedisSettings.from_dsn(os.getenv("REDIS_URL", "redis://localhost:6379"))
