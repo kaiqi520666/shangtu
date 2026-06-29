@@ -16,6 +16,7 @@ from app.core.json_utils import dump_json
 from app.core.system_settings import (
     get_effective_image_credit_costs,
     get_effective_recharge_packages,
+    get_effective_video_credit_costs,
 )
 from app.core.time import to_utc_iso, utc_now
 from app.models import CreditOrder, CreditTransaction, User
@@ -136,12 +137,14 @@ async def list_packages(
     try:
         packages = await get_effective_recharge_packages(db)
         image_credit_costs = await get_effective_image_credit_costs(db)
+        video_credit_costs = await get_effective_video_credit_costs(db)
     except ValueError as exc:
         return fail(str(exc))
     return success(
         {
             "packages": packages,
             "image_credit_costs": image_credit_costs,
+            "video_credit_costs": video_credit_costs,
             "credits": current_user.credits,
         }
     )

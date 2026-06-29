@@ -9,7 +9,6 @@ import {
   QrCode,
   RefreshCw,
   ShieldCheck,
-  Sparkles,
   WalletCards,
 } from "lucide-vue-next";
 import { createBillingOrder, getBillingOrder, getBillingPackages } from "@/api/billing.js";
@@ -33,6 +32,7 @@ const toast = useToast();
 const loadingPackages = ref(false);
 const packages = ref([]);
 const imageCreditCosts = ref({});
+const videoCreditCosts = ref({});
 const selectedPackageId = ref("");
 const creatingOrder = ref(false);
 const currentOrder = ref(null);
@@ -60,10 +60,8 @@ function formatMoney(amountCents) {
   return `¥${(Number(amountCents || 0) / 100).toFixed(2)}`;
 }
 
-function imageCountText(pkg, quality) {
-  const unit = Number(imageCreditCosts.value?.[quality] || 0);
-  if (!unit) return "-";
-  return Math.floor(Number(pkg.credits || 0) / unit);
+function formatCredits(credits) {
+  return Number(credits || 0).toLocaleString("en-US");
 }
 
 async function loadPackages() {
@@ -76,6 +74,7 @@ async function loadPackages() {
     }
     packages.value = result.data?.packages || [];
     imageCreditCosts.value = result.data?.image_credit_costs || {};
+    videoCreditCosts.value = result.data?.video_credit_costs || {};
     selectedPackageId.value = packages.value[0]?.id || "";
   } catch (error) {
     toast.error(getApiErrorMessage(error, "加载充值套餐失败"));
@@ -223,35 +222,31 @@ onBeforeUnmount(() => {
         </div>
         <div class="min-w-0">
           <h3 class="text-base font-black text-slate-950">{{ modalTitle }}</h3>
-          <p class="mt-0.5 text-xs font-medium text-slate-500">积分实时到账，可用于 1K / 2K / 4K 生图</p>
+          <p class="mt-0.5 text-xs font-medium text-slate-500">积分实时到账，可用于图片和视频生成</p>
         </div>
       </div>
     </template>
 
-    <div v-if="!currentOrder" class="min-h-0 space-y-2.5 overflow-y-auto bg-white p-4">
-      <div class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
-        <div class="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
+    <div v-if="!currentOrder" class="min-h-0 space-y-3 overflow-y-auto bg-white p-4">
+      <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+        <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div class="flex items-center gap-3">
-            <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-950 text-emerald-300">
+            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-950 text-emerald-300">
               <ShieldCheck class="h-4 w-4" />
             </div>
             <div>
               <p class="text-xs font-black text-slate-500">微信支付 · 实时到账</p>
-              <p class="text-base font-black text-slate-950">当前 {{ authStore.credits }} 点</p>
+              <p class="text-xl font-black text-slate-950">当前 {{ formatCredits(authStore.credits) }} 点</p>
             </div>
           </div>
-          <div class="grid grid-cols-3 gap-1.5 text-center text-[10px] font-bold text-slate-500 sm:w-72">
-            <div class="rounded-lg bg-white px-2 py-1 shadow-sm">
-              <p class="text-emerald-600">1K</p>
-              <p>{{ imageCreditCosts["1K"] || "-" }} 积分/张</p>
+          <div class="grid gap-2 text-xs font-bold text-slate-600 sm:grid-cols-2 lg:w-[520px]">
+            <div class="rounded-lg bg-white px-3 py-2 shadow-sm">
+              <p class="text-[11px] font-black text-slate-400">图片</p>
+              <p class="mt-1">1K {{ imageCreditCosts["1K"] || "-" }}/张 · 2K {{ imageCreditCosts["2K"] || "-" }}/张 · 4K {{ imageCreditCosts["4K"] || "-" }}/张</p>
             </div>
-            <div class="rounded-lg bg-white px-2 py-1 shadow-sm">
-              <p class="text-emerald-600">2K</p>
-              <p>{{ imageCreditCosts["2K"] || "-" }} 积分/张</p>
-            </div>
-            <div class="rounded-lg bg-white px-2 py-1 shadow-sm">
-              <p class="text-emerald-600">4K</p>
-              <p>{{ imageCreditCosts["4K"] || "-" }} 积分/张</p>
+            <div class="rounded-lg bg-white px-3 py-2 shadow-sm">
+              <p class="text-[11px] font-black text-slate-400">视频</p>
+              <p class="mt-1">720p {{ videoCreditCosts["720p"] || "-" }}/秒 · 1080p {{ videoCreditCosts["1080p"] || "-" }}/秒</p>
             </div>
           </div>
         </div>
@@ -267,41 +262,13 @@ onBeforeUnmount(() => {
           v-for="pkg in packages"
           :key="pkg.id"
           type="button"
-          class="group relative flex min-h-[120px] flex-col justify-between rounded-xl border px-3 py-2.5 text-left transition-all duration-200"
-          :class="selectedPackageId === pkg.id ? 'border-emerald-400 bg-emerald-50/80 shadow-[0_12px_30px_rgba(16,185,129,0.14)] ring-1 ring-emerald-200' : 'border-slate-200 bg-white shadow-sm hover:border-slate-300 hover:shadow-[0_12px_28px_rgba(15,23,42,0.08)]'"
+          class="group relative flex min-h-[112px] flex-col items-center justify-center rounded-2xl border px-4 py-4 text-center transition-all duration-200"
+          :class="selectedPackageId === pkg.id ? 'border-emerald-400 bg-slate-950 text-white shadow-[0_14px_34px_rgba(15,23,42,0.22)] ring-1 ring-emerald-300' : 'border-slate-300 bg-slate-950 text-white hover:border-emerald-300 hover:shadow-[0_12px_28px_rgba(15,23,42,0.16)]'"
           @click="selectedPackageId = pkg.id"
         >
-          <div>
-            <div class="flex items-start justify-between gap-2">
-              <div class="min-w-0">
-                <p class="truncate text-xs font-black text-slate-500">{{ pkg.name }}</p>
-                <p class="text-xl font-black tracking-normal text-emerald-600">{{ pkg.credits }}</p>
-              </div>
-              <span
-                v-if="pkg.badge"
-                class="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-black text-emerald-700"
-              >
-                <Sparkles class="h-2.5 w-2.5" />
-                {{ pkg.badge }}
-              </span>
-              <CheckCircle2 v-else-if="selectedPackageId === pkg.id" class="h-4 w-4 shrink-0 text-emerald-500" />
-            </div>
-            <p class="text-base font-black text-slate-950">{{ formatMoney(pkg.amount_cents) }}</p>
-          </div>
-          <div class="mt-1.5 grid grid-cols-3 gap-1 rounded-lg bg-slate-50 p-1 text-center text-[10px] font-bold text-slate-500">
-            <div class="rounded-md bg-white px-1 py-0.5">
-              <p>1K</p>
-              <p class="text-slate-950">{{ imageCountText(pkg, "1K") }}张</p>
-            </div>
-            <div class="rounded-md bg-white px-1 py-0.5">
-              <p>2K</p>
-              <p class="text-slate-950">{{ imageCountText(pkg, "2K") }}张</p>
-            </div>
-            <div class="rounded-md bg-white px-1 py-0.5">
-              <p>4K</p>
-              <p class="text-slate-950">{{ imageCountText(pkg, "4K") }}张</p>
-            </div>
-          </div>
+          <CheckCircle2 v-if="selectedPackageId === pkg.id" class="absolute right-3 top-3 h-4 w-4 text-emerald-300" />
+          <p class="text-xl font-black tracking-normal">{{ formatCredits(pkg.credits) }} 积分</p>
+          <p class="mt-2 text-sm font-bold text-slate-300">{{ formatMoney(pkg.amount_cents) }}</p>
         </button>
       </div>
 
