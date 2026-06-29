@@ -228,25 +228,33 @@ onBeforeUnmount(() => {
     </template>
 
     <div v-if="!currentOrder" class="min-h-0 space-y-3 overflow-y-auto bg-gradient-to-b from-slate-50/70 to-white p-4">
-      <div class="rounded-2xl border border-slate-200/80 bg-white px-4 py-3 shadow-sm">
-        <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div class="flex items-center gap-3">
-            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100">
+      <div class="rounded-2xl border border-emerald-100 bg-white px-4 py-3 shadow-[0_12px_32px_rgba(15,23,42,0.06)]">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div class="flex items-start gap-3">
+            <div class="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100">
               <ShieldCheck class="h-4 w-4" />
             </div>
             <div>
               <p class="text-xs font-black text-emerald-700">微信支付 · 实时到账</p>
-              <p class="text-xl font-black text-slate-950">当前 {{ formatCredits(authStore.credits) }} 点</p>
+              <p class="mt-0.5 text-xl font-black text-slate-950">当前 {{ formatCredits(authStore.credits) }} 点</p>
+              <p class="mt-1 text-xs font-semibold text-slate-500">生成时自动扣积分，失败会退回。</p>
             </div>
           </div>
-          <div class="grid gap-2 text-xs font-bold text-slate-600 sm:grid-cols-2 lg:w-[560px]">
-            <div class="rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2">
-              <p class="text-[11px] font-black text-slate-400">图片生成</p>
-              <p class="mt-1 text-slate-700">1K {{ imageCreditCosts["1K"] || "-" }}/张 · 2K {{ imageCreditCosts["2K"] || "-" }}/张 · 4K {{ imageCreditCosts["4K"] || "-" }}/张</p>
+          <div class="grid gap-2 text-xs font-bold text-slate-600 sm:grid-cols-2 lg:w-[600px]">
+            <div class="rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2.5">
+              <p class="text-[11px] font-black text-slate-400">图片按张扣费</p>
+              <div class="mt-1.5 flex flex-wrap gap-1.5">
+                <span class="rounded-full bg-white px-2.5 py-1 text-slate-700 shadow-sm">1K {{ imageCreditCosts["1K"] || "-" }} 积分/张</span>
+                <span class="rounded-full bg-white px-2.5 py-1 text-slate-700 shadow-sm">2K {{ imageCreditCosts["2K"] || "-" }} 积分/张</span>
+                <span class="rounded-full bg-white px-2.5 py-1 text-slate-700 shadow-sm">4K {{ imageCreditCosts["4K"] || "-" }} 积分/张</span>
+              </div>
             </div>
-            <div class="rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2">
-              <p class="text-[11px] font-black text-slate-400">视频生成</p>
-              <p class="mt-1 text-slate-700">720p {{ videoCreditCosts["720p"] || "-" }}/秒 · 1080p {{ videoCreditCosts["1080p"] || "-" }}/秒</p>
+            <div class="rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2.5">
+              <p class="text-[11px] font-black text-slate-400">视频按秒扣费</p>
+              <div class="mt-1.5 flex flex-wrap gap-1.5">
+                <span class="rounded-full bg-white px-2.5 py-1 text-slate-700 shadow-sm">720p {{ videoCreditCosts["720p"] || "-" }} 积分/秒</span>
+                <span class="rounded-full bg-white px-2.5 py-1 text-slate-700 shadow-sm">1080p {{ videoCreditCosts["1080p"] || "-" }} 积分/秒</span>
+              </div>
             </div>
           </div>
         </div>
