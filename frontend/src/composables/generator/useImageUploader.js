@@ -25,7 +25,7 @@ function makeUploadPlaceholder(file, previewUrl, index) {
 function makeAssetImage(asset) {
   return {
     id: `asset_${asset.taskId || asset.id}`,
-    previewUrl: asset.url,
+    previewUrl: asset.thumbUrl || asset.previewUrl || asset.url,
     url: asset.url,
     objectKey: "",
     contentType: "",

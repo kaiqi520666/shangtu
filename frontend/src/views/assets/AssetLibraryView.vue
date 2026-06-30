@@ -233,7 +233,7 @@ onMounted(() => {
         ></video>
         <img
           v-else
-          :src="zoomCard.dataUrl"
+          :src="zoomCard.previewUrl || zoomCard.resultUrl || zoomCard.dataUrl"
           referrerpolicy="no-referrer"
           class="max-h-[85vh] max-w-full object-contain"
           alt="大图预览"

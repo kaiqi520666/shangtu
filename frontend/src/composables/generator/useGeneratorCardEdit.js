@@ -66,9 +66,10 @@ export function useGeneratorCardEdit({
       if (target) {
         target.id = newTaskId;
         target.taskId = newTaskId;
-        target.previousResultUrl = target.resultUrl || target.dataUrl || "";
+        target.previousResultUrl = target.resultUrl || "";
         target.dataUrl = "";
         target.resultUrl = "";
+        target.previewUrl = "";
         target.status = "processing";
         target.errorMessage = "";
         target.userPrompt = prompt;

@@ -153,6 +153,8 @@ export function useGenerationCards({
       const data = result.data || {};
       const status = data.status || "processing";
       const resultUrl = data.result_url || "";
+      const displayUrl = data.thumb_url || resultUrl;
+      const previewUrl = data.preview_url || resultUrl;
       const now = Date.now();
       const previousStatus = card.status;
       const previousProgress = typeof card.progress === "number" ? card.progress : 0;
@@ -187,13 +189,14 @@ export function useGenerationCards({
           if (preloadResult) {
             // 保持遮罩：预加载新图完成后再切换状态。视频等媒体可关闭预加载。
             try {
-              await preloadImage(resultUrl);
+              await preloadImage(displayUrl);
             } catch {
               // 预加载失败也继续
             }
           }
           card.resultUrl = resultUrl;
-          card.dataUrl = resultUrl;
+          card.dataUrl = displayUrl;
+          card.previewUrl = previewUrl;
           card.previousResultUrl = "";
           card.status = "done";
           card.stalledWarning = "";
@@ -301,6 +304,7 @@ export function useGenerationCards({
       typeId: typeId || "",
       dataUrl: "",
       resultUrl: "",
+      previewUrl: "",
       selected: false,
       status: "pending",
       strategyTitle: strategyTitle || "",
@@ -322,8 +326,9 @@ export function useGenerationCards({
       id: item.task_id,
       taskId: item.task_id,
       typeId: extra.typeId ?? item.type_id ?? "",
-      dataUrl: item.result_url || "",
+      dataUrl: item.thumb_url || item.result_url || "",
       resultUrl: item.result_url || "",
+      previewUrl: item.preview_url || item.result_url || "",
       selected: false,
       status: item.status || "pending",
       strategyTitle: extra.strategyTitle ?? item.title ?? "",

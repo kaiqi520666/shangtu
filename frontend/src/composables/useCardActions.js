@@ -169,7 +169,7 @@ export function useCardActions({
       triggerBlobDownload(blobUrl, `${currentTaskTitle.value}_${getCardName(card)}.${ext}`);
     } catch {
       // fallback 到直接打开
-      openFallbackUrl(card.dataUrl);
+      openFallbackUrl(card.resultUrl || card.dataUrl);
     } finally {
       card.downloading = false;
       downloading.value = false;

@@ -84,6 +84,8 @@ async function loadAssets() {
       taskId: item.task_id,
       url: item.result_url || "",
       resultUrl: item.result_url || "",
+      thumbUrl: item.thumb_url || item.result_url || "",
+      previewUrl: item.preview_url || item.result_url || "",
       title: item.title || item.job_title || mediaLabel.value,
       typeId: item.type_id || "",
       scenario: item.scenario || "",
@@ -210,7 +212,7 @@ function confirmSelection() {
               ></video>
               <img
                 v-else
-                :src="asset.url"
+                :src="asset.thumbUrl || asset.url"
                 class="max-h-full max-w-full rounded-lg object-contain"
                 alt="资产图片"
               />

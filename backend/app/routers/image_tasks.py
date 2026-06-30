@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_user, get_db
 from app.core.json_utils import parse_json_or_none
+from app.core.oss import image_url_variants
 from app.core.prompt_snapshot import parse_prompt_snapshot
 from app.core.task_state import merge_task_state
 from app.core.task_timeout import project_task_runtime_state
@@ -54,11 +55,12 @@ async def get_image_task(
     )
 
     latest_credits = await get_user_credits(db, current_user.id)
+    urls = image_url_variants(runtime.result_url)
 
     return success(
         {
             "status": runtime.status,
-            "result_url": runtime.result_url,
+            **urls,
             "size": task.size,
             "prompt": task.prompt,
             "prompt_snapshot": parse_prompt_snapshot(task.prompt_snapshot_json),

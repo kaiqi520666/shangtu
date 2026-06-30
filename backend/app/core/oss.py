@@ -2,6 +2,7 @@ import asyncio
 import os
 import uuid
 from dataclasses import dataclass
+from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
 
 import oss2
 from dotenv import load_dotenv
@@ -12,6 +13,11 @@ load_dotenv()
 
 MAX_IMAGE_SIZE = 10 * 1024 * 1024
 MAX_VIDEO_SIZE = 300 * 1024 * 1024
+IMAGE_URL_VARIANTS = {
+    "thumb_url": "image/resize,w_480/quality,q_80/format,webp",
+    "preview_url": "image/resize,w_1200/quality,q_85/format,webp",
+}
+PROCESSABLE_IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".webp")
 ALLOWED_IMAGE_TYPES = {
     "image/jpeg": "jpg",
     "image/png": "png",
@@ -86,6 +92,43 @@ def build_public_url(object_key: str, config: dict[str, str]) -> str:
 
     endpoint = config["endpoint"].replace("https://", "").replace("http://", "").rstrip("/")
     return f"https://{config['bucket_name']}.{endpoint}/{object_key}"
+
+
+def image_url_variants(url: str | None) -> dict[str, str]:
+    clean_url = str(url or "").strip()
+    if not clean_url:
+        return {"result_url": "", "thumb_url": "", "preview_url": ""}
+
+    parsed = urlsplit(clean_url)
+    public_base_url = (os.getenv("OSS_PUBLIC_BASE_URL") or "").rstrip("/")
+    public_host = urlsplit(public_base_url).netloc if public_base_url else ""
+    endpoint_host = (os.getenv("OSS_ENDPOINT") or "").replace("https://", "").replace("http://", "").rstrip("/")
+    bucket_host = f"{os.getenv('OSS_BUCKET_NAME')}.{endpoint_host}" if endpoint_host else ""
+    if public_base_url and bucket_host and parsed.netloc == bucket_host:
+        public_url = f"{public_base_url}/{parsed.path.lstrip('/')}"
+        parsed = urlsplit(f"{public_url}?{parsed.query}" if parsed.query else public_url)
+    else:
+        public_url = clean_url
+
+    supported_hosts = {host for host in (public_host, bucket_host) if host}
+    can_process = (
+        parsed.scheme in {"http", "https"}
+        and parsed.path.lower().endswith(PROCESSABLE_IMAGE_EXTENSIONS)
+        and parsed.netloc in supported_hosts
+    )
+    if not can_process:
+        return {"result_url": public_url, "thumb_url": public_url, "preview_url": public_url}
+
+    base_query = urlencode(
+        [(key, value) for key, value in parse_qsl(parsed.query, keep_blank_values=True) if key != "x-oss-process"]
+    )
+    base_url = urlunsplit(parsed._replace(query=""))
+    variants = {"result_url": public_url}
+    for key, process in IMAGE_URL_VARIANTS.items():
+        process_query = f"x-oss-process={quote(process, safe='/,')}"
+        query = "&".join(part for part in (base_query, process_query) if part)
+        variants[key] = f"{base_url}?{query}"
+    return variants
 
 
 def upload_image_bytes_sync(

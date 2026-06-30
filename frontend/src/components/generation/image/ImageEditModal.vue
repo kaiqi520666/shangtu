@@ -54,7 +54,7 @@ function handleSubmit() {
   >
     <div v-if="card" class="space-y-4 p-5">
       <div class="overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
-        <img :src="card.dataUrl" class="mx-auto max-h-56 object-contain" referrerpolicy="no-referrer" alt="当前图片" />
+        <img :src="card.previewUrl || card.resultUrl || card.dataUrl" class="mx-auto max-h-56 object-contain" referrerpolicy="no-referrer" alt="当前图片" />
       </div>
       <div class="flex items-center gap-2 text-xs text-slate-600">
         <span class="rounded-full bg-slate-100 px-2 py-0.5 font-semibold">{{ moduleName }}</span>

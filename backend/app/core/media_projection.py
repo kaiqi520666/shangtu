@@ -1,6 +1,7 @@
 from sqlalchemy import Integer, String, cast, func, literal, select
 
 from app.core.json_utils import parse_json_or_none
+from app.core.oss import image_url_variants
 from app.core.prompt_snapshot import parse_prompt_snapshot
 from app.core.scenarios import VIDEO_SCENARIOS
 from app.core.task_timeout import project_task_runtime_state, user_visible_task_error
@@ -17,6 +18,7 @@ def image_task_payload(task: ImageTask) -> dict:
         result_url=task.result_url,
         created_at=task.created_at,
     )
+    urls = image_url_variants(runtime.result_url)
     return {
         "task_id": task.id,
         "media_type": "image",
@@ -25,7 +27,7 @@ def image_task_payload(task: ImageTask) -> dict:
         "sort_order": task.sort_order,
         "status": runtime.status,
         "progress": runtime.progress,
-        "result_url": runtime.result_url,
+        **urls,
         "size": task.size,
         "error_message": runtime.error_message,
         "credit_cost": task.credit_cost,

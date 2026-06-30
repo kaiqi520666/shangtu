@@ -72,8 +72,10 @@ export function useAssetLibrary() {
       assets.value = (data.items || []).map((item) => ({
         id: item.task_id,
         taskId: item.task_id,
-        dataUrl: item.result_url || "",
+        dataUrl: item.thumb_url || item.result_url || "",
         resultUrl: item.result_url || "",
+        thumbUrl: item.thumb_url || item.result_url || "",
+        previewUrl: item.preview_url || item.result_url || "",
         title: item.title || "",
         typeId: item.type_id || "",
         scenario: item.scenario || "",

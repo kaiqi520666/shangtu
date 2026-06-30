@@ -10,6 +10,7 @@ from app.core.media_projection import (
     includes_video,
     video_asset_select,
 )
+from app.core.oss import image_url_variants
 from app.core.scenarios import SUPPORTED_GENERATION_SCENARIOS
 from app.core.task_state import task_state_keys
 from app.core.time import to_utc_iso
@@ -60,8 +61,9 @@ async def list_assets(
         .offset(start)
         .limit(page_size)
     )
-    items = [
-        {
+    items = []
+    for row in result.mappings().all():
+        item = {
             "task_id": row["task_id"],
             "media_type": row["media_type"],
             "result_url": row["result_url"],
@@ -71,8 +73,9 @@ async def list_assets(
             "job_title": row["job_title"] or "",
             "created_at": to_utc_iso(row["created_at"]),
         }
-        for row in result.mappings().all()
-    ]
+        if row["media_type"] == "image":
+            item.update(image_url_variants(row["result_url"]))
+        items.append(item)
 
     return success({
         "items": items,
