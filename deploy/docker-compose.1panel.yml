@@ -25,7 +25,7 @@ services:
       - ./data/redis:/data
 
   backend:
-    image: kaiqi520666/shangtu-backend:latest
+    image: kaiqi520666/shangtu-backend:20260704-1
     restart: unless-stopped
     env_file: .env
     environment:
@@ -38,13 +38,14 @@ services:
         condition: service_started
 
   worker:
-    image: kaiqi520666/shangtu-backend:latest
+    image: kaiqi520666/shangtu-backend:20260704-1
     restart: unless-stopped
     command: ["arq", "app.worker.settings.WorkerSettings"]
     env_file: .env
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       REDIS_URL: redis://redis:6379
+      ARQ_MAX_JOBS: ${ARQ_MAX_JOBS:-5}
     depends_on:
       db:
         condition: service_healthy
@@ -52,7 +53,7 @@ services:
         condition: service_started
 
   frontend:
-    image: kaiqi520666/shangtu-frontend:latest
+    image: kaiqi520666/shangtu-frontend:20260704-1
     restart: unless-stopped
     ports:
       - "${FRONTEND_PORT:-8088}:80"
