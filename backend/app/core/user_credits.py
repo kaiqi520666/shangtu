@@ -69,6 +69,31 @@ async def deduct_user_credits(
     return balance_after
 
 
+async def deduct_user_credits_allow_negative(
+    db: AsyncSession,
+    user_id: int,
+    cost: int,
+    note: str | None = None,
+) -> int:
+    result = await db.execute(
+        update(User)
+        .where(User.id == user_id)
+        .values(credits=User.credits - cost)
+        .returning(User.credits)
+        .execution_options(synchronize_session=False)
+    )
+    balance_after = int(result.scalar_one())
+    add_credit_transaction(
+        db,
+        user_id=user_id,
+        tx_type="consume",
+        credits_delta=-abs(int(cost)),
+        balance_after=balance_after,
+        note=note,
+    )
+    return balance_after
+
+
 async def refund_user_credits(
     db: AsyncSession,
     user_id: int,

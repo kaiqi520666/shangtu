@@ -24,7 +24,11 @@ from app.core.system_settings import (
     get_effective_digital_human_precharge_costs,
 )
 from app.core.time import to_utc_iso, utc_now
-from app.core.user_credits import get_user_credits, refund_user_credits
+from app.core.user_credits import (
+    deduct_user_credits_allow_negative,
+    get_user_credits,
+    refund_user_credits,
+)
 from app.core.deps import get_current_user, get_db
 from app.core.task_timeout import project_task_runtime_state
 from app.models import GenerationJob, HeygenAvatar, HeygenVoice, User, VideoTask
@@ -443,7 +447,14 @@ async def _settle_task_credits_if_needed(db: AsyncSession, task: VideoTask) -> b
         task.credit_cost = final_cost
         return True
 
-    return False
+    await deduct_user_credits_allow_negative(
+        db,
+        task.user_id,
+        delta,
+        note=f"数字人结算补扣 · {task.id}",
+    )
+    task.credit_cost = final_cost
+    return True
 
 
 @router.get("/avatars", response_model=Response)
