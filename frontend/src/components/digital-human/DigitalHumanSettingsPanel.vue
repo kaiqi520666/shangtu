@@ -1,29 +1,26 @@
 <script setup>
+import { toRefs } from "vue";
 import { Bot, Mic2, Sparkles } from "lucide-vue-next";
 import GeneratorActionFooter from "@/components/generation/workspace/GeneratorActionFooter.vue";
 import GeneratorSidePanelShell from "@/components/generation/workspace/GeneratorSidePanelShell.vue";
-import AppSelect from "@/components/ui/AppSelect.vue";
+import VideoQualitySelector from "@/components/product-video/VideoQualitySelector.vue";
+import AppOptionCards from "@/components/ui/AppOptionCards.vue";
+import AppRangeCard from "@/components/ui/AppRangeCard.vue";
 
 const qualityOptions = [
-  { value: "standard", label: "标准档" },
-  { value: "premium", label: "高质档" },
-];
-const resolutionOptions = [
-  { value: "720p", label: "720p" },
-  { value: "1080p", label: "1080p" },
+  { value: "standard", label: "标准档", description: "日常口播" },
+  { value: "premium", label: "高质档", description: "更高表现力" },
 ];
 const aspectRatioOptions = [
   { value: "9:16", label: "9:16", description: "竖版口播" },
   { value: "16:9", label: "16:9", description: "横版口播" },
   { value: "1:1", label: "1:1", description: "方版口播" },
 ];
-const voiceSpeedOptions = [
-  { value: 0.8, label: "0.8x" },
-  { value: 1, label: "1.0x" },
-  { value: 1.2, label: "1.2x" },
-];
+const voiceSpeedMin = 0.8;
+const voiceSpeedMax = 1.2;
+const voiceSpeedStep = 0.1;
 
-defineProps({
+const props = defineProps({
   settings: {
     type: Object,
     required: true,
@@ -44,6 +41,31 @@ const emit = defineEmits([
   "open-voice-picker",
   "notify",
 ]);
+
+const { settings, selectedAvatar, selectedVoice } = toRefs(props);
+
+function updateSettings(patch) {
+  emit("update:settings", {
+    ...settings.value,
+    ...patch,
+  });
+}
+
+function updateVoiceSpeed(event) {
+  updateSettings({
+    voiceSpeed: Number(event),
+  });
+}
+
+function formatVoiceSpeed(speed) {
+  return `${Number(speed || 1).toFixed(1)}x`;
+}
+
+function getVoiceSpeedHint(speed) {
+  if (speed <= 0.9) return "语速偏慢，适合更稳的讲解节奏";
+  if (speed >= 1.1) return "语速更快，适合节奏更利落的口播";
+  return "标准语速，适合大多数口播场景";
+}
 </script>
 
 <template>
@@ -125,7 +147,7 @@ const emit = defineEmits([
           :value="settings.script"
           class="h-36 w-full resize-none rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs leading-relaxed text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-primary focus:ring-1 focus:ring-primary"
           placeholder="输入数字人要说的口播文案..."
-          @input="emit('update:settings', { ...settings, script: $event.target.value })"
+          @input="updateSettings({ script: $event.target.value })"
         ></textarea>
       </label>
 
@@ -135,7 +157,7 @@ const emit = defineEmits([
           :value="settings.motionPrompt"
           class="h-24 w-full resize-none rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs leading-relaxed text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-primary focus:ring-1 focus:ring-primary"
           placeholder="例如：自然挥手开场，手势克制，保持专业讲解状态..."
-          @input="emit('update:settings', { ...settings, motionPrompt: $event.target.value })"
+          @input="updateSettings({ motionPrompt: $event.target.value })"
         ></textarea>
       </label>
     </section>
@@ -143,29 +165,45 @@ const emit = defineEmits([
     <section class="space-y-4 p-5">
       <div>
         <h2 class="text-sm font-black text-slate-900">视频设置</h2>
-        <p class="mt-1 text-xs text-slate-400">这里先确定生成档位和比例，后续继续接入字幕、背景和积分规则。</p>
       </div>
 
-      <div class="grid grid-cols-2 gap-3">
-        <AppSelect
-          :model-value="settings.qualityTier"
-          :options="qualityOptions"
-          @update:model-value="emit('update:settings', { ...settings, qualityTier: $event })"
-        />
-        <AppSelect
-          :model-value="settings.aspectRatio"
-          :options="aspectRatioOptions"
-          @update:model-value="emit('update:settings', { ...settings, aspectRatio: $event })"
-        />
-        <AppSelect
-          :model-value="settings.resolution"
-          :options="resolutionOptions"
-          @update:model-value="emit('update:settings', { ...settings, resolution: $event })"
-        />
-        <AppSelect
+      <div class="space-y-4">
+        <div>
+          <div class="mb-2 flex items-center justify-between">
+            <h3 class="text-xs font-bold text-slate-800">生成档位</h3>
+            <span class="text-[11px] text-slate-400">按预算和质感选择</span>
+          </div>
+          <AppOptionCards :model-value="settings.qualityTier" :options="qualityOptions" @update:model-value="updateSettings({ qualityTier: $event })" />
+        </div>
+
+        <div>
+          <div class="mb-2 flex items-center justify-between">
+            <h3 class="text-xs font-bold text-slate-800">视频比例</h3>
+            <span class="text-[11px] text-slate-400">按投放平台选择</span>
+          </div>
+          <AppOptionCards
+            :model-value="settings.aspectRatio"
+            :options="aspectRatioOptions"
+            :columns="3"
+            align="center"
+            @update:model-value="updateSettings({ aspectRatio: $event })"
+          />
+        </div>
+
+        <VideoQualitySelector :model-value="settings.resolution" @update:model-value="updateSettings({ resolution: $event })" />
+
+        <AppRangeCard
           :model-value="settings.voiceSpeed"
-          :options="voiceSpeedOptions"
-          @update:model-value="emit('update:settings', { ...settings, voiceSpeed: $event })"
+          title="语速调节"
+          :hint="getVoiceSpeedHint(settings.voiceSpeed)"
+          :min="voiceSpeedMin"
+          :max="voiceSpeedMax"
+          :step="voiceSpeedStep"
+          :min-label="formatVoiceSpeed(voiceSpeedMin)"
+          :mid-label="formatVoiceSpeed(1)"
+          :max-label="formatVoiceSpeed(voiceSpeedMax)"
+          :value-formatter="formatVoiceSpeed"
+          @update:model-value="updateVoiceSpeed"
         />
       </div>
     </section>

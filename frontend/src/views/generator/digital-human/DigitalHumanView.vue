@@ -12,7 +12,7 @@ const settings = reactive({
   script: "",
   motionPrompt: "",
   qualityTier: "standard",
-  resolution: "1080p",
+  resolution: "720p",
   aspectRatio: "9:16",
   voiceSpeed: 1,
 });
@@ -41,6 +41,17 @@ function handleAvatarConfirm(item) {
 function handleVoiceConfirm(item) {
   selectedVoice.value = item;
 }
+
+function formatResolution(value) {
+  return value === "1080p" ? "1080p · 高清成片" : "720p · 默认推荐";
+}
+
+function formatVoiceSpeed(value) {
+  const speed = Number(value || 1).toFixed(1);
+  if (Number(value) <= 0.9) return `${speed}x · 偏慢`;
+  if (Number(value) >= 1.1) return `${speed}x · 偏快`;
+  return `${speed}x · 标准`;
+}
 </script>
 
 <template>
@@ -58,7 +69,7 @@ function handleVoiceConfirm(item) {
     <section class="flex min-h-0 flex-1 flex-col overflow-hidden bg-slate-50">
       <div class="border-b border-slate-200 bg-white px-6 py-4">
         <h1 class="text-base font-black text-slate-900">数字人</h1>
-        <p class="mt-1 text-xs text-slate-400">先完成正式入口，下一步直接接系统数字人 / 系统声音选择弹窗和 HeyGen 任务链路。</p>
+        <p class="mt-1 text-xs text-slate-400">选好数字人、声音和文案后，在这里生成视频。</p>
       </div>
 
       <div class="flex-1 overflow-y-auto p-6">
@@ -73,9 +84,7 @@ function handleVoiceConfirm(item) {
                 <Bot class="h-6 w-6" />
               </div>
               <p class="mt-4 text-sm font-bold text-slate-800">数字人功能入口已就位</p>
-              <p class="mt-2 max-w-md text-xs leading-relaxed text-slate-400">
-                下一步会把系统数字人选择、系统声音选择、HeyGen 任务创建和结果轮询依次接进这里。
-              </p>
+              <p class="mt-2 max-w-md text-xs leading-relaxed text-slate-400">这里接 HeyGen 生成、任务状态和成片结果。</p>
             </div>
           </section>
 
@@ -120,11 +129,11 @@ function handleVoiceConfirm(item) {
                 </div>
                 <div class="flex items-center justify-between gap-3">
                   <dt>视频清晰度</dt>
-                  <dd class="font-medium text-slate-700">{{ settings.resolution }}</dd>
+                  <dd class="font-medium text-slate-700">{{ formatResolution(settings.resolution) }}</dd>
                 </div>
                 <div class="flex items-center justify-between gap-3">
                   <dt>语速</dt>
-                  <dd class="font-medium text-slate-700">{{ settings.voiceSpeed }}x</dd>
+                  <dd class="font-medium text-slate-700">{{ formatVoiceSpeed(settings.voiceSpeed) }}</dd>
                 </div>
                 <div class="flex items-center justify-between gap-3">
                   <dt>口播文案</dt>
