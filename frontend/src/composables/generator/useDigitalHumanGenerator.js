@@ -217,6 +217,14 @@ export function useDigitalHumanGenerator({ toast, confirm, onJobCreated } = {}) 
   }
 
   function showNotice(message) {
+    if (message && typeof message === "object") {
+      const type = message.type === "error" ? "error" : message.type === "success" ? "success" : "info";
+      const text = String(message.message || "").trim();
+      if (text) {
+        toast?.[type]?.(text);
+      }
+      return;
+    }
     toast?.info?.(message);
   }
 

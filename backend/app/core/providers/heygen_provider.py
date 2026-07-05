@@ -135,7 +135,12 @@ async def create_photo_avatar(
     payload = {
         "name": name,
         "type": "photo",
-        "image_url": image_url,
+        "reference_images": [
+            {
+                "type": "url",
+                "url": image_url,
+            }
+        ],
     }
     response = await client.post(
         f"{HEYGEN_BASE_URL}/v3/avatars",

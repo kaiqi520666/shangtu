@@ -533,6 +533,46 @@ def _extract_provider_avatar_urls(data: dict) -> tuple[str, str]:
     return preview_image_url, preview_video_url
 
 
+def _extract_provider_avatar_status(data: dict) -> str:
+    avatar_item = data.get("avatar_item")
+    avatar_group = data.get("avatar_group")
+    if isinstance(avatar_item, dict):
+        status = _clean_text(str(avatar_item.get("status") or ""))
+        if status:
+            return status
+    if isinstance(avatar_group, dict):
+        status = _clean_text(str(avatar_group.get("status") or ""))
+        if status:
+            return status
+    return _clean_text(str(data.get("status") or ""))
+
+
+def _extract_provider_avatar_error_message(data: dict) -> str | None:
+    avatar_item = data.get("avatar_item")
+    avatar_group = data.get("avatar_group")
+    candidates = []
+    if isinstance(avatar_item, dict):
+        error = avatar_item.get("error")
+        if isinstance(error, dict):
+            candidates.append(error.get("message"))
+    if isinstance(avatar_group, dict):
+        error = avatar_group.get("error")
+        if isinstance(error, dict):
+            candidates.append(error.get("message"))
+    candidates.extend(
+        [
+            data.get("error_message"),
+            data.get("failure_reason"),
+            data.get("message"),
+        ]
+    )
+    for item in candidates:
+        message = _clean_text(str(item or ""))
+        if message:
+            return message
+    return None
+
+
 async def _upsert_user_avatar_from_task(
     db: AsyncSession,
     *,
@@ -600,10 +640,8 @@ async def _sync_user_avatar_task_from_provider(
     async with httpx.AsyncClient(timeout=60) as client:
         data = await get_avatar_look(client, avatar_look_id=task.provider_avatar_id)
 
-    provider_status = _clean_text(str(data.get("status") or ""))
-    error_message = _clean_text(
-        str(data.get("error_message") or data.get("failure_reason") or data.get("message") or "")
-    ) or None
+    provider_status = _extract_provider_avatar_status(data)
+    error_message = _extract_provider_avatar_error_message(data)
     task.status = _provider_avatar_status(provider_status, failure_message=error_message)
     task.error_message = error_message
 
@@ -1164,7 +1202,7 @@ async def upload_photo_avatar(
             raise ValueError("HeyGen 未返回照片数字人 ID")
         task.provider_task_id = provider_task_id or provider_avatar_id
         task.provider_avatar_id = provider_avatar_id
-        task.status = _provider_avatar_status(_clean_text(str(provider_data.get("status") or "")))
+        task.status = _provider_avatar_status(_extract_provider_avatar_status(provider_data))
         if task.status == "done":
             preview_image_url, preview_video_url = _extract_provider_avatar_urls(provider_data)
             asset = await _upsert_user_avatar_from_task(
@@ -1177,14 +1215,10 @@ async def upload_photo_avatar(
             await db.flush()
             task.result_avatar_id = asset.id
         elif task.status == "failed":
-            task.error_message = _clean_text(
-                str(
-                    provider_data.get("error_message")
-                    or provider_data.get("failure_reason")
-                    or provider_data.get("message")
-                    or ""
-                )
-            ) or "HeyGen 创建失败，请稍后重试"
+            task.error_message = (
+                _extract_provider_avatar_error_message(provider_data)
+                or "HeyGen 创建失败，请稍后重试"
+            )
             await _refund_user_avatar_task_if_needed(
                 db,
                 task,

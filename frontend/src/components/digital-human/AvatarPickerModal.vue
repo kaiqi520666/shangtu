@@ -142,6 +142,14 @@ onBeforeUnmount(() => {
   clearPhotoPreviewUrl();
 });
 
+function notify(type, message) {
+  emit("notify", { type, message });
+}
+
+function notifyError(message) {
+  notify("error", message);
+}
+
 function normalizeAvatar(item) {
   if (!item?.avatar_id) return null;
   return {
@@ -199,7 +207,7 @@ async function pollRunningPhotoTasks() {
     );
     await reloadPhotoLists();
   } catch (error) {
-    emit("notify", error.message || "照片数字人状态查询失败");
+    notifyError(error.message || "照片数字人状态查询失败");
     stopPhotoTaskPolling();
   }
 }
@@ -248,7 +256,7 @@ function handleFileChange(event) {
 
 function handleSelectedFile(file) {
   if (!isImageFile(file)) {
-    emit("notify", "请选择图片文件");
+    notifyError("请选择图片文件");
     return;
   }
   setPhotoFile(file);
@@ -267,7 +275,7 @@ async function initSystemTab() {
   systemPicker.reset();
   const result = await systemPicker.reload();
   if (!result.ok) {
-    emit("notify", result.message || "系统数字人加载失败");
+    notifyError(result.message || "系统数字人加载失败");
   }
 }
 
@@ -277,10 +285,10 @@ async function reloadPhotoLists() {
     photoTaskPicker.reload(),
   ]);
   if (!avatarResult.ok) {
-    emit("notify", avatarResult.message || "照片数字人加载失败");
+    notifyError(avatarResult.message || "照片数字人加载失败");
   }
   if (!taskResult.ok) {
-    emit("notify", taskResult.message || "照片数字人任务加载失败");
+    notifyError(taskResult.message || "照片数字人任务加载失败");
   }
 }
 
@@ -302,7 +310,7 @@ async function handleTabChange(value) {
 async function applyFilters() {
   const result = await systemPicker.reload();
   if (!result.ok) {
-    emit("notify", result.message || "系统数字人加载失败");
+    notifyError(result.message || "系统数字人加载失败");
   }
 }
 
@@ -313,16 +321,16 @@ async function handleReachEnd(event) {
       photoAvatarPicker.handleScroll(event),
     ]);
     if (!taskResult.ok) {
-      emit("notify", taskResult.message || "照片数字人任务加载失败");
+      notifyError(taskResult.message || "照片数字人任务加载失败");
     }
     if (!avatarResult.ok) {
-      emit("notify", avatarResult.message || "照片数字人加载失败");
+      notifyError(avatarResult.message || "照片数字人加载失败");
     }
     return;
   }
   const result = await systemPicker.handleScroll(event);
   if (!result.ok) {
-    emit("notify", result.message || "系统数字人加载失败");
+    notifyError(result.message || "系统数字人加载失败");
   }
 }
 
@@ -344,7 +352,7 @@ function isSelected(item) {
 
 function confirmSelection() {
   if (!pendingAvatar.value) {
-    emit("notify", "请选择数字人");
+    notifyError("请选择数字人");
     return;
   }
   emit("confirm", pendingAvatar.value);
@@ -354,11 +362,11 @@ function confirmSelection() {
 async function createPhotoAvatarAction() {
   const name = photoAvatarName.value.trim();
   if (!photoFile.value) {
-    emit("notify", "请先上传 1 张照片");
+    notifyError("请先上传 1 张照片");
     return;
   }
   if (!name) {
-    emit("notify", "请输入数字人名称");
+    notifyError("请输入数字人名称");
     return;
   }
   creatingPhotoAvatar.value = true;
@@ -368,7 +376,7 @@ async function createPhotoAvatarAction() {
       name,
     });
     if (result.code !== 0) {
-      emit("notify", result.message || "照片数字人创建失败");
+      notifyError(result.message || "照片数字人创建失败");
       return;
     }
     resetPhotoUploadState();
@@ -382,7 +390,11 @@ async function createPhotoAvatarAction() {
       }
     }
   } catch (error) {
-    emit("notify", error.response?.data?.message || "照片数字人创建失败");
+    const detail = error.response?.data?.detail;
+    const detailMessage = Array.isArray(detail)
+      ? detail.map((item) => item?.msg).filter(Boolean).join("，")
+      : "";
+    notifyError(error.response?.data?.message || detailMessage || "照片数字人创建失败");
   } finally {
     creatingPhotoAvatar.value = false;
   }
@@ -395,7 +407,7 @@ async function deletePhotoAvatarAction(item) {
   try {
     const result = await deletePhotoAvatar(item.id);
     if (result.code !== 0) {
-      emit("notify", result.message || "删除失败");
+      notifyError(result.message || "删除失败");
       return;
     }
     if (pendingAvatar.value?.source === "photo" && pendingAvatar.value?.asset_id === item.id) {
@@ -403,7 +415,7 @@ async function deletePhotoAvatarAction(item) {
     }
     await reloadPhotoLists();
   } catch (error) {
-    emit("notify", error.response?.data?.message || "删除失败，请稍后重试");
+    notifyError(error.response?.data?.message || "删除失败，请稍后重试");
   } finally {
     deletingAssetId.value = "";
   }
@@ -428,7 +440,7 @@ function photoTaskStatusClass(status) {
   <HeygenPickerModalShell
     :open="open"
     title="选择数字人"
-    :subtitle="activeTab === 'photo' ? '上传正面人像图，创建成功后可重复使用' : ''"
+    subtitle=""
     :tabs="tabs"
     :active-tab="activeTab"
     :keyword="systemPicker.state.keyword"
