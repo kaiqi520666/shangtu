@@ -42,6 +42,14 @@ const props = defineProps({
     type: String,
     default: "生成视频",
   },
+  scriptMetaText: {
+    type: String,
+    default: "",
+  },
+  scriptExceeded: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const emit = defineEmits([
@@ -156,9 +164,18 @@ function getVoiceSpeedHint(speed) {
         <textarea
           :value="settings.script"
           class="h-36 w-full resize-none rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs leading-relaxed text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-primary focus:ring-1 focus:ring-primary"
+          :class="scriptExceeded ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-400' : ''"
           placeholder="输入数字人要说的口播文案..."
           @input="updateSettings({ script: $event.target.value })"
         ></textarea>
+        <div class="mt-2 flex items-center justify-between text-[11px]">
+          <span :class="scriptExceeded ? 'font-semibold text-rose-500' : 'text-slate-400'">
+            {{ scriptMetaText || "当前最长支持约 5 分钟口播文案" }}
+          </span>
+          <span :class="scriptExceeded ? 'font-semibold text-rose-500' : 'text-slate-400'">
+            按 5 字/秒估算
+          </span>
+        </div>
       </label>
 
       <label class="block">

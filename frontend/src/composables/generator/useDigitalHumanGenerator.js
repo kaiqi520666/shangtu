@@ -31,6 +31,8 @@ const QUALITY_TIER_LABELS = {
 };
 
 const VIDEO_POLL_INTERVAL_MS = 3000;
+const MAX_SCRIPT_CHARS = 1500;
+const SCRIPT_CHARS_PER_SECOND = 5;
 
 function createDefaultSettings() {
   return { ...DEFAULT_SETTINGS };
@@ -133,16 +135,28 @@ export function useDigitalHumanGenerator({ toast, confirm, onJobCreated } = {}) 
     downloadSingleMedia: downloadSingleVideo,
   } = actions;
 
+  const scriptLength = computed(() => (settings.script || "").replace(/\s+/g, "").length);
+  const estimatedDurationSeconds = computed(() =>
+    Math.ceil(scriptLength.value / SCRIPT_CHARS_PER_SECOND),
+  );
+  const scriptExceeded = computed(() => scriptLength.value > MAX_SCRIPT_CHARS);
+  const scriptMetaText = computed(() => {
+    const durationText = estimatedDurationSeconds.value > 0 ? `，预计约 ${estimatedDurationSeconds.value} 秒` : "";
+    return `已输入 ${scriptLength.value}/${MAX_SCRIPT_CHARS} 字${durationText}`;
+  });
+
   const canGenerate = computed(() => {
     if (creatingBatch.value || generating.value) return false;
     if (!selectedAvatar.value?.avatar_id) return false;
     if (!selectedVoice.value?.voice_id) return false;
+    if (scriptExceeded.value) return false;
     return Boolean((settings.script || "").trim());
   });
 
   const generateButtonText = computed(() => {
     if (creatingBatch.value) return "创建任务中...";
     if (generating.value) return "生成中...";
+    if (scriptExceeded.value) return "文案超过 5 分钟";
     return "生成视频";
   });
 
@@ -191,6 +205,10 @@ export function useDigitalHumanGenerator({ toast, confirm, onJobCreated } = {}) 
     }
     if (!(settings.script || "").trim()) {
       toast?.info?.("请输入口播文案");
+      return;
+    }
+    if (scriptExceeded.value) {
+      toast?.info?.("当前最多支持约 5 分钟口播文案，请精简后再生成");
       return;
     }
 
@@ -349,6 +367,10 @@ export function useDigitalHumanGenerator({ toast, confirm, onJobCreated } = {}) 
     downloading,
     selectedCardsCount,
     voiceLanguage,
+    scriptLength,
+    estimatedDurationSeconds,
+    scriptExceeded,
+    scriptMetaText,
     canGenerate,
     generateButtonText,
     updateSettings,
