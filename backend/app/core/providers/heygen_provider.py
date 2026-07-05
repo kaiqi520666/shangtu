@@ -85,8 +85,9 @@ async def create_avatar_video(
     title: str,
     aspect_ratio: str,
     resolution: str,
-    script: str,
-    voice_id: str,
+    script: str | None = None,
+    voice_id: str | None = None,
+    audio_url: str | None = None,
     engine_type: str,
     background_url: str | None = None,
     voice_settings: dict[str, Any] | None = None,
@@ -99,13 +100,18 @@ async def create_avatar_video(
         "resolution": resolution,
         "aspect_ratio": aspect_ratio,
         "output_format": "mp4",
-        "script": script,
-        "voice_id": voice_id,
         "engine": {"type": engine_type},
     }
+    if audio_url:
+        payload["audio_url"] = audio_url
+    else:
+        if script:
+            payload["script"] = script
+        if voice_id:
+            payload["voice_id"] = voice_id
     if background_url:
         payload["background"] = {"url": background_url}
-    if voice_settings:
+    if voice_settings and not audio_url:
         payload["voice_settings"] = voice_settings
     response = await client.post(
         f"{HEYGEN_BASE_URL}/v3/videos",

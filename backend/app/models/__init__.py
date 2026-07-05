@@ -10,6 +10,7 @@ from app.models.product_catalog import ProductCatalog
 from app.models.prompt_template import PromptTemplate
 from app.models.system_setting import SystemSetting
 from app.models.user import User
+from app.models.user_audio_asset import UserAudioAsset
 from app.models.video_task import VideoTask
 
 __all__ = [
@@ -25,5 +26,6 @@ __all__ = [
     "PromptTemplate",
     "SystemSetting",
     "User",
+    "UserAudioAsset",
     "VideoTask",
 ]

@@ -1,5 +1,5 @@
 <script setup>
-import { toRefs } from "vue";
+import { computed, toRefs } from "vue";
 import { Bot, Mic2, Sparkles } from "lucide-vue-next";
 import ImageUploader from "@/components/generation/image/ImageUploader.vue";
 import GeneratorActionFooter from "@/components/generation/workspace/GeneratorActionFooter.vue";
@@ -66,6 +66,16 @@ const emit = defineEmits([
 ]);
 
 const { settings, selectedAvatar, selectedVoice, backgroundImages } = toRefs(props);
+const uploadAudioMode = computed(() => selectedVoice.value?.mode === "upload");
+const selectedVoicePreviewUrl = computed(() =>
+  uploadAudioMode.value ? selectedVoice.value?.audio_url || "" : selectedVoice.value?.preview_audio_url || "",
+);
+const selectedVoiceMeta = computed(() => {
+  if (!selectedVoice.value) return "";
+  if (!uploadAudioMode.value) return selectedVoice.value?.language || "未标注语言";
+  const duration = Number(selectedVoice.value?.duration_seconds || 0);
+  return duration > 0 ? `时长约 ${duration} 秒` : "上传音频";
+});
 
 function updateSettings(patch) {
   emit("update:settings", {
@@ -157,26 +167,26 @@ function getVoiceSpeedHint(speed) {
               <Mic2 class="h-4.5 w-4.5" />
             </span>
             <span class="min-w-0">
-              <span class="block text-xs font-bold text-slate-800">选择声音</span>
+              <span class="block text-xs font-bold text-slate-800">{{ uploadAudioMode ? "自定义音频" : "选择声音" }}</span>
               <span class="mt-0.5 block truncate text-xs text-slate-400">
                 {{ selectedVoice?.name || "未选择系统声音" }}
               </span>
-              <span v-if="selectedVoice?.language" class="mt-1 block truncate text-[11px] text-slate-400">
-                {{ selectedVoice.language }}
+              <span v-if="selectedVoiceMeta" class="mt-1 block truncate text-[11px] text-slate-400">
+                {{ uploadAudioMode ? `自定义音频 · ${selectedVoiceMeta}` : selectedVoiceMeta }}
               </span>
             </span>
           </span>
           <span class="text-xs font-medium text-primary">更换</span>
         </button>
 
-        <div v-if="selectedVoice?.preview_audio_url" class="border-t border-slate-100 p-3">
-          <p class="mb-2 text-[11px] font-bold text-slate-500">声音试听</p>
-          <audio :src="selectedVoice.preview_audio_url" controls preload="none" class="h-10 w-full"></audio>
+        <div v-if="selectedVoicePreviewUrl" class="border-t border-slate-100 p-3">
+          <p class="mb-2 text-[11px] font-bold text-slate-500">{{ uploadAudioMode ? "音频预览" : "声音试听" }}</p>
+          <audio :src="selectedVoicePreviewUrl" controls preload="none" class="h-10 w-full"></audio>
         </div>
       </section>
     </section>
 
-    <section class="space-y-4 border-b border-slate-100 p-5">
+    <section v-if="!uploadAudioMode" class="space-y-4 border-b border-slate-100 p-5">
       <label class="block">
         <span class="mb-1.5 block text-xs font-bold text-slate-800">口播文案</span>
         <textarea
@@ -227,6 +237,7 @@ function getVoiceSpeedHint(speed) {
         <VideoQualitySelector :model-value="settings.resolution" @update:model-value="updateSettings({ resolution: $event })" />
 
         <AppRangeCard
+          v-if="!uploadAudioMode"
           :model-value="settings.voiceSpeed"
           title="语速调节"
           :hint="getVoiceSpeedHint(settings.voiceSpeed)"

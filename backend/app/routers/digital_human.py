@@ -1,15 +1,18 @@
 from __future__ import annotations
 
+import mimetypes
+from pathlib import Path
 import uuid
 
 import httpx
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, File, Form, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.json_utils import dump_json_or_none, parse_json_or_none
+from app.core.oss import OssConfigError, upload_audio_bytes
 from app.core.pagination import page_payload
 from app.core.prompt_snapshot import build_prompt_snapshot, dump_prompt_snapshot, parse_prompt_snapshot
 from app.core.providers.heygen_provider import (
@@ -31,7 +34,7 @@ from app.core.user_credits import (
 )
 from app.core.deps import get_current_user, get_db
 from app.core.task_timeout import project_task_runtime_state
-from app.models import GenerationJob, HeygenAvatar, HeygenVoice, User, VideoTask
+from app.models import GenerationJob, HeygenAvatar, HeygenVoice, User, UserAudioAsset, VideoTask
 from app.routers.admin.utils import heygen_avatar_payload, heygen_voice_payload
 from app.schemas.response import Response, fail, success
 from app.services.generation_tasks import deduct_credits_or_fail
@@ -59,8 +62,9 @@ class DigitalHumanGenerateRequest(BaseModel):
     job_id: str | None = None
     title: str | None = None
     avatar_id: str
-    voice_id: str
-    script: str
+    voice_id: str | None = None
+    audio_asset_id: str | None = None
+    script: str | None = None
     background: DigitalHumanBackground | None = None
     quality_tier: str = "standard"
     resolution: str = DEFAULT_RESOLUTION
@@ -72,9 +76,11 @@ def _clean_text(value: str | None) -> str:
     return str(value or "").strip()
 
 
-def _default_job_title(script: str) -> str:
+def _default_job_title(script: str, audio_name: str | None = None) -> str:
     prefix = SCENARIO_TITLE_PREFIX.get("digital_human", "数字人")
     excerpt = _clean_text(script).replace("\n", " ")[:20]
+    if not excerpt:
+        excerpt = _clean_text(audio_name)[:20]
     if excerpt:
         return f"{prefix}_{excerpt}"
     return f"{prefix}_{utc_now():%Y%m%d_%H%M%S}"
@@ -118,6 +124,23 @@ def _normalize_voice_speed(value: float | int | None) -> float:
     return round(speed, 2)
 
 
+def _normalize_duration_seconds(value: float | int | None) -> int:
+    try:
+        duration = float(value or 0)
+    except (TypeError, ValueError):
+        return 0
+    if duration <= 0:
+        return 0
+    return int(round(duration))
+
+
+def _clean_audio_asset_name(filename: str | None) -> str:
+    stem = Path(str(filename or "").strip()).stem.strip()
+    if stem:
+        return stem[:255]
+    return f"音频_{utc_now():%Y%m%d_%H%M%S}"
+
+
 def _digital_human_consume_note(*, quality_tier: str, title: str | None) -> str:
     quality_label = "高质档" if quality_tier == "premium" else "标准档"
     parts = ["数字人", quality_label]
@@ -134,6 +157,22 @@ def _snapshot_scene(snapshot: dict | None) -> dict:
     if isinstance(scene, dict):
         return scene
     return {}
+
+
+def _audio_asset_payload(asset: UserAudioAsset) -> dict:
+    return {
+        "id": asset.id,
+        "name": asset.name,
+        "audio_url": asset.audio_url,
+        "object_key": asset.object_key,
+        "duration_seconds": int(asset.duration_seconds or 0),
+        "size": int(asset.size or 0),
+        "content_type": asset.content_type,
+        "source": asset.source,
+        "enabled": bool(asset.enabled),
+        "created_at": to_utc_iso(asset.created_at),
+        "updated_at": to_utc_iso(asset.updated_at),
+    }
 
 
 def _task_quality_tier(task: VideoTask) -> str:
@@ -155,7 +194,8 @@ def _should_sync_provider_task(task: VideoTask) -> bool:
 def _build_settings_snapshot(
     *,
     avatar: HeygenAvatar,
-    voice: HeygenVoice,
+    voice: HeygenVoice | None,
+    audio_asset: UserAudioAsset | None,
     script: str,
     background_url: str | None,
     quality_tier: str,
@@ -163,26 +203,32 @@ def _build_settings_snapshot(
     aspect_ratio: str,
     voice_settings: dict,
 ) -> dict:
+    audio_mode = "upload" if audio_asset else "platform"
     return {
         "scenario": "digital_human",
         "media_type": "video",
-        "language": voice.language or "",
+        "language": voice.language if voice else "",
         "ratio": aspect_ratio,
         "quality": resolution,
         "scene": {
             "avatarId": avatar.avatar_id,
             "avatarName": avatar.name,
             "avatarPreviewImageUrl": avatar.preview_image_url,
-            "voiceId": voice.voice_id,
-            "voiceName": voice.name,
-            "voiceLanguage": voice.language,
-            "voicePreviewAudioUrl": voice.preview_audio_url,
+            "audioMode": audio_mode,
+            "voiceId": voice.voice_id if voice else "",
+            "voiceName": voice.name if voice else "",
+            "voiceLanguage": voice.language if voice else "",
+            "voicePreviewAudioUrl": voice.preview_audio_url if voice else "",
+            "audioAssetId": audio_asset.id if audio_asset else "",
+            "audioName": audio_asset.name if audio_asset else "",
+            "audioUrl": audio_asset.audio_url if audio_asset else "",
+            "audioDurationSeconds": int(audio_asset.duration_seconds or 0) if audio_asset else 0,
             "backgroundUrl": background_url,
             "script": script,
             "qualityTier": quality_tier,
             "resolution": resolution,
             "aspectRatio": aspect_ratio,
-            "voiceSettings": voice_settings,
+            "voiceSettings": voice_settings if audio_mode == "platform" else {},
         },
     }
 
@@ -202,6 +248,23 @@ async def _get_enabled_voice(db: AsyncSession, voice_id: str) -> HeygenVoice | N
         select(HeygenVoice).where(
             HeygenVoice.voice_id == voice_id,
             HeygenVoice.enabled == True,  # noqa: E712
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+async def _get_available_audio_asset(
+    db: AsyncSession,
+    *,
+    audio_asset_id: str,
+    user_id: int,
+) -> UserAudioAsset | None:
+    result = await db.execute(
+        select(UserAudioAsset).where(
+            UserAudioAsset.id == audio_asset_id,
+            UserAudioAsset.user_id == user_id,
+            UserAudioAsset.enabled == True,  # noqa: E712
+            UserAudioAsset.archived_at.is_(None),
         )
     )
     return result.scalar_one_or_none()
@@ -317,7 +380,12 @@ def _digital_human_task_payload(task: VideoTask) -> dict:
         "provider": task.provider,
         "provider_task_id": task.provider_task_id,
         "avatar_id": scene.get("avatarId"),
+        "audio_mode": scene.get("audioMode") or "platform",
         "voice_id": scene.get("voiceId"),
+        "audio_asset_id": scene.get("audioAssetId"),
+        "audio_name": scene.get("audioName"),
+        "audio_url": scene.get("audioUrl"),
+        "audio_duration_seconds": scene.get("audioDurationSeconds"),
         "background_url": scene.get("backgroundUrl"),
         "script": scene.get("script"),
         "quality_tier": scene.get("qualityTier"),
@@ -558,6 +626,105 @@ async def list_digital_human_voices(
     return success(page_payload(items, total, page, page_size))
 
 
+@router.post("/audio-assets/upload", response_model=Response)
+async def upload_digital_human_audio_asset(
+    file: UploadFile = File(...),
+    duration_seconds: float | None = Form(None),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        detected_content_type = (file.content_type or "").strip()
+        if not detected_content_type and file.filename:
+            detected_content_type = mimetypes.guess_type(file.filename)[0] or ""
+        content = await file.read()
+        uploaded = await upload_audio_bytes(
+            user_id=current_user.id,
+            content=content,
+            content_type=detected_content_type,
+            source="audio-uploads",
+        )
+        asset = UserAudioAsset(
+            user_id=current_user.id,
+            name=_clean_audio_asset_name(file.filename),
+            audio_url=uploaded.url,
+            object_key=uploaded.object_key,
+            duration_seconds=_normalize_duration_seconds(duration_seconds),
+            size=uploaded.size,
+            content_type=uploaded.content_type,
+            source="upload",
+            enabled=True,
+        )
+        db.add(asset)
+        await db.commit()
+        await db.refresh(asset)
+    except (ValueError, OssConfigError) as exc:
+        await db.rollback()
+        return fail(str(exc))
+    except Exception:
+        await db.rollback()
+        return fail("音频上传失败")
+    finally:
+        await file.close()
+
+    return success(_audio_asset_payload(asset))
+
+
+@router.get("/audio-assets", response_model=Response)
+async def list_digital_human_audio_assets(
+    page: int = 1,
+    page_size: int = 12,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    page = max(1, page)
+    page_size = min(max(1, page_size), 50)
+    conditions = [
+        UserAudioAsset.user_id == current_user.id,
+        UserAudioAsset.enabled == True,  # noqa: E712
+        UserAudioAsset.archived_at.is_(None),
+    ]
+
+    total_stmt = select(func.count()).select_from(UserAudioAsset)
+    data_stmt = select(UserAudioAsset).order_by(
+        UserAudioAsset.created_at.desc(),
+        UserAudioAsset.id.desc(),
+    )
+    for condition in conditions:
+        total_stmt = total_stmt.where(condition)
+        data_stmt = data_stmt.where(condition)
+
+    total = int((await db.execute(total_stmt)).scalar_one() or 0)
+    result = await db.execute(data_stmt.offset((page - 1) * page_size).limit(page_size))
+    items = [_audio_asset_payload(item) for item in result.scalars().all()]
+    return success(page_payload(items, total, page, page_size))
+
+
+@router.delete("/audio-assets/{audio_asset_id}", response_model=Response)
+async def delete_digital_human_audio_asset(
+    audio_asset_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    asset = await _get_available_audio_asset(
+        db,
+        audio_asset_id=audio_asset_id,
+        user_id=current_user.id,
+    )
+    if not asset:
+        return fail("音频不存在")
+
+    asset.enabled = False
+    asset.archived_at = utc_now()
+    try:
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        return fail("删除失败，请稍后重试")
+
+    return success({"id": audio_asset_id})
+
+
 @router.get("/config", response_model=Response)
 async def get_digital_human_config(
     current_user: User = Depends(get_current_user),
@@ -585,6 +752,7 @@ async def create_digital_human_task(
 ):
     avatar_id = _clean_text(req.avatar_id)
     voice_id = _clean_text(req.voice_id)
+    audio_asset_id = _clean_text(req.audio_asset_id)
     script = _clean_text(req.script)
     background_url = _clean_text(req.background.url if req.background else None) or None
     quality_tier = _clean_text(req.quality_tier) or "standard"
@@ -596,10 +764,10 @@ async def create_digital_human_task(
 
     if not avatar_id:
         return fail("请选择系统数字人")
-    if not voice_id:
-        return fail("请选择系统声音")
-    if not script:
-        return fail("请输入口播文案")
+    if not voice_id and not audio_asset_id:
+        return fail("请选择系统声音或上传音频")
+    if voice_id and audio_asset_id:
+        return fail("系统声音和上传音频不能同时使用")
     if quality_tier not in QUALITY_TIER_TO_ENGINE:
         return fail("不支持的生成档位")
     if resolution not in SUPPORTED_RESOLUTIONS:
@@ -610,11 +778,29 @@ async def create_digital_human_task(
     avatar = await _get_enabled_avatar(db, avatar_id)
     if not avatar:
         return fail("系统数字人不存在或已停用")
-    voice = await _get_enabled_voice(db, voice_id)
-    if not voice:
-        return fail("系统声音不存在或已停用")
+    voice = None
+    audio_asset = None
+    audio_mode = "platform"
+    if audio_asset_id:
+        audio_asset = await _get_available_audio_asset(
+            db,
+            audio_asset_id=audio_asset_id,
+            user_id=current_user.id,
+        )
+        if not audio_asset:
+            return fail("上传音频不存在或已删除")
+        audio_mode = "upload"
+    else:
+        voice = await _get_enabled_voice(db, voice_id)
+        if not voice:
+            return fail("系统声音不存在或已停用")
+        if not script:
+            return fail("请输入口播文案")
 
-    title = _clean_text(req.title) or _default_job_title(script)
+    title = _clean_text(req.title) or _default_job_title(
+        script,
+        audio_name=audio_asset.name if audio_asset else None,
+    )
     try:
         credit_cost = await get_effective_digital_human_precharge_cost(db, quality_tier)
     except ValueError as exc:
@@ -622,12 +808,13 @@ async def create_digital_human_task(
     settings_snapshot = _build_settings_snapshot(
         avatar=avatar,
         voice=voice,
+        audio_asset=audio_asset,
         script=script,
         background_url=background_url,
         quality_tier=quality_tier,
         resolution=resolution,
         aspect_ratio=aspect_ratio,
-        voice_settings=voice_settings,
+        voice_settings=voice_settings if audio_mode == "platform" else {},
     )
 
     job = await _get_or_create_job(
@@ -649,6 +836,7 @@ async def create_digital_human_task(
     if fail_response is not None:
         return fail_response
 
+    prompt_text = script or (f"自定义音频：{audio_asset.name}" if audio_asset else "")
     task = VideoTask(
         id=str(uuid.uuid4()),
         user_id=current_user.id,
@@ -657,7 +845,7 @@ async def create_digital_human_task(
         type_id=quality_tier,
         title=title,
         sort_order=0,
-        prompt=script,
+        prompt=prompt_text,
         input_mode="avatar",
         input_images_json=None,
         input_video_url=None,
@@ -672,8 +860,8 @@ async def create_digital_human_task(
         credit_cost=credit_cost,
         prompt_snapshot_json=dump_prompt_snapshot(
             build_prompt_snapshot(
-                user=script,
-                final=script,
+                user=prompt_text,
+                final=prompt_text,
             )
         ),
         settings_snapshot_json=dump_json_or_none(settings_snapshot),
@@ -698,11 +886,12 @@ async def create_digital_human_task(
                 title=title,
                 aspect_ratio=aspect_ratio,
                 resolution=resolution,
-                script=script,
-                voice_id=voice.voice_id,
+                script=script if audio_mode == "platform" else None,
+                voice_id=voice.voice_id if voice else None,
+                audio_url=audio_asset.audio_url if audio_asset else None,
                 engine_type=QUALITY_TIER_TO_ENGINE[quality_tier],
                 background_url=background_url,
-                voice_settings=voice_settings,
+                voice_settings=voice_settings if audio_mode == "platform" else None,
                 idempotency_key=task.id,
             )
         provider_task_id = _clean_text(str(provider_data.get("video_id") or ""))

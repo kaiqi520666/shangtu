@@ -13,6 +13,7 @@ load_dotenv()
 
 MAX_IMAGE_SIZE = 10 * 1024 * 1024
 MAX_VIDEO_SIZE = 300 * 1024 * 1024
+MAX_AUDIO_SIZE = 20 * 1024 * 1024
 IMAGE_URL_VARIANTS = {
     "thumb_url": "image/resize,w_480/quality,q_80/format,webp",
     "preview_url": "image/resize,w_1200/quality,q_85/format,webp",
@@ -29,6 +30,20 @@ ALLOWED_VIDEO_TYPES = {
     "video/quicktime": "mov",
     "video/webm": "webm",
     "video/x-matroska": "mkv",
+}
+ALLOWED_AUDIO_TYPES = {
+    "audio/mpeg": "mp3",
+    "audio/mp3": "mp3",
+    "audio/wav": "wav",
+    "audio/x-wav": "wav",
+    "audio/wave": "wav",
+    "audio/mp4": "m4a",
+    "audio/x-m4a": "m4a",
+    "audio/aac": "aac",
+    "audio/ogg": "ogg",
+    "audio/webm": "webm",
+    "audio/flac": "flac",
+    "audio/x-flac": "flac",
 }
 
 
@@ -220,6 +235,56 @@ async def upload_video_bytes(
 ) -> UploadedFile:
     return await asyncio.to_thread(
         upload_video_bytes_sync,
+        user_id=user_id,
+        content=content,
+        content_type=content_type,
+        source=source,
+    )
+
+
+def upload_audio_bytes_sync(
+    *,
+    user_id: int,
+    content: bytes,
+    content_type: str,
+    source: str = "audio-uploads",
+) -> UploadedFile:
+    if content_type not in ALLOWED_AUDIO_TYPES:
+        raise ValueError("音频格式不支持")
+
+    if not content:
+        raise ValueError("音频不能为空")
+
+    if len(content) > MAX_AUDIO_SIZE:
+        raise ValueError("音频不能超过20MB")
+
+    config = get_oss_config()
+    object_key = build_file_object_key(
+        user_id=user_id,
+        extension=ALLOWED_AUDIO_TYPES[content_type],
+        source=source,
+    )
+    auth = oss2.Auth(config["access_key_id"], config["access_key_secret"])
+    bucket = oss2.Bucket(auth, config["endpoint"], config["bucket_name"])
+    bucket.put_object(object_key, content, headers={"Content-Type": content_type})
+
+    return UploadedFile(
+        url=build_public_url(object_key, config),
+        object_key=object_key,
+        content_type=content_type,
+        size=len(content),
+    )
+
+
+async def upload_audio_bytes(
+    *,
+    user_id: int,
+    content: bytes,
+    content_type: str,
+    source: str = "audio-uploads",
+) -> UploadedFile:
+    return await asyncio.to_thread(
+        upload_audio_bytes_sync,
         user_id=user_id,
         content=content,
         content_type=content_type,

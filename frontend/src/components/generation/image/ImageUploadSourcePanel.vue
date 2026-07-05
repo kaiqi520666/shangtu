@@ -22,6 +22,10 @@ defineProps({
     type: String,
     default: "资产库选择",
   },
+  showAssetButton: {
+    type: Boolean,
+    default: true,
+  },
   icon: {
     type: [Object, Function],
     default: () => ImagePlus,
@@ -53,7 +57,7 @@ const emit = defineEmits(["upload", "asset", "drag-over", "drag-leave", "drop"])
       </div>
     </div>
 
-    <div class="mt-3 grid grid-cols-2 gap-2">
+    <div class="mt-3 grid gap-2" :class="showAssetButton ? 'grid-cols-2' : 'grid-cols-1'">
       <button
         type="button"
         class="inline-flex h-11 min-w-0 items-center justify-center gap-2 rounded-xl border border-primary/20 bg-primary px-3 text-xs font-black text-white shadow-sm transition-colors hover:bg-primary/90"
@@ -63,6 +67,7 @@ const emit = defineEmits(["upload", "asset", "drag-over", "drag-leave", "drop"])
         <span class="truncate">{{ localButtonText }}</span>
       </button>
       <button
+        v-if="showAssetButton"
         type="button"
         class="inline-flex h-11 min-w-0 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 shadow-sm transition-colors hover:border-primary/30 hover:bg-primary/5 hover:text-primary"
         @click="emit('asset')"

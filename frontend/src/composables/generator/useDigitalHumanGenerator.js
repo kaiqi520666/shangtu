@@ -38,6 +38,34 @@ function createDefaultSettings() {
   return { ...DEFAULT_SETTINGS };
 }
 
+function isUploadAudioSelection(selection) {
+  return selection?.mode === "upload";
+}
+
+function hasSelectedAudio(selection) {
+  if (!selection) return false;
+  return isUploadAudioSelection(selection)
+    ? Boolean(selection.audio_asset_id)
+    : Boolean(selection.voice_id);
+}
+
+function buildPlatformVoiceSelection(voice) {
+  if (!voice?.voice_id) return null;
+  return {
+    ...voice,
+    mode: "platform",
+  };
+}
+
+function buildUploadAudioSelection(audioAsset) {
+  if (!audioAsset?.id && !audioAsset?.audio_asset_id) return null;
+  return {
+    ...audioAsset,
+    mode: "upload",
+    audio_asset_id: audioAsset.audio_asset_id || audioAsset.id,
+  };
+}
+
 export function useDigitalHumanGenerator({ toast, confirm, onJobCreated } = {}) {
   const settings = reactive(createDefaultSettings());
   const selectedAvatar = ref(null);
@@ -150,13 +178,15 @@ export function useDigitalHumanGenerator({ toast, confirm, onJobCreated } = {}) 
     const durationText = estimatedDurationSeconds.value > 0 ? `，预计约 ${estimatedDurationSeconds.value} 秒` : "";
     return `已输入 ${scriptLength.value}/${MAX_SCRIPT_CHARS} 字${durationText}`;
   });
+  const uploadAudioMode = computed(() => isUploadAudioSelection(selectedVoice.value));
 
   const canGenerate = computed(() => {
     if (creatingBatch.value || generating.value) return false;
     if (!selectedAvatar.value?.avatar_id) return false;
-    if (!selectedVoice.value?.voice_id) return false;
+    if (!hasSelectedAudio(selectedVoice.value)) return false;
     if (backgroundUploading.value) return false;
     if (scriptExceeded.value) return false;
+    if (uploadAudioMode.value) return true;
     return Boolean((settings.script || "").trim());
   });
 
@@ -168,7 +198,9 @@ export function useDigitalHumanGenerator({ toast, confirm, onJobCreated } = {}) 
     return "生成视频";
   });
 
-  const voiceLanguage = computed(() => selectedVoice.value?.language || "");
+  const voiceLanguage = computed(() =>
+    uploadAudioMode.value ? "" : selectedVoice.value?.language || "",
+  );
 
   function updateSettings(nextSettings) {
     Object.assign(settings, nextSettings);
@@ -183,22 +215,30 @@ export function useDigitalHumanGenerator({ toast, confirm, onJobCreated } = {}) 
   }
 
   function buildSettingsSnapshot() {
+    const selected = selectedVoice.value;
     return createDigitalHumanSettingsSnapshot({
       avatarId: selectedAvatar.value?.avatar_id || "",
       avatarName: selectedAvatar.value?.name || "",
       avatarPreviewImageUrl: selectedAvatar.value?.preview_image_url || "",
-      voiceId: selectedVoice.value?.voice_id || "",
-      voiceName: selectedVoice.value?.name || "",
-      voiceLanguage: selectedVoice.value?.language || "",
-      voicePreviewAudioUrl: selectedVoice.value?.preview_audio_url || "",
+      audioMode: uploadAudioMode.value ? "upload" : "platform",
+      voiceId: uploadAudioMode.value ? "" : selected?.voice_id || "",
+      voiceName: uploadAudioMode.value ? "" : selected?.name || "",
+      voiceLanguage: uploadAudioMode.value ? "" : selected?.language || "",
+      voicePreviewAudioUrl: uploadAudioMode.value ? "" : selected?.preview_audio_url || "",
+      audioAssetId: uploadAudioMode.value ? selected?.audio_asset_id || "" : "",
+      audioName: uploadAudioMode.value ? selected?.name || "" : "",
+      audioUrl: uploadAudioMode.value ? selected?.audio_url || "" : "",
+      audioDurationSeconds: uploadAudioMode.value ? Number(selected?.duration_seconds || 0) : 0,
       backgroundUrl: getBackgroundUrl(),
-      script: settings.script,
+      script: uploadAudioMode.value ? "" : settings.script,
       qualityTier: settings.qualityTier,
       resolution: settings.resolution,
       aspectRatio: settings.aspectRatio,
-      voiceSettings: {
-        speed: Number(settings.voiceSpeed || 1),
-      },
+      voiceSettings: uploadAudioMode.value
+        ? {}
+        : {
+            speed: Number(settings.voiceSpeed || 1),
+          },
     });
   }
 
@@ -211,15 +251,15 @@ export function useDigitalHumanGenerator({ toast, confirm, onJobCreated } = {}) 
       toast?.info?.("请先选择系统数字人");
       return;
     }
-    if (!selectedVoice.value?.voice_id) {
-      toast?.info?.("请先选择系统声音");
+    if (!hasSelectedAudio(selectedVoice.value)) {
+      toast?.info?.("请先选择系统声音或上传音频");
       return;
     }
     if (backgroundUploading.value) {
       toast?.info?.("背景图上传中，请稍后再生成");
       return;
     }
-    if (!(settings.script || "").trim()) {
+    if (!uploadAudioMode.value && !(settings.script || "").trim()) {
       toast?.info?.("请输入口播文案");
       return;
     }
@@ -231,14 +271,16 @@ export function useDigitalHumanGenerator({ toast, confirm, onJobCreated } = {}) 
     const settingsSnapshot = buildSettingsSnapshot();
     const title = (currentTaskTitle.value || "").trim() || "数字人视频";
     const queue = [{ qualityTier: settings.qualityTier }];
+    const selected = selectedVoice.value;
+    const submitLabel = uploadAudioMode.value ? "提交数字人和上传音频..." : "提交数字人、声音和口播文案...";
 
     await enqueueMediaBatch({
       queue,
       snapshotPayload: {
         settings: settingsSnapshot,
-        input_text: settings.script,
+        input_text: uploadAudioMode.value ? "" : settings.script,
       },
-      initialLogs: [`[${title}] 创建数字人任务`, "提交数字人、声音和口播文案..."],
+      initialLogs: [`[${title}] 创建数字人任务`, submitLabel],
       repeatLog: `[${title}] 创建数字人任务`,
       buildSettingsSnapshot: () => settingsSnapshot,
       createCard({ item, sortOrder, batchRunId, settingsSnapshot: snapshot }) {
@@ -255,8 +297,9 @@ export function useDigitalHumanGenerator({ toast, confirm, onJobCreated } = {}) 
           job_id: jobId,
           title,
           avatar_id: selectedAvatar.value.avatar_id,
-          voice_id: selectedVoice.value.voice_id,
-          script: settings.script,
+          voice_id: uploadAudioMode.value ? undefined : selected?.voice_id,
+          audio_asset_id: uploadAudioMode.value ? selected?.audio_asset_id : undefined,
+          script: uploadAudioMode.value ? undefined : settings.script,
           background: getBackgroundUrl()
             ? {
                 url: getBackgroundUrl(),
@@ -265,9 +308,11 @@ export function useDigitalHumanGenerator({ toast, confirm, onJobCreated } = {}) 
           quality_tier: item.qualityTier,
           resolution: settings.resolution,
           aspect_ratio: settings.aspectRatio,
-          voice_settings: {
-            speed: Number(settings.voiceSpeed || 1),
-          },
+          voice_settings: uploadAudioMode.value
+            ? undefined
+            : {
+                speed: Number(settings.voiceSpeed || 1),
+              },
         });
       },
       getCreateLog: () => `[${title}] 已进入队列`,
@@ -291,10 +336,10 @@ export function useDigitalHumanGenerator({ toast, confirm, onJobCreated } = {}) 
     const card = cards.createCard({
       typeId,
       strategyTitle: title || "数字人视频",
-      strategyContent: scene.script || "",
+      strategyContent: scene.script || scene.audioName || "",
       sortOrder,
       batchRunId,
-      userPrompt: scene.script || "",
+      userPrompt: scene.script || scene.audioName || "",
       settingsSnapshot,
     });
     card.progress = 10;
@@ -318,14 +363,25 @@ export function useDigitalHumanGenerator({ toast, confirm, onJobCreated } = {}) 
         }
       : null;
 
-    selectedVoice.value = scene.voiceId
-      ? {
-          voice_id: scene.voiceId,
-          name: scene.voiceName || scene.voiceId,
-          language: scene.voiceLanguage || snapshot?.language || "",
-          preview_audio_url: scene.voicePreviewAudioUrl || "",
-        }
-      : null;
+    if ((scene.audioMode || "") === "upload" && scene.audioAssetId) {
+      selectedVoice.value = buildUploadAudioSelection({
+        id: scene.audioAssetId,
+        name: scene.audioName || scene.audioAssetId,
+        audio_url: scene.audioUrl || "",
+        duration_seconds: Number(scene.audioDurationSeconds || 0),
+        content_type: "",
+        size: 0,
+      });
+    } else {
+      selectedVoice.value = scene.voiceId
+        ? buildPlatformVoiceSelection({
+            voice_id: scene.voiceId,
+            name: scene.voiceName || scene.voiceId,
+            language: scene.voiceLanguage || snapshot?.language || "",
+            preview_audio_url: scene.voicePreviewAudioUrl || "",
+          })
+        : null;
+    }
     backgroundImages.value = scene.backgroundUrl
       ? [
           {
@@ -385,6 +441,7 @@ export function useDigitalHumanGenerator({ toast, confirm, onJobCreated } = {}) 
     selectedAvatar,
     selectedVoice,
     backgroundImages,
+    uploadAudioMode,
     currentJobId,
     currentTaskTitle,
     historyTasks,

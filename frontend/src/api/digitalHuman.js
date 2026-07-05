@@ -8,6 +8,24 @@ export function getDigitalHumanVoices(params = {}) {
   return request.get("/digital-human/voices", { params, timeout: 15000 });
 }
 
+export function uploadDigitalHumanAudioAsset(file, { durationSeconds = 0 } = {}) {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("duration_seconds", String(durationSeconds || 0));
+  return request.post("/digital-human/audio-assets/upload", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+    timeout: 60000,
+  });
+}
+
+export function getDigitalHumanAudioAssets(params = {}) {
+  return request.get("/digital-human/audio-assets", { params, timeout: 15000 });
+}
+
+export function deleteDigitalHumanAudioAsset(audioAssetId) {
+  return request.delete(`/digital-human/audio-assets/${audioAssetId}`, { timeout: 15000 });
+}
+
 export function getDigitalHumanConfig() {
   return request.get("/digital-human/config", { timeout: 15000 });
 }
