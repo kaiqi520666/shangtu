@@ -5,8 +5,8 @@ import GeneratorSidePanelShell from "@/components/generation/workspace/Generator
 import AppSelect from "@/components/ui/AppSelect.vue";
 
 const qualityOptions = [
-  { value: "standard", label: "标准档", description: "Avatar III" },
-  { value: "premium", label: "高质档", description: "Avatar IV" },
+  { value: "standard", label: "标准档" },
+  { value: "premium", label: "高质档" },
 ];
 
 defineProps({
@@ -37,7 +37,7 @@ const emit = defineEmits([
     <section class="space-y-4 border-b border-slate-100 p-5">
       <div>
         <h2 class="text-sm font-black text-slate-900">数字人</h2>
-        <p class="mt-1 text-xs leading-relaxed text-slate-400">先选系统数字人和系统声音，后续这里会直接接入 HeyGen 出片。</p>
+        <p class="mt-1 text-xs leading-relaxed text-slate-400">先选系统数字人和系统声音，然后生成视频</p>
       </div>
 
       <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
