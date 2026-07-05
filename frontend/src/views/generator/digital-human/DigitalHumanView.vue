@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from "vue";
+import { onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import AvatarPickerModal from "@/components/digital-human/AvatarPickerModal.vue";
 import DigitalHumanSettingsPanel from "@/components/digital-human/DigitalHumanSettingsPanel.vue";
@@ -66,12 +66,17 @@ function closePreview() {
 function closeHistoryDrawer() {
   digitalHuman.showHistoryDrawer.value = false;
 }
+
+onMounted(() => {
+  digitalHuman.loadPricing();
+});
 </script>
 
 <template>
   <GeneratorLayout>
     <DigitalHumanSettingsPanel
       :settings="digitalHuman.settings"
+      :quality-options="digitalHuman.qualityOptions.value"
       :selected-avatar="digitalHuman.selectedAvatar.value"
       :selected-voice="digitalHuman.selectedVoice.value"
       :generate-disabled="!digitalHuman.canGenerate.value"

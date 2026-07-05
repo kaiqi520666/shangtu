@@ -13,7 +13,13 @@ from app.models import SystemSetting
 
 SETTING_IMAGE_CREDIT_COSTS = "image_credit_costs"
 SETTING_VIDEO_CREDIT_COSTS = "video_credit_costs"
+SETTING_DIGITAL_HUMAN_PRECHARGE_COSTS = "digital_human_precharge_costs"
 SETTING_RECHARGE_PACKAGES = "credit_recharge_packages"
+
+DEFAULT_DIGITAL_HUMAN_PRECHARGE_COSTS = {
+    "standard": 2000,
+    "premium": 5000,
+}
 
 DEFAULT_RECHARGE_PACKAGES: list[dict[str, Any]] = [
     {
@@ -161,6 +167,20 @@ def normalize_recharge_packages(
     return [item for item in packages if item["enabled"]]
 
 
+def normalize_digital_human_precharge_costs(raw: dict[str, Any]) -> dict[str, int]:
+    costs: dict[str, int] = {}
+    for tier in DEFAULT_DIGITAL_HUMAN_PRECHARGE_COSTS:
+        value = raw.get(tier)
+        try:
+            cost = int(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{tier} 预扣费必须是正整数") from exc
+        if cost < 1:
+            raise ValueError(f"{tier} 预扣费必须大于等于 1")
+        costs[tier] = cost
+    return costs
+
+
 async def get_setting(db: AsyncSession, key: str) -> SystemSetting | None:
     return await db.get(SystemSetting, key)
 
@@ -207,6 +227,28 @@ async def get_effective_video_credit_cost(
     if duration < 3 or duration > 15:
         raise ValueError("视频时长必须在 3-15 秒之间")
     return int(costs[normalized]) * int(duration)
+
+
+async def get_effective_digital_human_precharge_costs(db: AsyncSession) -> dict[str, int]:
+    setting = await get_setting(db, SETTING_DIGITAL_HUMAN_PRECHARGE_COSTS)
+    if setting:
+        parsed = parse_json_or_none(setting.value_json)
+        if not isinstance(parsed, dict):
+            raise ValueError("数据库中的数字人预扣费配置不是有效对象")
+        return normalize_digital_human_precharge_costs(parsed)
+    return normalize_digital_human_precharge_costs(DEFAULT_DIGITAL_HUMAN_PRECHARGE_COSTS)
+
+
+async def get_effective_digital_human_precharge_cost(
+    db: AsyncSession,
+    quality_tier: str | None,
+) -> int:
+    costs = await get_effective_digital_human_precharge_costs(db)
+    normalized = str(quality_tier or "standard").strip() or "standard"
+    if normalized not in costs:
+        supported = " / ".join(DEFAULT_DIGITAL_HUMAN_PRECHARGE_COSTS.keys())
+        raise ValueError(f"不支持的数字人档位：{quality_tier}，请选择 {supported}")
+    return int(costs[normalized])
 
 
 async def get_effective_recharge_packages(
@@ -258,6 +300,11 @@ async def seed_default_billing_settings(
             SETTING_VIDEO_CREDIT_COSTS,
             normalize_video_credit_costs(DEFAULT_VIDEO_CREDIT_COSTS),
             "商品视频每秒扣费配置",
+        ),
+        (
+            SETTING_DIGITAL_HUMAN_PRECHARGE_COSTS,
+            normalize_digital_human_precharge_costs(DEFAULT_DIGITAL_HUMAN_PRECHARGE_COSTS),
+            "数字人预扣费配置",
         ),
         (
             SETTING_RECHARGE_PACKAGES,

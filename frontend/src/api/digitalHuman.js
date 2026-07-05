@@ -8,6 +8,10 @@ export function getDigitalHumanVoices(params = {}) {
   return request.get("/digital-human/voices", { params, timeout: 15000 });
 }
 
+export function getDigitalHumanConfig() {
+  return request.get("/digital-human/config", { timeout: 15000 });
+}
+
 export function createDigitalHumanTask(payload) {
   return request.post("/digital-human/tasks", payload, { timeout: 30000 });
 }

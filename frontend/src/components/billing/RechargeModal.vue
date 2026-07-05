@@ -33,6 +33,7 @@ const loadingPackages = ref(false);
 const packages = ref([]);
 const imageCreditCosts = ref({});
 const videoCreditCosts = ref({});
+const digitalHumanPrechargeCosts = ref({});
 const selectedPackageId = ref("");
 const creatingOrder = ref(false);
 const currentOrder = ref(null);
@@ -75,6 +76,7 @@ async function loadPackages() {
     packages.value = result.data?.packages || [];
     imageCreditCosts.value = result.data?.image_credit_costs || {};
     videoCreditCosts.value = result.data?.video_credit_costs || {};
+    digitalHumanPrechargeCosts.value = result.data?.digital_human_precharge_costs || {};
     selectedPackageId.value = packages.value[0]?.id || "";
   } catch (error) {
     toast.error(getApiErrorMessage(error, "加载充值套餐失败"));
@@ -254,6 +256,13 @@ onBeforeUnmount(() => {
               <div class="mt-1.5 flex flex-wrap gap-1.5">
                 <span class="rounded-full bg-white px-2.5 py-1 text-slate-700 shadow-sm">720p {{ videoCreditCosts["720p"] || "-" }} 积分/秒</span>
                 <span class="rounded-full bg-white px-2.5 py-1 text-slate-700 shadow-sm">1080p {{ videoCreditCosts["1080p"] || "-" }} 积分/秒</span>
+              </div>
+            </div>
+            <div class="rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2.5 sm:col-span-2">
+              <p class="text-[11px] font-black text-slate-400">数字人按档预扣</p>
+              <div class="mt-1.5 flex flex-wrap gap-1.5">
+                <span class="rounded-full bg-white px-2.5 py-1 text-slate-700 shadow-sm">标准档预扣 {{ digitalHumanPrechargeCosts.standard || "-" }} 积分</span>
+                <span class="rounded-full bg-white px-2.5 py-1 text-slate-700 shadow-sm">高质档预扣 {{ digitalHumanPrechargeCosts.premium || "-" }} 积分</span>
               </div>
             </div>
           </div>

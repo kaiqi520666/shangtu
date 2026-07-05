@@ -15,6 +15,7 @@ import {
   createDigitalHumanSettingsSnapshot,
   getSnapshotScene,
 } from "@/utils/generationSnapshots.js";
+import { useDigitalHumanPricing } from "@/composables/digital-human/useDigitalHumanPricing.js";
 
 const DEFAULT_SETTINGS = {
   script: "",
@@ -42,6 +43,7 @@ export function useDigitalHumanGenerator({ toast, confirm, onJobCreated } = {}) 
   const settings = reactive(createDefaultSettings());
   const selectedAvatar = ref(null);
   const selectedVoice = ref(null);
+  const pricing = useDigitalHumanPricing();
 
   const cards = useGenerationCards({
     getTask: pollDigitalHumanTask,
@@ -367,6 +369,8 @@ export function useDigitalHumanGenerator({ toast, confirm, onJobCreated } = {}) 
     downloading,
     selectedCardsCount,
     voiceLanguage,
+    qualityOptions: pricing.qualityOptions,
+    loadPricing: pricing.loadPricing,
     scriptLength,
     estimatedDurationSeconds,
     scriptExceeded,

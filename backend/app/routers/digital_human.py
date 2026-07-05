@@ -18,6 +18,10 @@ from app.core.providers.heygen_provider import (
     parse_heygen_error_message,
 )
 from app.core.scenarios import SCENARIO_TITLE_PREFIX
+from app.core.system_settings import (
+    get_effective_digital_human_precharge_cost,
+    get_effective_digital_human_precharge_costs,
+)
 from app.core.time import to_utc_iso, utc_now
 from app.core.user_credits import get_user_credits, refund_user_credits
 from app.core.deps import get_current_user, get_db
@@ -32,10 +36,6 @@ router = APIRouter(prefix="/digital-human", tags=["数字人"])
 QUALITY_TIER_TO_ENGINE = {
     "standard": "avatar_iii",
     "premium": "avatar_iv",
-}
-QUALITY_TIER_TO_CREDIT_COST = {
-    "standard": 2000,
-    "premium": 5000,
 }
 SUPPORTED_ASPECT_RATIOS = {"16:9", "9:16", "1:1"}
 SUPPORTED_RESOLUTIONS = {"720p", "1080p"}
@@ -487,6 +487,19 @@ async def list_digital_human_voices(
     return success(page_payload(items, total, page, page_size))
 
 
+@router.get("/config", response_model=Response)
+async def get_digital_human_config(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    _ = current_user
+    try:
+        precharge_costs = await get_effective_digital_human_precharge_costs(db)
+    except ValueError as exc:
+        return fail(str(exc))
+    return success({"precharge_costs": precharge_costs})
+
+
 @router.post("/tasks", response_model=Response)
 async def create_digital_human_task(
     req: DigitalHumanGenerateRequest,
@@ -525,7 +538,10 @@ async def create_digital_human_task(
         return fail("系统声音不存在或已停用")
 
     title = _clean_text(req.title) or _default_job_title(script)
-    credit_cost = QUALITY_TIER_TO_CREDIT_COST[quality_tier]
+    try:
+        credit_cost = await get_effective_digital_human_precharge_cost(db, quality_tier)
+    except ValueError as exc:
+        return fail(str(exc))
     settings_snapshot = _build_settings_snapshot(
         avatar=avatar,
         voice=voice,

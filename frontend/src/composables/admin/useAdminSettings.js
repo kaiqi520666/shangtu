@@ -3,6 +3,7 @@ import { getAdminSettings, updateAdminSettings } from "@/api/admin.js";
 import { useAdminAuditLogs } from "@/composables/admin/useAdminAuditLogs.js";
 import { useToast } from "@/composables/useToast.js";
 import {
+  defaultDigitalHumanPrechargeCosts,
   defaultImageCreditCosts,
   defaultRechargePackage,
   defaultVideoCreditCosts,
@@ -11,6 +12,7 @@ import {
 const settingsState = reactive({
   imageCreditCosts: { ...defaultImageCreditCosts },
   videoCreditCosts: { ...defaultVideoCreditCosts },
+  digitalHumanPrechargeCosts: { ...defaultDigitalHumanPrechargeCosts },
   rechargePackages: [],
   paymentConfig: {},
   loading: false,
@@ -29,10 +31,14 @@ export function useAdminSettings() {
         toast.error(result.message || "加载系统配置失败");
         return;
       }
-      settingsState.imageCreditCosts = { ...(result.data?.image_credit_costs || {}) };
+      settingsState.imageCreditCosts = { ...result.data?.image_credit_costs };
       settingsState.videoCreditCosts = {
         ...defaultVideoCreditCosts,
-        ...(result.data?.video_credit_costs || {}),
+        ...result.data?.video_credit_costs,
+      };
+      settingsState.digitalHumanPrechargeCosts = {
+        ...defaultDigitalHumanPrechargeCosts,
+        ...result.data?.digital_human_precharge_costs,
       };
       settingsState.rechargePackages = (result.data?.recharge_packages || []).map((item) => ({ ...item }));
       settingsState.paymentConfig = result.data?.payment_config || {};
@@ -70,6 +76,10 @@ export function useAdminSettings() {
         video_credit_costs: {
           "720p": Number(settingsState.videoCreditCosts["720p"]),
           "1080p": Number(settingsState.videoCreditCosts["1080p"]),
+        },
+        digital_human_precharge_costs: {
+          standard: Number(settingsState.digitalHumanPrechargeCosts.standard),
+          premium: Number(settingsState.digitalHumanPrechargeCosts.premium),
         },
         recharge_packages: settingsState.rechargePackages.map((item) => ({
           id: String(item.id || "").trim(),

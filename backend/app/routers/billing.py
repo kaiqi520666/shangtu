@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.deps import get_current_user, get_db
 from app.core.json_utils import dump_json
 from app.core.system_settings import (
+    get_effective_digital_human_precharge_costs,
     get_effective_image_credit_costs,
     get_effective_recharge_packages,
     get_effective_video_credit_costs,
@@ -138,6 +139,7 @@ async def list_packages(
         packages = await get_effective_recharge_packages(db)
         image_credit_costs = await get_effective_image_credit_costs(db)
         video_credit_costs = await get_effective_video_credit_costs(db)
+        digital_human_precharge_costs = await get_effective_digital_human_precharge_costs(db)
     except ValueError as exc:
         return fail(str(exc))
     return success(
@@ -145,6 +147,7 @@ async def list_packages(
             "packages": packages,
             "image_credit_costs": image_credit_costs,
             "video_credit_costs": video_credit_costs,
+            "digital_human_precharge_costs": digital_human_precharge_costs,
             "credits": current_user.credits,
         }
     )

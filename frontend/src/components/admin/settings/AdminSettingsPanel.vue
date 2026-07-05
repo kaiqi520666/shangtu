@@ -56,6 +56,21 @@ const paymentConfigLabels = {
       </div>
 
       <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div class="mb-4 flex items-center justify-between">
+          <div>
+            <h2 class="text-sm font-black text-slate-800">数字人预扣费</h2>
+            <p class="mt-1 text-xs text-slate-400">按档位配置预扣积分，创建任务时先扣，失败自动退回。</p>
+          </div>
+        </div>
+        <div class="grid gap-3 md:grid-cols-2">
+          <label v-for="tier in [{ key: 'standard', label: '标准档预扣' }, { key: 'premium', label: '高质档预扣' }]" :key="tier.key" class="block">
+            <span class="text-xs font-bold text-slate-600">{{ tier.label }}</span>
+            <input v-model.number="state.digitalHumanPrechargeCosts[tier.key]" type="number" min="1" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary" />
+          </label>
+        </div>
+      </div>
+
+      <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <div class="mb-4 flex items-center justify-between gap-3">
           <div>
             <h2 class="text-sm font-black text-slate-800">充值套餐</h2>
