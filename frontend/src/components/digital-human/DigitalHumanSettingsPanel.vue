@@ -50,10 +50,6 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
-  chargeHintText: {
-    type: String,
-    default: "",
-  },
 });
 
 const emit = defineEmits([
@@ -238,20 +234,15 @@ function getVoiceSpeedHint(speed) {
     </section>
 
     <template #footer>
-      <div class="border-t border-slate-200 bg-white/95 px-4 pt-3">
-        <p class="mb-3 rounded-xl bg-slate-50 px-3 py-2 text-[11px] font-semibold text-slate-600">
-          {{ chargeHintText || "本次将预扣积分，失败自动退回" }}
-        </p>
-        <GeneratorActionFooter
-          :primary-text="generateText"
-          :primary-disabled="generateDisabled"
-          @primary="emit('generate')"
-        >
-          <template #primary-icon>
-            <Sparkles class="h-4 w-4" />
-          </template>
-        </GeneratorActionFooter>
-      </div>
+      <GeneratorActionFooter
+        :primary-text="generateText"
+        :primary-disabled="generateDisabled"
+        @primary="emit('generate')"
+      >
+        <template #primary-icon>
+          <Sparkles class="h-4 w-4" />
+        </template>
+      </GeneratorActionFooter>
     </template>
   </GeneratorSidePanelShell>
 </template>
