@@ -110,7 +110,7 @@ async def create_avatar_video(
         if voice_id:
             payload["voice_id"] = voice_id
     if background_url:
-        payload["background"] = {"url": background_url}
+        payload["background"] = {"type": "image", "url": background_url}
     if voice_settings and not audio_url:
         payload["voice_settings"] = voice_settings
     response = await client.post(
