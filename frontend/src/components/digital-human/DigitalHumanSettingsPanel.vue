@@ -132,10 +132,10 @@ const emit = defineEmits([
 
     <template #footer>
       <GeneratorActionFooter
-        primary-text="下一步接入数字人选择弹窗"
+        primary-text="下一步接入生成链路"
         :primary-disabled="false"
         secondary-text="保存草稿"
-        @primary="emit('notify', '数字人和声音选择弹窗将在下一步接入')"
+        @primary="emit('notify', 'HeyGen 任务创建和结果轮询将在下一步接入')"
         @secondary="emit('notify', '草稿保存会在后续版本开放')"
       >
         <template #primary-icon>

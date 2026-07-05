@@ -1,7 +1,9 @@
 <script setup>
-import { reactive } from "vue";
+import { reactive, ref } from "vue";
 import { Bot, Mic2, Sparkles, Video } from "lucide-vue-next";
+import AvatarPickerModal from "@/components/digital-human/AvatarPickerModal.vue";
 import DigitalHumanSettingsPanel from "@/components/digital-human/DigitalHumanSettingsPanel.vue";
+import VoicePickerModal from "@/components/digital-human/VoicePickerModal.vue";
 import GeneratorLayout from "@/components/layout/GeneratorLayout.vue";
 import { useToast } from "@/composables/useToast.js";
 
@@ -13,19 +15,29 @@ const settings = reactive({
   aspectRatio: "9:16",
 });
 
-const selectedAvatar = null;
-const selectedVoice = null;
+const selectedAvatar = ref(null);
+const selectedVoice = ref(null);
+const avatarPickerOpen = ref(false);
+const voicePickerOpen = ref(false);
 
 function showNotice(message) {
   toast.info(message);
 }
 
 function openAvatarPicker() {
-  showNotice("系统数字人选择弹窗将在下一步接入");
+  avatarPickerOpen.value = true;
 }
 
 function openVoicePicker() {
-  showNotice("系统声音选择弹窗将在下一步接入");
+  voicePickerOpen.value = true;
+}
+
+function handleAvatarConfirm(item) {
+  selectedAvatar.value = item;
+}
+
+function handleVoiceConfirm(item) {
+  selectedVoice.value = item;
 }
 </script>
 
@@ -71,7 +83,8 @@ function openVoicePicker() {
                 <Bot class="h-4.5 w-4.5 text-primary" />
                 <h2 class="text-sm font-black">当前数字人</h2>
               </div>
-              <p class="mt-3 text-xs text-slate-500">{{ selectedAvatar?.name || "暂未选择系统数字人" }}</p>
+              <p class="mt-3 text-xs font-medium text-slate-700">{{ selectedAvatar?.name || "暂未选择系统数字人" }}</p>
+              <p class="mt-1 text-xs text-slate-400">{{ selectedAvatar?.avatar_id || "选择后会在这里显示 avatar_id" }}</p>
             </div>
 
             <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -79,7 +92,8 @@ function openVoicePicker() {
                 <Mic2 class="h-4.5 w-4.5 text-secondary" />
                 <h2 class="text-sm font-black">当前声音</h2>
               </div>
-              <p class="mt-3 text-xs text-slate-500">{{ selectedVoice?.name || "暂未选择系统声音" }}</p>
+              <p class="mt-3 text-xs font-medium text-slate-700">{{ selectedVoice?.name || "暂未选择系统声音" }}</p>
+              <p class="mt-1 text-xs text-slate-400">{{ selectedVoice?.language || "选择后会在这里显示语言" }}</p>
             </div>
 
             <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -106,5 +120,21 @@ function openVoicePicker() {
         </div>
       </div>
     </section>
+
+    <AvatarPickerModal
+      :open="avatarPickerOpen"
+      :selected-avatar="selectedAvatar"
+      @close="avatarPickerOpen = false"
+      @confirm="handleAvatarConfirm"
+      @notify="showNotice"
+    />
+
+    <VoicePickerModal
+      :open="voicePickerOpen"
+      :selected-voice="selectedVoice"
+      @close="voicePickerOpen = false"
+      @confirm="handleVoiceConfirm"
+      @notify="showNotice"
+    />
   </GeneratorLayout>
 </template>
