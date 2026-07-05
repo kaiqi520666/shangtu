@@ -1,14 +1,293 @@
+from __future__ import annotations
+
+import uuid
+
+import httpx
 from fastapi import APIRouter, Depends
+from pydantic import BaseModel
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.deps import get_current_user, get_db
+from app.core.json_utils import dump_json_or_none, parse_json_or_none
 from app.core.pagination import page_payload
-from app.models import HeygenAvatar, HeygenVoice, User
+from app.core.prompt_snapshot import build_prompt_snapshot, dump_prompt_snapshot, parse_prompt_snapshot
+from app.core.providers.heygen_provider import (
+    create_avatar_video,
+    get_video,
+    parse_heygen_error_message,
+)
+from app.core.scenarios import SCENARIO_TITLE_PREFIX
+from app.core.time import to_utc_iso, utc_now
+from app.core.deps import get_current_user, get_db
+from app.core.task_timeout import project_task_runtime_state
+from app.models import GenerationJob, HeygenAvatar, HeygenVoice, User, VideoTask
 from app.routers.admin.utils import heygen_avatar_payload, heygen_voice_payload
-from app.schemas.response import Response, success
+from app.schemas.response import Response, fail, success
 
 router = APIRouter(prefix="/digital-human", tags=["数字人"])
+
+QUALITY_TIER_TO_ENGINE = {
+    "standard": "avatar_iii",
+    "premium": "avatar_iv",
+}
+SUPPORTED_ASPECT_RATIOS = {"16:9", "9:16", "1:1"}
+DEFAULT_RESOLUTION = "1080p"
+
+
+class DigitalHumanGenerateRequest(BaseModel):
+    job_id: str | None = None
+    title: str | None = None
+    avatar_id: str
+    voice_id: str
+    script: str
+    motion_prompt: str | None = None
+    quality_tier: str = "standard"
+    aspect_ratio: str = "9:16"
+
+
+def _clean_text(value: str | None) -> str:
+    return str(value or "").strip()
+
+
+def _default_job_title(script: str) -> str:
+    prefix = SCENARIO_TITLE_PREFIX.get("digital_human", "数字人")
+    excerpt = _clean_text(script).replace("\n", " ")[:20]
+    if excerpt:
+        return f"{prefix}_{excerpt}"
+    return f"{prefix}_{utc_now():%Y%m%d_%H%M%S}"
+
+
+def _task_status_from_provider(
+    provider_status: str | None,
+    *,
+    video_url: str | None = None,
+    failure_message: str | None = None,
+) -> str:
+    normalized = _clean_text(provider_status).lower()
+    if video_url:
+        return "done"
+    if normalized in {"completed", "done", "success", "succeeded"}:
+        return "done"
+    if normalized in {"failed", "error", "canceled", "cancelled"} or failure_message:
+        return "failed"
+    if normalized in {"pending", "queued", "processing", "rendering", "in_progress"}:
+        return "processing" if normalized != "pending" else "pending"
+    return "processing"
+
+
+def _task_progress_from_status(status: str) -> int:
+    if status == "done":
+        return 100
+    if status == "failed":
+        return 0
+    if status == "processing":
+        return 65
+    return 10
+
+
+async def _get_enabled_avatar(db: AsyncSession, avatar_id: str) -> HeygenAvatar | None:
+    result = await db.execute(
+        select(HeygenAvatar).where(
+            HeygenAvatar.avatar_id == avatar_id,
+            HeygenAvatar.enabled == True,  # noqa: E712
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+async def _get_enabled_voice(db: AsyncSession, voice_id: str) -> HeygenVoice | None:
+    result = await db.execute(
+        select(HeygenVoice).where(
+            HeygenVoice.voice_id == voice_id,
+            HeygenVoice.enabled == True,  # noqa: E712
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+async def _get_or_create_job(
+    db: AsyncSession,
+    *,
+    current_user: User,
+    job_id: str | None,
+    title: str,
+    settings_snapshot: dict,
+    script: str,
+) -> GenerationJob | None:
+    if job_id:
+        result = await db.execute(
+            select(GenerationJob).where(
+                GenerationJob.id == job_id,
+                GenerationJob.user_id == current_user.id,
+                GenerationJob.scenario == "digital_human",
+            )
+        )
+        job = result.scalar_one_or_none()
+        if not job:
+            return None
+        job.title = title
+        job.settings_json = dump_json_or_none(settings_snapshot)
+        job.input_text = script
+        job.updated_at = utc_now()
+        return job
+
+    job = GenerationJob(
+        id=str(uuid.uuid4()),
+        user_id=current_user.id,
+        scenario="digital_human",
+        title=title,
+        status="draft",
+        settings_json=dump_json_or_none(settings_snapshot),
+        input_text=script,
+    )
+    db.add(job)
+    return job
+
+
+async def _sync_job_status(db: AsyncSession, job_id: str | None) -> None:
+    if not job_id:
+        return
+    job_result = await db.execute(select(GenerationJob).where(GenerationJob.id == job_id))
+    job = job_result.scalar_one_or_none()
+    if not job:
+        return
+
+    task_result = await db.execute(
+        select(VideoTask.status, VideoTask.result_url, VideoTask.error_message, VideoTask.created_at).where(
+            VideoTask.job_id == job_id,
+            VideoTask.archived == False,  # noqa: E712
+            VideoTask.scenario == "digital_human",
+        )
+    )
+    rows = task_result.all()
+    if not rows:
+        job.status = "draft"
+        job.updated_at = utc_now()
+        return
+
+    total = len(rows)
+    completed = 0
+    failed = 0
+    for status, result_url, error_message, created_at in rows:
+        runtime = project_task_runtime_state(
+            "video",
+            status=status,
+            error_message=error_message,
+            progress=0,
+            result_url=result_url,
+            created_at=created_at,
+        )
+        if runtime.status == "done":
+            completed += 1
+        elif runtime.status in {"failed", "timeout"}:
+            failed += 1
+
+    if completed == total:
+        job.status = "done"
+    elif failed == total:
+        job.status = "failed"
+    elif completed > 0 or failed > 0:
+        job.status = "generating"
+    else:
+        job.status = "generating"
+    job.updated_at = utc_now()
+
+
+def _digital_human_task_payload(task: VideoTask) -> dict:
+    settings_snapshot = parse_json_or_none(task.settings_snapshot_json) or {}
+    runtime = project_task_runtime_state(
+        "video",
+        status=task.status,
+        error_message=task.error_message,
+        progress=task.progress,
+        result_url=task.result_url,
+        created_at=task.created_at,
+    )
+    return {
+        "task_id": task.id,
+        "job_id": task.job_id,
+        "scenario": task.scenario,
+        "status": runtime.status,
+        "progress": runtime.progress,
+        "result_url": runtime.result_url,
+        "title": task.title,
+        "provider": task.provider,
+        "provider_task_id": task.provider_task_id,
+        "avatar_id": settings_snapshot.get("avatar_id"),
+        "voice_id": settings_snapshot.get("voice_id"),
+        "script": settings_snapshot.get("script"),
+        "motion_prompt": settings_snapshot.get("motion_prompt"),
+        "quality_tier": settings_snapshot.get("quality_tier"),
+        "prompt": task.prompt,
+        "prompt_snapshot": parse_prompt_snapshot(task.prompt_snapshot_json),
+        "settings_snapshot": settings_snapshot,
+        "duration": task.duration,
+        "resolution": task.resolution,
+        "aspect_ratio": task.aspect_ratio,
+        "error_message": runtime.error_message,
+        "created_at": to_utc_iso(task.created_at),
+    }
+
+
+async def _get_task(
+    db: AsyncSession,
+    *,
+    task_id: str,
+    user_id: int,
+) -> VideoTask | None:
+    result = await db.execute(
+        select(VideoTask).where(
+            VideoTask.id == task_id,
+            VideoTask.user_id == user_id,
+            VideoTask.scenario == "digital_human",
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+async def _sync_task_from_provider(db: AsyncSession, task: VideoTask) -> VideoTask:
+    if not task.provider_task_id:
+        return task
+
+    async with httpx.AsyncClient(timeout=60) as client:
+        data = await get_video(client, video_id=task.provider_task_id)
+
+    provider_status = _clean_text(
+        str(data.get("status") or data.get("video_status") or "")
+    )
+    video_url = _clean_text(
+        str(data.get("video_url") or data.get("url") or data.get("result_url") or "")
+    ) or None
+    error_message = _clean_text(
+        str(
+            data.get("error_message")
+            or data.get("failure_reason")
+            or data.get("message")
+            or ""
+        )
+    ) or None
+    local_status = _task_status_from_provider(
+        provider_status,
+        video_url=video_url,
+        failure_message=error_message,
+    )
+
+    duration_value = data.get("duration") or data.get("video_duration") or 0
+    try:
+        duration = max(0, int(float(duration_value or 0)))
+    except (TypeError, ValueError):
+        duration = task.duration
+
+    task.status = local_status
+    task.progress = _task_progress_from_status(local_status)
+    task.result_url = video_url
+    task.error_message = error_message
+    task.duration = duration
+
+    await _sync_job_status(db, task.job_id)
+    await db.commit()
+    await db.refresh(task)
+    return task
 
 
 @router.get("/avatars", response_model=Response)
@@ -106,3 +385,199 @@ async def list_digital_human_voices(
     result = await db.execute(data_stmt.offset((page - 1) * page_size).limit(page_size))
     items = [heygen_voice_payload(item) for item in result.scalars().all()]
     return success(page_payload(items, total, page, page_size))
+
+
+@router.post("/tasks", response_model=Response)
+async def create_digital_human_task(
+    req: DigitalHumanGenerateRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    avatar_id = _clean_text(req.avatar_id)
+    voice_id = _clean_text(req.voice_id)
+    script = _clean_text(req.script)
+    motion_prompt = _clean_text(req.motion_prompt) or None
+    quality_tier = _clean_text(req.quality_tier) or "standard"
+    aspect_ratio = _clean_text(req.aspect_ratio) or "9:16"
+
+    if not avatar_id:
+        return fail("请选择系统数字人")
+    if not voice_id:
+        return fail("请选择系统声音")
+    if not script:
+        return fail("请输入口播文案")
+    if quality_tier not in QUALITY_TIER_TO_ENGINE:
+        return fail("不支持的生成档位")
+    if aspect_ratio not in SUPPORTED_ASPECT_RATIOS:
+        return fail("不支持的视频比例")
+
+    avatar = await _get_enabled_avatar(db, avatar_id)
+    if not avatar:
+        return fail("系统数字人不存在或已停用")
+    voice = await _get_enabled_voice(db, voice_id)
+    if not voice:
+        return fail("系统声音不存在或已停用")
+
+    title = _clean_text(req.title) or _default_job_title(script)
+    settings_snapshot = {
+        "scenario": "digital_human",
+        "avatar_id": avatar.avatar_id,
+        "avatar_name": avatar.name,
+        "voice_id": voice.voice_id,
+        "voice_name": voice.name,
+        "script": script,
+        "motion_prompt": motion_prompt,
+        "quality_tier": quality_tier,
+        "aspect_ratio": aspect_ratio,
+    }
+
+    job = await _get_or_create_job(
+        db,
+        current_user=current_user,
+        job_id=req.job_id,
+        title=title,
+        settings_snapshot=settings_snapshot,
+        script=script,
+    )
+    if req.job_id and job is None:
+        return fail("任务不存在")
+
+    task = VideoTask(
+        id=str(uuid.uuid4()),
+        user_id=current_user.id,
+        job_id=job.id if job else None,
+        scenario="digital_human",
+        type_id=quality_tier,
+        title=title,
+        sort_order=0,
+        prompt=script,
+        input_mode="avatar",
+        input_images_json=None,
+        input_video_url=None,
+        audio_setting=None,
+        duration=0,
+        resolution=DEFAULT_RESOLUTION,
+        aspect_ratio=aspect_ratio,
+        status="pending",
+        progress=10,
+        provider="heygen",
+        provider_task_id=None,
+        credit_cost=0,
+        prompt_snapshot_json=dump_prompt_snapshot(
+            build_prompt_snapshot(
+                task=motion_prompt,
+                user=script,
+                final=script,
+            )
+        ),
+        settings_snapshot_json=dump_json_or_none(settings_snapshot),
+    )
+    db.add(task)
+    if job is not None:
+        job.status = "generating"
+        job.updated_at = utc_now()
+
+    try:
+        await db.commit()
+        await db.refresh(task)
+    except Exception:
+        await db.rollback()
+        return fail("数字人任务创建失败，请稍后重试")
+
+    try:
+        async with httpx.AsyncClient(timeout=60) as client:
+            provider_data = await create_avatar_video(
+                client,
+                avatar_id=avatar.avatar_id,
+                title=title,
+                aspect_ratio=aspect_ratio,
+                resolution=DEFAULT_RESOLUTION,
+                script=script,
+                voice_id=voice.voice_id,
+                engine_type=QUALITY_TIER_TO_ENGINE[quality_tier],
+                motion_prompt=motion_prompt,
+                idempotency_key=task.id,
+            )
+        provider_task_id = _clean_text(str(provider_data.get("video_id") or ""))
+        if not provider_task_id:
+            raise ValueError("HeyGen 未返回 video_id")
+        task.provider_task_id = provider_task_id
+        task.status = _task_status_from_provider(
+            _clean_text(str(provider_data.get("status") or "")),
+        )
+        task.progress = _task_progress_from_status(task.status)
+        await _sync_job_status(db, task.job_id)
+        await db.commit()
+        await db.refresh(task)
+    except ValueError as exc:
+        task.status = "failed"
+        task.progress = 0
+        task.error_message = str(exc)
+        await _sync_job_status(db, task.job_id)
+        await db.commit()
+        return fail(str(exc), data={"task_id": task.id, "job_id": task.job_id})
+    except httpx.HTTPError as exc:
+        message = parse_heygen_error_message(exc)
+        task.status = "failed"
+        task.progress = 0
+        task.error_message = message
+        await _sync_job_status(db, task.job_id)
+        await db.commit()
+        return fail(message, data={"task_id": task.id, "job_id": task.job_id})
+    except Exception:
+        task.status = "failed"
+        task.progress = 0
+        task.error_message = "HeyGen 任务创建失败，请稍后重试"
+        await _sync_job_status(db, task.job_id)
+        await db.commit()
+        return fail(
+            "HeyGen 任务创建失败，请稍后重试",
+            data={"task_id": task.id, "job_id": task.job_id},
+        )
+
+    return success(
+        {
+            "task_id": task.id,
+            "job_id": task.job_id,
+            "provider_task_id": task.provider_task_id,
+            "status": task.status,
+        }
+    )
+
+
+@router.get("/tasks/{task_id}", response_model=Response)
+async def get_digital_human_task(
+    task_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    task = await _get_task(db, task_id=task_id, user_id=current_user.id)
+    if not task:
+        return fail("数字人任务不存在")
+    return success(_digital_human_task_payload(task))
+
+
+@router.get("/tasks/{task_id}/poll", response_model=Response)
+async def poll_digital_human_task(
+    task_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    task = await _get_task(db, task_id=task_id, user_id=current_user.id)
+    if not task:
+        return fail("数字人任务不存在")
+    if task.provider_task_id and task.status not in {"done", "failed", "timeout"}:
+        try:
+            task = await _sync_task_from_provider(db, task)
+        except ValueError as exc:
+            task.status = "failed"
+            task.progress = 0
+            task.error_message = str(exc)
+            await _sync_job_status(db, task.job_id)
+            await db.commit()
+            await db.refresh(task)
+        except httpx.HTTPError as exc:
+            return fail(parse_heygen_error_message(exc))
+        except Exception:
+            return fail("HeyGen 任务查询失败，请稍后重试")
+    return success(_digital_human_task_payload(task))

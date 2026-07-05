@@ -25,6 +25,13 @@ def _headers() -> dict[str, str]:
     return {"x-api-key": HEYGEN_API_KEY}
 
 
+def _request_headers(idempotency_key: str | None = None) -> dict[str, str]:
+    headers = _headers()
+    if idempotency_key:
+        headers["Idempotency-Key"] = idempotency_key
+    return headers
+
+
 async def _fetch_page(
     client: httpx.AsyncClient,
     *,
@@ -41,6 +48,88 @@ async def _fetch_page(
     if not isinstance(payload, dict):
         raise ValueError("HeyGen 返回格式不正确")
     return payload
+
+
+def parse_heygen_error_message(exc: httpx.HTTPError) -> str:
+    response = getattr(exc, "response", None)
+    if response is None:
+        return "HeyGen 请求失败，请稍后重试"
+    try:
+        payload = response.json()
+    except ValueError:
+        payload = None
+    if isinstance(payload, dict):
+        error = payload.get("error")
+        if isinstance(error, dict):
+            message = str(error.get("message") or "").strip()
+            if message:
+                return message
+        message = str(payload.get("message") or "").strip()
+        if message:
+            return message
+    if response.status_code == 401:
+        return "HeyGen API Key 无效或已失效"
+    if response.status_code == 404:
+        return "HeyGen 任务不存在"
+    if response.status_code == 409:
+        return "HeyGen 任务正在处理中，请稍后重试"
+    if response.status_code == 429:
+        return "HeyGen 请求过于频繁，请稍后重试"
+    return "HeyGen 请求失败，请稍后重试"
+
+
+async def create_avatar_video(
+    client: httpx.AsyncClient,
+    *,
+    avatar_id: str,
+    title: str,
+    aspect_ratio: str,
+    resolution: str,
+    script: str,
+    voice_id: str,
+    engine_type: str,
+    motion_prompt: str | None = None,
+    idempotency_key: str | None = None,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "type": "avatar",
+        "avatar_id": avatar_id,
+        "title": title,
+        "resolution": resolution,
+        "aspect_ratio": aspect_ratio,
+        "output_format": "mp4",
+        "script": script,
+        "voice_id": voice_id,
+        "engine": {"type": engine_type},
+    }
+    if motion_prompt:
+        payload["motion_prompt"] = motion_prompt
+    response = await client.post(
+        f"{HEYGEN_BASE_URL}/v3/videos",
+        headers=_request_headers(idempotency_key),
+        json=payload,
+    )
+    response.raise_for_status()
+    body = response.json()
+    if not isinstance(body, dict) or not isinstance(body.get("data"), dict):
+        raise ValueError("HeyGen 创建视频返回格式不正确")
+    return body["data"]
+
+
+async def get_video(
+    client: httpx.AsyncClient,
+    *,
+    video_id: str,
+) -> dict[str, Any]:
+    response = await client.get(
+        f"{HEYGEN_BASE_URL}/v3/videos/{video_id}",
+        headers=_request_headers(),
+    )
+    response.raise_for_status()
+    body = response.json()
+    if not isinstance(body, dict) or not isinstance(body.get("data"), dict):
+        raise ValueError("HeyGen 视频详情返回格式不正确")
+    return body["data"]
 
 
 def _is_terminal_token_error(exc: httpx.HTTPStatusError, token: str) -> bool:
