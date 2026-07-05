@@ -9,8 +9,8 @@ import AppRangeCard from "@/components/ui/AppRangeCard.vue";
 import AppSelect from "@/components/ui/AppSelect.vue";
 
 const qualityOptions = [
-  { value: "standard", label: "标准档", description: "日常口播" },
-  { value: "premium", label: "高质档", description: "更高表现力" },
+  { value: "standard", label: "标准档", description: "日常口播 · 2000积分" },
+  { value: "premium", label: "高质档", description: "更高表现力 · 5000积分" },
 ];
 const aspectRatioOptions = [
   { value: "9:16", label: "9:16", description: "竖版口播" },
@@ -49,6 +49,10 @@ const props = defineProps({
   scriptExceeded: {
     type: Boolean,
     default: false,
+  },
+  chargeHintText: {
+    type: String,
+    default: "",
   },
 });
 
@@ -234,15 +238,20 @@ function getVoiceSpeedHint(speed) {
     </section>
 
     <template #footer>
-      <GeneratorActionFooter
-        :primary-text="generateText"
-        :primary-disabled="generateDisabled"
-        @primary="emit('generate')"
-      >
-        <template #primary-icon>
-          <Sparkles class="h-4 w-4" />
-        </template>
-      </GeneratorActionFooter>
+      <div class="border-t border-slate-200 bg-white/95 px-4 pt-3">
+        <p class="mb-3 rounded-xl bg-slate-50 px-3 py-2 text-[11px] font-semibold text-slate-600">
+          {{ chargeHintText || "本次将预扣积分，失败自动退回" }}
+        </p>
+        <GeneratorActionFooter
+          :primary-text="generateText"
+          :primary-disabled="generateDisabled"
+          @primary="emit('generate')"
+        >
+          <template #primary-icon>
+            <Sparkles class="h-4 w-4" />
+          </template>
+        </GeneratorActionFooter>
+      </div>
     </template>
   </GeneratorSidePanelShell>
 </template>

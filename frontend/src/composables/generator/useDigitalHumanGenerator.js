@@ -29,6 +29,10 @@ const QUALITY_TIER_LABELS = {
   standard: "标准档",
   premium: "高质档",
 };
+const QUALITY_TIER_CREDIT_COSTS = {
+  standard: 2000,
+  premium: 5000,
+};
 
 const VIDEO_POLL_INTERVAL_MS = 3000;
 const MAX_SCRIPT_CHARS = 1500;
@@ -144,6 +148,10 @@ export function useDigitalHumanGenerator({ toast, confirm, onJobCreated } = {}) 
     const durationText = estimatedDurationSeconds.value > 0 ? `，预计约 ${estimatedDurationSeconds.value} 秒` : "";
     return `已输入 ${scriptLength.value}/${MAX_SCRIPT_CHARS} 字${durationText}`;
   });
+  const currentCreditCost = computed(
+    () => QUALITY_TIER_CREDIT_COSTS[settings.qualityTier] || QUALITY_TIER_CREDIT_COSTS.standard,
+  );
+  const chargeHintText = computed(() => `本次将预扣 ${currentCreditCost.value} 积分，失败自动退回`);
 
   const canGenerate = computed(() => {
     if (creatingBatch.value || generating.value) return false;
@@ -371,6 +379,8 @@ export function useDigitalHumanGenerator({ toast, confirm, onJobCreated } = {}) 
     estimatedDurationSeconds,
     scriptExceeded,
     scriptMetaText,
+    currentCreditCost,
+    chargeHintText,
     canGenerate,
     generateButtonText,
     updateSettings,

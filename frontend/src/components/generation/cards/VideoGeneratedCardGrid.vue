@@ -169,9 +169,14 @@ function getCardMetaText(card, fallbackPlatform, fallbackLanguage, fallbackVideo
           <p class="text-[11px] font-medium text-emerald-600">本次失败未消耗额度</p>
         </div>
         <div class="flex items-center justify-between gap-2">
-          <span class="min-w-0 truncate text-xs font-medium text-slate-500">
-            {{ getCardMetaText(card, platform, language, videoLabel) }}
-          </span>
+          <div class="min-w-0">
+            <span class="block truncate text-xs font-medium text-slate-500">
+              {{ getCardMetaText(card, platform, language, videoLabel) }}
+            </span>
+            <span v-if="card.creditCost" class="mt-1 block text-[11px] font-semibold text-slate-400">
+              消耗 {{ card.creditCost }} 积分
+            </span>
+          </div>
           <button
             v-if="card.status !== 'pending' && card.status !== 'processing'"
             type="button"

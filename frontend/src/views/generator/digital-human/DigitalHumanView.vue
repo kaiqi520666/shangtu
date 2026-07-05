@@ -78,6 +78,7 @@ function closeHistoryDrawer() {
       :generate-text="digitalHuman.generateButtonText.value"
       :script-meta-text="digitalHuman.scriptMetaText.value"
       :script-exceeded="digitalHuman.scriptExceeded.value"
+      :charge-hint-text="digitalHuman.chargeHintText.value"
       @update:settings="digitalHuman.updateSettings"
       @open-avatar-picker="openAvatarPicker"
       @open-voice-picker="openVoicePicker"
