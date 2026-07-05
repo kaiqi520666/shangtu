@@ -14,8 +14,9 @@ import HeygenPickerModalShell from "@/components/digital-human/HeygenPickerModal
 import ImageUploadSourcePanel from "@/components/generation/image/ImageUploadSourcePanel.vue";
 import AppModal from "@/components/ui/AppModal.vue";
 import AppSelect from "@/components/ui/AppSelect.vue";
-import { useHeygenResourcePicker } from "@/composables/digital-human/useHeygenResourcePicker.js";
 import { useDigitalHumanPricing } from "@/composables/digital-human/useDigitalHumanPricing.js";
+import { useHeygenResourcePicker } from "@/composables/digital-human/useHeygenResourcePicker.js";
+import { useConfirm } from "@/composables/useConfirm.js";
 import {
   heygenAvatarOrientationOptions,
   heygenGenderOptions,
@@ -55,6 +56,7 @@ const photoPreviewUrl = ref("");
 let photoTaskPollTimer = null;
 
 const pricing = useDigitalHumanPricing();
+const confirm = useConfirm();
 
 const systemPicker = useHeygenResourcePicker({
   listApi: getDigitalHumanAvatars,
@@ -104,10 +106,6 @@ const photoTaskItems = computed(() =>
   ),
 );
 
-const photoCreateCost = computed(
-  () => Number(pricing.photoAvatarCreateCost.value || 2000),
-);
-
 watch(
   () => props.open,
   async (open) => {
@@ -119,7 +117,6 @@ watch(
     }
     pendingAvatar.value = normalizeAvatar(props.selectedAvatar);
     activeTab.value = pendingAvatar.value?.source === "photo" ? "photo" : "system";
-    await pricing.loadPricing();
     if (activeTab.value === "photo") {
       await initPhotoTab();
     } else {
@@ -404,7 +401,14 @@ async function createPhotoAvatarAction() {
 
 async function deletePhotoAvatarAction(item) {
   if (!item?.id) return;
-  if (!window.confirm("确定删除这个照片数字人吗？删除后不会影响历史任务快照。")) return;
+  const ok = await confirm.open({
+    title: "删除照片数字人",
+    message: "确定删除这个照片数字人吗？删除后不会影响历史任务快照。",
+    confirmText: "删除",
+    cancelText: "取消",
+    tone: "danger",
+  });
+  if (!ok) return;
   deletingAssetId.value = item.id;
   try {
     const result = await deletePhotoAvatar(item.id);
@@ -425,7 +429,14 @@ async function deletePhotoAvatarAction(item) {
 
 async function deletePhotoAvatarTaskAction(item) {
   if (!item?.id || item.status !== "failed") return;
-  if (!window.confirm("确定删除这条失败任务吗？删除后将不再显示。")) return;
+  const ok = await confirm.open({
+    title: "删除失败任务",
+    message: "确定删除这条失败任务吗？删除后将不再显示。",
+    confirmText: "删除",
+    cancelText: "取消",
+    tone: "danger",
+  });
+  if (!ok) return;
   deletingTaskId.value = item.id;
   try {
     const result = await deletePhotoAvatarTask(item.id);
@@ -486,7 +497,6 @@ function photoTaskStatusClass(status) {
     <div v-if="activeTab === 'photo'" class="space-y-4">
       <div class="rounded-2xl border border-sky-100 bg-sky-50/80 px-4 py-3">
         <p class="text-sm font-bold text-slate-800">上传 1 张清晰正面人像图</p>
-        <p class="mt-1 text-xs leading-relaxed text-slate-500">创建成功后可在数字人口播中重复使用。本次创建将消耗 {{ photoCreateCost }} 积分，失败自动退回。</p>
       </div>
 
       <input ref="fileInput" type="file" accept="image/*" class="hidden" @change="handleFileChange" />
