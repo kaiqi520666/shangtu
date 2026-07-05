@@ -1349,6 +1349,28 @@ async def poll_photo_avatar_task(
     return success(payload)
 
 
+@router.delete("/photo-avatars/tasks/{task_id}", response_model=Response)
+async def delete_photo_avatar_task(
+    task_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    task = await _get_user_avatar_task(db, task_id=task_id, user_id=current_user.id)
+    if not task:
+        return fail("照片数字人任务不存在")
+    if task.status != "failed":
+        return fail("仅支持删除创建失败的任务")
+
+    task.archived_at = utc_now()
+    try:
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        return fail("删除失败，请稍后重试")
+
+    return success({"id": task_id})
+
+
 @router.get("/photo-avatars", response_model=Response)
 async def list_photo_avatars(
     page: int = 1,

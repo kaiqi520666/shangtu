@@ -22,6 +22,10 @@ export function pollPhotoAvatarTask(taskId) {
   return request.get(`/digital-human/photo-avatars/tasks/${taskId}/poll`, { timeout: 15000 });
 }
 
+export function deletePhotoAvatarTask(taskId) {
+  return request.delete(`/digital-human/photo-avatars/tasks/${taskId}`, { timeout: 15000 });
+}
+
 export function getPhotoAvatars(params = {}) {
   return request.get("/digital-human/photo-avatars", { params, timeout: 15000 });
 }

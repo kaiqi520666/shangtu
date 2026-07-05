@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { LoaderCircle, PlayCircle, Trash2, UploadCloud } from "lucide-vue-next";
 import {
   deletePhotoAvatar,
+  deletePhotoAvatarTask,
   getDigitalHumanAvatars,
   getPhotoAvatarTasks,
   getPhotoAvatars,
@@ -46,6 +47,7 @@ const previewItem = ref(null);
 const fileInput = ref(null);
 const uploadDragOver = ref(false);
 const creatingPhotoAvatar = ref(false);
+const deletingTaskId = ref("");
 const deletingAssetId = ref("");
 const photoAvatarName = ref("");
 const photoFile = ref(null);
@@ -421,6 +423,24 @@ async function deletePhotoAvatarAction(item) {
   }
 }
 
+async function deletePhotoAvatarTaskAction(item) {
+  if (!item?.id || item.status !== "failed") return;
+  if (!window.confirm("确定删除这条失败任务吗？删除后将不再显示。")) return;
+  deletingTaskId.value = item.id;
+  try {
+    const result = await deletePhotoAvatarTask(item.id);
+    if (result.code !== 0) {
+      notifyError(result.message || "删除失败");
+      return;
+    }
+    await reloadPhotoLists();
+  } catch (error) {
+    notifyError(error.response?.data?.message || "删除失败，请稍后重试");
+  } finally {
+    deletingTaskId.value = "";
+  }
+}
+
 function photoTaskStatusText(status) {
   if (status === "processing") return "创建中";
   if (status === "failed") return "创建失败";
@@ -559,6 +579,18 @@ function photoTaskStatusClass(status) {
               <p class="mt-2 text-xs text-slate-400">创建时间：{{ formatDateTime(item.created_at) }}</p>
               <p v-if="item.error_message" class="mt-2 text-xs text-rose-500">{{ item.error_message }}</p>
             </div>
+
+            <button
+              v-if="item.status === 'failed'"
+              type="button"
+              class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-400 transition-colors hover:border-rose-200 hover:bg-rose-50 hover:text-rose-500"
+              :disabled="deletingTaskId === item.id"
+              title="删除失败任务"
+              @click="deletePhotoAvatarTaskAction(item)"
+            >
+              <LoaderCircle v-if="deletingTaskId === item.id" class="h-3.5 w-3.5 animate-spin" />
+              <Trash2 v-else class="h-3.5 w-3.5" />
+            </button>
           </div>
         </article>
       </section>
