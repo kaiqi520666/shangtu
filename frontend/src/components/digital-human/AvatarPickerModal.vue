@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref, watch } from "vue";
-import { Bot, ExternalLink, PlayCircle } from "lucide-vue-next";
+import { Bot, PlayCircle } from "lucide-vue-next";
 import { getDigitalHumanAvatars } from "@/api/digitalHuman.js";
 import DigitalHumanPickerPlaceholder from "@/components/digital-human/DigitalHumanPickerPlaceholder.vue";
 import HeygenPickerModalShell from "@/components/digital-human/HeygenPickerModalShell.vue";
@@ -196,23 +196,12 @@ function confirmSelection() {
             <button
               v-if="item.preview_video_url || item.preview_image_url"
               type="button"
-              class="inline-flex items-center gap-1 text-[11px] font-bold text-primary hover:text-secondary"
+              class="inline-flex items-center gap-1.5 rounded-xl bg-primary/10 px-3 py-2 text-xs font-bold text-primary transition-colors hover:bg-primary/15 hover:text-secondary"
               @click.stop="previewItem = item"
             >
-              <PlayCircle class="h-3.5 w-3.5" />
+              <PlayCircle class="h-4 w-4" />
               预览
             </button>
-            <a
-              v-if="item.preview_video_url"
-              :href="item.preview_video_url"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-400 hover:text-slate-600"
-              @click.stop
-            >
-              <ExternalLink class="h-3.5 w-3.5" />
-              打开
-            </a>
           </div>
         </div>
       </article>

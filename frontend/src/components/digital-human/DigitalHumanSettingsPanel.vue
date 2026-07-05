@@ -46,18 +46,31 @@ const emit = defineEmits([
         @click="emit('open-avatar-picker')"
       >
         <span class="flex min-w-0 items-center gap-3">
-          <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            <Bot class="h-4.5 w-4.5" />
+          <span class="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-primary/10 text-primary">
+            <img
+              v-if="selectedAvatar?.preview_image_url"
+              :src="selectedAvatar.preview_image_url"
+              class="h-full w-full object-cover"
+              alt="数字人缩略图"
+            />
+            <Bot v-else class="h-4.5 w-4.5" />
           </span>
           <span class="min-w-0">
             <span class="block text-xs font-bold text-slate-800">选择数字人</span>
             <span class="mt-0.5 block truncate text-xs text-slate-400">
               {{ selectedAvatar?.name || "未选择系统数字人" }}
             </span>
+            <span v-if="selectedAvatar?.avatar_id" class="mt-1 block truncate text-[11px] text-slate-400">
+              {{ selectedAvatar.avatar_id }}
+            </span>
           </span>
         </span>
         <span class="text-xs font-medium text-primary">更换</span>
       </button>
+
+      <div v-if="selectedAvatar?.preview_image_url" class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+        <img :src="selectedAvatar.preview_image_url" class="h-40 w-full object-cover" alt="已选数字人预览" />
+      </div>
 
       <button
         type="button"
@@ -73,10 +86,18 @@ const emit = defineEmits([
             <span class="mt-0.5 block truncate text-xs text-slate-400">
               {{ selectedVoice?.name || "未选择系统声音" }}
             </span>
+            <span v-if="selectedVoice?.language" class="mt-1 block truncate text-[11px] text-slate-400">
+              {{ selectedVoice.language }}
+            </span>
           </span>
         </span>
         <span class="text-xs font-medium text-primary">更换</span>
       </button>
+
+      <div v-if="selectedVoice?.preview_audio_url" class="rounded-2xl border border-slate-200 bg-white p-3">
+        <p class="mb-2 text-[11px] font-bold text-slate-500">声音试听</p>
+        <audio :src="selectedVoice.preview_audio_url" controls preload="none" class="h-10 w-full"></audio>
+      </div>
     </section>
 
     <section class="space-y-4 border-b border-slate-100 p-5">

@@ -83,6 +83,9 @@ function handleVoiceConfirm(item) {
                 <Bot class="h-4.5 w-4.5 text-primary" />
                 <h2 class="text-sm font-black">当前数字人</h2>
               </div>
+              <div v-if="selectedAvatar?.preview_image_url" class="mt-3 overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
+                <img :src="selectedAvatar.preview_image_url" class="h-36 w-full object-cover" alt="当前数字人预览" />
+              </div>
               <p class="mt-3 text-xs font-medium text-slate-700">{{ selectedAvatar?.name || "暂未选择系统数字人" }}</p>
               <p class="mt-1 text-xs text-slate-400">{{ selectedAvatar?.avatar_id || "选择后会在这里显示 avatar_id" }}</p>
             </div>
@@ -94,6 +97,9 @@ function handleVoiceConfirm(item) {
               </div>
               <p class="mt-3 text-xs font-medium text-slate-700">{{ selectedVoice?.name || "暂未选择系统声音" }}</p>
               <p class="mt-1 text-xs text-slate-400">{{ selectedVoice?.language || "选择后会在这里显示语言" }}</p>
+              <div v-if="selectedVoice?.preview_audio_url" class="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <audio :src="selectedVoice.preview_audio_url" controls preload="none" class="h-10 w-full"></audio>
+              </div>
             </div>
 
             <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
