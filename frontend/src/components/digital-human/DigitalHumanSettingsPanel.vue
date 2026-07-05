@@ -6,6 +6,7 @@ import GeneratorSidePanelShell from "@/components/generation/workspace/Generator
 import VideoQualitySelector from "@/components/product-video/VideoQualitySelector.vue";
 import AppOptionCards from "@/components/ui/AppOptionCards.vue";
 import AppRangeCard from "@/components/ui/AppRangeCard.vue";
+import AppSelect from "@/components/ui/AppSelect.vue";
 
 const qualityOptions = [
   { value: "standard", label: "标准档", description: "日常口播" },
@@ -181,11 +182,9 @@ function getVoiceSpeedHint(speed) {
             <h3 class="text-xs font-bold text-slate-800">视频比例</h3>
             <span class="text-[11px] text-slate-400">按投放平台选择</span>
           </div>
-          <AppOptionCards
+          <AppSelect
             :model-value="settings.aspectRatio"
             :options="aspectRatioOptions"
-            :columns="3"
-            align="center"
             @update:model-value="updateSettings({ aspectRatio: $event })"
           />
         </div>
