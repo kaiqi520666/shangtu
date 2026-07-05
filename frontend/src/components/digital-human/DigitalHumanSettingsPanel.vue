@@ -105,10 +105,6 @@ const emit = defineEmits([
     </section>
 
     <section class="space-y-4 border-b border-slate-100 p-5">
-      <div>
-        <h2 class="text-sm font-black text-slate-900">口播内容</h2>
-      </div>
-
       <label class="block">
         <span class="mb-1.5 block text-xs font-bold text-slate-800">口播文案</span>
         <textarea
