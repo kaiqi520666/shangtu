@@ -3,6 +3,7 @@ import { getAdminSettings, updateAdminSettings } from "@/api/admin.js";
 import { useAdminAuditLogs } from "@/composables/admin/useAdminAuditLogs.js";
 import { useToast } from "@/composables/useToast.js";
 import {
+  defaultDigitalHumanCreditCosts,
   defaultDigitalHumanPrechargeCosts,
   defaultImageCreditCosts,
   defaultRechargePackage,
@@ -12,6 +13,7 @@ import {
 const settingsState = reactive({
   imageCreditCosts: { ...defaultImageCreditCosts },
   videoCreditCosts: { ...defaultVideoCreditCosts },
+  digitalHumanCreditCosts: { ...defaultDigitalHumanCreditCosts },
   digitalHumanPrechargeCosts: { ...defaultDigitalHumanPrechargeCosts },
   rechargePackages: [],
   paymentConfig: {},
@@ -35,6 +37,10 @@ export function useAdminSettings() {
       settingsState.videoCreditCosts = {
         ...defaultVideoCreditCosts,
         ...result.data?.video_credit_costs,
+      };
+      settingsState.digitalHumanCreditCosts = {
+        ...defaultDigitalHumanCreditCosts,
+        ...result.data?.digital_human_credit_costs,
       };
       settingsState.digitalHumanPrechargeCosts = {
         ...defaultDigitalHumanPrechargeCosts,
@@ -76,6 +82,10 @@ export function useAdminSettings() {
         video_credit_costs: {
           "720p": Number(settingsState.videoCreditCosts["720p"]),
           "1080p": Number(settingsState.videoCreditCosts["1080p"]),
+        },
+        digital_human_credit_costs: {
+          standard: Number(settingsState.digitalHumanCreditCosts.standard),
+          premium: Number(settingsState.digitalHumanCreditCosts.premium),
         },
         digital_human_precharge_costs: {
           standard: Number(settingsState.digitalHumanPrechargeCosts.standard),

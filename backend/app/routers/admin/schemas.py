@@ -36,6 +36,7 @@ class RechargePackageConfig(BaseModel):
 class AdminSettingsRequest(BaseModel):
     image_credit_costs: dict[str, int]
     video_credit_costs: dict[str, int]
+    digital_human_credit_costs: dict[str, int]
     digital_human_precharge_costs: dict[str, int]
     recharge_packages: list[RechargePackageConfig]
 

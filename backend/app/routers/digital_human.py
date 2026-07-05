@@ -19,6 +19,7 @@ from app.core.providers.heygen_provider import (
 )
 from app.core.scenarios import SCENARIO_TITLE_PREFIX
 from app.core.system_settings import (
+    get_effective_digital_human_credit_costs,
     get_effective_digital_human_precharge_cost,
     get_effective_digital_human_precharge_costs,
 )
@@ -494,10 +495,16 @@ async def get_digital_human_config(
 ):
     _ = current_user
     try:
+        credit_costs = await get_effective_digital_human_credit_costs(db)
         precharge_costs = await get_effective_digital_human_precharge_costs(db)
     except ValueError as exc:
         return fail(str(exc))
-    return success({"precharge_costs": precharge_costs})
+    return success(
+        {
+            "credit_costs": credit_costs,
+            "precharge_costs": precharge_costs,
+        }
+    )
 
 
 @router.post("/tasks", response_model=Response)

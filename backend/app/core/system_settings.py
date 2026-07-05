@@ -13,8 +13,14 @@ from app.models import SystemSetting
 
 SETTING_IMAGE_CREDIT_COSTS = "image_credit_costs"
 SETTING_VIDEO_CREDIT_COSTS = "video_credit_costs"
+SETTING_DIGITAL_HUMAN_CREDIT_COSTS = "digital_human_credit_costs"
 SETTING_DIGITAL_HUMAN_PRECHARGE_COSTS = "digital_human_precharge_costs"
 SETTING_RECHARGE_PACKAGES = "credit_recharge_packages"
+
+DEFAULT_DIGITAL_HUMAN_CREDIT_COSTS = {
+    "standard": 7,
+    "premium": 16,
+}
 
 DEFAULT_DIGITAL_HUMAN_PRECHARGE_COSTS = {
     "standard": 2000,
@@ -129,6 +135,20 @@ def normalize_video_credit_costs(raw: dict[str, Any]) -> dict[str, int]:
     return costs
 
 
+def normalize_digital_human_credit_costs(raw: dict[str, Any]) -> dict[str, int]:
+    costs: dict[str, int] = {}
+    for tier in DEFAULT_DIGITAL_HUMAN_CREDIT_COSTS:
+        value = raw.get(tier)
+        try:
+            cost = int(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{tier} 每秒扣费必须是正整数") from exc
+        if cost < 1:
+            raise ValueError(f"{tier} 每秒扣费必须大于等于 1")
+        costs[tier] = cost
+    return costs
+
+
 def normalize_recharge_package(raw: dict[str, Any]) -> dict[str, Any]:
     package_id = str(raw.get("id") or "").strip()
     name = str(raw.get("name") or "").strip()
@@ -229,6 +249,16 @@ async def get_effective_video_credit_cost(
     return int(costs[normalized]) * int(duration)
 
 
+async def get_effective_digital_human_credit_costs(db: AsyncSession) -> dict[str, int]:
+    setting = await get_setting(db, SETTING_DIGITAL_HUMAN_CREDIT_COSTS)
+    if setting:
+        parsed = parse_json_or_none(setting.value_json)
+        if not isinstance(parsed, dict):
+            raise ValueError("数据库中的数字人每秒扣费配置不是有效对象")
+        return normalize_digital_human_credit_costs(parsed)
+    return normalize_digital_human_credit_costs(DEFAULT_DIGITAL_HUMAN_CREDIT_COSTS)
+
+
 async def get_effective_digital_human_precharge_costs(db: AsyncSession) -> dict[str, int]:
     setting = await get_setting(db, SETTING_DIGITAL_HUMAN_PRECHARGE_COSTS)
     if setting:
@@ -300,6 +330,11 @@ async def seed_default_billing_settings(
             SETTING_VIDEO_CREDIT_COSTS,
             normalize_video_credit_costs(DEFAULT_VIDEO_CREDIT_COSTS),
             "商品视频每秒扣费配置",
+        ),
+        (
+            SETTING_DIGITAL_HUMAN_CREDIT_COSTS,
+            normalize_digital_human_credit_costs(DEFAULT_DIGITAL_HUMAN_CREDIT_COSTS),
+            "数字人每秒扣费配置",
         ),
         (
             SETTING_DIGITAL_HUMAN_PRECHARGE_COSTS,

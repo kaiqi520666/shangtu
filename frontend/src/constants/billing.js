@@ -9,6 +9,11 @@ export const defaultVideoCreditCosts = {
   "1080p": 64,
 };
 
+export const defaultDigitalHumanCreditCosts = {
+  standard: 7,
+  premium: 16,
+};
+
 export const defaultDigitalHumanPrechargeCosts = {
   standard: 2000,
   premium: 5000,
