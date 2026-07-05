@@ -9,6 +9,7 @@ import {
   ScrollText,
   Settings,
   ShoppingBag,
+  Volume2,
   UserRoundCheck,
   UsersRound,
 } from "lucide-vue-next";
@@ -27,10 +28,13 @@ const tabIcons = {
   orders: ShoppingBag,
   transactions: ReceiptText,
   imageTasks: Images,
+  assets: Images,
   settings: Settings,
   productCatalog: PackageSearch,
   promptTemplates: MessageSquareText,
   outfitModels: UserRoundCheck,
+  heygenAvatars: UserRoundCheck,
+  heygenVoices: Volume2,
   auditLogs: ScrollText,
 };
 

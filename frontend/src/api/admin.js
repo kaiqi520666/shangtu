@@ -28,6 +28,16 @@ export function getAdminImageTasks(params = {}) {
   return request.get("/admin/image-tasks", { params, timeout: 15000 });
 }
 
+export function getAdminAssets(params = {}) {
+  return request.get("/admin/image-tasks", {
+    params: {
+      ...params,
+      status: params.status || "done",
+    },
+    timeout: 15000,
+  });
+}
+
 export function getAdminSettings() {
   return request.get("/admin/settings", { timeout: 15000 });
 }
@@ -77,4 +87,24 @@ export function uploadAdminOutfitModel({ file, name, sortOrder }) {
 
 export function updateAdminOutfitModel(modelId, payload) {
   return request.patch(`/admin/outfit-models/${modelId}`, payload, { timeout: 15000 });
+}
+
+export function getAdminHeygenAvatars(params = {}) {
+  return request.get("/admin/heygen-avatars", { params, timeout: 15000 });
+}
+
+export function updateAdminHeygenAvatar(rowId, payload) {
+  return request.patch(`/admin/heygen-avatars/${rowId}`, payload, { timeout: 15000 });
+}
+
+export function getAdminHeygenVoices(params = {}) {
+  return request.get("/admin/heygen-voices", { params, timeout: 15000 });
+}
+
+export function updateAdminHeygenVoice(rowId, payload) {
+  return request.patch(`/admin/heygen-voices/${rowId}`, payload, { timeout: 15000 });
+}
+
+export function syncAdminHeygenResources() {
+  return request.post("/admin/heygen-resources/sync", {}, { timeout: 120000 });
 }

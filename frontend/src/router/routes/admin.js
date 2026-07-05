@@ -31,6 +31,11 @@ export const adminRoutes = [
         component: () => import("@/views/admin/AdminImageTasksView.vue"),
       },
       {
+        path: "assets",
+        name: "admin-assets",
+        component: () => import("@/views/admin/AdminAssetsView.vue"),
+      },
+      {
         path: "settings",
         name: "admin-settings",
         component: () => import("@/views/admin/AdminSettingsView.vue"),
@@ -49,6 +54,16 @@ export const adminRoutes = [
         path: "outfit-models",
         name: "admin-outfit-models",
         component: () => import("@/views/admin/AdminOutfitModelsView.vue"),
+      },
+      {
+        path: "heygen-avatars",
+        name: "admin-heygen-avatars",
+        component: () => import("@/views/admin/AdminHeygenAvatarsView.vue"),
+      },
+      {
+        path: "heygen-voices",
+        name: "admin-heygen-voices",
+        component: () => import("@/views/admin/AdminHeygenVoicesView.vue"),
       },
       {
         path: "audit-logs",

@@ -12,6 +12,8 @@ from app.models import (
     AdminAuditLog,
     CreditOrder,
     GenerationJob,
+    HeygenAvatar,
+    HeygenVoice,
     ImageTask,
     OutfitModel,
     PromptTemplate,
@@ -156,6 +158,47 @@ def product_catalog_payload(item: ProductCatalog) -> dict:
         "max_count": item.max_count,
         "enabled": item.enabled,
         "sort": item.sort,
+        "created_at": to_utc_iso(item.created_at),
+        "updated_at": to_utc_iso(item.updated_at),
+    }
+
+
+def heygen_avatar_payload(item: HeygenAvatar) -> dict:
+    return {
+        "id": item.id,
+        "avatar_id": item.avatar_id,
+        "group_id": item.group_id,
+        "name": item.name,
+        "avatar_type": item.avatar_type,
+        "ownership": item.ownership,
+        "gender": item.gender,
+        "default_voice_id": item.default_voice_id,
+        "preferred_orientation": item.preferred_orientation,
+        "preview_image_url": item.preview_image_url,
+        "preview_video_url": item.preview_video_url,
+        "status": item.status,
+        "supported_api_engines": parse_json_or_none(item.supported_api_engines_json) or [],
+        "tags": parse_json_or_none(item.tags_json) or [],
+        "sort_order": item.sort_order,
+        "enabled": item.enabled,
+        "created_at": to_utc_iso(item.created_at),
+        "updated_at": to_utc_iso(item.updated_at),
+    }
+
+
+def heygen_voice_payload(item: HeygenVoice) -> dict:
+    return {
+        "id": item.id,
+        "voice_id": item.voice_id,
+        "name": item.name,
+        "gender": item.gender,
+        "language": item.language,
+        "voice_type": item.voice_type,
+        "preview_audio_url": item.preview_audio_url,
+        "support_locale": item.support_locale,
+        "support_pause": item.support_pause,
+        "sort_order": item.sort_order,
+        "enabled": item.enabled,
         "created_at": to_utc_iso(item.created_at),
         "updated_at": to_utc_iso(item.updated_at),
     }

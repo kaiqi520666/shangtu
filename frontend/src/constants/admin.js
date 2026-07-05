@@ -4,10 +4,13 @@ export const adminTabs = [
   { key: "orders", label: "订单", to: "/admin/orders" },
   { key: "transactions", label: "流水", to: "/admin/transactions" },
   { key: "imageTasks", label: "生成任务", to: "/admin/image-tasks" },
+  { key: "assets", label: "管理资产", to: "/admin/assets" },
   { key: "settings", label: "系统配置", to: "/admin/settings" },
   { key: "productCatalog", label: "商品目录", to: "/admin/product-catalog" },
   { key: "promptTemplates", label: "提示词", to: "/admin/prompt-templates" },
   { key: "outfitModels", label: "模特库", to: "/admin/outfit-models" },
+  { key: "heygenAvatars", label: "系统数字人", to: "/admin/heygen-avatars" },
+  { key: "heygenVoices", label: "系统声音", to: "/admin/heygen-voices" },
   { key: "auditLogs", label: "审计日志", to: "/admin/audit-logs" },
 ];
 
@@ -85,6 +88,9 @@ export const auditActionOptions = [
   { label: "新增系统模特", value: "create_outfit_model" },
   { label: "更新系统模特", value: "update_outfit_model" },
   { label: "删除系统模特", value: "delete_outfit_model" },
+  { label: "同步 HeyGen 资源", value: "sync_heygen_resources" },
+  { label: "更新系统数字人", value: "update_heygen_avatar" },
+  { label: "更新系统声音", value: "update_heygen_voice" },
 ];
 
 export const activeStatusOptions = [
@@ -186,6 +192,13 @@ export function activeStatusLabel(active) {
 export function auditActionLabel(action) {
   const match = auditActionOptions.find((option) => option.value === action);
   return match?.label || action || "-";
+}
+
+export function heygenAvatarEngineLabel(engine) {
+  if (engine === "avatar_iv") return "Avatar IV";
+  if (engine === "avatar_v") return "Avatar V";
+  if (engine === "avatar_iii") return "Avatar III";
+  return engine || "-";
 }
 
 export function totalPages(state) {
