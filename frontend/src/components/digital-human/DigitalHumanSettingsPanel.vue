@@ -40,64 +40,68 @@ const emit = defineEmits([
         <p class="mt-1 text-xs leading-relaxed text-slate-400">先选系统数字人和系统声音，后续这里会直接接入 HeyGen 出片。</p>
       </div>
 
-      <button
-        type="button"
-        class="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left transition-colors hover:border-primary/30 hover:bg-white"
-        @click="emit('open-avatar-picker')"
-      >
-        <span class="flex min-w-0 items-center gap-3">
-          <span class="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-primary/10 text-primary">
-            <img
-              v-if="selectedAvatar?.preview_image_url"
-              :src="selectedAvatar.preview_image_url"
-              class="h-full w-full object-cover"
-              alt="数字人缩略图"
-            />
-            <Bot v-else class="h-4.5 w-4.5" />
-          </span>
-          <span class="min-w-0">
-            <span class="block text-xs font-bold text-slate-800">选择数字人</span>
-            <span class="mt-0.5 block truncate text-xs text-slate-400">
-              {{ selectedAvatar?.name || "未选择系统数字人" }}
+      <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+        <button
+          type="button"
+          class="flex w-full items-center justify-between bg-slate-50 px-4 py-3 text-left transition-colors hover:bg-white"
+          @click="emit('open-avatar-picker')"
+        >
+          <span class="flex min-w-0 items-center gap-3">
+            <span class="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-primary/10 text-primary">
+              <img
+                v-if="selectedAvatar?.preview_image_url"
+                :src="selectedAvatar.preview_image_url"
+                class="h-full w-full object-cover"
+                alt="数字人缩略图"
+              />
+              <Bot v-else class="h-4.5 w-4.5" />
             </span>
-            <span v-if="selectedAvatar?.avatar_id" class="mt-1 block truncate text-[11px] text-slate-400">
-              {{ selectedAvatar.avatar_id }}
+            <span class="min-w-0">
+              <span class="block text-xs font-bold text-slate-800">选择数字人</span>
+              <span class="mt-0.5 block truncate text-xs text-slate-400">
+                {{ selectedAvatar?.name || "未选择系统数字人" }}
+              </span>
+              <span v-if="selectedAvatar?.avatar_id" class="mt-1 block truncate text-[11px] text-slate-400">
+                {{ selectedAvatar.avatar_id }}
+              </span>
             </span>
           </span>
-        </span>
-        <span class="text-xs font-medium text-primary">更换</span>
-      </button>
+          <span class="text-xs font-medium text-primary">更换</span>
+        </button>
 
-      <div v-if="selectedAvatar?.preview_image_url" class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-        <img :src="selectedAvatar.preview_image_url" class="h-40 w-full object-cover" alt="已选数字人预览" />
-      </div>
+        <div v-if="selectedAvatar?.preview_image_url" class="border-t border-slate-100 p-3">
+          <img :src="selectedAvatar.preview_image_url" class="h-40 w-full rounded-xl object-cover" alt="已选数字人预览" />
+        </div>
+      </section>
 
-      <button
-        type="button"
-        class="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left transition-colors hover:border-primary/30 hover:bg-white"
-        @click="emit('open-voice-picker')"
-      >
-        <span class="flex min-w-0 items-center gap-3">
-          <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-secondary/10 text-secondary">
-            <Mic2 class="h-4.5 w-4.5" />
-          </span>
-          <span class="min-w-0">
-            <span class="block text-xs font-bold text-slate-800">选择声音</span>
-            <span class="mt-0.5 block truncate text-xs text-slate-400">
-              {{ selectedVoice?.name || "未选择系统声音" }}
+      <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+        <button
+          type="button"
+          class="flex w-full items-center justify-between bg-slate-50 px-4 py-3 text-left transition-colors hover:bg-white"
+          @click="emit('open-voice-picker')"
+        >
+          <span class="flex min-w-0 items-center gap-3">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-secondary/10 text-secondary">
+              <Mic2 class="h-4.5 w-4.5" />
             </span>
-            <span v-if="selectedVoice?.language" class="mt-1 block truncate text-[11px] text-slate-400">
-              {{ selectedVoice.language }}
+            <span class="min-w-0">
+              <span class="block text-xs font-bold text-slate-800">选择声音</span>
+              <span class="mt-0.5 block truncate text-xs text-slate-400">
+                {{ selectedVoice?.name || "未选择系统声音" }}
+              </span>
+              <span v-if="selectedVoice?.language" class="mt-1 block truncate text-[11px] text-slate-400">
+                {{ selectedVoice.language }}
+              </span>
             </span>
           </span>
-        </span>
-        <span class="text-xs font-medium text-primary">更换</span>
-      </button>
+          <span class="text-xs font-medium text-primary">更换</span>
+        </button>
 
-      <div v-if="selectedVoice?.preview_audio_url" class="rounded-2xl border border-slate-200 bg-white p-3">
-        <p class="mb-2 text-[11px] font-bold text-slate-500">声音试听</p>
-        <audio :src="selectedVoice.preview_audio_url" controls preload="none" class="h-10 w-full"></audio>
-      </div>
+        <div v-if="selectedVoice?.preview_audio_url" class="border-t border-slate-100 p-3">
+          <p class="mb-2 text-[11px] font-bold text-slate-500">声音试听</p>
+          <audio :src="selectedVoice.preview_audio_url" controls preload="none" class="h-10 w-full"></audio>
+        </div>
+      </section>
     </section>
 
     <section class="space-y-4 border-b border-slate-100 p-5">
