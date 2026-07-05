@@ -1,6 +1,7 @@
 <script setup>
 import { toRefs } from "vue";
 import { Bot, Mic2, Sparkles } from "lucide-vue-next";
+import ImageUploader from "@/components/generation/image/ImageUploader.vue";
 import GeneratorActionFooter from "@/components/generation/workspace/GeneratorActionFooter.vue";
 import GeneratorSidePanelShell from "@/components/generation/workspace/GeneratorSidePanelShell.vue";
 import VideoQualitySelector from "@/components/product-video/VideoQualitySelector.vue";
@@ -33,6 +34,10 @@ const props = defineProps({
     type: Object,
     default: null,
   },
+  backgroundImages: {
+    type: Array,
+    default: () => [],
+  },
   generateDisabled: {
     type: Boolean,
     default: false,
@@ -55,11 +60,12 @@ const emit = defineEmits([
   "update:settings",
   "open-avatar-picker",
   "open-voice-picker",
+  "update:backgroundImages",
   "generate",
   "notify",
 ]);
 
-const { settings, selectedAvatar, selectedVoice } = toRefs(props);
+const { settings, selectedAvatar, selectedVoice, backgroundImages } = toRefs(props);
 
 function updateSettings(patch) {
   emit("update:settings", {
@@ -155,6 +161,22 @@ function getVoiceSpeedHint(speed) {
     </section>
 
     <section class="space-y-4 border-b border-slate-100 p-5">
+      <ImageUploader
+        :images="backgroundImages"
+        :main-index="0"
+        title="背景图"
+        :max-count="1"
+        add-text="添加图片"
+        hint-text="拖拽或点击"
+        alt-text="数字人背景图"
+        main-badge-text="背景"
+        limit-message="背景图只能上传 1 张"
+        :show-placeholders="false"
+        :show-main-action="false"
+        @update:images="emit('update:backgroundImages', $event)"
+        @notify="emit('notify', $event)"
+      />
+
       <label class="block">
         <span class="mb-1.5 block text-xs font-bold text-slate-800">口播文案</span>
         <textarea

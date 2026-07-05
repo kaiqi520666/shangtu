@@ -51,12 +51,17 @@ class DigitalHumanVoiceSettings(BaseModel):
     speed: float = 1.0
 
 
+class DigitalHumanBackground(BaseModel):
+    url: str
+
+
 class DigitalHumanGenerateRequest(BaseModel):
     job_id: str | None = None
     title: str | None = None
     avatar_id: str
     voice_id: str
     script: str
+    background: DigitalHumanBackground | None = None
     quality_tier: str = "standard"
     resolution: str = DEFAULT_RESOLUTION
     aspect_ratio: str = "9:16"
@@ -152,6 +157,7 @@ def _build_settings_snapshot(
     avatar: HeygenAvatar,
     voice: HeygenVoice,
     script: str,
+    background_url: str | None,
     quality_tier: str,
     resolution: str,
     aspect_ratio: str,
@@ -171,6 +177,7 @@ def _build_settings_snapshot(
             "voiceName": voice.name,
             "voiceLanguage": voice.language,
             "voicePreviewAudioUrl": voice.preview_audio_url,
+            "backgroundUrl": background_url,
             "script": script,
             "qualityTier": quality_tier,
             "resolution": resolution,
@@ -311,6 +318,7 @@ def _digital_human_task_payload(task: VideoTask) -> dict:
         "provider_task_id": task.provider_task_id,
         "avatar_id": scene.get("avatarId"),
         "voice_id": scene.get("voiceId"),
+        "background_url": scene.get("backgroundUrl"),
         "script": scene.get("script"),
         "quality_tier": scene.get("qualityTier"),
         "voice_settings": scene.get("voiceSettings") or {},
@@ -578,6 +586,7 @@ async def create_digital_human_task(
     avatar_id = _clean_text(req.avatar_id)
     voice_id = _clean_text(req.voice_id)
     script = _clean_text(req.script)
+    background_url = _clean_text(req.background.url if req.background else None) or None
     quality_tier = _clean_text(req.quality_tier) or "standard"
     resolution = _clean_text(req.resolution) or DEFAULT_RESOLUTION
     aspect_ratio = _clean_text(req.aspect_ratio) or "9:16"
@@ -614,6 +623,7 @@ async def create_digital_human_task(
         avatar=avatar,
         voice=voice,
         script=script,
+        background_url=background_url,
         quality_tier=quality_tier,
         resolution=resolution,
         aspect_ratio=aspect_ratio,
@@ -691,6 +701,7 @@ async def create_digital_human_task(
                 script=script,
                 voice_id=voice.voice_id,
                 engine_type=QUALITY_TIER_TO_ENGINE[quality_tier],
+                background_url=background_url,
                 voice_settings=voice_settings,
                 idempotency_key=task.id,
             )

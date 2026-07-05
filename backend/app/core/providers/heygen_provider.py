@@ -88,6 +88,7 @@ async def create_avatar_video(
     script: str,
     voice_id: str,
     engine_type: str,
+    background_url: str | None = None,
     voice_settings: dict[str, Any] | None = None,
     idempotency_key: str | None = None,
 ) -> dict[str, Any]:
@@ -102,6 +103,8 @@ async def create_avatar_video(
         "voice_id": voice_id,
         "engine": {"type": engine_type},
     }
+    if background_url:
+        payload["background"] = {"url": background_url}
     if voice_settings:
         payload["voice_settings"] = voice_settings
     response = await client.post(

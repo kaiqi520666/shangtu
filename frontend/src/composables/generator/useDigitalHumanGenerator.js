@@ -42,6 +42,7 @@ export function useDigitalHumanGenerator({ toast, confirm, onJobCreated } = {}) 
   const settings = reactive(createDefaultSettings());
   const selectedAvatar = ref(null);
   const selectedVoice = ref(null);
+  const backgroundImages = ref([]);
   const pricing = useDigitalHumanPricing();
 
   const cards = useGenerationCards({
@@ -85,6 +86,7 @@ export function useDigitalHumanGenerator({ toast, confirm, onJobCreated } = {}) 
       Object.assign(settings, createDefaultSettings());
       selectedAvatar.value = null;
       selectedVoice.value = null;
+      backgroundImages.value = [];
     },
     applyJobData(data) {
       restoreDigitalHumanJobData(data);
@@ -141,6 +143,9 @@ export function useDigitalHumanGenerator({ toast, confirm, onJobCreated } = {}) 
     Math.ceil(scriptLength.value / SCRIPT_CHARS_PER_SECOND),
   );
   const scriptExceeded = computed(() => scriptLength.value > MAX_SCRIPT_CHARS);
+  const backgroundUploading = computed(() =>
+    backgroundImages.value.some((item) => item?.uploading),
+  );
   const scriptMetaText = computed(() => {
     const durationText = estimatedDurationSeconds.value > 0 ? `，预计约 ${estimatedDurationSeconds.value} 秒` : "";
     return `已输入 ${scriptLength.value}/${MAX_SCRIPT_CHARS} 字${durationText}`;
@@ -150,6 +155,7 @@ export function useDigitalHumanGenerator({ toast, confirm, onJobCreated } = {}) 
     if (creatingBatch.value || generating.value) return false;
     if (!selectedAvatar.value?.avatar_id) return false;
     if (!selectedVoice.value?.voice_id) return false;
+    if (backgroundUploading.value) return false;
     if (scriptExceeded.value) return false;
     return Boolean((settings.script || "").trim());
   });
@@ -157,6 +163,7 @@ export function useDigitalHumanGenerator({ toast, confirm, onJobCreated } = {}) 
   const generateButtonText = computed(() => {
     if (creatingBatch.value) return "创建任务中...";
     if (generating.value) return "生成中...";
+    if (backgroundUploading.value) return "背景图上传中...";
     if (scriptExceeded.value) return "文案超过 5 分钟";
     return "生成视频";
   });
@@ -171,6 +178,10 @@ export function useDigitalHumanGenerator({ toast, confirm, onJobCreated } = {}) 
     toast?.info?.(message);
   }
 
+  function getBackgroundUrl() {
+    return backgroundImages.value[0]?.url || "";
+  }
+
   function buildSettingsSnapshot() {
     return createDigitalHumanSettingsSnapshot({
       avatarId: selectedAvatar.value?.avatar_id || "",
@@ -180,6 +191,7 @@ export function useDigitalHumanGenerator({ toast, confirm, onJobCreated } = {}) 
       voiceName: selectedVoice.value?.name || "",
       voiceLanguage: selectedVoice.value?.language || "",
       voicePreviewAudioUrl: selectedVoice.value?.preview_audio_url || "",
+      backgroundUrl: getBackgroundUrl(),
       script: settings.script,
       qualityTier: settings.qualityTier,
       resolution: settings.resolution,
@@ -201,6 +213,10 @@ export function useDigitalHumanGenerator({ toast, confirm, onJobCreated } = {}) 
     }
     if (!selectedVoice.value?.voice_id) {
       toast?.info?.("请先选择系统声音");
+      return;
+    }
+    if (backgroundUploading.value) {
+      toast?.info?.("背景图上传中，请稍后再生成");
       return;
     }
     if (!(settings.script || "").trim()) {
@@ -241,6 +257,11 @@ export function useDigitalHumanGenerator({ toast, confirm, onJobCreated } = {}) 
           avatar_id: selectedAvatar.value.avatar_id,
           voice_id: selectedVoice.value.voice_id,
           script: settings.script,
+          background: getBackgroundUrl()
+            ? {
+                url: getBackgroundUrl(),
+              }
+            : null,
           quality_tier: item.qualityTier,
           resolution: settings.resolution,
           aspect_ratio: settings.aspectRatio,
@@ -305,6 +326,21 @@ export function useDigitalHumanGenerator({ toast, confirm, onJobCreated } = {}) 
           preview_audio_url: scene.voicePreviewAudioUrl || "",
         }
       : null;
+    backgroundImages.value = scene.backgroundUrl
+      ? [
+          {
+            id: `background_${scene.backgroundUrl}`,
+            previewUrl: scene.backgroundUrl,
+            url: scene.backgroundUrl,
+            objectKey: "",
+            contentType: "",
+            size: 0,
+            uploading: false,
+            error: "",
+            source: "asset",
+          },
+        ]
+      : [];
   }
 
   async function removeCard(card) {
@@ -348,6 +384,7 @@ export function useDigitalHumanGenerator({ toast, confirm, onJobCreated } = {}) 
     settings,
     selectedAvatar,
     selectedVoice,
+    backgroundImages,
     currentJobId,
     currentTaskTitle,
     historyTasks,
