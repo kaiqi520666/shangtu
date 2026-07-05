@@ -13,6 +13,10 @@ export function useAdminHeygenResources({
   listApi,
   updateApi,
   syncApi,
+  defaultState = {},
+  buildFilters = (state) => ({
+    active: state.active || undefined,
+  }),
   loadErrorMessage,
   saveErrorMessage,
   syncErrorMessage,
@@ -26,6 +30,7 @@ export function useAdminHeygenResources({
   const { loadPage, applyFilter: applyPageFilter, changePage: changeAdminPage } = useAdminPageLoader(toast);
   const state = reactive(createAdminPageState({
     active: "",
+    ...defaultState,
   }));
   const editorOpen = ref(false);
   const editorSaving = ref(false);
@@ -36,9 +41,7 @@ export function useAdminHeygenResources({
     await loadPage(
       state,
       listApi,
-      {
-        active: state.active || undefined,
-      },
+      buildFilters(state),
       loadErrorMessage,
     );
   }

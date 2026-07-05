@@ -26,6 +26,9 @@ async def list_heygen_avatars(
     page: int = 1,
     page_size: int = 20,
     active: str | None = None,
+    gender: str | None = None,
+    orientation: str | None = None,
+    engine: str | None = None,
     keyword: str | None = None,
     current_admin: User = Depends(get_current_super_admin),
     db: AsyncSession = Depends(get_db),
@@ -35,6 +38,12 @@ async def list_heygen_avatars(
     conditions = []
     if active in {"true", "false"}:
         conditions.append(HeygenAvatar.enabled == (active == "true"))
+    if gender in {"male", "female"}:
+        conditions.append(func.lower(HeygenAvatar.gender) == gender)
+    if orientation in {"portrait", "landscape"}:
+        conditions.append(HeygenAvatar.preferred_orientation == orientation)
+    if engine in {"avatar_iii", "avatar_iv", "avatar_v"}:
+        conditions.append(HeygenAvatar.supported_api_engines_json.ilike(f'%"{engine}"%'))
     if keyword:
         like = f"%{keyword.strip()}%"
         conditions.append(
@@ -107,6 +116,10 @@ async def list_heygen_voices(
     page: int = 1,
     page_size: int = 20,
     active: str | None = None,
+    gender: str | None = None,
+    language: str | None = None,
+    support_locale: str | None = None,
+    support_pause: str | None = None,
     keyword: str | None = None,
     current_admin: User = Depends(get_current_super_admin),
     db: AsyncSession = Depends(get_db),
@@ -116,6 +129,17 @@ async def list_heygen_voices(
     conditions = []
     if active in {"true", "false"}:
         conditions.append(HeygenVoice.enabled == (active == "true"))
+    if gender in {"male", "female", "unknown"}:
+        conditions.append(func.lower(HeygenVoice.gender) == gender)
+    if language:
+        if language == "__multilingual__":
+            conditions.append(HeygenVoice.language == "Multilingual")
+        else:
+            conditions.append(HeygenVoice.language == language)
+    if support_locale in {"true", "false"}:
+        conditions.append(HeygenVoice.support_locale == (support_locale == "true"))
+    if support_pause in {"true", "false"}:
+        conditions.append(HeygenVoice.support_pause == (support_pause == "true"))
     if keyword:
         like = f"%{keyword.strip()}%"
         conditions.append(

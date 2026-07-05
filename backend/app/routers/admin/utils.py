@@ -186,12 +186,19 @@ def heygen_avatar_payload(item: HeygenAvatar) -> dict:
     }
 
 
+def _normalize_voice_gender(value: str | None) -> str:
+    gender = (value or "").strip().lower()
+    if gender in {"male", "female"}:
+        return gender
+    return "unknown"
+
+
 def heygen_voice_payload(item: HeygenVoice) -> dict:
     return {
         "id": item.id,
         "voice_id": item.voice_id,
         "name": item.name,
-        "gender": item.gender,
+        "gender": _normalize_voice_gender(item.gender),
         "language": item.language,
         "voice_type": item.voice_type,
         "preview_audio_url": item.preview_audio_url,

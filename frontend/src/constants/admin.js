@@ -99,6 +99,52 @@ export const activeStatusOptions = [
   { label: "停用", value: "false" },
 ];
 
+export const heygenGenderOptions = [
+  { label: "全部性别", value: "" },
+  { label: "女", value: "female" },
+  { label: "男", value: "male" },
+  { label: "未知", value: "unknown" },
+];
+
+export const heygenAvatarOrientationOptions = [
+  { label: "全部方向", value: "" },
+  { label: "竖版", value: "portrait" },
+  { label: "横版", value: "landscape" },
+];
+
+export const heygenAvatarEngineOptions = [
+  { label: "全部引擎", value: "" },
+  { label: "Avatar III", value: "avatar_iii" },
+  { label: "Avatar IV", value: "avatar_iv" },
+  { label: "Avatar V", value: "avatar_v" },
+];
+
+export const heygenVoiceLocaleOptions = [
+  { label: "全部 Locale", value: "" },
+  { label: "支持", value: "true" },
+  { label: "不支持", value: "false" },
+];
+
+export const heygenVoicePauseOptions = [
+  { label: "全部 Pause", value: "" },
+  { label: "支持", value: "true" },
+  { label: "不支持", value: "false" },
+];
+
+export const heygenVoiceLanguageOptions = [
+  { label: "全部语言", value: "" },
+  { label: "全球 / 多语种", value: "__multilingual__" },
+  { label: "英语", value: "English" },
+  { label: "中文", value: "Chinese" },
+  { label: "日语", value: "Japanese" },
+  { label: "韩语", value: "Korean" },
+  { label: "西班牙语", value: "Spanish" },
+  { label: "法语", value: "French" },
+  { label: "德语", value: "German" },
+  { label: "葡萄牙语", value: "Portuguese" },
+  { label: "阿拉伯语", value: "Arabic" },
+];
+
 export const promptPurposeOptions = [
   { label: "全部用途", value: "" },
   { label: "生图", value: "image_generate" },

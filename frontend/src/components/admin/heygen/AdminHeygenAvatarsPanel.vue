@@ -1,12 +1,16 @@
 <script setup>
-import { ExternalLink, LoaderCircle, RefreshCw } from "lucide-vue-next";
+import { ExternalLink, LoaderCircle, PlayCircle, RefreshCw } from "lucide-vue-next";
 import {
   activeStatusLabel,
   activeStatusOptions,
   formatTime,
+  heygenAvatarEngineOptions,
   heygenAvatarEngineLabel,
+  heygenAvatarOrientationOptions,
+  heygenGenderOptions,
 } from "@/constants/admin.js";
 import AppCheckbox from "@/components/ui/AppCheckbox.vue";
+import AppModal from "@/components/ui/AppModal.vue";
 import AppSelect from "@/components/ui/AppSelect.vue";
 import AdminPagination from "@/components/admin/AdminPagination.vue";
 
@@ -22,12 +26,24 @@ defineProps({
 });
 
 const emit = defineEmits(["apply-filter", "change-page", "edit", "toggle", "sync"]);
+
+const previewOpen = defineModel("previewOpen", { type: Boolean, default: false });
+const previewItem = defineModel("previewItem", { type: Object, default: null });
 </script>
 
 <template>
   <section class="space-y-4">
     <div class="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
       <input v-model="state.keyword" type="text" class="min-w-72 rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none" placeholder="搜索名称、avatar_id、group_id、默认声音" @keyup.enter="emit('apply-filter')" />
+      <div class="w-28">
+        <AppSelect v-model="state.gender" :options="heygenGenderOptions" @update:model-value="emit('apply-filter')" />
+      </div>
+      <div class="w-28">
+        <AppSelect v-model="state.orientation" :options="heygenAvatarOrientationOptions" @update:model-value="emit('apply-filter')" />
+      </div>
+      <div class="w-32">
+        <AppSelect v-model="state.engine" :options="heygenAvatarEngineOptions" @update:model-value="emit('apply-filter')" />
+      </div>
       <div class="w-32">
         <AppSelect v-model="state.active" :options="activeStatusOptions" @update:model-value="emit('apply-filter')" />
       </div>
@@ -66,10 +82,15 @@ const emit = defineEmits(["apply-filter", "change-page", "edit", "toggle", "sync
           </div>
           <div class="flex items-center justify-between gap-2 pt-1">
             <p class="text-[11px] text-slate-400">{{ formatTime(item.updated_at || item.created_at) }}</p>
-            <a v-if="item.preview_video_url" :href="item.preview_video_url" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:text-secondary">
-              预览视频
-              <ExternalLink class="h-3 w-3" />
-            </a>
+            <div class="flex items-center gap-2">
+              <button v-if="item.preview_video_url || item.preview_image_url" type="button" class="inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:text-secondary" @click="previewItem = item; previewOpen = true">
+                <PlayCircle class="h-3.5 w-3.5" />
+                预览
+              </button>
+              <a v-if="item.preview_video_url" :href="item.preview_video_url" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-400 hover:text-slate-600">
+                <ExternalLink class="h-3 w-3" />
+              </a>
+            </div>
           </div>
           <button type="button" class="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50" @click="emit('edit', item)">编辑</button>
         </div>
@@ -77,5 +98,24 @@ const emit = defineEmits(["apply-filter", "change-page", "edit", "toggle", "sync
     </div>
 
     <AdminPagination :state="state" @change-page="emit('change-page', $event)" />
+
+    <AppModal :open="previewOpen" title="数字人预览" panel-class="w-full max-w-3xl" @close="previewOpen = false">
+      <div v-if="previewItem" class="space-y-4 p-5">
+        <video
+          v-if="previewItem.preview_video_url"
+          :src="previewItem.preview_video_url"
+          class="max-h-[70vh] w-full rounded-xl bg-black object-contain"
+          controls
+          autoplay
+          playsinline
+        ></video>
+        <img
+          v-else-if="previewItem.preview_image_url"
+          :src="previewItem.preview_image_url"
+          class="max-h-[70vh] w-full rounded-xl bg-slate-100 object-contain"
+          alt="数字人预览"
+        />
+      </div>
+    </AppModal>
   </section>
 </template>

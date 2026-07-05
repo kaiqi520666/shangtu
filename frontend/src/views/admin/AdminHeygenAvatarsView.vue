@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted } from "vue";
+import { onMounted, ref } from "vue";
 import AdminHeygenAvatarsPanel from "@/components/admin/heygen/AdminHeygenAvatarsPanel.vue";
 import HeygenResourceEditorModal from "@/components/admin/heygen/HeygenResourceEditorModal.vue";
 import { useAdminHeygenAvatars } from "@/composables/admin/useAdminHeygenAvatars.js";
@@ -19,6 +19,8 @@ const {
   toggleItem,
   syncItems,
 } = useAdminHeygenAvatars();
+const previewOpen = ref(false);
+const previewItem = ref(null);
 
 onMounted(() => {
   loadItems();
@@ -29,6 +31,8 @@ onMounted(() => {
   <AdminHeygenAvatarsPanel
     :state="state"
     :syncing="syncing"
+    v-model:preview-open="previewOpen"
+    v-model:preview-item="previewItem"
     @apply-filter="applyFilter"
     @change-page="changePage"
     @edit="openEditModal"

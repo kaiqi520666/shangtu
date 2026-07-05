@@ -1,6 +1,14 @@
 <script setup>
 import { LoaderCircle, RefreshCw } from "lucide-vue-next";
-import { activeStatusLabel, activeStatusOptions, formatTime } from "@/constants/admin.js";
+import {
+  activeStatusLabel,
+  activeStatusOptions,
+  formatTime,
+  heygenGenderOptions,
+  heygenVoiceLanguageOptions,
+  heygenVoiceLocaleOptions,
+  heygenVoicePauseOptions,
+} from "@/constants/admin.js";
 import AppCheckbox from "@/components/ui/AppCheckbox.vue";
 import AppSelect from "@/components/ui/AppSelect.vue";
 import AdminPagination from "@/components/admin/AdminPagination.vue";
@@ -23,6 +31,18 @@ const emit = defineEmits(["apply-filter", "change-page", "edit", "toggle", "sync
   <section class="space-y-4">
     <div class="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
       <input v-model="state.keyword" type="text" class="min-w-72 rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none" placeholder="搜索名称、voice_id、语言" @keyup.enter="emit('apply-filter')" />
+      <div class="w-32">
+        <AppSelect v-model="state.language" :options="heygenVoiceLanguageOptions" @update:model-value="emit('apply-filter')" />
+      </div>
+      <div class="w-28">
+        <AppSelect v-model="state.gender" :options="heygenGenderOptions" @update:model-value="emit('apply-filter')" />
+      </div>
+      <div class="w-32">
+        <AppSelect v-model="state.support_locale" :options="heygenVoiceLocaleOptions" @update:model-value="emit('apply-filter')" />
+      </div>
+      <div class="w-32">
+        <AppSelect v-model="state.support_pause" :options="heygenVoicePauseOptions" @update:model-value="emit('apply-filter')" />
+      </div>
       <div class="w-32">
         <AppSelect v-model="state.active" :options="activeStatusOptions" @update:model-value="emit('apply-filter')" />
       </div>
