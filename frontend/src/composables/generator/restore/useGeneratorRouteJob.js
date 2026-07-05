@@ -1,7 +1,16 @@
 import { onMounted, watch } from "vue";
 import { deleteGenerationJob } from "@/api/generation.js";
 
-export function useGeneratorRouteJob({ generator, route, router, basePath, toast, confirm }) {
+export function useGeneratorRouteJob({
+  generator,
+  route,
+  router,
+  basePath,
+  toast,
+  confirm,
+  deleteMessage = "确定删除这个生成任务吗？已生成图片不会立即从存储中物理删除。",
+  deleteSuccessText = "任务已删除",
+} = {}) {
   async function openHistory() {
     generator.showHistoryDrawer.value = true;
     await generator.loadHistoryTasks();
@@ -39,7 +48,7 @@ export function useGeneratorRouteJob({ generator, route, router, basePath, toast
 
     const ok = await confirm.open({
       title: "删除任务",
-      message: "确定删除这个生成任务吗？已生成图片不会立即从存储中物理删除。",
+      message: deleteMessage,
       confirmText: "删除",
       cancelText: "取消",
       tone: "danger",
@@ -59,7 +68,7 @@ export function useGeneratorRouteJob({ generator, route, router, basePath, toast
         generator.resetWorkspaceToDraft();
         router.push(basePath);
       }
-      toast.success("任务已删除");
+      toast.success(deleteSuccessText);
     } catch {
       toast.error("删除失败，请稍后重试");
     }

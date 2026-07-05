@@ -68,6 +68,45 @@ export function createVideoSettingsSnapshot({
   });
 }
 
+export function createDigitalHumanSettingsSnapshot({
+  avatarId,
+  avatarName,
+  avatarPreviewImageUrl,
+  voiceId,
+  voiceName,
+  voiceLanguage,
+  voicePreviewAudioUrl,
+  script,
+  motionPrompt,
+  qualityTier,
+  resolution,
+  aspectRatio,
+  voiceSettings,
+} = {}) {
+  return createGenerationSettingsSnapshot({
+    scenario: "digital_human",
+    mediaType: "video",
+    language: voiceLanguage || "",
+    ratio: aspectRatio || "",
+    quality: resolution || "",
+    scene: {
+      avatarId,
+      avatarName,
+      avatarPreviewImageUrl,
+      voiceId,
+      voiceName,
+      voiceLanguage,
+      voicePreviewAudioUrl,
+      script,
+      motionPrompt,
+      qualityTier,
+      resolution,
+      aspectRatio,
+      voiceSettings: voiceSettings && typeof voiceSettings === "object" ? cloneSnapshotValue(voiceSettings) : {},
+    },
+  });
+}
+
 export function getSnapshotScene(snapshot) {
   return snapshot && typeof snapshot.scene === "object" && snapshot.scene !== null
     ? snapshot.scene

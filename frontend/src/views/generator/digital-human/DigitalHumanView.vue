@@ -1,30 +1,32 @@
 <script setup>
-import { reactive, ref } from "vue";
-import { Bot, Mic2, Sparkles, Video } from "lucide-vue-next";
+import { ref } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import AvatarPickerModal from "@/components/digital-human/AvatarPickerModal.vue";
 import DigitalHumanSettingsPanel from "@/components/digital-human/DigitalHumanSettingsPanel.vue";
 import VoicePickerModal from "@/components/digital-human/VoicePickerModal.vue";
+import GenerationHistoryDrawer from "@/components/generation/workspace/GenerationHistoryDrawer.vue";
+import GenerationPreviewModal from "@/components/generation/workspace/GenerationPreviewModal.vue";
+import GenerationWorkspace from "@/components/generation/workspace/GenerationWorkspace.vue";
 import GeneratorLayout from "@/components/layout/GeneratorLayout.vue";
+import { useDigitalHumanGenerator } from "@/composables/generator/useDigitalHumanGenerator.js";
+import { useGeneratorRouteJob } from "@/composables/generator/restore/useGeneratorRouteJob.js";
+import { useConfirm } from "@/composables/useConfirm.js";
 import { useToast } from "@/composables/useToast.js";
 
+const route = useRoute();
+const router = useRouter();
+const confirm = useConfirm();
 const toast = useToast();
-const settings = reactive({
-  script: "",
-  motionPrompt: "",
-  qualityTier: "standard",
-  resolution: "720p",
-  aspectRatio: "9:16",
-  voiceSpeed: 1,
+const digitalHuman = useDigitalHumanGenerator({
+  toast,
+  confirm,
+  onJobCreated(jobId) {
+    router.replace(`/generator/digital-human/${jobId}`);
+  },
 });
-
-const selectedAvatar = ref(null);
-const selectedVoice = ref(null);
+const zoomCard = ref(null);
 const avatarPickerOpen = ref(false);
 const voicePickerOpen = ref(false);
-
-function showNotice(message) {
-  toast.info(message);
-}
 
 function openAvatarPicker() {
   avatarPickerOpen.value = true;
@@ -35,131 +37,124 @@ function openVoicePicker() {
 }
 
 function handleAvatarConfirm(item) {
-  selectedAvatar.value = item;
+  digitalHuman.selectedAvatar.value = item;
 }
 
 function handleVoiceConfirm(item) {
-  selectedVoice.value = item;
+  digitalHuman.selectedVoice.value = item;
 }
 
-function formatResolution(value) {
-  return value === "1080p" ? "1080p · 高清成片" : "720p · 默认推荐";
+const { openHistory, pickHistory, handleCreateNewTask, handleDeleteJob } = useGeneratorRouteJob({
+  generator: digitalHuman,
+  route,
+  router,
+  basePath: "/generator/digital-human",
+  toast,
+  confirm,
+  deleteMessage: "确定删除这个生成任务吗？已生成视频不会立即从存储中物理删除。",
+});
+
+function openPreview(card) {
+  if (card.status !== "done" || !card.dataUrl) return;
+  zoomCard.value = card;
 }
 
-function formatVoiceSpeed(value) {
-  const speed = Number(value || 1).toFixed(1);
-  if (Number(value) <= 0.9) return `${speed}x · 偏慢`;
-  if (Number(value) >= 1.1) return `${speed}x · 偏快`;
-  return `${speed}x · 标准`;
+function closePreview() {
+  zoomCard.value = null;
+}
+
+function closeHistoryDrawer() {
+  digitalHuman.showHistoryDrawer.value = false;
 }
 </script>
 
 <template>
   <GeneratorLayout>
     <DigitalHumanSettingsPanel
-      :settings="settings"
-      :selected-avatar="selectedAvatar"
-      :selected-voice="selectedVoice"
-      @update:settings="Object.assign(settings, $event)"
+      :settings="digitalHuman.settings"
+      :selected-avatar="digitalHuman.selectedAvatar.value"
+      :selected-voice="digitalHuman.selectedVoice.value"
+      :generate-disabled="!digitalHuman.canGenerate.value"
+      :generate-text="digitalHuman.generateButtonText.value"
+      @update:settings="digitalHuman.updateSettings"
       @open-avatar-picker="openAvatarPicker"
       @open-voice-picker="openVoicePicker"
-      @notify="showNotice"
+      @generate="digitalHuman.generateDigitalHuman"
+      @notify="digitalHuman.showNotice"
     />
 
-    <section class="flex min-h-0 flex-1 flex-col overflow-hidden bg-slate-50">
-      <div class="border-b border-slate-200 bg-white px-6 py-4">
-        <h1 class="text-base font-black text-slate-900">数字人</h1>
-        <p class="mt-1 text-xs text-slate-400">选好数字人、声音和文案后，在这里生成视频。</p>
-      </div>
+    <GenerationWorkspace
+      :settings="digitalHuman.settings"
+      :current-task-title="digitalHuman.currentTaskTitle.value"
+      :output-cards="digitalHuman.outputCards.value"
+      :generating="digitalHuman.generating.value"
+      :creating-batch="digitalHuman.creatingBatch.value"
+      :generated-count="digitalHuman.generatedCount.value"
+      :running-count="digitalHuman.runningCount.value"
+      :failed-count="digitalHuman.failedCount.value"
+      :total-count="digitalHuman.jobTotal.value"
+      :job-total="digitalHuman.jobTotal.value"
+      :gen-logs="digitalHuman.genLogs.value"
+      :selected-cards-count="digitalHuman.selectedCardsCount.value"
+      :downloading="digitalHuman.downloading.value"
+      selected-image-label="数字人口播"
+      :get-module-name="digitalHuman.getDigitalHumanModuleName"
+      empty-title="数字人工作台"
+      empty-subtitle="选择数字人、声音和口播文案后，这里会显示生成进度和成片结果。"
+      :empty-slides="[]"
+      media-type="video"
+      media-unit="个"
+      loading-title="数字人视频生成中"
+      loading-description="正在提交 HeyGen 任务，稍后会在这里显示状态和成片结果。"
+      progress-text="正在生成数字人视频"
+      poll-hint="每 3 秒轮询任务状态"
+      :language="digitalHuman.voiceLanguage.value"
+      platform=""
+      @update:current-task-title="digitalHuman.updateCurrentJobTitle"
+      @select-all-cards="digitalHuman.toggleSelectAllCards"
+      @batch-download="digitalHuman.batchDownload"
+      @toggle-card="digitalHuman.toggleCardSelection"
+      @download-card="digitalHuman.downloadSingleVideo"
+      @zoom-card="openPreview"
+      @delete-card="digitalHuman.removeCard"
+      @create-new-task="handleCreateNewTask"
+      @open-history="openHistory"
+    />
 
-      <div class="flex-1 overflow-y-auto p-6">
-        <div class="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-          <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div class="flex items-center gap-2 text-slate-800">
-              <Video class="h-4.5 w-4.5 text-primary" />
-              <h2 class="text-sm font-black">生成工作区</h2>
-            </div>
-            <div class="mt-4 flex min-h-[420px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 text-center">
-              <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                <Bot class="h-6 w-6" />
-              </div>
-              <p class="mt-4 text-sm font-bold text-slate-800">数字人功能入口已就位</p>
-              <p class="mt-2 max-w-md text-xs leading-relaxed text-slate-400">这里接 HeyGen 生成、任务状态和成片结果。</p>
-            </div>
-          </section>
+    <GenerationHistoryDrawer
+      :open="digitalHuman.showHistoryDrawer.value"
+      :jobs="digitalHuman.historyTasks.value"
+      :loading="digitalHuman.historyLoading.value"
+      :current-job-id="digitalHuman.currentJobId.value"
+      empty-hint="点击「新建任务」开始生成数字人视频"
+      unit="个"
+      @close="closeHistoryDrawer"
+      @pick="pickHistory"
+      @delete="handleDeleteJob"
+    />
 
-          <section class="space-y-4">
-            <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div class="flex items-center gap-2 text-slate-800">
-                <Bot class="h-4.5 w-4.5 text-primary" />
-                <h2 class="text-sm font-black">当前数字人</h2>
-              </div>
-              <div v-if="selectedAvatar?.preview_image_url" class="mt-3 overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
-                <img :src="selectedAvatar.preview_image_url" class="h-36 w-full object-cover" alt="当前数字人预览" />
-              </div>
-              <p class="mt-3 text-xs font-medium text-slate-700">{{ selectedAvatar?.name || "暂未选择系统数字人" }}</p>
-              <p class="mt-1 text-xs text-slate-400">{{ selectedAvatar?.avatar_id || "选择后会在这里显示 avatar_id" }}</p>
-            </div>
-
-            <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div class="flex items-center gap-2 text-slate-800">
-                <Mic2 class="h-4.5 w-4.5 text-secondary" />
-                <h2 class="text-sm font-black">当前声音</h2>
-              </div>
-              <p class="mt-3 text-xs font-medium text-slate-700">{{ selectedVoice?.name || "暂未选择系统声音" }}</p>
-              <p class="mt-1 text-xs text-slate-400">{{ selectedVoice?.language || "选择后会在这里显示语言" }}</p>
-              <div v-if="selectedVoice?.preview_audio_url" class="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <audio :src="selectedVoice.preview_audio_url" controls preload="none" class="h-10 w-full"></audio>
-              </div>
-            </div>
-
-            <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div class="flex items-center gap-2 text-slate-800">
-                <Sparkles class="h-4.5 w-4.5 text-primary" />
-                <h2 class="text-sm font-black">当前设置</h2>
-              </div>
-              <dl class="mt-3 space-y-2 text-xs text-slate-500">
-                <div class="flex items-center justify-between gap-3">
-                  <dt>生成档位</dt>
-                  <dd class="font-medium text-slate-700">{{ settings.qualityTier === "premium" ? "高质档" : "标准档" }}</dd>
-                </div>
-                <div class="flex items-center justify-between gap-3">
-                  <dt>画面比例</dt>
-                  <dd class="font-medium text-slate-700">{{ settings.aspectRatio }}</dd>
-                </div>
-                <div class="flex items-center justify-between gap-3">
-                  <dt>视频清晰度</dt>
-                  <dd class="font-medium text-slate-700">{{ formatResolution(settings.resolution) }}</dd>
-                </div>
-                <div class="flex items-center justify-between gap-3">
-                  <dt>语速</dt>
-                  <dd class="font-medium text-slate-700">{{ formatVoiceSpeed(settings.voiceSpeed) }}</dd>
-                </div>
-                <div class="flex items-center justify-between gap-3">
-                  <dt>口播文案</dt>
-                  <dd class="font-medium text-slate-700">{{ settings.script ? "已填写" : "未填写" }}</dd>
-                </div>
-              </dl>
-            </div>
-          </section>
-        </div>
-      </div>
-    </section>
+    <GenerationPreviewModal
+      :card="zoomCard"
+      title="数字人视频预览"
+      alt="数字人视频预览"
+      media-type="video"
+      @close="closePreview"
+    />
 
     <AvatarPickerModal
       :open="avatarPickerOpen"
-      :selected-avatar="selectedAvatar"
+      :selected-avatar="digitalHuman.selectedAvatar.value"
       @close="avatarPickerOpen = false"
       @confirm="handleAvatarConfirm"
-      @notify="showNotice"
+      @notify="digitalHuman.showNotice"
     />
 
     <VoicePickerModal
       :open="voicePickerOpen"
-      :selected-voice="selectedVoice"
+      :selected-voice="digitalHuman.selectedVoice.value"
       @close="voicePickerOpen = false"
       @confirm="handleVoiceConfirm"
-      @notify="showNotice"
+      @notify="digitalHuman.showNotice"
     />
   </GeneratorLayout>
 </template>

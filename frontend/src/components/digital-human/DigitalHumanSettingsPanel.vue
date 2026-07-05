@@ -34,12 +34,21 @@ const props = defineProps({
     type: Object,
     default: null,
   },
+  generateDisabled: {
+    type: Boolean,
+    default: false,
+  },
+  generateText: {
+    type: String,
+    default: "生成视频",
+  },
 });
 
 const emit = defineEmits([
   "update:settings",
   "open-avatar-picker",
   "open-voice-picker",
+  "generate",
   "notify",
 ]);
 
@@ -209,11 +218,9 @@ function getVoiceSpeedHint(speed) {
 
     <template #footer>
       <GeneratorActionFooter
-        primary-text="下一步接入生成链路"
-        :primary-disabled="false"
-        secondary-text="保存草稿"
-        @primary="emit('notify', 'HeyGen 任务创建和结果轮询将在下一步接入')"
-        @secondary="emit('notify', '草稿保存会在后续版本开放')"
+        :primary-text="generateText"
+        :primary-disabled="generateDisabled"
+        @primary="emit('generate')"
       >
         <template #primary-icon>
           <Sparkles class="h-4 w-4" />

@@ -19,3 +19,11 @@ export function getDigitalHumanTask(taskId) {
 export function pollDigitalHumanTask(taskId) {
   return request.get(`/digital-human/tasks/${taskId}/poll`, { timeout: 15000 });
 }
+
+export function deleteDigitalHumanTask(taskId) {
+  return request.delete(`/digital-human/tasks/${taskId}`, { timeout: 15000 });
+}
+
+export function getDigitalHumanDownloadUrl(taskId) {
+  return `${request.defaults.baseURL}/digital-human/tasks/${taskId}/download`;
+}

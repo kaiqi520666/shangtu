@@ -4,6 +4,7 @@ import uuid
 
 import httpx
 from fastapi import APIRouter, Depends
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -100,6 +101,50 @@ def _normalize_voice_speed(value: float | int | None) -> float:
     if speed <= 0:
         return 1.0
     return round(speed, 2)
+
+
+def _snapshot_scene(snapshot: dict | None) -> dict:
+    if not isinstance(snapshot, dict):
+        return {}
+    scene = snapshot.get("scene")
+    if isinstance(scene, dict):
+        return scene
+    return {}
+
+
+def _build_settings_snapshot(
+    *,
+    avatar: HeygenAvatar,
+    voice: HeygenVoice,
+    script: str,
+    motion_prompt: str | None,
+    quality_tier: str,
+    resolution: str,
+    aspect_ratio: str,
+    voice_settings: dict,
+) -> dict:
+    return {
+        "scenario": "digital_human",
+        "media_type": "video",
+        "language": voice.language or "",
+        "ratio": aspect_ratio,
+        "quality": resolution,
+        "scene": {
+            "avatarId": avatar.avatar_id,
+            "avatarName": avatar.name,
+            "avatarPreviewImageUrl": avatar.preview_image_url,
+            "voiceId": voice.voice_id,
+            "voiceName": voice.name,
+            "voiceLanguage": voice.language,
+            "voicePreviewAudioUrl": voice.preview_audio_url,
+            "script": script,
+            "motionPrompt": motion_prompt,
+            "qualityTier": quality_tier,
+            "resolution": resolution,
+            "aspectRatio": aspect_ratio,
+            "voiceSettings": voice_settings,
+        },
+    }
 
 
 async def _get_enabled_avatar(db: AsyncSession, avatar_id: str) -> HeygenAvatar | None:
@@ -212,6 +257,7 @@ async def _sync_job_status(db: AsyncSession, job_id: str | None) -> None:
 
 def _digital_human_task_payload(task: VideoTask) -> dict:
     settings_snapshot = parse_json_or_none(task.settings_snapshot_json) or {}
+    scene = _snapshot_scene(settings_snapshot)
     runtime = project_task_runtime_state(
         "video",
         status=task.status,
@@ -230,12 +276,12 @@ def _digital_human_task_payload(task: VideoTask) -> dict:
         "title": task.title,
         "provider": task.provider,
         "provider_task_id": task.provider_task_id,
-        "avatar_id": settings_snapshot.get("avatar_id"),
-        "voice_id": settings_snapshot.get("voice_id"),
-        "script": settings_snapshot.get("script"),
-        "motion_prompt": settings_snapshot.get("motion_prompt"),
-        "quality_tier": settings_snapshot.get("quality_tier"),
-        "voice_settings": settings_snapshot.get("voice_settings") or {},
+        "avatar_id": scene.get("avatarId"),
+        "voice_id": scene.get("voiceId"),
+        "script": scene.get("script"),
+        "motion_prompt": scene.get("motionPrompt"),
+        "quality_tier": scene.get("qualityTier"),
+        "voice_settings": scene.get("voiceSettings") or {},
         "prompt": task.prompt,
         "prompt_snapshot": parse_prompt_snapshot(task.prompt_snapshot_json),
         "settings_snapshot": settings_snapshot,
@@ -443,19 +489,16 @@ async def create_digital_human_task(
         return fail("系统声音不存在或已停用")
 
     title = _clean_text(req.title) or _default_job_title(script)
-    settings_snapshot = {
-        "scenario": "digital_human",
-        "avatar_id": avatar.avatar_id,
-        "avatar_name": avatar.name,
-        "voice_id": voice.voice_id,
-        "voice_name": voice.name,
-        "script": script,
-        "motion_prompt": motion_prompt,
-        "quality_tier": quality_tier,
-        "resolution": resolution,
-        "aspect_ratio": aspect_ratio,
-        "voice_settings": voice_settings,
-    }
+    settings_snapshot = _build_settings_snapshot(
+        avatar=avatar,
+        voice=voice,
+        script=script,
+        motion_prompt=motion_prompt,
+        quality_tier=quality_tier,
+        resolution=resolution,
+        aspect_ratio=aspect_ratio,
+        voice_settings=voice_settings,
+    )
 
     job = await _get_or_create_job(
         db,
@@ -582,6 +625,63 @@ async def get_digital_human_task(
     if not task:
         return fail("数字人任务不存在")
     return success(_digital_human_task_payload(task))
+
+
+@router.delete("/tasks/{task_id}", response_model=Response)
+async def delete_digital_human_task(
+    task_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    task = await _get_task(db, task_id=task_id, user_id=current_user.id)
+    if not task:
+        return fail("数字人视频不存在")
+
+    task.archived = True
+    task.archived_at = utc_now()
+    await _sync_job_status(db, task.job_id)
+    try:
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        return fail("删除失败，请稍后重试")
+
+    return success({"task_id": task_id})
+
+
+@router.get("/tasks/{task_id}/download")
+async def download_digital_human_task(
+    task_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    task = await _get_task(db, task_id=task_id, user_id=current_user.id)
+    if not task or not task.result_url:
+        return fail("数字人视频不存在或尚未生成完成")
+
+    async def stream():
+        async with httpx.AsyncClient(timeout=60) as client:
+            async with client.stream("GET", task.result_url) as resp:
+                resp.raise_for_status()
+                async for chunk in resp.aiter_bytes(chunk_size=65536):
+                    yield chunk
+
+    url_lower = task.result_url.lower()
+    if url_lower.endswith(".webm"):
+        media_type = "video/webm"
+        ext = "webm"
+    elif url_lower.endswith(".mov"):
+        media_type = "video/quicktime"
+        ext = "mov"
+    else:
+        media_type = "video/mp4"
+        ext = "mp4"
+
+    return StreamingResponse(
+        stream(),
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{task_id}.{ext}"'},
+    )
 
 
 @router.get("/tasks/{task_id}/poll", response_model=Response)
