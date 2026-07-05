@@ -24,7 +24,7 @@ from app.core.system_settings import (
     get_effective_digital_human_precharge_costs,
 )
 from app.core.time import to_utc_iso, utc_now
-from app.core.user_credits import get_user_credits, refund_user_credits
+from app.core.user_credits import deduct_user_credits, get_user_credits, refund_user_credits
 from app.core.deps import get_current_user, get_db
 from app.core.task_timeout import project_task_runtime_state
 from app.models import GenerationJob, HeygenAvatar, HeygenVoice, User, VideoTask
@@ -126,6 +126,22 @@ def _snapshot_scene(snapshot: dict | None) -> dict:
     if isinstance(scene, dict):
         return scene
     return {}
+
+
+def _task_quality_tier(task: VideoTask) -> str:
+    quality_tier = _clean_text(task.type_id)
+    if quality_tier:
+        return quality_tier
+    scene = _snapshot_scene(parse_json_or_none(task.settings_snapshot_json))
+    return _clean_text(scene.get("qualityTier")) or "standard"
+
+
+def _should_sync_provider_task(task: VideoTask) -> bool:
+    if not task.provider_task_id:
+        return False
+    if task.status not in {"done", "failed", "timeout"}:
+        return True
+    return task.status == "done" and int(task.duration or 0) < 1
 
 
 def _build_settings_snapshot(
@@ -371,6 +387,8 @@ async def _sync_task_from_provider(db: AsyncSession, task: VideoTask) -> VideoTa
             task,
             note=f"数字人任务失败退回 · {task.id}",
         )
+    elif local_status == "done":
+        await _settle_task_credits_if_needed(db, task)
 
     await _sync_job_status(db, task.job_id)
     await db.commit()
@@ -389,6 +407,52 @@ async def _refund_task_credits_if_needed(
     refunded_credits = await refund_user_credits(db, task.user_id, int(task.credit_cost), note=note)
     task.credit_refunded = True
     return refunded_credits
+
+
+async def _settle_task_credits_if_needed(db: AsyncSession, task: VideoTask) -> bool:
+    if task.scenario != "digital_human" or task.status != "done" or task.credit_refunded:
+        return False
+
+    duration = int(task.duration or 0)
+    if duration < 1:
+        return False
+
+    try:
+        costs = await get_effective_digital_human_credit_costs(db)
+    except ValueError:
+        return False
+
+    quality_tier = _task_quality_tier(task)
+    per_second_cost = costs.get(quality_tier)
+    if per_second_cost is None:
+        return False
+
+    final_cost = int(per_second_cost) * duration
+    current_cost = int(task.credit_cost or 0)
+    delta = final_cost - current_cost
+    if delta == 0:
+        return False
+
+    if delta < 0:
+        await refund_user_credits(
+            db,
+            task.user_id,
+            abs(delta),
+            note=f"数字人结算退回 · {task.id}",
+        )
+        task.credit_cost = final_cost
+        return True
+
+    remaining_credits = await deduct_user_credits(
+        db,
+        task.user_id,
+        delta,
+        note=f"数字人结算补扣 · {task.id}",
+    )
+    if remaining_credits is None:
+        return False
+    task.credit_cost = final_cost
+    return True
 
 
 @router.get("/avatars", response_model=Response)
@@ -769,6 +833,17 @@ async def get_digital_human_task(
     task = await _get_task(db, task_id=task_id, user_id=current_user.id)
     if not task:
         return fail("数字人任务不存在")
+    if _should_sync_provider_task(task):
+        try:
+            task = await _sync_task_from_provider(db, task)
+        except httpx.HTTPError as exc:
+            return fail(parse_heygen_error_message(exc))
+        except Exception:
+            return fail("HeyGen 任务查询失败，请稍后重试")
+    if await _settle_task_credits_if_needed(db, task):
+        await _sync_job_status(db, task.job_id)
+        await db.commit()
+        await db.refresh(task)
     payload = _digital_human_task_payload(task)
     payload["credits"] = await get_user_credits(db, current_user.id)
     return success(payload)
@@ -840,7 +915,7 @@ async def poll_digital_human_task(
     task = await _get_task(db, task_id=task_id, user_id=current_user.id)
     if not task:
         return fail("数字人任务不存在")
-    if task.provider_task_id and task.status not in {"done", "failed", "timeout"}:
+    if _should_sync_provider_task(task):
         try:
             task = await _sync_task_from_provider(db, task)
         except ValueError as exc:
@@ -854,6 +929,10 @@ async def poll_digital_human_task(
             return fail(parse_heygen_error_message(exc))
         except Exception:
             return fail("HeyGen 任务查询失败，请稍后重试")
+    elif await _settle_task_credits_if_needed(db, task):
+        await _sync_job_status(db, task.job_id)
+        await db.commit()
+        await db.refresh(task)
     payload = _digital_human_task_payload(task)
     payload["credits"] = await get_user_credits(db, current_user.id)
     return success(payload)
