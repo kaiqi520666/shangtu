@@ -8,8 +8,6 @@ import AppModal from "@/components/ui/AppModal.vue";
 import AppSelect from "@/components/ui/AppSelect.vue";
 import { useHeygenResourcePicker } from "@/composables/digital-human/useHeygenResourcePicker.js";
 import {
-  heygenAvatarEngineLabel,
-  heygenAvatarEngineOptions,
   heygenAvatarOrientationOptions,
   heygenGenderOptions,
 } from "@/constants/admin.js";
@@ -41,7 +39,6 @@ const picker = useHeygenResourcePicker({
   defaultFilters: {
     gender: "",
     orientation: "",
-    engine: "",
   },
   buildParams: ({ page, pageSize, keyword, filters }) => ({
     page,
@@ -49,7 +46,6 @@ const picker = useHeygenResourcePicker({
     keyword: keyword || undefined,
     gender: filters.gender || undefined,
     orientation: filters.orientation || undefined,
-    engine: filters.engine || undefined,
   }),
 });
 
@@ -140,9 +136,6 @@ function confirmSelection() {
       </div>
       <div class="w-28">
         <AppSelect v-model="picker.filters.orientation" :options="heygenAvatarOrientationOptions" @update:model-value="applyFilters" />
-      </div>
-      <div class="w-32">
-        <AppSelect v-model="picker.filters.engine" :options="heygenAvatarEngineOptions" @update:model-value="applyFilters" />
       </div>
     </template>
 
