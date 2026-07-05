@@ -88,7 +88,6 @@ async def create_avatar_video(
     script: str,
     voice_id: str,
     engine_type: str,
-    motion_prompt: str | None = None,
     voice_settings: dict[str, Any] | None = None,
     idempotency_key: str | None = None,
 ) -> dict[str, Any]:
@@ -103,8 +102,6 @@ async def create_avatar_video(
         "voice_id": voice_id,
         "engine": {"type": engine_type},
     }
-    if motion_prompt:
-        payload["motion_prompt"] = motion_prompt
     if voice_settings:
         payload["voice_settings"] = voice_settings
     response = await client.post(

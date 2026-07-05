@@ -19,7 +19,6 @@ import { useDigitalHumanPricing } from "@/composables/digital-human/useDigitalHu
 
 const DEFAULT_SETTINGS = {
   script: "",
-  motionPrompt: "",
   qualityTier: "standard",
   resolution: "720p",
   aspectRatio: "9:16",
@@ -182,7 +181,6 @@ export function useDigitalHumanGenerator({ toast, confirm, onJobCreated } = {}) 
       voiceLanguage: selectedVoice.value?.language || "",
       voicePreviewAudioUrl: selectedVoice.value?.preview_audio_url || "",
       script: settings.script,
-      motionPrompt: settings.motionPrompt,
       qualityTier: settings.qualityTier,
       resolution: settings.resolution,
       aspectRatio: settings.aspectRatio,
@@ -243,7 +241,6 @@ export function useDigitalHumanGenerator({ toast, confirm, onJobCreated } = {}) 
           avatar_id: selectedAvatar.value.avatar_id,
           voice_id: selectedVoice.value.voice_id,
           script: settings.script,
-          motion_prompt: settings.motionPrompt || null,
           quality_tier: item.qualityTier,
           resolution: settings.resolution,
           aspect_ratio: settings.aspectRatio,
@@ -287,7 +284,6 @@ export function useDigitalHumanGenerator({ toast, confirm, onJobCreated } = {}) 
     const snapshot = data.settings || null;
     const scene = getSnapshotScene(snapshot);
     settings.script = data.input_text || scene.script || "";
-    settings.motionPrompt = scene.motionPrompt || "";
     settings.qualityTier = scene.qualityTier || "standard";
     settings.resolution = scene.resolution || snapshot?.quality || "720p";
     settings.aspectRatio = scene.aspectRatio || snapshot?.ratio || "9:16";

@@ -177,15 +177,6 @@ function getVoiceSpeedHint(speed) {
         </div>
       </label>
 
-      <label class="block">
-        <span class="mb-1.5 block text-xs font-bold text-slate-800">动作提示（可选）</span>
-        <textarea
-          :value="settings.motionPrompt"
-          class="h-24 w-full resize-none rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs leading-relaxed text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-primary focus:ring-1 focus:ring-primary"
-          placeholder="例如：自然挥手开场，手势克制，保持专业讲解状态..."
-          @input="updateSettings({ motionPrompt: $event.target.value })"
-        ></textarea>
-      </label>
     </section>
 
     <section class="space-y-4 p-5">

@@ -57,7 +57,6 @@ class DigitalHumanGenerateRequest(BaseModel):
     avatar_id: str
     voice_id: str
     script: str
-    motion_prompt: str | None = None
     quality_tier: str = "standard"
     resolution: str = DEFAULT_RESOLUTION
     aspect_ratio: str = "9:16"
@@ -153,7 +152,6 @@ def _build_settings_snapshot(
     avatar: HeygenAvatar,
     voice: HeygenVoice,
     script: str,
-    motion_prompt: str | None,
     quality_tier: str,
     resolution: str,
     aspect_ratio: str,
@@ -174,7 +172,6 @@ def _build_settings_snapshot(
             "voiceLanguage": voice.language,
             "voicePreviewAudioUrl": voice.preview_audio_url,
             "script": script,
-            "motionPrompt": motion_prompt,
             "qualityTier": quality_tier,
             "resolution": resolution,
             "aspectRatio": aspect_ratio,
@@ -315,7 +312,6 @@ def _digital_human_task_payload(task: VideoTask) -> dict:
         "avatar_id": scene.get("avatarId"),
         "voice_id": scene.get("voiceId"),
         "script": scene.get("script"),
-        "motion_prompt": scene.get("motionPrompt"),
         "quality_tier": scene.get("qualityTier"),
         "voice_settings": scene.get("voiceSettings") or {},
         "prompt": task.prompt,
@@ -582,7 +578,6 @@ async def create_digital_human_task(
     avatar_id = _clean_text(req.avatar_id)
     voice_id = _clean_text(req.voice_id)
     script = _clean_text(req.script)
-    motion_prompt = _clean_text(req.motion_prompt) or None
     quality_tier = _clean_text(req.quality_tier) or "standard"
     resolution = _clean_text(req.resolution) or DEFAULT_RESOLUTION
     aspect_ratio = _clean_text(req.aspect_ratio) or "9:16"
@@ -619,7 +614,6 @@ async def create_digital_human_task(
         avatar=avatar,
         voice=voice,
         script=script,
-        motion_prompt=motion_prompt,
         quality_tier=quality_tier,
         resolution=resolution,
         aspect_ratio=aspect_ratio,
@@ -668,7 +662,6 @@ async def create_digital_human_task(
         credit_cost=credit_cost,
         prompt_snapshot_json=dump_prompt_snapshot(
             build_prompt_snapshot(
-                task=motion_prompt,
                 user=script,
                 final=script,
             )
@@ -698,7 +691,6 @@ async def create_digital_human_task(
                 script=script,
                 voice_id=voice.voice_id,
                 engine_type=QUALITY_TIER_TO_ENGINE[quality_tier],
-                motion_prompt=motion_prompt,
                 voice_settings=voice_settings,
                 idempotency_key=task.id,
             )
