@@ -178,13 +178,6 @@ function confirmSelection() {
           </div>
 
           <p class="truncate text-[11px] text-slate-400" :title="item.avatar_id">avatar_id：{{ item.avatar_id }}</p>
-
-          <div class="flex flex-wrap gap-1">
-            <span v-for="engine in item.supported_api_engines" :key="engine" class="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500">
-              {{ heygenAvatarEngineLabel(engine) }}
-            </span>
-          </div>
-
           <div class="flex items-center justify-between gap-2 pt-1">
             <button
               v-if="item.preview_video_url || item.preview_image_url"
