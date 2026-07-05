@@ -89,6 +89,7 @@ async def create_avatar_video(
     voice_id: str,
     engine_type: str,
     motion_prompt: str | None = None,
+    voice_settings: dict[str, Any] | None = None,
     idempotency_key: str | None = None,
 ) -> dict[str, Any]:
     payload: dict[str, Any] = {
@@ -104,6 +105,8 @@ async def create_avatar_video(
     }
     if motion_prompt:
         payload["motion_prompt"] = motion_prompt
+    if voice_settings:
+        payload["voice_settings"] = voice_settings
     response = await client.post(
         f"{HEYGEN_BASE_URL}/v3/videos",
         headers=_request_headers(idempotency_key),

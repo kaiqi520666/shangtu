@@ -12,7 +12,9 @@ const settings = reactive({
   script: "",
   motionPrompt: "",
   qualityTier: "standard",
+  resolution: "1080p",
   aspectRatio: "9:16",
+  voiceSpeed: 1,
 });
 
 const selectedAvatar = ref(null);
@@ -115,6 +117,14 @@ function handleVoiceConfirm(item) {
                 <div class="flex items-center justify-between gap-3">
                   <dt>画面比例</dt>
                   <dd class="font-medium text-slate-700">{{ settings.aspectRatio }}</dd>
+                </div>
+                <div class="flex items-center justify-between gap-3">
+                  <dt>视频清晰度</dt>
+                  <dd class="font-medium text-slate-700">{{ settings.resolution }}</dd>
+                </div>
+                <div class="flex items-center justify-between gap-3">
+                  <dt>语速</dt>
+                  <dd class="font-medium text-slate-700">{{ settings.voiceSpeed }}x</dd>
                 </div>
                 <div class="flex items-center justify-between gap-3">
                   <dt>口播文案</dt>

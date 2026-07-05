@@ -31,7 +31,12 @@ QUALITY_TIER_TO_ENGINE = {
     "premium": "avatar_iv",
 }
 SUPPORTED_ASPECT_RATIOS = {"16:9", "9:16", "1:1"}
+SUPPORTED_RESOLUTIONS = {"720p", "1080p"}
 DEFAULT_RESOLUTION = "1080p"
+
+
+class DigitalHumanVoiceSettings(BaseModel):
+    speed: float = 1.0
 
 
 class DigitalHumanGenerateRequest(BaseModel):
@@ -42,7 +47,9 @@ class DigitalHumanGenerateRequest(BaseModel):
     script: str
     motion_prompt: str | None = None
     quality_tier: str = "standard"
+    resolution: str = DEFAULT_RESOLUTION
     aspect_ratio: str = "9:16"
+    voice_settings: DigitalHumanVoiceSettings | None = None
 
 
 def _clean_text(value: str | None) -> str:
@@ -83,6 +90,16 @@ def _task_progress_from_status(status: str) -> int:
     if status == "processing":
         return 65
     return 10
+
+
+def _normalize_voice_speed(value: float | int | None) -> float:
+    try:
+        speed = float(value or 1.0)
+    except (TypeError, ValueError):
+        return 1.0
+    if speed <= 0:
+        return 1.0
+    return round(speed, 2)
 
 
 async def _get_enabled_avatar(db: AsyncSession, avatar_id: str) -> HeygenAvatar | None:
@@ -218,6 +235,7 @@ def _digital_human_task_payload(task: VideoTask) -> dict:
         "script": settings_snapshot.get("script"),
         "motion_prompt": settings_snapshot.get("motion_prompt"),
         "quality_tier": settings_snapshot.get("quality_tier"),
+        "voice_settings": settings_snapshot.get("voice_settings") or {},
         "prompt": task.prompt,
         "prompt_snapshot": parse_prompt_snapshot(task.prompt_snapshot_json),
         "settings_snapshot": settings_snapshot,
@@ -398,7 +416,11 @@ async def create_digital_human_task(
     script = _clean_text(req.script)
     motion_prompt = _clean_text(req.motion_prompt) or None
     quality_tier = _clean_text(req.quality_tier) or "standard"
+    resolution = _clean_text(req.resolution) or DEFAULT_RESOLUTION
     aspect_ratio = _clean_text(req.aspect_ratio) or "9:16"
+    voice_settings = {
+        "speed": _normalize_voice_speed(req.voice_settings.speed if req.voice_settings else 1.0),
+    }
 
     if not avatar_id:
         return fail("请选择系统数字人")
@@ -408,6 +430,8 @@ async def create_digital_human_task(
         return fail("请输入口播文案")
     if quality_tier not in QUALITY_TIER_TO_ENGINE:
         return fail("不支持的生成档位")
+    if resolution not in SUPPORTED_RESOLUTIONS:
+        return fail("不支持的视频清晰度")
     if aspect_ratio not in SUPPORTED_ASPECT_RATIOS:
         return fail("不支持的视频比例")
 
@@ -428,7 +452,9 @@ async def create_digital_human_task(
         "script": script,
         "motion_prompt": motion_prompt,
         "quality_tier": quality_tier,
+        "resolution": resolution,
         "aspect_ratio": aspect_ratio,
+        "voice_settings": voice_settings,
     }
 
     job = await _get_or_create_job(
@@ -456,7 +482,7 @@ async def create_digital_human_task(
         input_video_url=None,
         audio_setting=None,
         duration=0,
-        resolution=DEFAULT_RESOLUTION,
+        resolution=resolution,
         aspect_ratio=aspect_ratio,
         status="pending",
         progress=10,
@@ -491,11 +517,12 @@ async def create_digital_human_task(
                 avatar_id=avatar.avatar_id,
                 title=title,
                 aspect_ratio=aspect_ratio,
-                resolution=DEFAULT_RESOLUTION,
+                resolution=resolution,
                 script=script,
                 voice_id=voice.voice_id,
                 engine_type=QUALITY_TIER_TO_ENGINE[quality_tier],
                 motion_prompt=motion_prompt,
+                voice_settings=voice_settings,
                 idempotency_key=task.id,
             )
         provider_task_id = _clean_text(str(provider_data.get("video_id") or ""))

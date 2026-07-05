@@ -8,6 +8,20 @@ const qualityOptions = [
   { value: "standard", label: "标准档" },
   { value: "premium", label: "高质档" },
 ];
+const resolutionOptions = [
+  { value: "720p", label: "720p" },
+  { value: "1080p", label: "1080p" },
+];
+const aspectRatioOptions = [
+  { value: "9:16", label: "9:16", description: "竖版口播" },
+  { value: "16:9", label: "16:9", description: "横版口播" },
+  { value: "1:1", label: "1:1", description: "方版口播" },
+];
+const voiceSpeedOptions = [
+  { value: 0.8, label: "0.8x" },
+  { value: 1, label: "1.0x" },
+  { value: 1.2, label: "1.2x" },
+];
 
 defineProps({
   settings: {
@@ -140,12 +154,18 @@ const emit = defineEmits([
         />
         <AppSelect
           :model-value="settings.aspectRatio"
-          :options="[
-            { value: '9:16', label: '9:16', description: '竖版口播' },
-            { value: '16:9', label: '16:9', description: '横版口播' },
-            { value: '1:1', label: '1:1', description: '方版口播' },
-          ]"
+          :options="aspectRatioOptions"
           @update:model-value="emit('update:settings', { ...settings, aspectRatio: $event })"
+        />
+        <AppSelect
+          :model-value="settings.resolution"
+          :options="resolutionOptions"
+          @update:model-value="emit('update:settings', { ...settings, resolution: $event })"
+        />
+        <AppSelect
+          :model-value="settings.voiceSpeed"
+          :options="voiceSpeedOptions"
+          @update:model-value="emit('update:settings', { ...settings, voiceSpeed: $event })"
         />
       </div>
     </section>
