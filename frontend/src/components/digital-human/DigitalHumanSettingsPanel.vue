@@ -9,8 +9,8 @@ import AppRangeCard from "@/components/ui/AppRangeCard.vue";
 import AppSelect from "@/components/ui/AppSelect.vue";
 
 const qualityOptions = [
-  { value: "standard", label: "标准档", description: "日常口播 · 2000积分" },
-  { value: "premium", label: "高质档", description: "更高表现力 · 5000积分" },
+  { value: "standard", label: "标准档", description: "日常口播 · 预扣 2000积分" },
+  { value: "premium", label: "高质档", description: "更高表现力 · 预扣 5000积分" },
 ];
 const aspectRatioOptions = [
   { value: "9:16", label: "9:16", description: "竖版口播" },
