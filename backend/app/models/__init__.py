@@ -2,6 +2,8 @@ from app.models.admin_audit_log import AdminAuditLog
 from app.models.credit_order import CreditOrder
 from app.models.credit_transaction import CreditTransaction
 from app.models.generation_job import GenerationJob
+from app.models.heygen_avatar import HeygenAvatar
+from app.models.heygen_voice import HeygenVoice
 from app.models.image_task import ImageTask
 from app.models.outfit_model import OutfitModel
 from app.models.product_catalog import ProductCatalog
@@ -15,6 +17,8 @@ __all__ = [
     "CreditOrder",
     "CreditTransaction",
     "GenerationJob",
+    "HeygenAvatar",
+    "HeygenVoice",
     "ImageTask",
     "OutfitModel",
     "ProductCatalog",
