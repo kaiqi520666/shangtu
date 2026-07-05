@@ -114,9 +114,6 @@ function getVoiceSpeedHint(speed) {
               <span class="mt-0.5 block truncate text-xs text-slate-400">
                 {{ selectedAvatar?.name || "未选择系统数字人" }}
               </span>
-              <span v-if="selectedAvatar?.avatar_id" class="mt-1 block truncate text-[11px] text-slate-400">
-                {{ selectedAvatar.avatar_id }}
-              </span>
             </span>
           </span>
           <span class="text-xs font-medium text-primary">更换</span>
