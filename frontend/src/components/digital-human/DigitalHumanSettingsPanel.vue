@@ -107,7 +107,6 @@ const emit = defineEmits([
     <section class="space-y-4 border-b border-slate-100 p-5">
       <div>
         <h2 class="text-sm font-black text-slate-900">口播内容</h2>
-        <p class="mt-1 text-xs text-slate-400">`口播文案` 用于脚本内容，`动作提示` 用于 motion prompt。</p>
       </div>
 
       <label class="block">
