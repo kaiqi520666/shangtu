@@ -12,11 +12,13 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.json_utils import dump_json_or_none, parse_json_or_none
-from app.core.oss import OssConfigError, upload_audio_bytes
+from app.core.oss import OssConfigError, upload_audio_bytes, upload_image_bytes
 from app.core.pagination import page_payload
 from app.core.prompt_snapshot import build_prompt_snapshot, dump_prompt_snapshot, parse_prompt_snapshot
 from app.core.providers.heygen_provider import (
+    create_photo_avatar,
     create_avatar_video,
+    get_avatar_look,
     get_video,
     parse_heygen_error_message,
 )
@@ -25,6 +27,7 @@ from app.core.system_settings import (
     get_effective_digital_human_credit_costs,
     get_effective_digital_human_precharge_cost,
     get_effective_digital_human_precharge_costs,
+    get_effective_photo_avatar_create_cost,
 )
 from app.core.time import to_utc_iso, utc_now
 from app.core.user_credits import (
@@ -34,7 +37,16 @@ from app.core.user_credits import (
 )
 from app.core.deps import get_current_user, get_db
 from app.core.task_timeout import project_task_runtime_state
-from app.models import GenerationJob, HeygenAvatar, HeygenVoice, User, UserAudioAsset, VideoTask
+from app.models import (
+    GenerationJob,
+    HeygenAvatar,
+    HeygenVoice,
+    User,
+    UserAudioAsset,
+    UserAvatar,
+    UserAvatarTask,
+    VideoTask,
+)
 from app.routers.admin.utils import heygen_avatar_payload, heygen_voice_payload
 from app.schemas.response import Response, fail, success
 from app.services.generation_tasks import deduct_credits_or_fail
@@ -48,6 +60,17 @@ QUALITY_TIER_TO_ENGINE = {
 SUPPORTED_ASPECT_RATIOS = {"16:9", "9:16", "1:1"}
 SUPPORTED_RESOLUTIONS = {"720p", "1080p"}
 DEFAULT_RESOLUTION = "1080p"
+PHOTO_AVATAR_TYPE = "photo"
+
+
+class ResolvedAvatar(BaseModel):
+    avatar_id: str
+    name: str
+    preview_image_url: str = ""
+    preview_video_url: str = ""
+    source: str = "system"
+    asset_id: str = ""
+    avatar_type: str = "studio_avatar"
 
 
 class DigitalHumanVoiceSettings(BaseModel):
@@ -141,6 +164,38 @@ def _clean_audio_asset_name(filename: str | None) -> str:
     return f"音频_{utc_now():%Y%m%d_%H%M%S}"
 
 
+def _clean_avatar_name(value: str | None, fallback: str = "照片数字人") -> str:
+    cleaned = str(value or "").strip()
+    if cleaned:
+        return cleaned[:120]
+    return fallback
+
+
+def _provider_avatar_status(
+    provider_status: str | None,
+    *,
+    failure_message: str | None = None,
+) -> str:
+    normalized = _clean_text(provider_status).lower()
+    if normalized in {"completed", "done", "success", "succeeded", "ready", "active"}:
+        return "done"
+    if normalized in {"failed", "error", "canceled", "cancelled"} or failure_message:
+        return "failed"
+    if normalized in {"pending", "queued", "processing", "rendering", "training", "in_progress"}:
+        return "processing" if normalized != "pending" else "pending"
+    return "processing"
+
+
+def _provider_avatar_progress(status: str) -> int:
+    if status == "done":
+        return 100
+    if status == "failed":
+        return 0
+    if status == "processing":
+        return 65
+    return 10
+
+
 def _digital_human_consume_note(*, quality_tier: str, title: str | None) -> str:
     quality_label = "高质档" if quality_tier == "premium" else "标准档"
     parts = ["数字人", quality_label]
@@ -175,6 +230,55 @@ def _audio_asset_payload(asset: UserAudioAsset) -> dict:
     }
 
 
+def _user_avatar_payload(asset: UserAvatar) -> dict:
+    return {
+        "id": asset.id,
+        "avatar_id": asset.heygen_avatar_id,
+        "asset_id": asset.id,
+        "name": asset.name,
+        "source": "photo",
+        "avatar_type": asset.avatar_type,
+        "preview_image_url": asset.preview_image_url or asset.source_image_url,
+        "preview_video_url": asset.preview_video_url,
+        "source_image_url": asset.source_image_url,
+        "status": asset.status,
+        "enabled": bool(asset.enabled),
+        "created_at": to_utc_iso(asset.created_at),
+        "updated_at": to_utc_iso(asset.updated_at),
+    }
+
+
+def _user_avatar_task_payload(
+    task: UserAvatarTask,
+    asset: UserAvatar | None = None,
+) -> dict:
+    preview_image_url = (
+        asset.preview_image_url if asset and asset.preview_image_url else task.source_image_url
+    )
+    preview_video_url = asset.preview_video_url if asset else ""
+    avatar_id = asset.heygen_avatar_id if asset else (task.provider_avatar_id or "")
+    return {
+        "id": task.id,
+        "name": task.name,
+        "avatar_type": task.avatar_type,
+        "status": task.status,
+        "progress": _provider_avatar_progress(task.status),
+        "error_message": task.error_message,
+        "source_image_url": task.source_image_url,
+        "preview_image_url": preview_image_url,
+        "preview_video_url": preview_video_url,
+        "provider": task.provider,
+        "provider_task_id": task.provider_task_id,
+        "provider_avatar_id": task.provider_avatar_id,
+        "avatar_id": avatar_id,
+        "result_avatar_id": task.result_avatar_id,
+        "credit_cost": int(task.credit_cost or 0),
+        "credit_refunded": bool(task.credit_refunded),
+        "created_at": to_utc_iso(task.created_at),
+        "updated_at": to_utc_iso(task.updated_at),
+    }
+
+
 def _task_quality_tier(task: VideoTask) -> str:
     quality_tier = _clean_text(task.type_id)
     if quality_tier:
@@ -193,7 +297,7 @@ def _should_sync_provider_task(task: VideoTask) -> bool:
 
 def _build_settings_snapshot(
     *,
-    avatar: HeygenAvatar,
+    avatar: ResolvedAvatar,
     voice: HeygenVoice | None,
     audio_asset: UserAudioAsset | None,
     script: str,
@@ -214,6 +318,10 @@ def _build_settings_snapshot(
             "avatarId": avatar.avatar_id,
             "avatarName": avatar.name,
             "avatarPreviewImageUrl": avatar.preview_image_url,
+            "avatarPreviewVideoUrl": avatar.preview_video_url,
+            "avatarSource": avatar.source,
+            "avatarAssetId": avatar.asset_id,
+            "avatarType": avatar.avatar_type,
             "audioMode": audio_mode,
             "voiceId": voice.voice_id if voice else "",
             "voiceName": voice.name if voice else "",
@@ -243,6 +351,78 @@ async def _get_enabled_avatar(db: AsyncSession, avatar_id: str) -> HeygenAvatar 
     return result.scalar_one_or_none()
 
 
+async def _get_enabled_user_avatar(
+    db: AsyncSession,
+    *,
+    avatar_id: str,
+    user_id: int,
+) -> UserAvatar | None:
+    result = await db.execute(
+        select(UserAvatar).where(
+            UserAvatar.user_id == user_id,
+            UserAvatar.heygen_avatar_id == avatar_id,
+            UserAvatar.enabled == True,  # noqa: E712
+            UserAvatar.status == "active",
+            UserAvatar.archived_at.is_(None),
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+async def _get_photo_avatar_asset(
+    db: AsyncSession,
+    *,
+    asset_id: str,
+    user_id: int,
+) -> UserAvatar | None:
+    result = await db.execute(
+        select(UserAvatar).where(
+            UserAvatar.id == asset_id,
+            UserAvatar.user_id == user_id,
+            UserAvatar.enabled == True,  # noqa: E712
+            UserAvatar.status == "active",
+            UserAvatar.archived_at.is_(None),
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+async def _resolve_avatar(
+    db: AsyncSession,
+    *,
+    avatar_id: str,
+    user_id: int,
+) -> ResolvedAvatar | None:
+    user_avatar = await _get_enabled_user_avatar(
+        db,
+        avatar_id=avatar_id,
+        user_id=user_id,
+    )
+    if user_avatar:
+        return ResolvedAvatar(
+            avatar_id=user_avatar.heygen_avatar_id,
+            name=user_avatar.name,
+            preview_image_url=user_avatar.preview_image_url or user_avatar.source_image_url or "",
+            preview_video_url=user_avatar.preview_video_url or "",
+            source="photo",
+            asset_id=user_avatar.id,
+            avatar_type=user_avatar.avatar_type,
+        )
+
+    avatar = await _get_enabled_avatar(db, avatar_id)
+    if not avatar:
+        return None
+    return ResolvedAvatar(
+        avatar_id=avatar.avatar_id,
+        name=avatar.name,
+        preview_image_url=avatar.preview_image_url or "",
+        preview_video_url=avatar.preview_video_url or "",
+        source="system",
+        asset_id=avatar.id,
+        avatar_type=avatar.avatar_type,
+    )
+
+
 async def _get_enabled_voice(db: AsyncSession, voice_id: str) -> HeygenVoice | None:
     result = await db.execute(
         select(HeygenVoice).where(
@@ -268,6 +448,188 @@ async def _get_available_audio_asset(
         )
     )
     return result.scalar_one_or_none()
+
+
+async def _get_user_avatar_task(
+    db: AsyncSession,
+    *,
+    task_id: str,
+    user_id: int,
+) -> UserAvatarTask | None:
+    result = await db.execute(
+        select(UserAvatarTask).where(
+            UserAvatarTask.id == task_id,
+            UserAvatarTask.user_id == user_id,
+            UserAvatarTask.archived_at.is_(None),
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+async def _refund_user_avatar_task_if_needed(
+    db: AsyncSession,
+    task: UserAvatarTask,
+    *,
+    note: str,
+) -> int | None:
+    if task.credit_refunded or int(task.credit_cost or 0) <= 0:
+        return None
+    refunded_credits = await refund_user_credits(
+        db,
+        task.user_id,
+        int(task.credit_cost),
+        note=note,
+    )
+    task.credit_refunded = True
+    return refunded_credits
+
+
+async def _get_user_avatars_by_ids(
+    db: AsyncSession,
+    avatar_ids: list[str],
+) -> dict[str, UserAvatar]:
+    ids = [item for item in avatar_ids if item]
+    if not ids:
+        return {}
+    result = await db.execute(select(UserAvatar).where(UserAvatar.id.in_(ids)))
+    return {item.id: item for item in result.scalars().all()}
+
+
+def _extract_provider_avatar_identity(data: dict) -> tuple[str, str]:
+    look = data.get("avatar_item")
+    if not isinstance(look, dict):
+        look = data.get("avatar")
+    avatar_look_id = _clean_text(
+        str(
+            (look or {}).get("id")
+            or data.get("avatar_look_id")
+            or data.get("avatar_id")
+            or ""
+        )
+    )
+    avatar_group_id = _clean_text(
+        str(data.get("avatar_group_id") or data.get("group_id") or "")
+    )
+    return avatar_group_id, avatar_look_id
+
+
+def _extract_provider_avatar_urls(data: dict) -> tuple[str, str]:
+    preview_image_url = _clean_text(
+        str(
+            data.get("preview_image_url")
+            or data.get("image_url")
+            or data.get("thumbnail_url")
+            or ""
+        )
+    )
+    preview_video_url = _clean_text(
+        str(
+            data.get("preview_video_url")
+            or data.get("video_url")
+            or data.get("preview_url")
+            or ""
+        )
+    )
+    return preview_image_url, preview_video_url
+
+
+async def _upsert_user_avatar_from_task(
+    db: AsyncSession,
+    *,
+    task: UserAvatarTask,
+    heygen_avatar_id: str,
+    preview_image_url: str,
+    preview_video_url: str,
+) -> UserAvatar:
+    asset = None
+    if task.result_avatar_id:
+        asset = await db.get(UserAvatar, task.result_avatar_id)
+    if not asset:
+        result = await db.execute(
+            select(UserAvatar).where(
+                UserAvatar.user_id == task.user_id,
+                UserAvatar.heygen_avatar_id == heygen_avatar_id,
+            )
+        )
+        asset = result.scalar_one_or_none()
+    if not asset:
+        asset = UserAvatar(
+            user_id=task.user_id,
+            avatar_type=task.avatar_type,
+            name=task.name,
+            heygen_avatar_id=heygen_avatar_id,
+            preview_image_url=preview_image_url or task.source_image_url,
+            preview_video_url=preview_video_url or None,
+            source_image_url=task.source_image_url,
+            source_object_key=task.source_object_key,
+            status="active",
+            enabled=True,
+        )
+        db.add(asset)
+    else:
+        asset.avatar_type = task.avatar_type
+        asset.name = task.name
+        asset.heygen_avatar_id = heygen_avatar_id
+        asset.preview_image_url = preview_image_url or task.source_image_url
+        asset.preview_video_url = preview_video_url or None
+        asset.source_image_url = task.source_image_url
+        asset.source_object_key = task.source_object_key
+        asset.status = "active"
+        asset.enabled = True
+        asset.archived_at = None
+        asset.updated_at = utc_now()
+    return asset
+
+
+async def _sync_user_avatar_task_from_provider(
+    db: AsyncSession,
+    task: UserAvatarTask,
+) -> UserAvatarTask:
+    if not task.provider_avatar_id:
+        task.status = "failed"
+        task.error_message = "HeyGen 未返回照片数字人 ID"
+        await _refund_user_avatar_task_if_needed(
+            db,
+            task,
+            note=f"照片数字人创建失败退回 · {task.id}",
+        )
+        await db.commit()
+        await db.refresh(task)
+        return task
+
+    async with httpx.AsyncClient(timeout=60) as client:
+        data = await get_avatar_look(client, avatar_look_id=task.provider_avatar_id)
+
+    provider_status = _clean_text(str(data.get("status") or ""))
+    error_message = _clean_text(
+        str(data.get("error_message") or data.get("failure_reason") or data.get("message") or "")
+    ) or None
+    task.status = _provider_avatar_status(provider_status, failure_message=error_message)
+    task.error_message = error_message
+
+    if task.status == "done":
+        preview_image_url, preview_video_url = _extract_provider_avatar_urls(data)
+        heygen_avatar_id = _clean_text(str(data.get("id") or task.provider_avatar_id))
+        asset = await _upsert_user_avatar_from_task(
+            db,
+            task=task,
+            heygen_avatar_id=heygen_avatar_id,
+            preview_image_url=preview_image_url,
+            preview_video_url=preview_video_url,
+        )
+        await db.flush()
+        task.result_avatar_id = asset.id
+        task.error_message = None
+    elif task.status == "failed":
+        await _refund_user_avatar_task_if_needed(
+            db,
+            task,
+            note=f"照片数字人创建失败退回 · {task.id}",
+        )
+
+    await db.commit()
+    await db.refresh(task)
+    return task
 
 
 async def _get_or_create_job(
@@ -380,6 +742,9 @@ def _digital_human_task_payload(task: VideoTask) -> dict:
         "provider": task.provider,
         "provider_task_id": task.provider_task_id,
         "avatar_id": scene.get("avatarId"),
+        "avatar_source": scene.get("avatarSource") or "system",
+        "avatar_asset_id": scene.get("avatarAssetId"),
+        "avatar_type": scene.get("avatarType"),
         "audio_mode": scene.get("audioMode") or "platform",
         "voice_id": scene.get("voiceId"),
         "audio_asset_id": scene.get("audioAssetId"),
@@ -725,6 +1090,289 @@ async def delete_digital_human_audio_asset(
     return success({"id": audio_asset_id})
 
 
+@router.post("/photo-avatars/upload", response_model=Response)
+async def upload_photo_avatar(
+    file: UploadFile = File(...),
+    name: str = Form(...),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if not _clean_text(name):
+        return fail("请输入数字人名称")
+    avatar_name = _clean_avatar_name(name)
+    uploaded = None
+    detected_content_type = (file.content_type or "").strip()
+    if not detected_content_type and file.filename:
+        detected_content_type = mimetypes.guess_type(file.filename)[0] or ""
+
+    try:
+        content = await file.read()
+        uploaded = await upload_image_bytes(
+            user_id=current_user.id,
+            content=content,
+            content_type=detected_content_type,
+            source="photo-avatars",
+        )
+        credit_cost = await get_effective_photo_avatar_create_cost(db)
+    except (ValueError, OssConfigError) as exc:
+        await db.rollback()
+        return fail(str(exc))
+    except Exception:
+        await db.rollback()
+        return fail("照片上传失败，请稍后重试")
+    finally:
+        await file.close()
+
+    remaining_credits, fail_response = await deduct_credits_or_fail(
+        db,
+        current_user.id,
+        credit_cost,
+        note=f"照片数字人创建 · {avatar_name}",
+    )
+    if fail_response is not None:
+        return fail_response
+
+    task = UserAvatarTask(
+        user_id=current_user.id,
+        avatar_type=PHOTO_AVATAR_TYPE,
+        name=avatar_name,
+        source_image_url=uploaded.url,
+        source_object_key=uploaded.object_key,
+        provider="heygen",
+        status="pending",
+        credit_cost=credit_cost,
+        credit_refunded=False,
+    )
+    db.add(task)
+    try:
+        await db.commit()
+        await db.refresh(task)
+    except Exception:
+        await db.rollback()
+        return fail("照片数字人任务创建失败，请稍后重试")
+
+    try:
+        async with httpx.AsyncClient(timeout=60) as client:
+            provider_data = await create_photo_avatar(
+                client,
+                name=avatar_name,
+                image_url=uploaded.url,
+                idempotency_key=task.id,
+            )
+        provider_task_id, provider_avatar_id = _extract_provider_avatar_identity(provider_data)
+        if not provider_avatar_id:
+            raise ValueError("HeyGen 未返回照片数字人 ID")
+        task.provider_task_id = provider_task_id or provider_avatar_id
+        task.provider_avatar_id = provider_avatar_id
+        task.status = _provider_avatar_status(_clean_text(str(provider_data.get("status") or "")))
+        if task.status == "done":
+            preview_image_url, preview_video_url = _extract_provider_avatar_urls(provider_data)
+            asset = await _upsert_user_avatar_from_task(
+                db,
+                task=task,
+                heygen_avatar_id=provider_avatar_id,
+                preview_image_url=preview_image_url,
+                preview_video_url=preview_video_url,
+            )
+            await db.flush()
+            task.result_avatar_id = asset.id
+        elif task.status == "failed":
+            task.error_message = _clean_text(
+                str(
+                    provider_data.get("error_message")
+                    or provider_data.get("failure_reason")
+                    or provider_data.get("message")
+                    or ""
+                )
+            ) or "HeyGen 创建失败，请稍后重试"
+            await _refund_user_avatar_task_if_needed(
+                db,
+                task,
+                note=f"照片数字人创建失败退回 · {task.id}",
+            )
+        await db.commit()
+        await db.refresh(task)
+    except ValueError as exc:
+        task.status = "failed"
+        task.error_message = str(exc)
+        refunded_credits = await _refund_user_avatar_task_if_needed(
+            db,
+            task,
+            note=f"照片数字人创建失败退回 · {task.id}",
+        )
+        await db.commit()
+        return fail(
+            str(exc),
+            data={
+                "task_id": task.id,
+                "credits": refunded_credits if refunded_credits is not None else await get_user_credits(db, current_user.id),
+                "credit_cost": credit_cost,
+            },
+        )
+    except httpx.HTTPError as exc:
+        message = parse_heygen_error_message(exc)
+        task.status = "failed"
+        task.error_message = message
+        refunded_credits = await _refund_user_avatar_task_if_needed(
+            db,
+            task,
+            note=f"照片数字人创建失败退回 · {task.id}",
+        )
+        await db.commit()
+        return fail(
+            message,
+            data={
+                "task_id": task.id,
+                "credits": refunded_credits if refunded_credits is not None else await get_user_credits(db, current_user.id),
+                "credit_cost": credit_cost,
+            },
+        )
+    except Exception:
+        task.status = "failed"
+        task.error_message = "HeyGen 创建失败，请稍后重试"
+        refunded_credits = await _refund_user_avatar_task_if_needed(
+            db,
+            task,
+            note=f"照片数字人创建失败退回 · {task.id}",
+        )
+        await db.commit()
+        return fail(
+            "HeyGen 创建失败，请稍后重试",
+            data={
+                "task_id": task.id,
+                "credits": refunded_credits if refunded_credits is not None else await get_user_credits(db, current_user.id),
+                "credit_cost": credit_cost,
+            },
+        )
+
+    asset_map = await _get_user_avatars_by_ids(db, [task.result_avatar_id or ""])
+    payload = _user_avatar_task_payload(task, asset_map.get(task.result_avatar_id or ""))
+    payload["credits"] = await get_user_credits(db, current_user.id) if task.credit_refunded else remaining_credits
+    return success(payload)
+
+
+@router.get("/photo-avatars/tasks", response_model=Response)
+async def list_photo_avatar_tasks(
+    page: int = 1,
+    page_size: int = 12,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    page = max(1, page)
+    page_size = min(max(1, page_size), 50)
+    conditions = [
+        UserAvatarTask.user_id == current_user.id,
+        UserAvatarTask.archived_at.is_(None),
+        UserAvatarTask.avatar_type == PHOTO_AVATAR_TYPE,
+    ]
+
+    total_stmt = select(func.count()).select_from(UserAvatarTask)
+    data_stmt = select(UserAvatarTask).order_by(
+        UserAvatarTask.created_at.desc(),
+        UserAvatarTask.id.desc(),
+    )
+    for condition in conditions:
+        total_stmt = total_stmt.where(condition)
+        data_stmt = data_stmt.where(condition)
+
+    total = int((await db.execute(total_stmt)).scalar_one() or 0)
+    result = await db.execute(data_stmt.offset((page - 1) * page_size).limit(page_size))
+    tasks = result.scalars().all()
+    asset_map = await _get_user_avatars_by_ids(db, [item.result_avatar_id or "" for item in tasks])
+    items = [_user_avatar_task_payload(item, asset_map.get(item.result_avatar_id or "")) for item in tasks]
+    return success(page_payload(items, total, page, page_size))
+
+
+@router.get("/photo-avatars/tasks/{task_id}/poll", response_model=Response)
+async def poll_photo_avatar_task(
+    task_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    task = await _get_user_avatar_task(db, task_id=task_id, user_id=current_user.id)
+    if not task:
+        return fail("照片数字人任务不存在")
+    if task.status in {"pending", "processing"} or (task.status == "done" and not task.result_avatar_id):
+        try:
+            task = await _sync_user_avatar_task_from_provider(db, task)
+        except ValueError as exc:
+            task.status = "failed"
+            task.error_message = str(exc)
+            await _refund_user_avatar_task_if_needed(
+                db,
+                task,
+                note=f"照片数字人创建失败退回 · {task.id}",
+            )
+            await db.commit()
+            await db.refresh(task)
+        except httpx.HTTPError as exc:
+            return fail(parse_heygen_error_message(exc))
+        except Exception:
+            return fail("HeyGen 状态查询失败，请稍后重试")
+    asset_map = await _get_user_avatars_by_ids(db, [task.result_avatar_id or ""])
+    payload = _user_avatar_task_payload(task, asset_map.get(task.result_avatar_id or ""))
+    payload["credits"] = await get_user_credits(db, current_user.id)
+    return success(payload)
+
+
+@router.get("/photo-avatars", response_model=Response)
+async def list_photo_avatars(
+    page: int = 1,
+    page_size: int = 12,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    page = max(1, page)
+    page_size = min(max(1, page_size), 50)
+    conditions = [
+        UserAvatar.user_id == current_user.id,
+        UserAvatar.avatar_type == PHOTO_AVATAR_TYPE,
+        UserAvatar.enabled == True,  # noqa: E712
+        UserAvatar.status == "active",
+        UserAvatar.archived_at.is_(None),
+    ]
+
+    total_stmt = select(func.count()).select_from(UserAvatar)
+    data_stmt = select(UserAvatar).order_by(
+        UserAvatar.created_at.desc(),
+        UserAvatar.id.desc(),
+    )
+    for condition in conditions:
+        total_stmt = total_stmt.where(condition)
+        data_stmt = data_stmt.where(condition)
+
+    total = int((await db.execute(total_stmt)).scalar_one() or 0)
+    result = await db.execute(data_stmt.offset((page - 1) * page_size).limit(page_size))
+    items = [_user_avatar_payload(item) for item in result.scalars().all()]
+    return success(page_payload(items, total, page, page_size))
+
+
+@router.delete("/photo-avatars/{asset_id}", response_model=Response)
+async def delete_photo_avatar(
+    asset_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    asset = await _get_photo_avatar_asset(
+        db,
+        asset_id=asset_id,
+        user_id=current_user.id,
+    )
+    if not asset:
+        return fail("照片数字人不存在")
+
+    asset.enabled = False
+    asset.status = "deleted"
+    asset.archived_at = utc_now()
+    try:
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        return fail("删除失败，请稍后重试")
+
+    return success({"id": asset_id})
+
+
 @router.get("/config", response_model=Response)
 async def get_digital_human_config(
     current_user: User = Depends(get_current_user),
@@ -734,12 +1382,14 @@ async def get_digital_human_config(
     try:
         credit_costs = await get_effective_digital_human_credit_costs(db)
         precharge_costs = await get_effective_digital_human_precharge_costs(db)
+        photo_avatar_create_cost = await get_effective_photo_avatar_create_cost(db)
     except ValueError as exc:
         return fail(str(exc))
     return success(
         {
             "credit_costs": credit_costs,
             "precharge_costs": precharge_costs,
+            "photo_avatar_create_cost": photo_avatar_create_cost,
         }
     )
 
@@ -763,7 +1413,7 @@ async def create_digital_human_task(
     }
 
     if not avatar_id:
-        return fail("请选择系统数字人")
+        return fail("请选择数字人")
     if not voice_id and not audio_asset_id:
         return fail("请选择系统声音或上传音频")
     if voice_id and audio_asset_id:
@@ -775,9 +1425,9 @@ async def create_digital_human_task(
     if aspect_ratio not in SUPPORTED_ASPECT_RATIOS:
         return fail("不支持的视频比例")
 
-    avatar = await _get_enabled_avatar(db, avatar_id)
+    avatar = await _resolve_avatar(db, avatar_id=avatar_id, user_id=current_user.id)
     if not avatar:
-        return fail("系统数字人不存在或已停用")
+        return fail("数字人不存在或已停用")
     voice = None
     audio_asset = None
     audio_mode = "platform"

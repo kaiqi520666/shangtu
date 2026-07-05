@@ -106,7 +106,7 @@ function getVoiceSpeedHint(speed) {
     <section class="space-y-4 border-b border-slate-100 p-5">
       <div>
         <h2 class="text-sm font-black text-slate-900">数字人</h2>
-        <p class="mt-1 text-xs leading-relaxed text-slate-400">先选系统数字人和系统声音，然后生成视频</p>
+        <p class="mt-1 text-xs leading-relaxed text-slate-400">先选数字人和系统声音，然后生成视频</p>
       </div>
 
       <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
@@ -128,7 +128,10 @@ function getVoiceSpeedHint(speed) {
             <span class="min-w-0">
               <span class="block text-xs font-bold text-slate-800">选择数字人</span>
               <span class="mt-0.5 block truncate text-xs text-slate-400">
-                {{ selectedAvatar?.name || "未选择系统数字人" }}
+                {{ selectedAvatar?.name || "未选择数字人" }}
+              </span>
+              <span v-if="selectedAvatar?.source === 'photo'" class="mt-1 block truncate text-[11px] text-slate-400">
+                照片数字人
               </span>
             </span>
           </span>

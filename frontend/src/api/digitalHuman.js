@@ -4,6 +4,32 @@ export function getDigitalHumanAvatars(params = {}) {
   return request.get("/digital-human/avatars", { params, timeout: 15000 });
 }
 
+export function uploadPhotoAvatar({ file, name }) {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("name", name || "");
+  return request.post("/digital-human/photo-avatars/upload", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+    timeout: 60000,
+  });
+}
+
+export function getPhotoAvatarTasks(params = {}) {
+  return request.get("/digital-human/photo-avatars/tasks", { params, timeout: 15000 });
+}
+
+export function pollPhotoAvatarTask(taskId) {
+  return request.get(`/digital-human/photo-avatars/tasks/${taskId}/poll`, { timeout: 15000 });
+}
+
+export function getPhotoAvatars(params = {}) {
+  return request.get("/digital-human/photo-avatars", { params, timeout: 15000 });
+}
+
+export function deletePhotoAvatar(assetId) {
+  return request.delete(`/digital-human/photo-avatars/${assetId}`, { timeout: 15000 });
+}
+
 export function getDigitalHumanVoices(params = {}) {
   return request.get("/digital-human/voices", { params, timeout: 15000 });
 }

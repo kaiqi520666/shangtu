@@ -49,6 +49,16 @@ function hasSelectedAudio(selection) {
     : Boolean(selection.voice_id);
 }
 
+function buildAvatarSelection(avatar) {
+  if (!avatar?.avatar_id) return null;
+  return {
+    ...avatar,
+    source: avatar.source || avatar.avatarSource || "system",
+    asset_id: avatar.asset_id || avatar.avatarAssetId || "",
+    avatar_type: avatar.avatar_type || avatar.avatarType || "studio_avatar",
+  };
+}
+
 function buildPlatformVoiceSelection(voice) {
   if (!voice?.voice_id) return null;
   return {
@@ -220,6 +230,10 @@ export function useDigitalHumanGenerator({ toast, confirm, onJobCreated } = {}) 
       avatarId: selectedAvatar.value?.avatar_id || "",
       avatarName: selectedAvatar.value?.name || "",
       avatarPreviewImageUrl: selectedAvatar.value?.preview_image_url || "",
+      avatarPreviewVideoUrl: selectedAvatar.value?.preview_video_url || "",
+      avatarSource: selectedAvatar.value?.source || "system",
+      avatarAssetId: selectedAvatar.value?.asset_id || "",
+      avatarType: selectedAvatar.value?.avatar_type || "studio_avatar",
       audioMode: uploadAudioMode.value ? "upload" : "platform",
       voiceId: uploadAudioMode.value ? "" : selected?.voice_id || "",
       voiceName: uploadAudioMode.value ? "" : selected?.name || "",
@@ -248,7 +262,7 @@ export function useDigitalHumanGenerator({ toast, confirm, onJobCreated } = {}) 
       return;
     }
     if (!selectedAvatar.value?.avatar_id) {
-      toast?.info?.("请先选择系统数字人");
+      toast?.info?.("请先选择数字人");
       return;
     }
     if (!hasSelectedAudio(selectedVoice.value)) {
@@ -356,11 +370,15 @@ export function useDigitalHumanGenerator({ toast, confirm, onJobCreated } = {}) 
     settings.voiceSpeed = Number(scene.voiceSettings?.speed || 1);
 
     selectedAvatar.value = scene.avatarId
-      ? {
+      ? buildAvatarSelection({
           avatar_id: scene.avatarId,
           name: scene.avatarName || scene.avatarId,
           preview_image_url: scene.avatarPreviewImageUrl || "",
-        }
+          preview_video_url: scene.avatarPreviewVideoUrl || "",
+          source: scene.avatarSource || "system",
+          asset_id: scene.avatarAssetId || "",
+          avatar_type: scene.avatarType || "studio_avatar",
+        })
       : null;
 
     if ((scene.audioMode || "") === "upload" && scene.audioAssetId) {

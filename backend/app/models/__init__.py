@@ -11,6 +11,8 @@ from app.models.prompt_template import PromptTemplate
 from app.models.system_setting import SystemSetting
 from app.models.user import User
 from app.models.user_audio_asset import UserAudioAsset
+from app.models.user_avatar import UserAvatar
+from app.models.user_avatar_task import UserAvatarTask
 from app.models.video_task import VideoTask
 
 __all__ = [
@@ -27,5 +29,7 @@ __all__ = [
     "SystemSetting",
     "User",
     "UserAudioAsset",
+    "UserAvatar",
+    "UserAvatarTask",
     "VideoTask",
 ]

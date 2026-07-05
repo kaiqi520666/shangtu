@@ -125,6 +125,46 @@ async def create_avatar_video(
     return body["data"]
 
 
+async def create_photo_avatar(
+    client: httpx.AsyncClient,
+    *,
+    name: str,
+    image_url: str,
+    idempotency_key: str | None = None,
+) -> dict[str, Any]:
+    payload = {
+        "name": name,
+        "type": "photo",
+        "image_url": image_url,
+    }
+    response = await client.post(
+        f"{HEYGEN_BASE_URL}/v3/avatars",
+        headers=_request_headers(idempotency_key),
+        json=payload,
+    )
+    response.raise_for_status()
+    body = response.json()
+    if not isinstance(body, dict) or not isinstance(body.get("data"), dict):
+        raise ValueError("HeyGen 创建照片数字人返回格式不正确")
+    return body["data"]
+
+
+async def get_avatar_look(
+    client: httpx.AsyncClient,
+    *,
+    avatar_look_id: str,
+) -> dict[str, Any]:
+    response = await client.get(
+        f"{HEYGEN_BASE_URL}/v3/avatars/looks/{avatar_look_id}",
+        headers=_request_headers(),
+    )
+    response.raise_for_status()
+    body = response.json()
+    if not isinstance(body, dict) or not isinstance(body.get("data"), dict):
+        raise ValueError("HeyGen 照片数字人详情返回格式不正确")
+    return body["data"]
+
+
 async def get_video(
     client: httpx.AsyncClient,
     *,

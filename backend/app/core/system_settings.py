@@ -15,6 +15,7 @@ SETTING_IMAGE_CREDIT_COSTS = "image_credit_costs"
 SETTING_VIDEO_CREDIT_COSTS = "video_credit_costs"
 SETTING_DIGITAL_HUMAN_CREDIT_COSTS = "digital_human_credit_costs"
 SETTING_DIGITAL_HUMAN_PRECHARGE_COSTS = "digital_human_precharge_costs"
+SETTING_PHOTO_AVATAR_CREATE_COST = "photo_avatar_create_cost"
 SETTING_RECHARGE_PACKAGES = "credit_recharge_packages"
 
 DEFAULT_DIGITAL_HUMAN_CREDIT_COSTS = {
@@ -26,6 +27,8 @@ DEFAULT_DIGITAL_HUMAN_PRECHARGE_COSTS = {
     "standard": 2000,
     "premium": 5000,
 }
+
+DEFAULT_PHOTO_AVATAR_CREATE_COST = 2000
 
 DEFAULT_RECHARGE_PACKAGES: list[dict[str, Any]] = [
     {
@@ -201,6 +204,16 @@ def normalize_digital_human_precharge_costs(raw: dict[str, Any]) -> dict[str, in
     return costs
 
 
+def normalize_photo_avatar_create_cost(raw: Any) -> int:
+    try:
+        cost = int(raw)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("照片数字人创建收费必须是正整数") from exc
+    if cost < 1:
+        raise ValueError("照片数字人创建收费必须大于等于 1")
+    return cost
+
+
 async def get_setting(db: AsyncSession, key: str) -> SystemSetting | None:
     return await db.get(SystemSetting, key)
 
@@ -281,6 +294,14 @@ async def get_effective_digital_human_precharge_cost(
     return int(costs[normalized])
 
 
+async def get_effective_photo_avatar_create_cost(db: AsyncSession) -> int:
+    setting = await get_setting(db, SETTING_PHOTO_AVATAR_CREATE_COST)
+    if setting:
+        parsed = parse_json_or_none(setting.value_json)
+        return normalize_photo_avatar_create_cost(parsed)
+    return normalize_photo_avatar_create_cost(DEFAULT_PHOTO_AVATAR_CREATE_COST)
+
+
 async def get_effective_recharge_packages(
     db: AsyncSession,
     include_disabled: bool = False,
@@ -340,6 +361,11 @@ async def seed_default_billing_settings(
             SETTING_DIGITAL_HUMAN_PRECHARGE_COSTS,
             normalize_digital_human_precharge_costs(DEFAULT_DIGITAL_HUMAN_PRECHARGE_COSTS),
             "数字人预扣费配置",
+        ),
+        (
+            SETTING_PHOTO_AVATAR_CREATE_COST,
+            normalize_photo_avatar_create_cost(DEFAULT_PHOTO_AVATAR_CREATE_COST),
+            "照片数字人创建收费配置",
         ),
         (
             SETTING_RECHARGE_PACKAGES,

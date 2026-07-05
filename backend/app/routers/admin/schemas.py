@@ -38,6 +38,7 @@ class AdminSettingsRequest(BaseModel):
     video_credit_costs: dict[str, int]
     digital_human_credit_costs: dict[str, int]
     digital_human_precharge_costs: dict[str, int]
+    photo_avatar_create_cost: int
     recharge_packages: list[RechargePackageConfig]
 
 
