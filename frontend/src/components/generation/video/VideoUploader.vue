@@ -69,6 +69,25 @@ function releaseLocalPreview() {
   localPreviewUrl.value = "";
 }
 
+function readVideoDuration(url) {
+  return new Promise((resolve) => {
+    if (!url) {
+      resolve(0);
+      return;
+    }
+    const video = document.createElement("video");
+    video.preload = "metadata";
+    video.onloadedmetadata = () => {
+      const duration = Number.isFinite(video.duration) ? Math.ceil(video.duration) : 0;
+      video.removeAttribute("src");
+      video.load();
+      resolve(duration);
+    };
+    video.onerror = () => resolve(0);
+    video.src = url;
+  });
+}
+
 async function uploadSelectedFile(file) {
   if (!file.type.startsWith("video/")) {
     emit("notify", "请选择视频文件");
@@ -77,6 +96,7 @@ async function uploadSelectedFile(file) {
   const placeholder = makeLocalVideo(file);
   emit("update:video", placeholder);
   try {
+    const durationSeconds = await readVideoDuration(placeholder.previewUrl);
     const result = await uploadVideo(file);
     if (result.code !== 0) {
       emit("update:video", { ...placeholder, uploading: false, error: result.message || "视频上传失败" });
@@ -91,6 +111,7 @@ async function uploadSelectedFile(file) {
       objectKey: result.data.object_key,
       contentType: result.data.content_type,
       size: result.data.size,
+      durationSeconds,
     });
   } catch (error) {
     emit("update:video", { ...placeholder, uploading: false, error: "视频上传失败" });
@@ -110,10 +131,11 @@ function handleDrop(event) {
   if (file) uploadSelectedFile(file);
 }
 
-function addAssetVideo(assets) {
+async function addAssetVideo(assets) {
   const asset = assets[0];
   if (!asset?.url) return;
   releaseLocalPreview();
+  const durationSeconds = Number(asset.durationSeconds || asset.duration || 0) || await readVideoDuration(asset.url);
   emit("update:video", {
     id: `asset_${asset.taskId || asset.id}`,
     previewUrl: asset.url,
@@ -125,6 +147,7 @@ function addAssetVideo(assets) {
     error: "",
     source: "asset",
     assetTaskId: asset.taskId || asset.id,
+    durationSeconds,
   });
   assetPickerOpen.value = false;
 }

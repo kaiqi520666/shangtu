@@ -15,7 +15,7 @@ SETTING_IMAGE_CREDIT_COSTS = "image_credit_costs"
 SETTING_VIDEO_CREDIT_COSTS = "video_credit_costs"
 SETTING_DIGITAL_HUMAN_CREDIT_COSTS = "digital_human_credit_costs"
 SETTING_DIGITAL_HUMAN_PRECHARGE_COSTS = "digital_human_precharge_costs"
-SETTING_PHOTO_AVATAR_CREATE_COST = "photo_avatar_create_cost"
+SETTING_VIDEO_TRANSLATION_CREDIT_COSTS = "video_translation_credit_costs"
 SETTING_RECHARGE_PACKAGES = "credit_recharge_packages"
 
 DEFAULT_DIGITAL_HUMAN_CREDIT_COSTS = {
@@ -28,7 +28,10 @@ DEFAULT_DIGITAL_HUMAN_PRECHARGE_COSTS = {
     "premium": 5000,
 }
 
-DEFAULT_PHOTO_AVATAR_CREATE_COST = 2000
+DEFAULT_VIDEO_TRANSLATION_CREDIT_COSTS = {
+    "standard": 7,
+    "premium": 14,
+}
 
 DEFAULT_RECHARGE_PACKAGES: list[dict[str, Any]] = [
     {
@@ -152,6 +155,20 @@ def normalize_digital_human_credit_costs(raw: dict[str, Any]) -> dict[str, int]:
     return costs
 
 
+def normalize_video_translation_credit_costs(raw: dict[str, Any]) -> dict[str, int]:
+    costs: dict[str, int] = {}
+    for tier in DEFAULT_VIDEO_TRANSLATION_CREDIT_COSTS:
+        value = raw.get(tier)
+        try:
+            cost = int(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{tier} 视频翻译每秒扣费必须是正整数") from exc
+        if cost < 1:
+            raise ValueError(f"{tier} 视频翻译每秒扣费必须大于等于 1")
+        costs[tier] = cost
+    return costs
+
+
 def normalize_recharge_package(raw: dict[str, Any]) -> dict[str, Any]:
     package_id = str(raw.get("id") or "").strip()
     name = str(raw.get("name") or "").strip()
@@ -202,16 +219,6 @@ def normalize_digital_human_precharge_costs(raw: dict[str, Any]) -> dict[str, in
             raise ValueError(f"{tier} 预扣费必须大于等于 1")
         costs[tier] = cost
     return costs
-
-
-def normalize_photo_avatar_create_cost(raw: Any) -> int:
-    try:
-        cost = int(raw)
-    except (TypeError, ValueError) as exc:
-        raise ValueError("照片数字人创建收费必须是正整数") from exc
-    if cost < 1:
-        raise ValueError("照片数字人创建收费必须大于等于 1")
-    return cost
 
 
 async def get_setting(db: AsyncSession, key: str) -> SystemSetting | None:
@@ -282,6 +289,16 @@ async def get_effective_digital_human_precharge_costs(db: AsyncSession) -> dict[
     return normalize_digital_human_precharge_costs(DEFAULT_DIGITAL_HUMAN_PRECHARGE_COSTS)
 
 
+async def get_effective_video_translation_credit_costs(db: AsyncSession) -> dict[str, int]:
+    setting = await get_setting(db, SETTING_VIDEO_TRANSLATION_CREDIT_COSTS)
+    if setting:
+        parsed = parse_json_or_none(setting.value_json)
+        if not isinstance(parsed, dict):
+            raise ValueError("数据库中的视频翻译扣费配置不是有效对象")
+        return normalize_video_translation_credit_costs(parsed)
+    return normalize_video_translation_credit_costs(DEFAULT_VIDEO_TRANSLATION_CREDIT_COSTS)
+
+
 async def get_effective_digital_human_precharge_cost(
     db: AsyncSession,
     quality_tier: str | None,
@@ -292,14 +309,6 @@ async def get_effective_digital_human_precharge_cost(
         supported = " / ".join(DEFAULT_DIGITAL_HUMAN_PRECHARGE_COSTS.keys())
         raise ValueError(f"不支持的数字人档位：{quality_tier}，请选择 {supported}")
     return int(costs[normalized])
-
-
-async def get_effective_photo_avatar_create_cost(db: AsyncSession) -> int:
-    setting = await get_setting(db, SETTING_PHOTO_AVATAR_CREATE_COST)
-    if setting:
-        parsed = parse_json_or_none(setting.value_json)
-        return normalize_photo_avatar_create_cost(parsed)
-    return normalize_photo_avatar_create_cost(DEFAULT_PHOTO_AVATAR_CREATE_COST)
 
 
 async def get_effective_recharge_packages(
@@ -363,9 +372,9 @@ async def seed_default_billing_settings(
             "数字人预扣费配置",
         ),
         (
-            SETTING_PHOTO_AVATAR_CREATE_COST,
-            normalize_photo_avatar_create_cost(DEFAULT_PHOTO_AVATAR_CREATE_COST),
-            "照片数字人创建收费配置",
+            SETTING_VIDEO_TRANSLATION_CREDIT_COSTS,
+            normalize_video_translation_credit_costs(DEFAULT_VIDEO_TRANSLATION_CREDIT_COSTS),
+            "视频翻译每秒扣费配置",
         ),
         (
             SETTING_RECHARGE_PACKAGES,

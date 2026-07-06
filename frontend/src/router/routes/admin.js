@@ -66,6 +66,11 @@ export const adminRoutes = [
         component: () => import("@/views/admin/AdminHeygenVoicesView.vue"),
       },
       {
+        path: "heygen-translation-languages",
+        name: "admin-heygen-translation-languages",
+        component: () => import("@/views/admin/AdminHeygenTranslationLanguagesView.vue"),
+      },
+      {
         path: "audit-logs",
         name: "admin-audit-logs",
         component: () => import("@/views/admin/AdminAuditLogsView.vue"),

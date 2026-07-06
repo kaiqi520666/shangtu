@@ -39,6 +39,11 @@ export const generatorRoutes = [
     component: () => import("@/views/generator/digital-human/DigitalHumanView.vue"),
   },
   {
+    path: "/generator/video-translation/:jobId?",
+    name: "video-translation",
+    component: () => import("@/views/generator/video-translation/VideoTranslationView.vue"),
+  },
+  {
     path: "/generator/assets",
     name: "assets",
     component: () => import("@/views/assets/AssetLibraryView.vue"),

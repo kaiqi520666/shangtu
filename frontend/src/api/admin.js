@@ -108,3 +108,15 @@ export function updateAdminHeygenVoice(rowId, payload) {
 export function syncAdminHeygenResources() {
   return request.post("/admin/heygen-resources/sync", {}, { timeout: 120000 });
 }
+
+export function getAdminHeygenTranslationLanguages(params = {}) {
+  return request.get("/admin/heygen-translation-languages", { params, timeout: 15000 });
+}
+
+export function updateAdminHeygenTranslationLanguage(rowId, payload) {
+  return request.patch(`/admin/heygen-translation-languages/${rowId}`, payload, { timeout: 15000 });
+}
+
+export function syncAdminHeygenTranslationLanguages() {
+  return request.post("/admin/heygen-translation-languages/sync", {}, { timeout: 120000 });
+}

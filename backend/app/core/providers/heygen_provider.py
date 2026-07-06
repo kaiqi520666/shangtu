@@ -135,12 +135,10 @@ async def create_photo_avatar(
     payload = {
         "name": name,
         "type": "photo",
-        "reference_images": [
-            {
-                "type": "url",
-                "url": image_url,
-            }
-        ],
+        "file": {
+            "type": "url",
+            "url": image_url,
+        },
     }
     response = await client.post(
         f"{HEYGEN_BASE_URL}/v3/avatars",
@@ -151,6 +149,65 @@ async def create_photo_avatar(
     body = response.json()
     if not isinstance(body, dict) or not isinstance(body.get("data"), dict):
         raise ValueError("HeyGen 创建照片数字人返回格式不正确")
+    return body["data"]
+
+
+async def list_translation_languages(client: httpx.AsyncClient) -> list[str]:
+    response = await client.get(
+        f"{HEYGEN_BASE_URL}/v3/video-translations/languages",
+        headers=_request_headers(),
+    )
+    response.raise_for_status()
+    body = response.json()
+    if not isinstance(body, dict) or not isinstance(body.get("data"), dict):
+        raise ValueError("HeyGen 翻译语言返回格式不正确")
+    languages = body["data"].get("languages")
+    if not isinstance(languages, list):
+        raise ValueError("HeyGen 翻译语言缺少 data.languages")
+    return [str(item).strip() for item in languages if str(item or "").strip()]
+
+
+async def create_video_translation(
+    client: httpx.AsyncClient,
+    *,
+    video_url: str,
+    title: str,
+    output_language: str,
+    mode: str,
+    idempotency_key: str | None = None,
+) -> dict[str, Any]:
+    payload = {
+        "video_url": video_url,
+        "title": title,
+        "output_languages": [output_language],
+        "mode": mode,
+        "translate_audio_only": False,
+    }
+    response = await client.post(
+        f"{HEYGEN_BASE_URL}/v3/video-translations",
+        headers=_request_headers(idempotency_key),
+        json=payload,
+    )
+    response.raise_for_status()
+    body = response.json()
+    if not isinstance(body, dict) or not isinstance(body.get("data"), dict):
+        raise ValueError("HeyGen 创建视频翻译返回格式不正确")
+    return body["data"]
+
+
+async def get_video_translation(
+    client: httpx.AsyncClient,
+    *,
+    video_translation_id: str,
+) -> dict[str, Any]:
+    response = await client.get(
+        f"{HEYGEN_BASE_URL}/v3/video-translations/{video_translation_id}",
+        headers=_request_headers(),
+    )
+    response.raise_for_status()
+    body = response.json()
+    if not isinstance(body, dict) or not isinstance(body.get("data"), dict):
+        raise ValueError("HeyGen 视频翻译详情返回格式不正确")
     return body["data"]
 
 

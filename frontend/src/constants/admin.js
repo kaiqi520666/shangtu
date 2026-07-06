@@ -11,6 +11,7 @@ export const adminTabs = [
   { key: "outfitModels", label: "模特库", to: "/admin/outfit-models" },
   { key: "heygenAvatars", label: "系统数字人", to: "/admin/heygen-avatars" },
   { key: "heygenVoices", label: "系统声音", to: "/admin/heygen-voices" },
+  { key: "heygenTranslationLanguages", label: "翻译语言", to: "/admin/heygen-translation-languages" },
   { key: "auditLogs", label: "审计日志", to: "/admin/audit-logs" },
 ];
 
@@ -58,6 +59,8 @@ export const scenarioOptions = [
   { label: "自由生图", value: "free_image" },
   { label: "商品视频", value: "product_video" },
   { label: "自由生视频", value: "free_video" },
+  { label: "数字人", value: "digital_human" },
+  { label: "视频翻译", value: "video_translation" },
 ];
 
 export const taskMediaTypeOptions = [
@@ -89,8 +92,10 @@ export const auditActionOptions = [
   { label: "更新系统模特", value: "update_outfit_model" },
   { label: "删除系统模特", value: "delete_outfit_model" },
   { label: "同步 HeyGen 资源", value: "sync_heygen_resources" },
+  { label: "同步 HeyGen 翻译语言", value: "sync_heygen_translation_languages" },
   { label: "更新系统数字人", value: "update_heygen_avatar" },
   { label: "更新系统声音", value: "update_heygen_voice" },
+  { label: "更新翻译语言", value: "update_heygen_translation_language" },
 ];
 
 export const activeStatusOptions = [

@@ -38,7 +38,7 @@ class AdminSettingsRequest(BaseModel):
     video_credit_costs: dict[str, int]
     digital_human_credit_costs: dict[str, int]
     digital_human_precharge_costs: dict[str, int]
-    photo_avatar_create_cost: int
+    video_translation_credit_costs: dict[str, int]
     recharge_packages: list[RechargePackageConfig]
 
 
@@ -72,5 +72,11 @@ class ProductCatalogRequest(BaseModel):
 
 class UpdateHeygenResourceRequest(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=120)
+    sort_order: int | None = Field(default=None, ge=-100000, le=100000)
+    enabled: bool | None = None
+
+
+class UpdateHeygenTranslationLanguageRequest(BaseModel):
+    display_name_zh: str | None = Field(default=None, min_length=1, max_length=120)
     sort_order: int | None = Field(default=None, ge=-100000, le=100000)
     enabled: bool | None = None

@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 
 from app.core.database import Base, SessionLocal, engine
 from app.core.system_settings import seed_default_billing_settings
-from app.routers import account, admin, asset, auth, billing, digital_human, generation, image_generation, outfit, video
+from app.routers import account, admin, asset, auth, billing, digital_human, generation, image_generation, outfit, video, video_translation
 from app.schemas.response import fail
 import app.models
 
@@ -63,3 +63,4 @@ app.include_router(digital_human.router)
 app.include_router(asset.router)
 app.include_router(outfit.router)
 app.include_router(video.router)
+app.include_router(video_translation.router)

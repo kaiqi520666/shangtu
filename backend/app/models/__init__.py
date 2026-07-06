@@ -3,6 +3,7 @@ from app.models.credit_order import CreditOrder
 from app.models.credit_transaction import CreditTransaction
 from app.models.generation_job import GenerationJob
 from app.models.heygen_avatar import HeygenAvatar
+from app.models.heygen_translation_language import HeygenTranslationLanguage
 from app.models.heygen_voice import HeygenVoice
 from app.models.image_task import ImageTask
 from app.models.outfit_model import OutfitModel
@@ -21,6 +22,7 @@ __all__ = [
     "CreditTransaction",
     "GenerationJob",
     "HeygenAvatar",
+    "HeygenTranslationLanguage",
     "HeygenVoice",
     "ImageTask",
     "OutfitModel",

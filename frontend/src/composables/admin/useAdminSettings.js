@@ -6,8 +6,8 @@ import {
   defaultDigitalHumanCreditCosts,
   defaultDigitalHumanPrechargeCosts,
   defaultImageCreditCosts,
-  defaultPhotoAvatarCreateCost,
   defaultRechargePackage,
+  defaultVideoTranslationCreditCosts,
   defaultVideoCreditCosts,
 } from "@/constants/billing.js";
 
@@ -16,7 +16,7 @@ const settingsState = reactive({
   videoCreditCosts: { ...defaultVideoCreditCosts },
   digitalHumanCreditCosts: { ...defaultDigitalHumanCreditCosts },
   digitalHumanPrechargeCosts: { ...defaultDigitalHumanPrechargeCosts },
-  photoAvatarCreateCost: defaultPhotoAvatarCreateCost,
+  videoTranslationCreditCosts: { ...defaultVideoTranslationCreditCosts },
   rechargePackages: [],
   paymentConfig: {},
   loading: false,
@@ -48,9 +48,10 @@ export function useAdminSettings() {
         ...defaultDigitalHumanPrechargeCosts,
         ...result.data?.digital_human_precharge_costs,
       };
-      settingsState.photoAvatarCreateCost = Number(
-        result.data?.photo_avatar_create_cost || defaultPhotoAvatarCreateCost,
-      );
+      settingsState.videoTranslationCreditCosts = {
+        ...defaultVideoTranslationCreditCosts,
+        ...result.data?.video_translation_credit_costs,
+      };
       settingsState.rechargePackages = (result.data?.recharge_packages || []).map((item) => ({ ...item }));
       settingsState.paymentConfig = result.data?.payment_config || {};
     } catch {
@@ -96,7 +97,10 @@ export function useAdminSettings() {
           standard: Number(settingsState.digitalHumanPrechargeCosts.standard),
           premium: Number(settingsState.digitalHumanPrechargeCosts.premium),
         },
-        photo_avatar_create_cost: Number(settingsState.photoAvatarCreateCost),
+        video_translation_credit_costs: {
+          standard: Number(settingsState.videoTranslationCreditCosts.standard),
+          premium: Number(settingsState.videoTranslationCreditCosts.premium),
+        },
         recharge_packages: settingsState.rechargePackages.map((item) => ({
           id: String(item.id || "").trim(),
           name: String(item.name || "").trim(),

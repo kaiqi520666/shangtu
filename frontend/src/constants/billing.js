@@ -19,6 +19,11 @@ export const defaultDigitalHumanPrechargeCosts = {
   premium: 5000,
 };
 
+export const defaultVideoTranslationCreditCosts = {
+  standard: 7,
+  premium: 14,
+};
+
 export const defaultPhotoAvatarCreateCost = 2000;
 
 export const defaultRechargePackage = {

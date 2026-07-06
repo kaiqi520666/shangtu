@@ -13,6 +13,7 @@ from app.models import (
     CreditOrder,
     GenerationJob,
     HeygenAvatar,
+    HeygenTranslationLanguage,
     HeygenVoice,
     ImageTask,
     OutfitModel,
@@ -206,6 +207,20 @@ def heygen_voice_payload(item: HeygenVoice) -> dict:
         "support_pause": item.support_pause,
         "sort_order": item.sort_order,
         "enabled": item.enabled,
+        "created_at": to_utc_iso(item.created_at),
+        "updated_at": to_utc_iso(item.updated_at),
+    }
+
+
+def heygen_translation_language_payload(item: HeygenTranslationLanguage) -> dict:
+    return {
+        "id": item.id,
+        "name": item.name,
+        "display_name_zh": item.display_name_zh,
+        "provider": item.provider,
+        "enabled": item.enabled,
+        "sort_order": item.sort_order,
+        "raw_json": parse_json_or_none(item.raw_json) or {},
         "created_at": to_utc_iso(item.created_at),
         "updated_at": to_utc_iso(item.updated_at),
     }

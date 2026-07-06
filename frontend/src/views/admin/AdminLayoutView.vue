@@ -9,6 +9,7 @@ import {
   ScrollText,
   Settings,
   ShoppingBag,
+  Languages,
   Volume2,
   UserRoundCheck,
   UsersRound,
@@ -35,6 +36,7 @@ const tabIcons = {
   outfitModels: UserRoundCheck,
   heygenAvatars: UserRoundCheck,
   heygenVoices: Volume2,
+  heygenTranslationLanguages: Languages,
   auditLogs: ScrollText,
 };
 

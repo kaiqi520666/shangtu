@@ -88,14 +88,16 @@ const paymentConfigLabels = {
       <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <div class="mb-4 flex items-center justify-between">
           <div>
-            <h2 class="text-sm font-black text-slate-800">照片数字人创建收费</h2>
-            <p class="mt-1 text-xs text-slate-400">按次收费，创建照片数字人时预扣，失败自动退回。</p>
+            <h2 class="text-sm font-black text-slate-800">视频翻译扣费</h2>
+            <p class="mt-1 text-xs text-slate-400">视频翻译独立收费体系，按档位配置每秒积分。</p>
           </div>
         </div>
-        <label class="block max-w-xs">
-          <span class="text-xs font-bold text-slate-600">创建一次消耗积分</span>
-          <input v-model.number="state.photoAvatarCreateCost" type="number" min="1" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary" />
-        </label>
+        <div class="grid gap-3 md:grid-cols-2">
+          <label v-for="tier in [{ key: 'standard', label: '标准翻译每秒扣费' }, { key: 'premium', label: '高质翻译每秒扣费' }]" :key="tier.key" class="block">
+            <span class="text-xs font-bold text-slate-600">{{ tier.label }}</span>
+            <input v-model.number="state.videoTranslationCreditCosts[tier.key]" type="number" min="1" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary" />
+          </label>
+        </div>
       </div>
 
       <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">

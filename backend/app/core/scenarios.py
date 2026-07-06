@@ -1,5 +1,5 @@
 IMAGE_SCENARIOS = {"product_suite", "product_image", "outfit", "free_image"}
-VIDEO_SCENARIOS = {"product_video", "free_video", "digital_human"}
+VIDEO_SCENARIOS = {"product_video", "free_video", "digital_human", "video_translation"}
 SUPPORTED_GENERATION_SCENARIOS = IMAGE_SCENARIOS | VIDEO_SCENARIOS
 
 SCENARIO_TITLE_PREFIX = {
@@ -10,4 +10,5 @@ SCENARIO_TITLE_PREFIX = {
     "product_video": "商品视频",
     "free_video": "自由生视频",
     "digital_human": "数字人",
+    "video_translation": "视频翻译",
 }

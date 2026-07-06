@@ -125,6 +125,39 @@ export function createDigitalHumanSettingsSnapshot({
   });
 }
 
+export function createVideoTranslationSettingsSnapshot({
+  videoUrl,
+  targetLanguageId,
+  targetLanguageName,
+  targetLanguageDisplayNameZh,
+  qualityTier,
+  durationSeconds,
+  perSecondCost,
+  creditCost,
+  source,
+  assetTaskId,
+} = {}) {
+  return createGenerationSettingsSnapshot({
+    scenario: "video_translation",
+    mediaType: "video",
+    language: targetLanguageName || "",
+    ratio: "original",
+    quality: qualityTier || "",
+    scene: {
+      videoUrl,
+      targetLanguageId,
+      targetLanguageName,
+      targetLanguageDisplayNameZh,
+      qualityTier,
+      durationSeconds,
+      perSecondCost,
+      creditCost,
+      source,
+      assetTaskId,
+    },
+  });
+}
+
 export function getSnapshotScene(snapshot) {
   return snapshot && typeof snapshot.scene === "object" && snapshot.scene !== null
     ? snapshot.scene
