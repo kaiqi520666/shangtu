@@ -9,13 +9,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.credits import normalize_video_resolution
 from app.core.deps import get_current_user, get_db
+from app.core.json_utils import dump_json_or_none, parse_json_or_none
 from app.core.oss import OssConfigError, upload_video_bytes
 from app.core.scenarios import SCENARIO_TITLE_PREFIX, VIDEO_SCENARIOS
 from app.core.strategy.dashscope_client import (
     DashScopeConfigError,
     optimize_free_video_prompt,
 )
-from app.core.json_utils import dump_json_or_none, parse_json_or_none
 from app.core.prompt_template_builder import build_strategy_template_prompt
 from app.core.prompt_snapshot import dump_prompt_snapshot, parse_prompt_snapshot
 from app.core.system_settings import (
@@ -235,6 +235,7 @@ async def free_video_optimize(
 async def upload_video(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     try:
         content = await file.read()
@@ -244,9 +245,43 @@ async def upload_video(
             content_type=file.content_type or "",
             source="video-uploads",
         )
+        title = (file.filename or "用户上传视频").strip()[:100]
+        task = VideoTask(
+            id=str(uuid.uuid4()),
+            user_id=current_user.id,
+            scenario="upload",
+            type_id="upload",
+            title=title or "用户上传视频",
+            sort_order=0,
+            prompt="用户上传视频",
+            input_mode="upload",
+            input_images_json=None,
+            input_video_url=uploaded.url,
+            duration=0,
+            resolution="upload",
+            aspect_ratio="original",
+            status="done",
+            result_url=uploaded.url,
+            progress=100,
+            provider="upload",
+            provider_task_id=uploaded.object_key,
+            credit_cost=0,
+            prompt_snapshot_json=None,
+            settings_snapshot_json=dump_json_or_none(
+                {
+                    "source": "upload",
+                    "object_key": uploaded.object_key,
+                    "content_type": uploaded.content_type,
+                    "size": uploaded.size,
+                }
+            ),
+        )
+        db.add(task)
+        await db.commit()
     except (ValueError, OssConfigError) as e:
         return fail(str(e))
     except Exception:
+        await db.rollback()
         return fail("视频上传失败")
     finally:
         await file.close()
