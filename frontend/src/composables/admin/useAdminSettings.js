@@ -85,8 +85,8 @@ export function useAdminSettings() {
           "4K": Number(settingsState.imageCreditCosts["4K"]),
         },
         video_credit_costs: {
+          "480p": Number(settingsState.videoCreditCosts["480p"]),
           "720p": Number(settingsState.videoCreditCosts["720p"]),
-          "1080p": Number(settingsState.videoCreditCosts["1080p"]),
         },
         digital_human_credit_costs: {
           standard: Number(settingsState.digitalHumanCreditCosts.standard),

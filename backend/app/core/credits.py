@@ -5,8 +5,8 @@ DEFAULT_IMAGE_CREDIT_COSTS: dict[str, int] = {
 }
 
 DEFAULT_VIDEO_CREDIT_COSTS: dict[str, int] = {
+    "480p": 24,
     "720p": 36,
-    "1080p": 64,
 }
 
 

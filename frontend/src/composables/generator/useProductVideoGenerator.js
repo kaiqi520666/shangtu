@@ -70,7 +70,6 @@ function attachVideoStrategyBrief(snapshot, brief) {
 }
 
 function getRequiredImageMessage(inputMode, count) {
-  if (inputMode === "image_to_video" && count !== 1) return "请上传 1 张首帧图";
   if (inputMode === "reference_to_video" && (count < 1 || count > 9)) {
     return "请上传 1-9 张参考图";
   }
@@ -84,7 +83,7 @@ export function useProductVideoGenerator({ toast, confirm, onJobCreated } = {}) 
     market: "global",
     language: "english",
     sizePreset: "tiktok_9_16",
-    duration: 6,
+    duration: 8,
     resolution: "720p",
     productInput: "",
   });
@@ -187,7 +186,7 @@ export function useProductVideoGenerator({ toast, confirm, onJobCreated } = {}) 
       settings.market = "global";
       settings.language = "english";
       settings.sizePreset = "tiktok_9_16";
-      settings.duration = 6;
+      settings.duration = 8;
       settings.resolution = "720p";
       settings.productInput = "";
       resetStrategy("config");

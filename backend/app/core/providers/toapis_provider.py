@@ -70,42 +70,31 @@ def build_create_payload(
 def build_video_create_payload(
     *,
     prompt: str,
-    action: str,
     duration: int,
     aspect_ratio: str,
     resolution: str,
     image_urls: list[str],
     input_video_url: str | None = None,
-    audio_setting: str = "auto",
     client_business_id: str | None = None,
 ) -> dict:
     cleaned_urls = [url for url in image_urls if url]
-    provider_resolution = str(resolution or "").upper()
+    provider_resolution = str(resolution or "").lower()
     payload: dict[str, Any] = {
         "model": VIDEO_GENERATE_MODEL,
-        "action": action,
         "prompt": prompt,
         "duration": int(duration),
         "aspect_ratio": aspect_ratio,
         "resolution": provider_resolution,
-        "watermark": False,
     }
     if client_business_id:
         payload["client_business_id"] = client_business_id
-    if action == "text-to-video":
-        return payload
-    if action == "video-edit":
-        payload.pop("duration", None)
-        payload.pop("aspect_ratio", None)
-        payload["url"] = str(input_video_url or "").strip()
-        payload["audio_setting"] = audio_setting
-        if cleaned_urls:
-            payload["reference_images"] = cleaned_urls[:5]
-        return payload
-    if action == "image-to-video":
-        payload["image_urls"] = cleaned_urls[:1]
-    else:
-        payload["reference_images"] = cleaned_urls[:9]
+    if cleaned_urls:
+        payload["image_with_roles"] = [
+            {"url": url, "role": "reference_image"} for url in cleaned_urls[:9]
+        ]
+    video_url = str(input_video_url or "").strip()
+    if video_url:
+        payload["video_with_roles"] = [{"url": video_url, "role": "reference_video"}]
     return payload
 
 

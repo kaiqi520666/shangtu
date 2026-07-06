@@ -10,7 +10,7 @@ async def generate_video_strategy(
     input_mode: str,
     market: str = "",
     language: str = "中文",
-    duration: int = 6,
+    duration: int = 8,
     aspect_ratio: str = "9:16",
     product_input: str = "",
     images: list[dict],

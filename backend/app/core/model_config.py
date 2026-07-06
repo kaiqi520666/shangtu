@@ -12,4 +12,4 @@ def _env_model(name: str, default: str) -> str:
 
 QWEN_TEXT_MODEL = _env_model("QWEN_TEXT_MODEL", "qwen3.6-flash")
 IMAGE_GENERATE_MODEL = _env_model("IMAGE_GENERATE_MODEL", "gpt-image-2")
-VIDEO_GENERATE_MODEL = _env_model("VIDEO_GENERATE_MODEL", "happyhorse-1.1")
+VIDEO_GENERATE_MODEL = _env_model("VIDEO_GENERATE_MODEL", "seedance-2-mini")

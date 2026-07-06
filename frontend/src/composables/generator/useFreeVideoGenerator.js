@@ -66,10 +66,9 @@ export function useFreeVideoGenerator({ confirm, onJobCreated } = {}) {
   const settings = reactive({
     inputMode: "text_to_video",
     prompt: "",
-    duration: 5,
+    duration: 8,
     resolution: "720p",
     aspectRatio: "9:16",
-    audioSetting: "auto",
   });
 
   const cards = useGenerationCards({
@@ -115,10 +114,9 @@ export function useFreeVideoGenerator({ confirm, onJobCreated } = {}) {
       mainImageIndex.value = 0;
       settings.inputMode = "text_to_video";
       settings.prompt = "";
-      settings.duration = 5;
+      settings.duration = 8;
       settings.resolution = "720p";
       settings.aspectRatio = "9:16";
-      settings.audioSetting = "auto";
     },
     applyJobData(data) {
       restoreFreeVideoJobData(data);
@@ -189,9 +187,13 @@ export function useFreeVideoGenerator({ confirm, onJobCreated } = {}) {
   const canOptimize = computed(
     () => settings.inputMode === "text_to_video" && hasPrompt.value && !optimizing.value,
   );
-  const canGenerate = computed(
-    () => hasPrompt.value && !hasUploadingImages.value && !hasUploadingVideo.value && !creatingBatch.value,
-  );
+  const canGenerate = computed(() => {
+    if (!hasPrompt.value || hasUploadingImages.value || hasUploadingVideo.value || creatingBatch.value) return false;
+    const imageCount = uploadedImages.value.filter((img) => img?.url).length;
+    if (settings.inputMode === "reference_to_video") return imageCount >= 1 && imageCount <= 9;
+    if (settings.inputMode === "video_edit") return Boolean(uploadedVideo.value?.url) && imageCount <= 9;
+    return true;
+  });
   const selectedVideoLabel = computed(
     () =>
       settings.inputMode === "video_edit"
@@ -225,7 +227,6 @@ export function useFreeVideoGenerator({ confirm, onJobCreated } = {}) {
     if (typeof scene.duration === "number") settings.duration = scene.duration;
     if (typeof scene.resolution === "string") settings.resolution = scene.resolution;
     if (typeof scene.aspectRatio === "string") settings.aspectRatio = scene.aspectRatio;
-    if (typeof scene.audioSetting === "string") settings.audioSetting = scene.audioSetting;
     if (typeof data.input_text === "string") settings.prompt = data.input_text;
 
     if (Array.isArray(data.source_images)) {
@@ -253,15 +254,12 @@ export function useFreeVideoGenerator({ confirm, onJobCreated } = {}) {
     if (hasUploadingImages.value) return "素材还在上传中，请稍等";
     if (hasUploadingVideo.value) return "参考视频还在上传中，请稍等";
     const imageCount = uploadedImages.value.filter((img) => img?.url).length;
-    if (settings.inputMode === "image_to_video" && imageCount !== 1) {
-      return "图生视频必须上传 1 张首帧图";
-    }
     if (settings.inputMode === "reference_to_video" && (imageCount < 1 || imageCount > 9)) {
       return "参考图生视频必须上传 1-9 张图片";
     }
     if (settings.inputMode === "video_edit") {
       if (!uploadedVideo.value?.url) return "爆款复刻必须选择 1 条参考视频";
-      if (imageCount > 5) return "爆款复刻最多只能选择 5 张参考图";
+      if (imageCount > 9) return "爆款复刻最多只能选择 9 张参考图";
     }
     return "";
   }
@@ -313,7 +311,6 @@ export function useFreeVideoGenerator({ confirm, onJobCreated } = {}) {
         duration: settings.duration,
         resolution: settings.resolution,
         aspectRatio: settings.aspectRatio,
-        audioSetting: settings.audioSetting,
       },
     });
   }
@@ -399,7 +396,6 @@ export function useFreeVideoGenerator({ confirm, onJobCreated } = {}) {
           input_mode: settings.inputMode,
           image_urls: imageUrls,
           input_video_url: inputVideoUrl || null,
-          audio_setting: settings.audioSetting,
           user_prompt: item.prompt,
           duration: settings.duration,
           resolution: settings.resolution,

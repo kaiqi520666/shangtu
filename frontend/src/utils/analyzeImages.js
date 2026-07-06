@@ -25,10 +25,6 @@ export function buildProductAnalyzeImages(uploadedImages, mainImageIndex = 0) {
 export function buildVideoAnalyzeImages(inputMode, uploadedImages) {
   const images = (uploadedImages || []).filter((img) => img?.url);
 
-  if (inputMode === "image_to_video") {
-    return images.slice(0, 1).map((img) => ({ url: img.url, label: "首帧图" }));
-  }
-
   return images.slice(0, 9).map((img, index) => ({
     url: img.url,
     label: `参考图${index + 1}`,

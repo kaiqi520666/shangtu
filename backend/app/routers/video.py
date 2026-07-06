@@ -38,9 +38,9 @@ from app.services.generation_tasks import deduct_credits_or_fail, enqueue_or_com
 
 router = APIRouter(prefix="/video", tags=["视频生成"])
 
-VIDEO_INPUT_MODES = {"text_to_video", "image_to_video", "reference_to_video", "video_edit"}
+VIDEO_INPUT_MODES = {"text_to_video", "reference_to_video", "video_edit"}
 VIDEO_ASPECT_RATIOS = {"16:9", "9:16", "1:1", "4:3", "3:4"}
-VIDEO_AUDIO_SETTINGS = {"auto", "origin"}
+VIDEO_DURATIONS = {4, 8, 10, 12, 15}
 
 
 class VideoGenerateRequest(BaseModel):
@@ -50,9 +50,8 @@ class VideoGenerateRequest(BaseModel):
     input_mode: str
     image_urls: list[str] = Field(default_factory=list)
     input_video_url: str | None = None
-    audio_setting: str = "auto"
     user_prompt: str | None = None
-    duration: int = 6
+    duration: int = 8
     resolution: str = "720p"
     aspect_ratio: str = "9:16"
     settings_snapshot: dict | None = None
@@ -72,7 +71,7 @@ class VideoStrategyRequest(BaseModel):
     images: list[VideoImageItem] = Field(default_factory=list)
     market: str = ""
     language: str = ""
-    duration: int = 6
+    duration: int = 8
     aspect_ratio: str = "9:16"
     product_input: str = ""
 
@@ -87,12 +86,6 @@ def _clean_image_urls(image_urls: list[str]) -> list[str]:
 
 def _clean_video_url(video_url: str | None) -> str:
     return str(video_url or "").strip()
-
-
-def _validate_audio_setting(audio_setting: str) -> str | None:
-    if audio_setting not in VIDEO_AUDIO_SETTINGS:
-        return "不支持的声音设置"
-    return None
 
 
 def _validate_video_inputs(
@@ -111,12 +104,10 @@ def _validate_video_inputs(
             return "商品视频暂不支持爆款复刻模式"
         if not input_video_url:
             return "爆款复刻必须上传或选择 1 条参考视频"
-        if len(image_urls) > 5:
-            return "爆款复刻最多只能选择 5 张参考图"
+        if len(image_urls) > 9:
+            return "爆款复刻最多只能选择 9 张参考图"
         return None
     count = len(image_urls)
-    if input_mode == "image_to_video" and count != 1:
-        return "图生视频必须上传 1 张图片"
     if input_mode == "reference_to_video" and not 1 <= count <= 9:
         return "参考图生视频必须上传 1-9 张图片"
     return None
@@ -129,20 +120,16 @@ def _validate_aspect_ratio(aspect_ratio: str) -> str | None:
     return None
 
 
-def _video_action(input_mode: str) -> str:
-    if input_mode == "text_to_video":
-        return "text-to-video"
-    if input_mode == "image_to_video":
-        return "image-to-video"
-    if input_mode == "video_edit":
-        return "video-edit"
-    return "reference-to-video"
+def _validate_video_duration(duration: int) -> str | None:
+    if duration not in VIDEO_DURATIONS:
+        supported = " / ".join(str(item) for item in sorted(VIDEO_DURATIONS))
+        return f"不支持的视频时长：{duration}秒，请选择 {supported} 秒"
+    return None
 
 
 def _video_input_mode_label(input_mode: str) -> str:
     labels = {
         "text_to_video": "文生视频",
-        "image_to_video": "图生视频",
         "reference_to_video": "参考图生视频",
         "video_edit": "爆款复刻",
     }
@@ -198,6 +185,9 @@ async def video_strategy(
     aspect_error = _validate_aspect_ratio(aspect_ratio)
     if aspect_error:
         return fail(aspect_error)
+    duration_error = _validate_video_duration(req.duration)
+    if duration_error:
+        return fail(duration_error)
 
     try:
         template_prompt = await build_strategy_template_prompt(
@@ -284,10 +274,6 @@ async def create_video_task(
 
     image_urls = _clean_image_urls(req.image_urls)
     input_video_url = _clean_video_url(req.input_video_url)
-    audio_setting = str(req.audio_setting or "auto").strip() or "auto"
-    audio_error = _validate_audio_setting(audio_setting)
-    if audio_error:
-        return fail(audio_error)
     input_error = _validate_video_inputs(
         req.input_mode,
         image_urls,
@@ -301,6 +287,9 @@ async def create_video_task(
     aspect_error = _validate_aspect_ratio(aspect_ratio)
     if aspect_error:
         return fail(aspect_error)
+    duration_error = _validate_video_duration(req.duration)
+    if duration_error:
+        return fail(duration_error)
 
     try:
         normalized_resolution = normalize_video_resolution(req.resolution)
@@ -335,7 +324,6 @@ async def create_video_task(
         "title": req.title,
         "input_mode": req.input_mode,
         "input_video_url": input_video_url,
-        "audio_setting": audio_setting,
         "duration": req.duration,
         "resolution": normalized_resolution,
         "aspect_ratio": aspect_ratio,
@@ -380,7 +368,6 @@ async def create_video_task(
         input_mode=req.input_mode,
         input_images_json=dump_json_or_none(image_urls),
         input_video_url=input_video_url or None,
-        audio_setting=audio_setting,
         duration=req.duration,
         resolution=normalized_resolution,
         aspect_ratio=aspect_ratio,
@@ -413,10 +400,8 @@ async def create_video_task(
             req.duration,
             aspect_ratio,
             normalized_resolution,
-            _video_action(req.input_mode),
             image_urls,
             input_video_url,
-            audio_setting,
         ),
         user_id=current_user.id,
         credit_cost=credit_cost,
@@ -500,7 +485,6 @@ async def get_video_task(
             "input_mode": task.input_mode,
             "input_images": parse_json_or_none(task.input_images_json) or [],
             "input_video_url": task.input_video_url,
-            "audio_setting": task.audio_setting,
             "duration": task.duration,
             "resolution": task.resolution,
             "aspect_ratio": task.aspect_ratio,

@@ -53,30 +53,22 @@ const emit = defineEmits([
 
 const selectedType = computed(() => getVideoDemoType(props.settings.videoType));
 const maxUploadCount = computed(() => {
-  if (selectedType.value.inputMode === "reference_to_video") return 9;
-  return 1;
+  return 9;
 });
 const uploadAddText = computed(() => {
-  if (selectedType.value.inputMode === "reference_to_video") return "添加参考图";
-  return "添加首帧图";
+  return "添加参考图";
 });
 const uploadHintText = computed(() => {
-  if (selectedType.value.inputMode === "reference_to_video") return "支持 1-9 张";
-  return "必须上传 1 张";
+  return "支持 1-9 张";
 });
 const uploadRoleText = computed(() => {
-  if (selectedType.value.inputMode === "image_to_video") return "当前将作为视频开头画面生成";
   return "当前将参考多张图片生成视频";
 });
 const uploadRequirementText = computed(() => {
-  if (selectedType.value.inputMode === "image_to_video") {
-    return "上传 1 张商品或人物首帧图，系统会从这张画面开始生成视频。";
-  }
   return "至少上传 1 张产品参考图，最多 9 张；图片越完整，产品还原越稳定。";
 });
 const uploadLimitMessage = computed(() => {
-  if (selectedType.value.inputMode === "reference_to_video") return "参考图最多只能上传 9 张";
-  return "图生视频只能上传 1 张图片";
+  return "参考图最多只能上传 9 张";
 });
 const showUploadPlaceholders = computed(() => false);
 const showMainImageAction = computed(() => false);
@@ -90,8 +82,7 @@ const generateText = computed(() => {
   if (props.strategyLoading) return "AI 正在生成提示词...";
   if (props.uploadedImages.some((img) => img?.uploading)) return "素材上传中...";
   if (generateDisabled.value) {
-    if (selectedType.value.inputMode === "reference_to_video") return "请至少上传 1 张参考图";
-    return "请上传 1 张首帧图";
+    return "请至少上传 1 张参考图";
   }
   return "AI 生成视频提示词";
 });

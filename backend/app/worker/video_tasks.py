@@ -28,10 +28,8 @@ async def generate_video(
     duration: int,
     aspect_ratio: str,
     resolution: str,
-    action: str,
     image_urls: list[str],
     input_video_url: str = "",
-    audio_setting: str = "auto",
 ):
     def create_failure_message(exc):
         detail = ""
@@ -60,13 +58,11 @@ async def generate_video(
         mark_timeout=mark_video_timeout,
         build_payload=lambda: build_video_create_payload(
             prompt=prompt,
-            action=action,
             duration=duration,
             aspect_ratio=aspect_ratio,
             resolution=resolution,
             image_urls=image_urls,
             input_video_url=input_video_url,
-            audio_setting=audio_setting,
             client_business_id=task_id,
         ),
         materialize_result=materialize_video_to_oss,

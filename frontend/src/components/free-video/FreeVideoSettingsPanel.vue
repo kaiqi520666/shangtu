@@ -9,7 +9,6 @@ import VideoUploader from "@/components/generation/video/VideoUploader.vue";
 import VideoDurationSlider from "@/components/product-video/VideoDurationSlider.vue";
 import VideoQualitySelector from "@/components/product-video/VideoQualitySelector.vue";
 import {
-  freeVideoAudioOptions,
   freeVideoInputModes,
   freeVideoRatioOptions,
   getFreeVideoInputMode,
@@ -76,19 +75,19 @@ const selectedMode = computed(() => getFreeVideoInputMode(props.settings.inputMo
 const isVideoEditMode = computed(() => props.settings.inputMode === "video_edit");
 const showUploader = computed(() => props.settings.inputMode !== "text_to_video");
 const maxUploadCount = computed(() => {
-  if (props.settings.inputMode === "reference_to_video") return 9;
-  if (props.settings.inputMode === "video_edit") return 5;
-  return 1;
+  if (props.settings.inputMode === "text_to_video") return 0;
+  return 9;
 });
 const uploadLimitMessage = computed(() => {
   if (props.settings.inputMode === "reference_to_video") return "参考图最多只能上传 9 张";
-  if (props.settings.inputMode === "video_edit") return "爆款复刻最多只能选择 5 张参考图";
-  return "图生视频只能上传 1 张首帧图";
+  return "爆款复刻最多只能选择 9 张参考图";
 });
 const primaryText = computed(() => {
+  const imageCount = props.uploadedImages.filter((img) => img?.url).length;
   if (!props.settings.prompt.trim()) return "请输入视频提示词";
   if (props.uploadedVideo?.uploading) return "参考视频上传中...";
   if (isVideoEditMode.value && !props.uploadedVideo?.url) return "请选择爆款参考视频";
+  if (props.settings.inputMode === "reference_to_video" && imageCount < 1) return "请上传 1 张参考图";
   if (props.uploadedImages.some((img) => img?.uploading)) return "素材上传中...";
   if (props.creatingBatch) return "正在创建任务...";
   if (props.hasRunningTasks) return "追加生成";
@@ -105,12 +104,12 @@ function updateSetting(key, value) {
 function updateInputMode(mode) {
   emit("update:settings", {
     ...props.settings,
-      inputMode: mode,
-    });
-    emit("update:uploadedImages", []);
-    emit("update:uploadedVideo", null);
-    emit("update:mainImageIndex", 0);
-  }
+    inputMode: mode,
+  });
+  emit("update:uploadedImages", []);
+  emit("update:uploadedVideo", null);
+  emit("update:mainImageIndex", 0);
+}
 </script>
 
 <template>
@@ -203,17 +202,9 @@ function updateInputMode(mode) {
         />
       </div>
 
-      <div v-if="isVideoEditMode">
-        <label class="mb-1.5 block text-xs font-bold text-slate-500">声音处理</label>
-        <AppSelect
-          :model-value="settings.audioSetting"
-          :options="freeVideoAudioOptions"
-          @update:model-value="updateSetting('audioSetting', $event)"
-        />
-        <p class="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold leading-relaxed text-amber-700">
-          爆款复刻会参考原视频比例，时长仅用于本次积分预估与扣费。
-        </p>
-      </div>
+      <p v-if="isVideoEditMode" class="rounded-lg bg-primary/5 px-3 py-2 text-xs font-semibold leading-relaxed text-primary">
+        爆款复刻会参考原视频节奏，参考图可选上传。
+      </p>
 
       <VideoDurationSlider
         :duration="settings.duration"

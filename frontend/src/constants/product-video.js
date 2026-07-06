@@ -7,9 +7,9 @@ export const videoDemoTypes = [
     typeId: "ugc_seeding",
     title: "UGC 种草",
     subtitle: "用户视角真实分享体验",
-    inputMode: "image_to_video",
-    uploadTitle: "上传视频开头画面",
-    uploadHint: "建议上传产品在真实场景里的首帧图。",
+    inputMode: "reference_to_video",
+    uploadTitle: "上传视频参考图",
+    uploadHint: "建议上传产品在真实场景里的参考图。",
     videoUrl: "https://youjia-bucket.oss-cn-hongkong.aliyuncs.com/system/product-video-demos/videos/ugc_seeding.mp4",
     posterUrl: "https://youjia-bucket.oss-cn-hongkong.aliyuncs.com/system/product-video-demos/posters/ugc_seeding.jpg",
   },
@@ -37,9 +37,9 @@ export const videoDemoTypes = [
     typeId: "product_talk",
     title: "产品口播",
     subtitle: "面对镜头讲解产品卖点",
-    inputMode: "image_to_video",
-    uploadTitle: "上传口播首帧图",
-    uploadHint: "适合上传人物持产品、产品近景或口播画面首帧。",
+    inputMode: "reference_to_video",
+    uploadTitle: "上传口播参考图",
+    uploadHint: "适合上传人物持产品、产品近景或口播画面参考图。",
     videoUrl: "https://youjia-bucket.oss-cn-hongkong.aliyuncs.com/system/product-video-demos/videos/product_talk.mp4",
     posterUrl: "https://youjia-bucket.oss-cn-hongkong.aliyuncs.com/system/product-video-demos/posters/product_talk.jpg",
   },
@@ -114,17 +114,19 @@ export const videoSizeOptions = [
 ];
 
 export const videoResolutionOptions = [
+  { value: "480p", label: "480p", subtitle: "快速草稿" },
   { value: "720p", label: "720p", subtitle: "默认推荐" },
-  { value: "1080p", label: "1080p", subtitle: "高清成片" },
 ];
+
+export const videoDurationOptions = [4, 8, 10, 12, 15];
 
 export function getVideoDemoType(typeId) {
   return videoDemoTypes.find((item) => item.typeId === typeId) || videoDemoTypes[0];
 }
 
-export function getVideoCreditCost({ resolution = "720p", duration = 6, costs = defaultVideoCreditCosts } = {}) {
+export function getVideoCreditCost({ resolution = "720p", duration = 8, costs = defaultVideoCreditCosts } = {}) {
   const unitCost = Number(costs[resolution] ?? defaultVideoCreditCosts[resolution]);
-  const seconds = Math.max(3, Math.min(15, Number(duration || 6)));
+  const seconds = videoDurationOptions.includes(Number(duration)) ? Number(duration) : 8;
   if (!Number.isFinite(unitCost) || unitCost <= 0) return null;
   return unitCost * seconds;
 }

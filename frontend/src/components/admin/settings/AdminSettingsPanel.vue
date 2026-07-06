@@ -48,7 +48,7 @@ const paymentConfigLabels = {
           </div>
         </div>
         <div class="grid gap-3 md:grid-cols-2">
-          <label v-for="resolution in ['720p', '1080p']" :key="resolution" class="block">
+          <label v-for="resolution in ['480p', '720p']" :key="resolution" class="block">
             <span class="text-xs font-bold text-slate-600">{{ resolution }} 每秒扣费</span>
             <input v-model.number="state.videoCreditCosts[resolution]" type="number" min="1" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary" />
           </label>
