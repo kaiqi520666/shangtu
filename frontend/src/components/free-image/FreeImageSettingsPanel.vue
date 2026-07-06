@@ -119,6 +119,7 @@ function selectQuality(quality) {
       main-badge-text="参"
       limit-message="最多只能上传 9 张参考图"
       :max-count="9"
+      :show-placeholders="false"
       :images="referenceImages"
       :main-index="mainImageIndex"
       @update:images="emit('update:referenceImages', $event)"
