@@ -114,10 +114,11 @@ function selectQuality(quality) {
     <ImageUploader
       title="参考图"
       add-text="添加参考图"
-      hint-text="可选"
+      hint-text="可选，最多 9 张"
       alt-text="参考图"
       main-badge-text="参"
-      limit-message="最多只能上传 3 张参考图"
+      limit-message="最多只能上传 9 张参考图"
+      :max-count="9"
       :images="referenceImages"
       :main-index="mainImageIndex"
       @update:images="emit('update:referenceImages', $event)"

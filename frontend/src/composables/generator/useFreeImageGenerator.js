@@ -208,6 +208,11 @@ export function useFreeImageGenerator({ onJobCreated } = {}) {
       toast.info("参考图还在上传中，请稍候");
       return;
     }
+    const imageUrls = referenceImages.value.map((img) => img.url).filter(Boolean);
+    if (imageUrls.length > 9) {
+      toast.info("参考图最多只能上传 9 张");
+      return;
+    }
 
     const title = makePromptTitle(prompt);
     const queue = [
@@ -242,8 +247,6 @@ export function useFreeImageGenerator({ onJobCreated } = {}) {
       input_text: prompt,
       structure: [{ id: "free", title, prompt }],
     };
-
-    const imageUrls = referenceImages.value.map((img) => img.url).filter(Boolean);
 
     await enqueueImageBatch({
       queue,
