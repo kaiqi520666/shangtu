@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted } from "vue";
+import { computed } from "vue";
 import { RouterLink } from "vue-router";
 import {
   ArrowRight,
@@ -36,13 +36,12 @@ const workspaceTarget = computed(() =>
     : { path: "/login", query: { redirect: "/generator/product-suite" } },
 );
 
-onMounted(() => {
-  document.documentElement.classList.add("scroll-smooth");
-});
-
-onBeforeUnmount(() => {
-  document.documentElement.classList.remove("scroll-smooth");
-});
+const scrollToSection = (id) => {
+  document.getElementById(id)?.scrollIntoView({
+    behavior: "smooth",
+    block: "start",
+  });
+};
 
 const featureItems = [
   {
@@ -140,9 +139,9 @@ const showcaseItems = [
         </RouterLink>
 
         <nav class="hidden items-center rounded-full border border-slate-200 bg-slate-50 p-1 text-xs font-black text-slate-500 shadow-inner md:flex">
-          <a href="#features" class="rounded-full px-4 py-2 transition-colors hover:bg-white hover:text-primary hover:shadow-sm">能力矩阵</a>
-          <a href="#workflow" class="rounded-full px-4 py-2 transition-colors hover:bg-white hover:text-primary hover:shadow-sm">生成流程</a>
-          <a href="#showcase" class="rounded-full px-4 py-2 transition-colors hover:bg-white hover:text-primary hover:shadow-sm">作品展示</a>
+          <a href="#features" class="rounded-full px-4 py-2 transition-colors hover:bg-white hover:text-primary hover:shadow-sm" @click.prevent="scrollToSection('features')">能力矩阵</a>
+          <a href="#workflow" class="rounded-full px-4 py-2 transition-colors hover:bg-white hover:text-primary hover:shadow-sm" @click.prevent="scrollToSection('workflow')">生成流程</a>
+          <a href="#showcase" class="rounded-full px-4 py-2 transition-colors hover:bg-white hover:text-primary hover:shadow-sm" @click.prevent="scrollToSection('showcase')">作品展示</a>
         </nav>
 
         <div class="flex items-center gap-2">
