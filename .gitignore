@@ -18,6 +18,7 @@ Thumbs.db
 
 # 比赛/交付材料（产物体积大，不入库）
 deliverables/
+deploy/exports/
 
 # Office 临时锁文件
 ~$*
