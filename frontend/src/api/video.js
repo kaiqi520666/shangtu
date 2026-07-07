@@ -17,6 +17,15 @@ export function uploadVideo(file) {
   });
 }
 
+export function uploadAudio(file) {
+  const formData = new FormData();
+  formData.append("file", file);
+  return request.post("/video/audio-upload", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+    timeout: 120000,
+  });
+}
+
 export function generateVideo({
   scenario = "product_video",
   type_id,
@@ -24,10 +33,14 @@ export function generateVideo({
   input_mode,
   image_urls = [],
   input_video_url = null,
+  video_urls = [],
+  audio_urls = [],
   user_prompt = null,
   duration,
   resolution,
   aspect_ratio,
+  generate_audio = false,
+  enable_web_search = false,
   settings_snapshot = null,
   sort_order = 0,
   job_id = null,
@@ -41,10 +54,14 @@ export function generateVideo({
       input_mode,
       image_urls,
       input_video_url,
+      video_urls,
+      audio_urls,
       user_prompt,
       duration,
       resolution,
       aspect_ratio,
+      generate_audio,
+      enable_web_search,
       settings_snapshot,
       sort_order,
       job_id,

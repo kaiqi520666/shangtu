@@ -7,6 +7,10 @@ defineProps({
     type: String,
     required: true,
   },
+  options: {
+    type: Array,
+    default: () => videoResolutionOptions,
+  },
 });
 
 const emit = defineEmits(["update:modelValue"]);
@@ -17,7 +21,7 @@ const emit = defineEmits(["update:modelValue"]);
     <label class="mb-1.5 block text-xs font-bold text-slate-500">视频清晰度</label>
     <AppOptionCards
       :model-value="modelValue"
-      :options="videoResolutionOptions.map((option) => ({ value: option.value, label: option.label, description: option.subtitle }))"
+      :options="options.map((option) => ({ value: option.value, label: option.label, description: option.subtitle }))"
       align="center"
       @update:model-value="emit('update:modelValue', $event)"
     />

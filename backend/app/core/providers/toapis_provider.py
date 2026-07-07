@@ -80,9 +80,15 @@ def build_video_create_payload(
     resolution: str,
     image_urls: list[str],
     input_video_url: str | None = None,
+    video_urls: list[str] | None = None,
+    audio_urls: list[str] | None = None,
+    generate_audio: bool = False,
+    enable_web_search: bool = False,
     client_business_id: str | None = None,
 ) -> dict:
     cleaned_urls = [url for url in image_urls if url]
+    cleaned_video_urls = [url for url in (video_urls or []) if url]
+    cleaned_audio_urls = [url for url in (audio_urls or []) if url]
     provider_resolution = str(resolution or "").lower()
     content: list[dict[str, Any]] = []
     if prompt:
@@ -95,13 +101,23 @@ def build_video_create_payload(
         }
         for url in cleaned_urls[:9]
     )
-    video_url = str(input_video_url or "").strip()
-    if video_url:
+    fallback_video_url = str(input_video_url or "").strip()
+    if fallback_video_url and fallback_video_url not in cleaned_video_urls:
+        cleaned_video_urls.append(fallback_video_url)
+    for video_url in cleaned_video_urls[:3]:
         content.append(
             {
                 "type": "video_url",
                 "video_url": {"url": video_url},
                 "role": "reference_video",
+            }
+        )
+    for audio_url in cleaned_audio_urls[:3]:
+        content.append(
+            {
+                "type": "audio_url",
+                "audio_url": {"url": audio_url},
+                "role": "reference_audio",
             }
         )
     payload: dict[str, Any] = {
@@ -112,7 +128,10 @@ def build_video_create_payload(
         "resolution": provider_resolution,
         "execution_expires_after": 3600,
         "watermark": False,
+        "generate_audio": bool(generate_audio),
     }
+    if enable_web_search:
+        payload["tools"] = [{"type": "web_search"}]
     if client_business_id:
         payload["safety_identifier"] = client_business_id
     return payload

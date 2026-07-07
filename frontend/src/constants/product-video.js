@@ -114,8 +114,8 @@ export const videoSizeOptions = [
 ];
 
 export const videoResolutionOptions = [
-  { value: "480p", label: "480p", subtitle: "快速草稿" },
   { value: "720p", label: "720p", subtitle: "默认推荐" },
+  { value: "1080p", label: "1080p", subtitle: "高清成片" },
 ];
 
 export const videoDurationOptions = [4, 8, 10, 12, 15];

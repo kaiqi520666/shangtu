@@ -31,6 +31,10 @@ async def generate_video(
     resolution: str,
     image_urls: list[str],
     input_video_url: str = "",
+    video_urls: list[str] | None = None,
+    audio_urls: list[str] | None = None,
+    generate_audio: bool = False,
+    enable_web_search: bool = False,
 ):
     def create_failure_message(exc):
         detail = ""
@@ -64,6 +68,10 @@ async def generate_video(
             resolution=resolution,
             image_urls=image_urls,
             input_video_url=input_video_url,
+            video_urls=video_urls or [],
+            audio_urls=audio_urls or [],
+            generate_audio=generate_audio,
+            enable_web_search=enable_web_search,
             client_business_id=task_id,
         ),
         materialize_result=materialize_video_to_oss,

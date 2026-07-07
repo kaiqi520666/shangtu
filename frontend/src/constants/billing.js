@@ -5,8 +5,8 @@ export const defaultImageCreditCosts = {
 };
 
 export const defaultVideoCreditCosts = {
-  "480p": 24,
   "720p": 36,
+  "1080p": 54,
 };
 
 export const defaultDigitalHumanCreditCosts = {

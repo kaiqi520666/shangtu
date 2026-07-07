@@ -1,18 +1,16 @@
 <script setup>
 import { computed } from "vue";
-import { Clapperboard, LoaderCircle, Sparkles } from "lucide-vue-next";
+import { Clapperboard, LoaderCircle, Search, Sparkles, Volume2 } from "lucide-vue-next";
 import AppSelect from "@/components/ui/AppSelect.vue";
+import AppCheckbox from "@/components/ui/AppCheckbox.vue";
 import GeneratorActionFooter from "@/components/generation/workspace/GeneratorActionFooter.vue";
 import GeneratorSidePanelShell from "@/components/generation/workspace/GeneratorSidePanelShell.vue";
 import ImageUploader from "@/components/generation/image/ImageUploader.vue";
-import VideoUploader from "@/components/generation/video/VideoUploader.vue";
+import MediaUploader from "@/components/generation/media/MediaUploader.vue";
 import VideoDurationSlider from "@/components/product-video/VideoDurationSlider.vue";
 import VideoQualitySelector from "@/components/product-video/VideoQualitySelector.vue";
-import {
-  freeVideoInputModes,
-  freeVideoRatioOptions,
-  getFreeVideoInputMode,
-} from "@/constants/free-video.js";
+import { freeVideoRatioOptions } from "@/constants/free-video.js";
+import { videoResolutionOptions } from "@/constants/product-video.js";
 
 const props = defineProps({
   settings: {
@@ -23,9 +21,13 @@ const props = defineProps({
     type: Array,
     required: true,
   },
-  uploadedVideo: {
-    type: Object,
-    default: null,
+  uploadedVideos: {
+    type: Array,
+    required: true,
+  },
+  uploadedAudios: {
+    type: Array,
+    required: true,
   },
   mainImageIndex: {
     type: Number,
@@ -64,31 +66,19 @@ const props = defineProps({
 const emit = defineEmits([
   "update:settings",
   "update:uploadedImages",
-  "update:uploadedVideo",
+  "update:uploadedVideos",
+  "update:uploadedAudios",
   "update:mainImageIndex",
   "notify",
   "optimize",
   "generate",
 ]);
 
-const selectedMode = computed(() => getFreeVideoInputMode(props.settings.inputMode));
-const isVideoEditMode = computed(() => props.settings.inputMode === "video_edit");
-const showUploader = computed(() => props.settings.inputMode !== "text_to_video");
-const maxUploadCount = computed(() => {
-  if (props.settings.inputMode === "text_to_video") return 0;
-  return 9;
-});
-const uploadLimitMessage = computed(() => {
-  if (props.settings.inputMode === "reference_to_video") return "参考图最多只能上传 9 张";
-  return "爆款复刻最多只能选择 9 张参考图";
-});
 const primaryText = computed(() => {
-  const imageCount = props.uploadedImages.filter((img) => img?.url).length;
   if (!props.settings.prompt.trim()) return "请输入视频提示词";
-  if (props.uploadedVideo?.uploading) return "参考视频上传中...";
-  if (isVideoEditMode.value && !props.uploadedVideo?.url) return "请选择爆款参考视频";
-  if (props.settings.inputMode === "reference_to_video" && imageCount < 1) return "请上传 1 张参考图";
   if (props.uploadedImages.some((img) => img?.uploading)) return "素材上传中...";
+  if (props.uploadedVideos.some((item) => item?.uploading)) return "参考视频上传中...";
+  if (props.uploadedAudios.some((item) => item?.uploading)) return "参考音频上传中...";
   if (props.creatingBatch) return "正在创建任务...";
   if (props.hasRunningTasks) return "追加生成";
   return "生成视频";
@@ -101,71 +91,48 @@ function updateSetting(key, value) {
   });
 }
 
-function updateInputMode(mode) {
-  emit("update:settings", {
-    ...props.settings,
-    inputMode: mode,
-  });
-  emit("update:uploadedImages", []);
-  emit("update:uploadedVideo", null);
-  emit("update:mainImageIndex", 0);
-}
 </script>
 
 <template>
   <GeneratorSidePanelShell>
-    <section class="space-y-4 border-b border-slate-100 p-5">
-      <div>
-        <h2 class="text-sm font-black text-slate-900">生成模式</h2>
-        <div class="mt-3 grid grid-cols-1 gap-2">
-          <button
-            v-for="mode in freeVideoInputModes"
-            :key="mode.value"
-            type="button"
-            class="rounded-xl border px-3 py-2 text-left transition-all"
-            :class="
-              settings.inputMode === mode.value
-                ? 'border-primary bg-primary/10 text-primary shadow-sm'
-                : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
-            "
-            @click="updateInputMode(mode.value)"
-          >
-            <span class="block text-xs font-black">{{ mode.label }}</span>
-            <span
-              class="mt-1 block text-xs leading-relaxed"
-              :class="settings.inputMode === mode.value ? 'text-primary/80' : 'text-slate-400'"
-            >
-              {{ mode.description }}
-            </span>
-          </button>
-        </div>
-      </div>
-    </section>
-
-    <VideoUploader
-      v-if="isVideoEditMode"
-      :video="uploadedVideo"
-      title="爆款参考视频"
-      add-text="添加参考视频"
-      hint-text="必须选择 1 条爆款参考视频"
-      @update:video="emit('update:uploadedVideo', $event)"
+    <ImageUploader
+      :images="uploadedImages"
+      :main-index="mainImageIndex"
+      title="参考图片"
+      :max-count="9"
+      add-text="添加参考图"
+      hint-text="可选，最多 9 张"
+      alt-text="自由生视频素材"
+      main-badge-text="素材"
+      limit-message="参考图最多只能上传 9 张"
+      :show-placeholders="false"
+      :show-main-action="false"
+      @update:images="emit('update:uploadedImages', $event)"
+      @update:main-index="emit('update:mainImageIndex', $event)"
       @notify="emit('notify', $event)"
     />
 
-    <ImageUploader
-      v-if="showUploader"
-      :images="uploadedImages"
-      :main-index="mainImageIndex"
-      :title="selectedMode.uploadTitle"
-      :max-count="maxUploadCount"
-      :add-text="selectedMode.addText"
-      :hint-text="selectedMode.hintText"
-      alt-text="自由生视频素材"
-      main-badge-text="素材"
-      :limit-message="uploadLimitMessage"
-      :show-placeholders="false"
-      @update:images="emit('update:uploadedImages', $event)"
-      @update:main-index="emit('update:mainImageIndex', $event)"
+    <MediaUploader
+      :items="uploadedVideos"
+      media-type="video"
+      title="参考视频"
+      add-text="添加参考视频"
+      hint-text="可选，最多 3 条"
+      :max-count="3"
+      limit-message="参考视频最多只能上传 3 条"
+      @update:items="emit('update:uploadedVideos', $event)"
+      @notify="emit('notify', $event)"
+    />
+
+    <MediaUploader
+      :items="uploadedAudios"
+      media-type="audio"
+      title="参考音频"
+      add-text="添加参考音频"
+      hint-text="可选，最多 3 条"
+      :max-count="3"
+      limit-message="参考音频最多只能上传 3 条"
+      @update:items="emit('update:uploadedAudios', $event)"
       @notify="emit('notify', $event)"
     />
 
@@ -174,7 +141,6 @@ function updateInputMode(mode) {
         <div class="mb-1.5 flex items-center justify-between gap-3">
           <label class="text-xs font-bold text-slate-800">视频提示词</label>
           <button
-            v-if="settings.inputMode === 'text_to_video'"
             type="button"
             class="flex cursor-pointer items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-primary shadow-sm transition-colors hover:border-primary/30 hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-50"
             :disabled="!canOptimize"
@@ -193,7 +159,7 @@ function updateInputMode(mode) {
         ></textarea>
       </div>
 
-      <div v-if="!isVideoEditMode">
+      <div>
         <label class="mb-1.5 block text-xs font-bold text-slate-500">视频比例</label>
         <AppSelect
           :model-value="settings.aspectRatio"
@@ -201,10 +167,6 @@ function updateInputMode(mode) {
           @update:model-value="updateSetting('aspectRatio', $event)"
         />
       </div>
-
-      <p v-if="isVideoEditMode" class="rounded-lg bg-primary/5 px-3 py-2 text-xs font-semibold leading-relaxed text-primary">
-        爆款复刻会参考原视频节奏，参考图可选上传。
-      </p>
 
       <VideoDurationSlider
         :duration="settings.duration"
@@ -215,8 +177,38 @@ function updateInputMode(mode) {
 
       <VideoQualitySelector
         :model-value="settings.resolution"
+        :options="videoResolutionOptions"
         @update:model-value="updateSetting('resolution', $event)"
       />
+
+      <div class="grid gap-2">
+        <div
+          class="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2.5 transition-colors hover:border-primary/30 hover:bg-primary/5"
+        >
+          <span class="flex items-center gap-2 text-xs font-bold text-slate-700">
+            <Volume2 class="h-4 w-4 text-primary" />
+            生成音频
+          </span>
+          <AppCheckbox
+            :model-value="settings.generateAudio"
+            size="sm"
+            @update:model-value="updateSetting('generateAudio', $event)"
+          />
+        </div>
+        <div
+          class="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2.5 transition-colors hover:border-primary/30 hover:bg-primary/5"
+        >
+          <span class="flex items-center gap-2 text-xs font-bold text-slate-700">
+            <Search class="h-4 w-4 text-primary" />
+            开启联网搜索
+          </span>
+          <AppCheckbox
+            :model-value="settings.enableWebSearch"
+            size="sm"
+            @update:model-value="updateSetting('enableWebSearch', $event)"
+          />
+        </div>
+      </div>
 
       <p class="rounded-lg bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">
         当前输出：{{ selectedVideoLabel }}

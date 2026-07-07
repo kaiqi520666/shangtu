@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.credits import normalize_video_resolution
 from app.core.deps import get_current_user, get_db
 from app.core.json_utils import dump_json_or_none, parse_json_or_none
-from app.core.oss import OssConfigError, upload_video_bytes
+from app.core.oss import OssConfigError, upload_audio_bytes, upload_video_bytes
 from app.core.scenarios import SCENARIO_TITLE_PREFIX, VIDEO_SCENARIOS
 from app.core.strategy.dashscope_client import (
     DashScopeConfigError,
@@ -38,22 +38,27 @@ from app.services.generation_tasks import deduct_credits_or_fail, enqueue_or_com
 
 router = APIRouter(prefix="/video", tags=["视频生成"])
 
-VIDEO_INPUT_MODES = {"text_to_video", "reference_to_video", "video_edit"}
+VIDEO_INPUT_MODES = {"reference_to_video", "multimodal_reference"}
 VIDEO_ASPECT_RATIOS = {"16:9", "9:16", "1:1", "4:3", "3:4"}
 VIDEO_DURATIONS = {4, 8, 10, 12, 15}
+FREE_VIDEO_RESOLUTIONS = {"720p", "1080p"}
 
 
 class VideoGenerateRequest(BaseModel):
     scenario: str = "product_video"
     type_id: str
     title: str | None = None
-    input_mode: str
+    input_mode: str = "reference_to_video"
     image_urls: list[str] = Field(default_factory=list)
     input_video_url: str | None = None
+    video_urls: list[str] = Field(default_factory=list)
+    audio_urls: list[str] = Field(default_factory=list)
     user_prompt: str | None = None
     duration: int = 8
     resolution: str = "720p"
     aspect_ratio: str = "9:16"
+    generate_audio: bool = False
+    enable_web_search: bool = False
     settings_snapshot: dict | None = None
     sort_order: int = 0
     job_id: str | None = None
@@ -88,28 +93,19 @@ def _clean_video_url(video_url: str | None) -> str:
     return str(video_url or "").strip()
 
 
+def _clean_urls(urls: list[str]) -> list[str]:
+    return [str(url).strip() for url in urls if str(url).strip()]
+
+
 def _validate_video_inputs(
     input_mode: str,
     image_urls: list[str],
-    *,
-    allow_text: bool,
-    input_video_url: str = "",
 ) -> str | None:
     if input_mode not in VIDEO_INPUT_MODES:
         return "不支持的视频素材模式"
-    if input_mode == "text_to_video":
-        return None if allow_text else "商品视频暂不支持文生视频模式"
-    if input_mode == "video_edit":
-        if not allow_text:
-            return "商品视频暂不支持爆款复刻模式"
-        if not input_video_url:
-            return "爆款复刻必须上传或选择 1 条参考视频"
-        if len(image_urls) > 9:
-            return "爆款复刻最多只能选择 9 张参考图"
-        return None
     count = len(image_urls)
     if input_mode == "reference_to_video" and not 1 <= count <= 9:
-        return "参考图生视频必须上传 1-9 张图片"
+        return "商品视频必须上传 1-9 张参考图"
     return None
 
 
@@ -129,9 +125,8 @@ def _validate_video_duration(duration: int) -> str | None:
 
 def _video_input_mode_label(input_mode: str) -> str:
     labels = {
-        "text_to_video": "文生视频",
         "reference_to_video": "参考图生视频",
-        "video_edit": "爆款复刻",
+        "multimodal_reference": "多模态参考生视频",
     }
     return labels.get(input_mode, input_mode)
 
@@ -177,7 +172,7 @@ async def video_strategy(
 ):
     images = [item.model_dump() for item in req.images]
     image_urls = _clean_image_urls([item["url"] for item in images])
-    input_error = _validate_video_inputs(req.input_mode, image_urls, allow_text=False)
+    input_error = _validate_video_inputs(req.input_mode, image_urls)
     if input_error:
         return fail(input_error)
 
@@ -296,6 +291,36 @@ async def upload_video(
     )
 
 
+@router.post("/audio-upload", response_model=Response)
+async def upload_reference_audio(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        content = await file.read()
+        uploaded = await upload_audio_bytes(
+            user_id=current_user.id,
+            content=content,
+            content_type=file.content_type or "",
+            source="video-audio-uploads",
+        )
+    except (ValueError, OssConfigError) as e:
+        return fail(str(e))
+    except Exception:
+        return fail("音频上传失败")
+    finally:
+        await file.close()
+
+    return success(
+        {
+            "url": uploaded.url,
+            "object_key": uploaded.object_key,
+            "content_type": uploaded.content_type,
+            "size": uploaded.size,
+        }
+    )
+
+
 @router.post("/generate", response_model=Response)
 async def create_video_task(
     req: VideoGenerateRequest,
@@ -308,15 +333,27 @@ async def create_video_task(
         return fail("不支持的视频场景")
 
     image_urls = _clean_image_urls(req.image_urls)
+    video_urls = _clean_urls(req.video_urls)
+    audio_urls = _clean_urls(req.audio_urls)
     input_video_url = _clean_video_url(req.input_video_url)
-    input_error = _validate_video_inputs(
-        req.input_mode,
-        image_urls,
-        allow_text=scenario == "free_video",
-        input_video_url=input_video_url,
-    )
-    if input_error:
-        return fail(input_error)
+    effective_input_mode = req.input_mode
+    if scenario == "free_video":
+        effective_input_mode = "multimodal_reference"
+        if not str(req.user_prompt or "").strip():
+            return fail("请输入视频提示词")
+        if len(image_urls) > 9:
+            return fail("参考图最多只能上传 9 张")
+        if len(video_urls) > 3:
+            return fail("参考视频最多只能上传 3 条")
+        if len(audio_urls) > 3:
+            return fail("参考音频最多只能上传 3 条")
+    else:
+        input_error = _validate_video_inputs(
+            req.input_mode,
+            image_urls,
+        )
+        if input_error:
+            return fail(input_error)
 
     aspect_ratio = str(req.aspect_ratio or "").strip()
     aspect_error = _validate_aspect_ratio(aspect_ratio)
@@ -328,6 +365,8 @@ async def create_video_task(
 
     try:
         normalized_resolution = normalize_video_resolution(req.resolution)
+        if scenario == "free_video" and normalized_resolution not in FREE_VIDEO_RESOLUTIONS:
+            return fail("自由生视频清晰度请选择 720p / 1080p")
         credit_cost = await get_effective_video_credit_cost(
             db,
             normalized_resolution,
@@ -357,11 +396,15 @@ async def create_video_task(
         "scenario": scenario,
         "type_id": req.type_id,
         "title": req.title,
-        "input_mode": req.input_mode,
+        "input_mode": effective_input_mode,
         "input_video_url": input_video_url,
+        "video_urls": video_urls,
+        "audio_urls": audio_urls,
         "duration": req.duration,
         "resolution": normalized_resolution,
         "aspect_ratio": aspect_ratio,
+        "generate_audio": req.generate_audio,
+        "enable_web_search": req.enable_web_search,
     }
 
     try:
@@ -382,7 +425,7 @@ async def create_video_task(
         note=_video_consume_note(
             scenario=scenario,
             title=req.title,
-            input_mode=req.input_mode,
+            input_mode=effective_input_mode,
             resolution=normalized_resolution,
             duration=req.duration,
         ),
@@ -400,9 +443,9 @@ async def create_video_task(
         title=req.title,
         sort_order=req.sort_order,
         prompt=built_prompt.final_prompt,
-        input_mode=req.input_mode,
+        input_mode=effective_input_mode,
         input_images_json=dump_json_or_none(image_urls),
-        input_video_url=input_video_url or None,
+        input_video_url=(video_urls[0] if scenario == "free_video" and video_urls else input_video_url) or None,
         duration=req.duration,
         resolution=normalized_resolution,
         aspect_ratio=aspect_ratio,
@@ -437,6 +480,10 @@ async def create_video_task(
             normalized_resolution,
             image_urls,
             input_video_url,
+            video_urls,
+            audio_urls,
+            req.generate_audio,
+            req.enable_web_search,
         ),
         user_id=current_user.id,
         credit_cost=credit_cost,

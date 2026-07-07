@@ -24,10 +24,7 @@ import {
   defaultVideoCreditCosts,
   getVideoCreditCost,
 } from "@/constants/product-video.js";
-import {
-  getFreeVideoInputMode,
-  makeFreeVideoTitle,
-} from "@/constants/free-video.js";
+import { makeFreeVideoTitle } from "@/constants/free-video.js";
 
 const VIDEO_POLL_INTERVAL_MS = 3000;
 
@@ -42,33 +39,35 @@ function serializeImages(images) {
   }));
 }
 
-function serializeVideo(video) {
-  if (!video) return null;
-  return {
-    id: video.id,
-    url: video.url,
-    objectKey: video.objectKey,
-    contentType: video.contentType,
-    size: video.size,
-    previewUrl: video.url || video.previewUrl,
-    source: video.source || "",
-    assetTaskId: video.assetTaskId || "",
-  };
+function serializeMedia(items) {
+  return items.map((item) => ({
+    id: item.id,
+    url: item.url,
+    objectKey: item.objectKey,
+    contentType: item.contentType,
+    size: item.size,
+    name: item.name || "",
+    previewUrl: item.url || item.previewUrl,
+    source: item.source || "",
+    assetTaskId: item.assetTaskId || "",
+  }));
 }
 
 export function useFreeVideoGenerator({ confirm, onJobCreated } = {}) {
   const toast = useToast();
   const uploadedImages = ref([]);
-  const uploadedVideo = ref(null);
+  const uploadedVideos = ref([]);
+  const uploadedAudios = ref([]);
   const mainImageIndex = ref(0);
   const optimizing = ref(false);
   const creditCosts = ref({ ...defaultVideoCreditCosts });
   const settings = reactive({
-    inputMode: "text_to_video",
     prompt: "",
     duration: 8,
     resolution: "720p",
     aspectRatio: "9:16",
+    generateAudio: false,
+    enableWebSearch: false,
   });
 
   const cards = useGenerationCards({
@@ -110,13 +109,15 @@ export function useFreeVideoGenerator({ confirm, onJobCreated } = {}) {
     mediaUnit: "个",
     resetSceneState() {
       uploadedImages.value = [];
-      uploadedVideo.value = null;
+      uploadedVideos.value = [];
+      uploadedAudios.value = [];
       mainImageIndex.value = 0;
-      settings.inputMode = "text_to_video";
       settings.prompt = "";
       settings.duration = 8;
       settings.resolution = "720p";
       settings.aspectRatio = "9:16";
+      settings.generateAudio = false;
+      settings.enableWebSearch = false;
     },
     applyJobData(data) {
       restoreFreeVideoJobData(data);
@@ -175,7 +176,8 @@ export function useFreeVideoGenerator({ confirm, onJobCreated } = {}) {
 
   const hasPrompt = computed(() => settings.prompt.trim().length > 0);
   const hasUploadingImages = computed(() => uploadedImages.value.some((img) => img?.uploading));
-  const hasUploadingVideo = computed(() => Boolean(uploadedVideo.value?.uploading));
+  const hasUploadingVideos = computed(() => uploadedVideos.value.some((item) => item?.uploading));
+  const hasUploadingAudios = computed(() => uploadedAudios.value.some((item) => item?.uploading));
   const hasRunningTasks = computed(() => runningCount.value > 0 || creatingBatch.value || generating.value);
   const estimatedCredits = computed(() =>
     getVideoCreditCost({
@@ -184,21 +186,16 @@ export function useFreeVideoGenerator({ confirm, onJobCreated } = {}) {
       costs: creditCosts.value,
     }),
   );
-  const canOptimize = computed(
-    () => settings.inputMode === "text_to_video" && hasPrompt.value && !optimizing.value,
-  );
+  const canOptimize = computed(() => hasPrompt.value && !optimizing.value);
   const canGenerate = computed(() => {
-    if (!hasPrompt.value || hasUploadingImages.value || hasUploadingVideo.value || creatingBatch.value) return false;
+    if (!hasPrompt.value || hasUploadingImages.value || hasUploadingVideos.value || hasUploadingAudios.value || creatingBatch.value) return false;
     const imageCount = uploadedImages.value.filter((img) => img?.url).length;
-    if (settings.inputMode === "reference_to_video") return imageCount >= 1 && imageCount <= 9;
-    if (settings.inputMode === "video_edit") return Boolean(uploadedVideo.value?.url) && imageCount <= 9;
-    return true;
+    const videoCount = uploadedVideos.value.filter((item) => item?.url).length;
+    const audioCount = uploadedAudios.value.filter((item) => item?.url).length;
+    return imageCount <= 9 && videoCount <= 3 && audioCount <= 3;
   });
   const selectedVideoLabel = computed(
-    () =>
-      settings.inputMode === "video_edit"
-        ? `${settings.resolution} / 参考视频比例 / ${settings.duration}秒`
-        : `${settings.resolution} / ${settings.aspectRatio} / ${settings.duration}秒`,
+    () => `${settings.resolution} / ${settings.aspectRatio} / ${settings.duration}秒`,
   );
 
   async function loadCreditCosts() {
@@ -222,11 +219,12 @@ export function useFreeVideoGenerator({ confirm, onJobCreated } = {}) {
   function restoreFreeVideoJobData(data) {
     const sourceSettings = data.settings || {};
     const scene = getSnapshotScene(sourceSettings);
-    if (typeof scene.inputMode === "string") settings.inputMode = scene.inputMode;
     if (typeof scene.prompt === "string") settings.prompt = scene.prompt;
     if (typeof scene.duration === "number") settings.duration = scene.duration;
     if (typeof scene.resolution === "string") settings.resolution = scene.resolution;
     if (typeof scene.aspectRatio === "string") settings.aspectRatio = scene.aspectRatio;
+    settings.generateAudio = Boolean(scene.generateAudio);
+    settings.enableWebSearch = Boolean(scene.enableWebSearch);
     if (typeof data.input_text === "string") settings.prompt = data.input_text;
 
     if (Array.isArray(data.source_images)) {
@@ -237,13 +235,21 @@ export function useFreeVideoGenerator({ confirm, onJobCreated } = {}) {
     } else {
       uploadedImages.value = [];
     }
-    if (data.source_video?.url) {
-      uploadedVideo.value = {
-        ...data.source_video,
-        previewUrl: data.source_video.previewUrl || data.source_video.url,
-      };
+    if (Array.isArray(data.source_videos)) {
+      uploadedVideos.value = data.source_videos.map((item) => ({
+        ...item,
+        previewUrl: item?.previewUrl || item?.url || "",
+      }));
     } else {
-      uploadedVideo.value = null;
+      uploadedVideos.value = [];
+    }
+    if (Array.isArray(data.source_audios)) {
+      uploadedAudios.value = data.source_audios.map((item) => ({
+        ...item,
+        previewUrl: item?.previewUrl || item?.url || "",
+      }));
+    } else {
+      uploadedAudios.value = [];
     }
     mainImageIndex.value = 0;
   }
@@ -252,15 +258,14 @@ export function useFreeVideoGenerator({ confirm, onJobCreated } = {}) {
     const prompt = settings.prompt.trim();
     if (!prompt) return "请输入视频提示词";
     if (hasUploadingImages.value) return "素材还在上传中，请稍等";
-    if (hasUploadingVideo.value) return "参考视频还在上传中，请稍等";
+    if (hasUploadingVideos.value) return "参考视频还在上传中，请稍等";
+    if (hasUploadingAudios.value) return "参考音频还在上传中，请稍等";
     const imageCount = uploadedImages.value.filter((img) => img?.url).length;
-    if (settings.inputMode === "reference_to_video" && (imageCount < 1 || imageCount > 9)) {
-      return "参考图生视频必须上传 1-9 张图片";
-    }
-    if (settings.inputMode === "video_edit") {
-      if (!uploadedVideo.value?.url) return "爆款复刻必须选择 1 条参考视频";
-      if (imageCount > 9) return "爆款复刻最多只能选择 9 张参考图";
-    }
+    const videoCount = uploadedVideos.value.filter((item) => item?.url).length;
+    const audioCount = uploadedAudios.value.filter((item) => item?.url).length;
+    if (imageCount > 9) return "参考图最多只能上传 9 张";
+    if (videoCount > 3) return "参考视频最多只能上传 3 条";
+    if (audioCount > 3) return "参考音频最多只能上传 3 条";
     return "";
   }
 
@@ -270,11 +275,6 @@ export function useFreeVideoGenerator({ confirm, onJobCreated } = {}) {
       toast.info("请先输入视频提示词");
       return;
     }
-    if (settings.inputMode !== "text_to_video") {
-      toast.info("AI 优化暂只支持文生视频");
-      return;
-    }
-
     optimizing.value = true;
     try {
       const result = await optimizeFreeVideoPrompt(prompt);
@@ -305,12 +305,12 @@ export function useFreeVideoGenerator({ confirm, onJobCreated } = {}) {
       ratio: settings.aspectRatio,
       quality: settings.resolution,
       scene: {
-        inputMode: settings.inputMode,
-        inputModeLabel: getFreeVideoInputMode(settings.inputMode).label,
         prompt,
         duration: settings.duration,
         resolution: settings.resolution,
         aspectRatio: settings.aspectRatio,
+        generateAudio: settings.generateAudio,
+        enableWebSearch: settings.enableWebSearch,
       },
     });
   }
@@ -364,7 +364,8 @@ export function useFreeVideoGenerator({ confirm, onJobCreated } = {}) {
     const title = makeFreeVideoTitle(prompt);
     const settingsSnapshot = createSettingsSnapshot(prompt);
     const imageUrls = uploadedImages.value.map((img) => img?.url).filter(Boolean);
-    const inputVideoUrl = uploadedVideo.value?.url || "";
+    const videoUrls = uploadedVideos.value.map((item) => item?.url).filter(Boolean);
+    const audioUrls = uploadedAudios.value.map((item) => item?.url).filter(Boolean);
     const queue = [{ id: "free_video", title, prompt }];
 
     await enqueueMediaBatch({
@@ -372,7 +373,8 @@ export function useFreeVideoGenerator({ confirm, onJobCreated } = {}) {
       snapshotPayload: {
         settings: settingsSnapshot,
         source_images: serializeImages(uploadedImages.value),
-        source_video: uploadedVideo.value ? serializeVideo(uploadedVideo.value) : null,
+        source_videos: serializeMedia(uploadedVideos.value),
+        source_audios: serializeMedia(uploadedAudios.value),
         input_text: prompt,
         structure: [{ id: "free_video", title, prompt }],
       },
@@ -393,13 +395,16 @@ export function useFreeVideoGenerator({ confirm, onJobCreated } = {}) {
           scenario: "free_video",
           type_id: item.id,
           title: item.title,
-          input_mode: settings.inputMode,
+          input_mode: "multimodal_reference",
           image_urls: imageUrls,
-          input_video_url: inputVideoUrl || null,
+          video_urls: videoUrls,
+          audio_urls: audioUrls,
           user_prompt: item.prompt,
           duration: settings.duration,
           resolution: settings.resolution,
           aspect_ratio: settings.aspectRatio,
+          generate_audio: settings.generateAudio,
+          enable_web_search: settings.enableWebSearch,
           settings_snapshot: snapshot,
           sort_order: card.sortOrder,
           job_id: jobId,
@@ -459,7 +464,8 @@ export function useFreeVideoGenerator({ confirm, onJobCreated } = {}) {
   return {
     settings,
     uploadedImages,
-    uploadedVideo,
+    uploadedVideos,
+    uploadedAudios,
     mainImageIndex,
     optimizing,
     creditCosts,
