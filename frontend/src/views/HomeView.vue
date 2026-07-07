@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from "vue";
+import { computed, onBeforeUnmount, onMounted } from "vue";
 import { RouterLink } from "vue-router";
 import {
   ArrowRight,
@@ -36,15 +36,13 @@ const workspaceTarget = computed(() =>
     : { path: "/login", query: { redirect: "/generator/product-suite" } },
 );
 
-const scrollToSection = (id) => {
-  const target = document.getElementById(id);
-  if (!target) return;
+onMounted(() => {
+  document.documentElement.classList.add("scroll-smooth");
+});
 
-  window.scrollTo({
-    top: target.getBoundingClientRect().top + window.scrollY - 80,
-    behavior: "smooth",
-  });
-};
+onBeforeUnmount(() => {
+  document.documentElement.classList.remove("scroll-smooth");
+});
 
 const featureItems = [
   {
@@ -128,7 +126,7 @@ const showcaseItems = [
 </script>
 
 <template>
-  <div class="min-h-screen bg-slate-50 text-slate-950">
+  <div class="min-h-screen scroll-smooth bg-slate-50 text-slate-950">
     <header class="sticky top-0 z-30 border-b border-slate-200 bg-white/85 backdrop-blur">
       <div class="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 lg:px-8">
         <RouterLink to="/" class="flex items-center gap-3">
@@ -142,9 +140,9 @@ const showcaseItems = [
         </RouterLink>
 
         <nav class="hidden items-center rounded-full border border-slate-200 bg-slate-50 p-1 text-xs font-black text-slate-500 shadow-inner md:flex">
-          <button type="button" class="rounded-full px-4 py-2 transition-colors hover:bg-white hover:text-primary hover:shadow-sm" @click="scrollToSection('features')">能力矩阵</button>
-          <button type="button" class="rounded-full px-4 py-2 transition-colors hover:bg-white hover:text-primary hover:shadow-sm" @click="scrollToSection('workflow')">生成流程</button>
-          <button type="button" class="rounded-full px-4 py-2 transition-colors hover:bg-white hover:text-primary hover:shadow-sm" @click="scrollToSection('showcase')">作品展示</button>
+          <a href="#features" class="rounded-full px-4 py-2 transition-colors hover:bg-white hover:text-primary hover:shadow-sm">能力矩阵</a>
+          <a href="#workflow" class="rounded-full px-4 py-2 transition-colors hover:bg-white hover:text-primary hover:shadow-sm">生成流程</a>
+          <a href="#showcase" class="rounded-full px-4 py-2 transition-colors hover:bg-white hover:text-primary hover:shadow-sm">作品展示</a>
         </nav>
 
         <div class="flex items-center gap-2">
@@ -230,7 +228,7 @@ const showcaseItems = [
         </div>
       </section>
 
-      <section id="features" class="mx-auto max-w-7xl px-5 py-16 lg:px-8">
+      <section id="features" class="mx-auto max-w-7xl scroll-mt-24 px-5 py-16 lg:px-8">
         <div class="mb-8 max-w-3xl">
           <div>
             <p class="text-xs font-black uppercase text-primary">Creative Workspace</p>
@@ -291,7 +289,7 @@ const showcaseItems = [
         </div>
       </section>
 
-      <section id="workflow" class="border-y border-slate-200 bg-white">
+      <section id="workflow" class="scroll-mt-24 border-y border-slate-200 bg-white">
         <div class="mx-auto max-w-7xl px-5 py-16 lg:px-8">
           <div class="mx-auto max-w-3xl text-center">
             <p class="text-xs font-black uppercase text-primary">Workflow</p>
@@ -321,7 +319,7 @@ const showcaseItems = [
         </div>
       </section>
 
-      <section id="showcase" class="mx-auto max-w-7xl px-5 py-16 lg:px-8">
+      <section id="showcase" class="mx-auto max-w-7xl scroll-mt-24 px-5 py-16 lg:px-8">
         <div class="mb-8">
           <p class="text-xs font-black uppercase text-primary">Showcase</p>
           <h2 class="mt-2 text-2xl font-black text-slate-950 md:text-3xl">面向真实电商场景的视觉输出</h2>
