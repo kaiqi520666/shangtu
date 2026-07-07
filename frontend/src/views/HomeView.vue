@@ -179,7 +179,7 @@ const showcaseItems = [
               AI 电商内容生成平台
             </p>
             <h1 class="text-4xl font-black leading-tight md:text-6xl">
-              NodePass AI
+              一站式生成电商图片、视频与数字人内容
             </h1>
             <p class="mt-5 max-w-2xl text-base leading-8 text-slate-100 md:text-lg">
               从商品图、详情页、短视频到数字人和视频翻译，把电商内容生产流程整合到一个工作台。
