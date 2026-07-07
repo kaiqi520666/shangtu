@@ -283,19 +283,64 @@ const showcaseItems = [
           <p class="text-xs font-black uppercase text-primary">Showcase</p>
           <h2 class="mt-2 text-2xl font-black text-slate-950 md:text-3xl">面向真实电商场景的视觉输出</h2>
         </div>
-        <div class="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
-          <article
-            v-for="item in showcaseItems"
-            :key="item.title"
-            class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
-          >
-            <img :src="item.image" class="aspect-[4/3] w-full object-cover" :alt="item.title" />
-            <div class="p-4">
-              <h3 class="text-sm font-black text-slate-950">{{ item.title }}</h3>
-              <p class="mt-1 text-xs leading-5 text-slate-500">{{ item.desc }}</p>
+        <div class="grid gap-5 lg:grid-cols-[1.15fr_0.85fr]">
+          <article class="group overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+            <div class="relative">
+              <img :src="showcaseItems[0].image" class="aspect-[16/10] w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" :alt="showcaseItems[0].title" />
+              <div class="absolute left-4 top-4 rounded-full bg-white/90 px-3 py-1 text-xs font-black text-primary shadow-sm backdrop-blur">
+                图片生产
+              </div>
+            </div>
+            <div class="flex flex-col gap-4 p-5 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h3 class="text-xl font-black text-slate-950">{{ showcaseItems[0].title }}</h3>
+                <p class="mt-2 text-sm leading-6 text-slate-500">{{ showcaseItems[0].desc }}</p>
+              </div>
+              <RouterLink to="/generator/product-suite" class="inline-flex shrink-0 items-center gap-2 rounded-xl bg-primary px-4 py-2 text-xs font-black text-white transition-colors hover:bg-secondary">
+                生成图片
+                <ArrowRight class="h-4 w-4" />
+              </RouterLink>
             </div>
           </article>
+
+          <div class="grid gap-5">
+            <article class="group grid overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm sm:grid-cols-[0.95fr_1.05fr]">
+              <img :src="showcaseItems[1].image" class="h-full min-h-56 w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" :alt="showcaseItems[1].title" />
+              <div class="flex flex-col justify-between p-5">
+                <span class="w-fit rounded-full bg-primary/10 px-3 py-1 text-xs font-black text-primary">服饰穿搭</span>
+                <div class="mt-8">
+                  <h3 class="text-lg font-black text-slate-950">{{ showcaseItems[1].title }}</h3>
+                  <p class="mt-2 text-sm leading-6 text-slate-500">{{ showcaseItems[1].desc }}</p>
+                </div>
+              </div>
+            </article>
+
+            <article class="group grid overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm sm:grid-cols-[1.1fr_0.9fr]">
+              <div class="flex flex-col justify-between p-5">
+                <span class="w-fit rounded-full bg-primary/10 px-3 py-1 text-xs font-black text-primary">视频生成</span>
+                <div class="mt-8">
+                  <h3 class="text-lg font-black text-slate-950">{{ showcaseItems[2].title }}</h3>
+                  <p class="mt-2 text-sm leading-6 text-slate-500">{{ showcaseItems[2].desc }}</p>
+                </div>
+              </div>
+              <img :src="showcaseItems[2].image" class="h-full min-h-56 w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" :alt="showcaseItems[2].title" />
+            </article>
+          </div>
         </div>
+
+        <article class="mt-5 grid overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm lg:grid-cols-[0.85fr_1.15fr]">
+          <div class="flex flex-col justify-center p-6">
+            <span class="w-fit rounded-full bg-primary/10 px-3 py-1 text-xs font-black text-primary">数字人与翻译</span>
+            <h3 class="mt-6 text-2xl font-black text-slate-950">{{ showcaseItems[3].title }}</h3>
+            <p class="mt-3 max-w-xl text-sm leading-7 text-slate-500">{{ showcaseItems[3].desc }}</p>
+            <div class="mt-5 flex flex-wrap gap-2 text-xs font-bold text-slate-500">
+              <span class="rounded-full bg-slate-100 px-3 py-1">口播视频</span>
+              <span class="rounded-full bg-slate-100 px-3 py-1">多语言翻译</span>
+              <span class="rounded-full bg-slate-100 px-3 py-1">素材复用</span>
+            </div>
+          </div>
+          <img :src="showcaseItems[3].image" class="h-full min-h-72 w-full object-cover" :alt="showcaseItems[3].title" />
+        </article>
       </section>
 
       <section class="bg-slate-950 px-5 py-14 text-white lg:px-8">
