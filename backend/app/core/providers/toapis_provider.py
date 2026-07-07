@@ -9,6 +9,10 @@ load_dotenv()
 
 TOAPIS_BASE_URL = (os.getenv("TOAPIS_URL") or "https://toapis.com").rstrip("/")
 TOAPIS_KEY = os.getenv("TOAPIS_KEY")
+TOPENROUTER_BASE_URL = (
+    os.getenv("TOPENROUTER_URL") or "https://tp-api.chinadatapay.com:8000"
+).rstrip("/")
+TOPENROUTER_KEY = os.getenv("TOPENROUTER_KEY") or os.getenv("TOPENROUTER_API_KEY")
 
 POLL_INTERVAL_SECONDS = 5
 MAX_WAIT_SECONDS = 20 * 60
@@ -33,7 +37,7 @@ TOAPIS_SIZE_TABLE: dict[str, dict[str, tuple[int, int]]] = {
 }
 
 TOAPIS_STATUS_DONE = {"completed", "succeeded", "success"}
-TOAPIS_STATUS_FAILED = {"failed", "error", "cancelled", "canceled"}
+TOAPIS_STATUS_FAILED = {"failed", "error", "cancelled", "canceled", "expired"}
 
 
 def validate_size(ratio: str, resolution: str) -> str | None:
@@ -80,22 +84,37 @@ def build_video_create_payload(
 ) -> dict:
     cleaned_urls = [url for url in image_urls if url]
     provider_resolution = str(resolution or "").lower()
-    payload: dict[str, Any] = {
-        "model": VIDEO_GENERATE_MODEL,
-        "prompt": prompt,
-        "duration": int(duration),
-        "aspect_ratio": aspect_ratio,
-        "resolution": provider_resolution,
-    }
-    if client_business_id:
-        payload["client_business_id"] = client_business_id
-    if cleaned_urls:
-        payload["image_with_roles"] = [
-            {"url": url, "role": "reference_image"} for url in cleaned_urls[:9]
-        ]
+    content: list[dict[str, Any]] = []
+    if prompt:
+        content.append({"type": "text", "text": prompt})
+    content.extend(
+        {
+            "type": "image_url",
+            "image_url": {"url": url},
+            "role": "reference_image",
+        }
+        for url in cleaned_urls[:9]
+    )
     video_url = str(input_video_url or "").strip()
     if video_url:
-        payload["video_with_roles"] = [{"url": video_url, "role": "reference_video"}]
+        content.append(
+            {
+                "type": "video_url",
+                "video_url": {"url": video_url},
+                "role": "reference_video",
+            }
+        )
+    payload: dict[str, Any] = {
+        "model": VIDEO_GENERATE_MODEL,
+        "content": content,
+        "duration": int(duration),
+        "ratio": aspect_ratio,
+        "resolution": provider_resolution,
+        "execution_expires_after": 3600,
+        "watermark": False,
+    }
+    if client_business_id:
+        payload["safety_identifier"] = client_business_id
     return payload
 
 
@@ -139,18 +158,33 @@ def extract_provider_progress(poll_response: dict) -> int | None:
         return None
 
 
+def _extract_error_message(error: Any) -> str | None:
+    if isinstance(error, dict):
+        message = error.get("message") or error.get("detail")
+        code = error.get("code")
+        if message and code:
+            return f"{code}: {message}"
+        if message:
+            return str(message)
+        if code:
+            return str(code)
+    if isinstance(error, str) and error:
+        return error
+    return None
+
+
 def extract_provider_error(poll_response: dict) -> str | None:
-    err = poll_response.get("error") or poll_response.get("error_message")
-    if isinstance(err, dict):
-        err = err.get("message") or err.get("detail")
-    if isinstance(err, str) and err:
+    err = _extract_error_message(poll_response.get("error")) or _extract_error_message(
+        poll_response.get("error_message")
+    )
+    if err:
         return err
     data = poll_response.get("data")
     if isinstance(data, dict):
-        nested = data.get("error") or data.get("error_message")
-        if isinstance(nested, dict):
-            nested = nested.get("message") or nested.get("detail")
-        if isinstance(nested, str) and nested:
+        nested = _extract_error_message(data.get("error")) or _extract_error_message(
+            data.get("error_message")
+        )
+        if nested:
             return nested
     return None
 
@@ -158,6 +192,7 @@ def extract_provider_error(poll_response: dict) -> str | None:
 def extract_result_url(poll_response: dict) -> str | None:
     # 候选位置：顶层 data / 顶层 result / data.data / data.result（覆盖 ToAPIS 的多种返回形态）
     candidates: list[Any] = [
+        poll_response.get("content"),
         poll_response.get("data"),
         poll_response.get("result"),
     ]
@@ -173,6 +208,9 @@ def extract_result_url(poll_response: dict) -> str | None:
             if isinstance(url, str) and url:
                 return url
         if isinstance(node, dict):
+            video_url = node.get("video_url")
+            if isinstance(video_url, str) and video_url:
+                return video_url
             url = node.get("url")
             if isinstance(url, str) and url:
                 return url
@@ -186,7 +224,19 @@ def extract_result_url(poll_response: dict) -> str | None:
 
 
 async def create_generation(client, *, media: str, payload: dict) -> dict:
-    media_path = "images" if media == "image" else "videos"
+    if media == "video":
+        resp = await client.post(
+            f"{TOPENROUTER_BASE_URL}/v1/video/tasks",
+            headers={
+                "Authorization": f"Bearer {TOPENROUTER_KEY}",
+                "Content-Type": "application/json",
+            },
+            json=payload,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    media_path = "images"
     resp = await client.post(
         f"{TOAPIS_BASE_URL}/v1/{media_path}/generations",
         headers={
@@ -200,7 +250,15 @@ async def create_generation(client, *, media: str, payload: dict) -> dict:
 
 
 async def fetch_generation(client, *, media: str, provider_task_id: str) -> dict:
-    media_path = "images" if media == "image" else "videos"
+    if media == "video":
+        resp = await client.get(
+            f"{TOPENROUTER_BASE_URL}/v1/video/tasks/{provider_task_id}",
+            headers={"Authorization": f"Bearer {TOPENROUTER_KEY}"},
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    media_path = "images"
     resp = await client.get(
         f"{TOAPIS_BASE_URL}/v1/{media_path}/generations/{provider_task_id}",
         headers={"Authorization": f"Bearer {TOAPIS_KEY}"},

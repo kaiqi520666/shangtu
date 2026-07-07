@@ -2,6 +2,7 @@ import logging
 
 from app.core.generated_media_storage import materialize_video_to_oss
 from app.core.providers.toapis_provider import (
+    TOPENROUTER_KEY,
     VIDEO_MAX_WAIT_SECONDS,
     VIDEO_POLL_INTERVAL_SECONDS,
     build_video_create_payload,
@@ -42,7 +43,7 @@ async def generate_video(
             reason = f"{exc} | {detail}" if detail else str(exc)
         else:
             reason = f"{type(exc).__name__}: {exc!r}"
-        return f"创建 ToAPIS 视频任务失败: {reason}"
+        return f"创建 TopenRouter 视频任务失败: {reason}"
 
     config = GenerationRunnerConfig(
         media_type="video",
@@ -67,17 +68,18 @@ async def generate_video(
         ),
         materialize_result=materialize_video_to_oss,
         validate_inputs=None,
-        config_missing_message=lambda: "TOAPIS_KEY 未配置，无法调用视频生成服务",
+        provider_configured=lambda: bool(TOPENROUTER_KEY),
+        config_missing_message=lambda: "TOPENROUTER_KEY 未配置，无法调用视频生成服务",
         task_missing_message=lambda: "视频任务不存在或已删除",
         create_failure_message=create_failure_message,
-        create_parse_failure_message=lambda exc: f"ToAPIS 视频创建响应解析失败: {exc}",
-        poll_failure_log_message="轮询 ToAPIS 视频异常: %s",
-        poll_parse_log_message="ToAPIS 视频轮询响应解析失败: %s",
-        missing_provider_task_message="ToAPIS 未返回 video task id",
-        result_missing_message=lambda: "ToAPIS 已完成但未返回视频 URL",
-        provider_failed_message="ToAPIS 视频任务失败",
-        wait_timeout_message="等待 ToAPIS 视频任务超时",
-        request_timeout_message="请求 ToAPIS 视频服务超时",
+        create_parse_failure_message=lambda exc: f"TopenRouter 视频创建响应解析失败: {exc}",
+        poll_failure_log_message="轮询 TopenRouter 视频异常: %s",
+        poll_parse_log_message="TopenRouter 视频轮询响应解析失败: %s",
+        missing_provider_task_message="TopenRouter 未返回 video task id",
+        result_missing_message=lambda: "TopenRouter 已完成但未返回视频 URL",
+        provider_failed_message="TopenRouter 视频任务失败",
+        wait_timeout_message="等待 TopenRouter 视频任务超时",
+        request_timeout_message="请求 TopenRouter 视频服务超时",
         unexpected_failure_log_message="视频任务失败详细错误: %s",
         download_failure_message=lambda exc: f"下载生成视频失败: {exc}",
         upload_failure_message=lambda exc: f"视频上传 OSS 失败: {exc}",

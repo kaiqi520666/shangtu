@@ -35,6 +35,7 @@ FetchFailureMessageFn = Callable[[Exception], str]
 ResultMissingMessageFn = Callable[[], str]
 TaskMissingMessageFn = Callable[[], str]
 ConfigMissingMessageFn = Callable[[], str]
+ProviderConfiguredFn = Callable[[], bool]
 
 
 @dataclass(slots=True)
@@ -57,6 +58,7 @@ class GenerationRunnerConfig:
     materialize_result: MaterializeFn | None = None
     is_download_error: IsDownloadErrorFn | None = None
     validate_inputs: Callable[[], str | None] | None = None
+    provider_configured: ProviderConfiguredFn = lambda: bool(TOAPIS_KEY)
     config_missing_message: ConfigMissingMessageFn | None = None
     task_missing_message: TaskMissingMessageFn | None = None
     create_failure_message: CreateFailureMessageFn | None = None
@@ -160,7 +162,7 @@ async def run_generation_task(
     try:
         await _mark_processing(redis, task_id, config)
 
-        if not TOAPIS_KEY:
+        if not config.provider_configured():
             if config.mark_failed is not None and config.config_missing_message is not None:
                 await config.mark_failed(redis, task_id, config.config_missing_message())
             return
