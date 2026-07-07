@@ -36,6 +36,16 @@ const workspaceTarget = computed(() =>
     : { path: "/login", query: { redirect: "/generator/product-suite" } },
 );
 
+const scrollToSection = (id) => {
+  const target = document.getElementById(id);
+  if (!target) return;
+
+  window.scrollTo({
+    top: target.getBoundingClientRect().top + window.scrollY - 80,
+    behavior: "smooth",
+  });
+};
+
 const featureItems = [
   {
     icon: Layers3,
@@ -132,9 +142,9 @@ const showcaseItems = [
         </RouterLink>
 
         <nav class="hidden items-center rounded-full border border-slate-200 bg-slate-50 p-1 text-xs font-black text-slate-500 shadow-inner md:flex">
-          <a href="#features" class="rounded-full px-4 py-2 transition-colors hover:bg-white hover:text-primary hover:shadow-sm">能力矩阵</a>
-          <a href="#workflow" class="rounded-full px-4 py-2 transition-colors hover:bg-white hover:text-primary hover:shadow-sm">生成流程</a>
-          <a href="#showcase" class="rounded-full px-4 py-2 transition-colors hover:bg-white hover:text-primary hover:shadow-sm">作品展示</a>
+          <button type="button" class="rounded-full px-4 py-2 transition-colors hover:bg-white hover:text-primary hover:shadow-sm" @click="scrollToSection('features')">能力矩阵</button>
+          <button type="button" class="rounded-full px-4 py-2 transition-colors hover:bg-white hover:text-primary hover:shadow-sm" @click="scrollToSection('workflow')">生成流程</button>
+          <button type="button" class="rounded-full px-4 py-2 transition-colors hover:bg-white hover:text-primary hover:shadow-sm" @click="scrollToSection('showcase')">作品展示</button>
         </nav>
 
         <div class="flex items-center gap-2">
