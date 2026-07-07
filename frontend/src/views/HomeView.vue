@@ -3,6 +3,7 @@ import { computed } from "vue";
 import { RouterLink } from "vue-router";
 import {
   ArrowRight,
+  Boxes,
   CheckCircle2,
   Clapperboard,
   FolderOpen,
@@ -14,6 +15,7 @@ import {
   Sparkles,
   UserRound,
   WandSparkles,
+  Workflow,
 } from "lucide-vue-next";
 import { useAuthStore } from "@/stores/auth.js";
 
@@ -101,10 +103,10 @@ const featureItems = [
 ];
 
 const workflowItems = [
-  { title: "上传素材", desc: "商品图、服装图、视频和音频集中管理。" },
-  { title: "选择场景", desc: "套图、详情页、短视频、数字人等流程直达。" },
-  { title: "AI 生成", desc: "策略、提示词、参考素材一起驱动生成。" },
-  { title: "沉淀资产", desc: "结果自动进入资产库，方便复用和下载。" },
+  { icon: ImagePlus, title: "上传素材", desc: "图片、视频、音频统一进入素材池。" },
+  { icon: Workflow, title: "选择场景", desc: "套图、详情、视频、数字人流程直达。" },
+  { icon: WandSparkles, title: "AI 生成", desc: "策略、提示词和参考素材协同生成。" },
+  { icon: Boxes, title: "沉淀资产", desc: "结果自动进入资产库，方便复用下载。" },
 ];
 
 const showcaseItems = [
@@ -254,25 +256,30 @@ const showcaseItems = [
       </section>
 
       <section id="workflow" class="border-y border-slate-200 bg-white">
-        <div class="mx-auto grid max-w-7xl gap-10 px-5 py-16 lg:grid-cols-[0.9fr_1.1fr] lg:px-8">
-          <div>
+        <div class="mx-auto max-w-7xl px-5 py-16 lg:px-8">
+          <div class="mx-auto max-w-3xl text-center">
             <p class="text-xs font-black uppercase text-primary">Workflow</p>
-            <h2 class="mt-2 text-2xl font-black text-slate-950 md:text-3xl">从素材到资产，减少重复操作</h2>
+            <h2 class="mt-2 text-2xl font-black text-slate-950 md:text-3xl">从素材到成品，一条线完成</h2>
             <p class="mt-4 text-sm leading-7 text-slate-500">
-              NodePass AI 把生成流程拆成清晰步骤，既能快速试图，也能沉淀可复用的素材和成品。
+              把上传、选择、生成和资产沉淀串成固定流程，减少重复配置，让团队更快拿到可用内容。
             </p>
           </div>
-          <div class="grid gap-4 sm:grid-cols-2">
+
+          <div class="relative mt-10 grid gap-4 lg:grid-cols-4">
+            <div class="absolute left-10 right-10 top-12 hidden h-px bg-gradient-to-r from-primary/0 via-primary/40 to-primary/0 lg:block"></div>
             <article
               v-for="(item, index) in workflowItems"
               :key="item.title"
-              class="rounded-2xl border border-slate-200 bg-slate-50 p-5"
+              class="relative rounded-3xl border border-slate-200 bg-slate-50 p-5 shadow-sm"
             >
-              <span class="mb-5 flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-sm font-black text-white">
-                {{ index + 1 }}
-              </span>
-              <h3 class="text-sm font-black text-slate-950">{{ item.title }}</h3>
-              <p class="mt-2 text-xs leading-6 text-slate-500">{{ item.desc }}</p>
+              <div class="mb-6 flex items-center justify-between">
+                <span class="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-white shadow-lg shadow-primary/20">
+                  <component :is="item.icon" class="h-6 w-6" />
+                </span>
+                <span class="font-mono text-3xl font-black text-slate-200">0{{ index + 1 }}</span>
+              </div>
+              <h3 class="text-base font-black text-slate-950">{{ item.title }}</h3>
+              <p class="mt-2 text-sm leading-6 text-slate-500">{{ item.desc }}</p>
             </article>
           </div>
         </div>
