@@ -32,7 +32,7 @@ from app.core.user_credits import (
 )
 from app.core.video_prompt_builder import build_video_generate_prompt
 from app.core.video_strategy_generation import generate_video_strategy
-from app.models import GenerationJob, User, VideoTask
+from app.models import GenerationJob, User, UserAudioAsset, VideoTask
 from app.schemas.response import Response, fail, success
 from app.services.generation_tasks import deduct_credits_or_fail, enqueue_or_compensate
 
@@ -295,6 +295,7 @@ async def upload_video(
 async def upload_reference_audio(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     try:
         content = await file.read()
@@ -304,9 +305,22 @@ async def upload_reference_audio(
             content_type=file.content_type or "",
             source="video-audio-uploads",
         )
+        asset = UserAudioAsset(
+            user_id=current_user.id,
+            name=(file.filename or "参考音频").strip()[:255] or "参考音频",
+            audio_url=uploaded.url,
+            object_key=uploaded.object_key,
+            duration_seconds=0,
+            size=uploaded.size,
+            content_type=uploaded.content_type,
+            source="upload",
+        )
+        db.add(asset)
+        await db.commit()
     except (ValueError, OssConfigError) as e:
         return fail(str(e))
     except Exception:
+        await db.rollback()
         return fail("音频上传失败")
     finally:
         await file.close()
@@ -317,6 +331,7 @@ async def upload_reference_audio(
             "object_key": uploaded.object_key,
             "content_type": uploaded.content_type,
             "size": uploaded.size,
+            "asset_id": asset.id,
         }
     )
 

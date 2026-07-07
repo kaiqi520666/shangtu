@@ -6,7 +6,7 @@ from app.core.prompt_snapshot import parse_prompt_snapshot
 from app.core.scenarios import VIDEO_SCENARIOS
 from app.core.task_timeout import project_task_runtime_state, user_visible_task_error
 from app.core.time import to_utc_iso
-from app.models import GenerationJob, ImageTask, User, VideoTask
+from app.models import GenerationJob, ImageTask, User, UserAudioAsset, VideoTask
 
 
 def image_task_payload(task: ImageTask) -> dict:
@@ -126,6 +126,28 @@ def video_asset_select(user_id: int, scenario: str | None):
     return stmt
 
 
+def audio_asset_select(user_id: int, scenario: str | None):
+    if scenario:
+        return None
+    return (
+        select(
+            UserAudioAsset.id.label("task_id"),
+            literal("audio").label("media_type"),
+            UserAudioAsset.audio_url.label("result_url"),
+            UserAudioAsset.name.label("title"),
+            literal("audio").label("type_id"),
+            literal("").label("scenario"),
+            literal("").label("job_title"),
+            UserAudioAsset.created_at.label("created_at"),
+        )
+        .where(
+            UserAudioAsset.user_id == user_id,
+            UserAudioAsset.enabled.is_(True),
+            UserAudioAsset.archived_at.is_(None),
+        )
+    )
+
+
 def image_admin_select():
     return (
         select(
@@ -235,3 +257,7 @@ def includes_image(media_type: str | None) -> bool:
 
 def includes_video(media_type: str | None) -> bool:
     return media_type in (None, "", "video")
+
+
+def includes_audio(media_type: str | None) -> bool:
+    return media_type == "audio"

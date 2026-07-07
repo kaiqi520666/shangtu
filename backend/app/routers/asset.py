@@ -5,7 +5,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_user, get_db
 from app.core.media_projection import (
+    audio_asset_select,
     image_asset_select,
+    includes_audio,
     includes_image,
     includes_video,
     video_asset_select,
@@ -14,7 +16,7 @@ from app.core.oss import image_url_variants
 from app.core.scenarios import SUPPORTED_GENERATION_SCENARIOS
 from app.core.task_state import task_state_keys
 from app.core.time import to_utc_iso
-from app.models import ImageTask, User, VideoTask
+from app.models import ImageTask, User, UserAudioAsset, VideoTask
 from app.schemas.response import Response, fail, success
 
 router = APIRouter(prefix="/asset", tags=["资产库"])
@@ -42,6 +44,7 @@ async def list_assets(
         for stmt in (
             image_asset_select(current_user.id, scenario) if includes_image(media_type) else None,
             video_asset_select(current_user.id, scenario) if includes_video(media_type) else None,
+            audio_asset_select(current_user.id, scenario) if includes_audio(media_type) else None,
         )
         if stmt is not None
     ]
@@ -128,6 +131,18 @@ async def batch_delete_assets(
         )
         result = await db.execute(stmt)
         deleted_video_ids.extend([row[0] for row in result.all()])
+    deleted_audio_ids: list[str] = []
+    if includes_audio(req.media_type):
+        stmt = (
+            delete(UserAudioAsset)
+            .where(
+                UserAudioAsset.id.in_(req.task_ids),
+                UserAudioAsset.user_id == current_user.id,
+            )
+            .returning(UserAudioAsset.id)
+        )
+        result = await db.execute(stmt)
+        deleted_audio_ids.extend([row[0] for row in result.all()])
     await db.commit()
 
     # 清理 Redis 缓存 key（best effort）
@@ -144,5 +159,5 @@ async def batch_delete_assets(
         except Exception:
             pass  # Redis 清理失败不影响主流程
 
-    all_deleted_ids = [*deleted_ids, *deleted_video_ids]
+    all_deleted_ids = [*deleted_ids, *deleted_video_ids, *deleted_audio_ids]
     return success({"deleted": len(all_deleted_ids), "deleted_ids": all_deleted_ids})

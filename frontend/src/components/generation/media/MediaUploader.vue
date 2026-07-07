@@ -50,7 +50,7 @@ const assetPickerOpen = ref(false);
 const icon = computed(() => (props.mediaType === "audio" ? FileAudio : Video));
 const accept = computed(() => `${props.mediaType}/*`);
 const remainingCount = computed(() => Math.max(0, props.maxCount - props.items.length));
-const canPickAsset = computed(() => props.mediaType === "video" && props.showAssetButton);
+const canPickAsset = computed(() => props.showAssetButton);
 
 function triggerFileInput() {
   fileInput.value?.click();
@@ -139,6 +139,7 @@ function handleDrop(event) {
 }
 
 function addAssetItems(assets) {
+  const fallbackName = props.mediaType === "audio" ? "资产库音频" : "资产库视频";
   const selected = assets.slice(0, remainingCount.value).map((asset) => ({
     id: `asset_${asset.taskId || asset.id}`,
     previewUrl: asset.url,
@@ -146,7 +147,7 @@ function addAssetItems(assets) {
     objectKey: "",
     contentType: "",
     size: 0,
-    name: asset.title || "资产库视频",
+    name: asset.title || fallbackName,
     uploading: false,
     error: "",
     source: "asset",
@@ -282,8 +283,8 @@ onBeforeUnmount(() => {
 
     <AssetPickerModal
       :open="assetPickerOpen"
-      media-type="video"
-      title="从资产库选择视频"
+      :media-type="mediaType"
+      :title="`从资产库选择${mediaType === 'audio' ? '音频' : '视频'}`"
       :max-count="remainingCount"
       :exclude-urls="items.map((item) => item?.url).filter(Boolean)"
       @close="assetPickerOpen = false"

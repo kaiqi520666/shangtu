@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref, watch } from "vue";
-import { Check, ChevronLeft, ChevronRight, ImageOff, LoaderCircle } from "lucide-vue-next";
+import { Check, ChevronLeft, ChevronRight, FileAudio, ImageOff, LoaderCircle } from "lucide-vue-next";
 import { listAssets } from "@/api/assets.js";
 import AppModal from "@/components/ui/AppModal.vue";
 
@@ -50,7 +50,12 @@ const scenarioOptions = [
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)));
 const selectedAssets = computed(() => Object.values(selectedMap.value));
 const selectedCount = computed(() => selectedAssets.value.length);
-const mediaLabel = computed(() => (props.mediaType === "video" ? "视频" : "图片"));
+const mediaLabel = computed(() => {
+  if (props.mediaType === "video") return "视频";
+  if (props.mediaType === "audio") return "音频";
+  return "图片";
+});
+const scenarioFilters = computed(() => (props.mediaType === "audio" ? scenarioOptions.slice(0, 1) : scenarioOptions));
 
 watch(
   () => props.open,
@@ -158,7 +163,7 @@ function confirmSelection() {
       <div class="flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 px-5 py-3">
         <div class="flex flex-wrap gap-2">
           <button
-            v-for="option in scenarioOptions"
+            v-for="option in scenarioFilters"
             :key="option.value"
             type="button"
             class="rounded-full border px-3 py-1 text-xs font-bold transition-colors"
@@ -210,6 +215,12 @@ function confirmSelection() {
                 playsinline
                 preload="metadata"
               ></video>
+              <div v-else-if="asset.mediaType === 'audio'" class="flex w-full flex-col items-center gap-3 px-2">
+                <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-primary shadow-sm">
+                  <FileAudio class="h-6 w-6" />
+                </div>
+                <audio :src="asset.url" controls preload="none" class="h-10 w-full"></audio>
+              </div>
               <img
                 v-else
                 :src="asset.thumbUrl || asset.url"
