@@ -221,37 +221,63 @@ const showcaseItems = [
       </section>
 
       <section id="features" class="mx-auto max-w-7xl px-5 py-16 lg:px-8">
-        <div class="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
+        <div class="mb-8 max-w-3xl">
           <div>
             <p class="text-xs font-black uppercase text-primary">Creative Workspace</p>
             <h2 class="mt-2 text-2xl font-black text-slate-950 md:text-3xl">覆盖电商内容生产全链路</h2>
           </div>
-          <p class="max-w-xl text-sm leading-7 text-slate-500">
+          <p class="mt-4 text-sm leading-7 text-slate-500">
             从素材上传到成品下载，功能入口集中在一个工作台，适合跨境电商、国内电商和短视频带货团队。
           </p>
         </div>
 
-        <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div class="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
           <RouterLink
-            v-for="item in featureItems"
-            :key="item.title"
-            :to="item.to"
-            class="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all hover:-translate-y-1 hover:border-primary/35 hover:shadow-md"
+            :to="featureItems[0].to"
+            class="group relative min-h-[460px] overflow-hidden rounded-3xl bg-slate-950 p-6 text-white shadow-xl"
           >
-            <div class="flex h-full gap-4 p-4">
-              <img :src="item.image" class="h-20 w-24 shrink-0 rounded-xl object-cover" :alt="item.title" />
-              <div class="min-w-0 flex-1">
-                <div class="mb-3 flex items-center justify-between gap-3">
-                  <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                    <component :is="item.icon" class="h-5 w-5" />
-                  </span>
-                  <ArrowRight class="h-4 w-4 text-slate-300 transition-colors group-hover:text-primary" />
+            <img :src="featureItems[0].image" class="absolute inset-0 h-full w-full object-cover opacity-60 transition-transform duration-700 group-hover:scale-[1.04]" :alt="featureItems[0].title" />
+            <div class="absolute inset-0 bg-slate-950/45"></div>
+            <div class="relative flex h-full flex-col justify-between">
+              <div class="flex items-center justify-between">
+                <span class="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-black backdrop-blur">
+                  核心能力
+                </span>
+                <span class="flex h-10 w-10 items-center justify-center rounded-full bg-white/15 backdrop-blur transition-colors group-hover:bg-primary">
+                  <ArrowRight class="h-5 w-5" />
+                </span>
+              </div>
+              <div>
+                <component :is="featureItems[0].icon" class="mb-5 h-10 w-10 text-primary" />
+                <h3 class="text-3xl font-black">{{ featureItems[0].title }}</h3>
+                <p class="mt-3 max-w-md text-sm leading-7 text-slate-100">{{ featureItems[0].desc }}</p>
+                <div class="mt-6 flex flex-wrap gap-2 text-xs font-bold text-white/85">
+                  <span class="rounded-full bg-white/10 px-3 py-1 backdrop-blur">主图</span>
+                  <span class="rounded-full bg-white/10 px-3 py-1 backdrop-blur">场景图</span>
+                  <span class="rounded-full bg-white/10 px-3 py-1 backdrop-blur">卖点图</span>
+                  <span class="rounded-full bg-white/10 px-3 py-1 backdrop-blur">细节图</span>
                 </div>
-                <h3 class="text-sm font-black text-slate-950">{{ item.title }}</h3>
-                <p class="mt-1 text-xs leading-5 text-slate-500">{{ item.desc }}</p>
               </div>
             </div>
           </RouterLink>
+
+          <div class="grid gap-4 sm:grid-cols-2">
+            <RouterLink
+              v-for="item in featureItems.slice(1)"
+              :key="item.title"
+              :to="item.to"
+              class="group rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:-translate-y-1 hover:border-primary/35 hover:shadow-md"
+            >
+              <div class="flex items-start justify-between gap-4">
+                <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                  <component :is="item.icon" class="h-6 w-6" />
+                </span>
+                <ArrowRight class="h-4 w-4 text-slate-300 transition-colors group-hover:text-primary" />
+              </div>
+              <h3 class="mt-6 text-base font-black text-slate-950">{{ item.title }}</h3>
+              <p class="mt-2 text-sm leading-6 text-slate-500">{{ item.desc }}</p>
+            </RouterLink>
+          </div>
         </div>
       </section>
 
