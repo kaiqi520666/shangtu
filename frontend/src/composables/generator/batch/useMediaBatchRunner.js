@@ -10,35 +10,16 @@ import {
 import { getApiErrorMessage } from "@/utils/apiError.js";
 
 const TITLE_DEBOUNCE_MS = 600;
-const BATCH_SORT_ORDER_KEY = "batch_sort_order";
 
 function getNumericOrder(value, fallback = 0) {
   const numberValue = Number(value);
   return Number.isFinite(numberValue) ? numberValue : fallback;
 }
 
-function attachBatchSortOrder(settingsSnapshot, batchSortOrder) {
-  return {
-    ...(settingsSnapshot && typeof settingsSnapshot === "object" ? settingsSnapshot : {}),
-    [BATCH_SORT_ORDER_KEY]: batchSortOrder,
-  };
-}
-
-function getCardBatchSortOrder(card) {
-  return getNumericOrder(
-    card.batchSortOrder ?? card.settingsSnapshot?.[BATCH_SORT_ORDER_KEY],
-    getNumericOrder(card.sortOrder),
-  );
-}
-
 function sortOutputCards(cards) {
-  return [...cards].sort((left, right) => {
-    const batchDiff = getCardBatchSortOrder(right) - getCardBatchSortOrder(left);
-    if (batchDiff !== 0) return batchDiff;
-    const sortDiff = getNumericOrder(left.sortOrder) - getNumericOrder(right.sortOrder);
-    if (sortDiff !== 0) return sortDiff;
-    return String(left.id || "").localeCompare(String(right.id || ""));
-  });
+  return [...cards].sort(
+    (left, right) => getNumericOrder(left.sortOrder) - getNumericOrder(right.sortOrder),
+  );
 }
 
 export function useMediaBatchRunner({
@@ -221,12 +202,8 @@ export function useMediaBatchRunner({
   function buildBatchCards({ queue, baseSortOrder, batchRunId, buildSettingsSnapshot, createCard }) {
     return queue.map((item, index) => {
       const sortOrder = baseSortOrder + index;
-      const settingsSnapshot = attachBatchSortOrder(
-        buildSettingsSnapshot?.(item, { index, sortOrder }) || null,
-        baseSortOrder,
-      );
+      const settingsSnapshot = buildSettingsSnapshot?.(item, { index, sortOrder }) || null;
       const card = createCard({ item, index, sortOrder, batchRunId, settingsSnapshot });
-      card.batchSortOrder = baseSortOrder;
       return {
         card,
         item,
