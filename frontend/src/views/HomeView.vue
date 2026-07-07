@@ -197,19 +197,22 @@ const showcaseItems = [
                 查看资产库
               </RouterLink>
             </div>
-            <div class="mt-8 grid max-w-xl gap-3 text-xs font-semibold text-slate-100 sm:grid-cols-3">
-              <span class="inline-flex items-center gap-2">
-                <CheckCircle2 class="h-4 w-4 text-primary" />
-                图片与视频生成
-              </span>
-              <span class="inline-flex items-center gap-2">
-                <CheckCircle2 class="h-4 w-4 text-primary" />
-                素材资产复用
-              </span>
-              <span class="inline-flex items-center gap-2">
-                <CheckCircle2 class="h-4 w-4 text-primary" />
-                多语言内容扩展
-              </span>
+            <div class="mt-8 grid max-w-2xl gap-3 sm:grid-cols-3">
+              <div class="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur">
+                <CheckCircle2 class="mb-3 h-5 w-5 text-primary" />
+                <p class="text-lg font-black text-white">图文视频</p>
+                <p class="mt-1 text-xs leading-5 text-slate-200">覆盖商品图、短视频与详情内容</p>
+              </div>
+              <div class="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur">
+                <CheckCircle2 class="mb-3 h-5 w-5 text-primary" />
+                <p class="text-lg font-black text-white">资产复用</p>
+                <p class="mt-1 text-xs leading-5 text-slate-200">上传素材与生成结果统一沉淀</p>
+              </div>
+              <div class="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur">
+                <CheckCircle2 class="mb-3 h-5 w-5 text-primary" />
+                <p class="text-lg font-black text-white">多语言扩展</p>
+                <p class="mt-1 text-xs leading-5 text-slate-200">支持跨境内容翻译和本地化</p>
+              </div>
             </div>
           </section>
         </div>
