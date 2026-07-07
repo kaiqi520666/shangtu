@@ -126,7 +126,8 @@ export function getVideoDemoType(typeId) {
 
 export function getVideoCreditCost({ resolution = "720p", duration = 8, costs = defaultVideoCreditCosts } = {}) {
   const unitCost = Number(costs[resolution] ?? defaultVideoCreditCosts[resolution]);
-  const seconds = videoDurationOptions.includes(Number(duration)) ? Number(duration) : 8;
+  const seconds = Number(duration);
   if (!Number.isFinite(unitCost) || unitCost <= 0) return null;
+  if (!Number.isFinite(seconds) || seconds < 4 || seconds > 15) return null;
   return unitCost * seconds;
 }

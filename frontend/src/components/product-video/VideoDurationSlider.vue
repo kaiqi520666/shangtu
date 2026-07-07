@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from "vue";
 import AppRangeCard from "@/components/ui/AppRangeCard.vue";
-import { getVideoCreditCost, videoDurationOptions } from "@/constants/product-video.js";
+import { getVideoCreditCost } from "@/constants/product-video.js";
 
 const props = defineProps({
   duration: {
@@ -28,27 +28,22 @@ const creditCost = computed(() =>
 
 const emit = defineEmits(["update:duration"]);
 
-const durationIndex = computed(() => {
-  const index = videoDurationOptions.indexOf(Number(props.duration));
-  return index >= 0 ? index : videoDurationOptions.indexOf(8);
-});
-
 function formatDuration(value) {
-  return `${videoDurationOptions[value] || 8} 秒`;
+  return `${value || 8} 秒`;
 }
 
-function updateDuration(index) {
-  emit("update:duration", videoDurationOptions[index] || 8);
+function updateDuration(value) {
+  emit("update:duration", Number(value) || 8);
 }
 </script>
 
 <template>
   <AppRangeCard
-    :model-value="durationIndex"
+    :model-value="duration"
     title="视频时长"
-    hint="4 / 8 / 10 / 12 / 15 秒，可拖动调整"
-    :min="0"
-    :max="videoDurationOptions.length - 1"
+    hint="4-15 秒，可拖动调整"
+    :min="4"
+    :max="15"
     :step="1"
     min-label="4 秒"
     mid-label="10 秒"
