@@ -17,6 +17,8 @@ class GenerationJob(Base):
     status: Mapped[str] = mapped_column(String(20), default="draft")
     settings_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     source_images_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_videos_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_audios_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     input_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     structure_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     archived: Mapped[bool] = mapped_column(Boolean, default=False)

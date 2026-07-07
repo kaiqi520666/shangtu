@@ -51,6 +51,8 @@ class UpdateJobRequest(BaseModel):
     title: str | None = None
     settings: dict[str, Any] | None = None
     source_images: list[Any] | None = None
+    source_videos: list[Any] | None = None
+    source_audios: list[Any] | None = None
     input_text: str | None = None
     structure: list[Any] | None = None
 
@@ -232,6 +234,8 @@ async def get_job(
             ),
             "settings": parse_json_or_none(job.settings_json),
             "source_images": parse_json_or_none(job.source_images_json),
+            "source_videos": parse_json_or_none(job.source_videos_json),
+            "source_audios": parse_json_or_none(job.source_audios_json),
             "input_text": job.input_text,
             "structure": parse_json_or_none(job.structure_json),
             "items": items,
@@ -267,6 +271,10 @@ async def update_job(
         job.settings_json = dump_json(req.settings)
     if req.source_images is not None:
         job.source_images_json = dump_json(req.source_images)
+    if req.source_videos is not None:
+        job.source_videos_json = dump_json(req.source_videos)
+    if req.source_audios is not None:
+        job.source_audios_json = dump_json(req.source_audios)
     if req.input_text is not None:
         job.input_text = req.input_text
     if req.structure is not None:
