@@ -18,7 +18,7 @@ function getNumericOrder(value, fallback = 0) {
 
 function sortOutputCards(cards) {
   return [...cards].sort(
-    (left, right) => getNumericOrder(left.sortOrder) - getNumericOrder(right.sortOrder),
+    (left, right) => getNumericOrder(right.sortOrder) - getNumericOrder(left.sortOrder),
   );
 }
 
