@@ -1,91 +1,313 @@
 <script setup>
+import { computed } from "vue";
 import { RouterLink } from "vue-router";
-import { ArrowRight, Clapperboard, ImagePlus, Layers3, Shirt, Sparkles } from "lucide-vue-next";
+import {
+  ArrowRight,
+  CheckCircle2,
+  Clapperboard,
+  FolderOpen,
+  ImagePlus,
+  Languages,
+  Layers3,
+  PlayCircle,
+  Shirt,
+  Sparkles,
+  UserRound,
+  WandSparkles,
+} from "lucide-vue-next";
 import { useAuthStore } from "@/stores/auth.js";
 
 const authStore = useAuthStore();
-const loginTarget = { path: "/login", query: { redirect: "/generator/product-suite" } };
+
+const images = {
+  hero: "https://image.nodepass.net/generated/2/2026/07/d9566b18c3db4989a598f0db4fafd486.png",
+  suite: "https://image.nodepass.net/generated/2/2026/07/de76ef7431fb435c8f29935f909f069f.png",
+  detail: "https://image.nodepass.net/generated/2/2026/07/3458163d2a1e4adfb2c32b4038094648.png",
+  outfit: "https://image.nodepass.net/generated/2/2026/07/b5b475e305c948388ef5777194d70d0f.png",
+  video: "https://image.nodepass.net/generated/2/2026/07/22041c896cf54dbaa296296789e58100.png",
+  avatar: "https://image.nodepass.net/generated/2/2026/07/9ce4c6aaa4d4478f9d9d68f60ecb1e7b.png",
+};
+
+const workspaceTarget = computed(() =>
+  authStore.isAuthenticated
+    ? "/generator/product-suite"
+    : { path: "/login", query: { redirect: "/generator/product-suite" } },
+);
 
 const featureItems = [
-  { icon: Layers3, title: "商品套图", desc: "批量生成主图、场景图、卖点图和细节图。" },
-  { icon: ImagePlus, title: "商品详情图", desc: "根据卖点生成多张详情页模块图。" },
-  { icon: Clapperboard, title: "商品视频", desc: "用商品图生成 UGC 种草、产品演示和广告短片。" },
-  { icon: Shirt, title: "服饰穿搭", desc: "上传服装图，搭配模特和拍摄场景。" },
-  { icon: Sparkles, title: "自由生图", desc: "支持文生图和参考图生图。" },
+  {
+    icon: Layers3,
+    title: "商品套图",
+    desc: "批量生成主图、场景图、卖点图和细节图。",
+    to: "/generator/product-suite",
+    image: images.suite,
+  },
+  {
+    icon: ImagePlus,
+    title: "商品详情图",
+    desc: "根据卖点生成详情页模块图。",
+    to: "/generator/product-image",
+    image: images.detail,
+  },
+  {
+    icon: Clapperboard,
+    title: "商品视频",
+    desc: "生成 UGC 种草、产品演示和广告短片。",
+    to: "/generator/product-video",
+    image: images.video,
+  },
+  {
+    icon: Shirt,
+    title: "服饰穿搭",
+    desc: "上传服装图，搭配模特和拍摄场景。",
+    to: "/generator/outfit",
+    image: images.outfit,
+  },
+  {
+    icon: Sparkles,
+    title: "自由生图",
+    desc: "支持文生图和多参考图生图。",
+    to: "/generator/free-image",
+    image: images.detail,
+  },
+  {
+    icon: PlayCircle,
+    title: "自由生视频",
+    desc: "用提示词、参考图、视频和音频生成短片。",
+    to: "/generator/free-video",
+    image: images.video,
+  },
+  {
+    icon: UserRound,
+    title: "数字人",
+    desc: "创建数字人口播和产品讲解视频。",
+    to: "/generator/digital-human",
+    image: images.avatar,
+  },
+  {
+    icon: Languages,
+    title: "视频翻译",
+    desc: "将视频翻译为多语言版本。",
+    to: "/generator/video-translation",
+    image: images.avatar,
+  },
+  {
+    icon: FolderOpen,
+    title: "资产库",
+    desc: "统一管理上传素材和生成结果。",
+    to: "/generator/assets",
+    image: images.suite,
+  },
+];
+
+const workflowItems = [
+  { title: "上传素材", desc: "商品图、服装图、视频和音频集中管理。" },
+  { title: "选择场景", desc: "套图、详情页、短视频、数字人等流程直达。" },
+  { title: "AI 生成", desc: "策略、提示词、参考素材一起驱动生成。" },
+  { title: "沉淀资产", desc: "结果自动进入资产库，方便复用和下载。" },
+];
+
+const showcaseItems = [
+  { title: "图片内容", desc: "商品套图、详情图、自由生图", image: images.suite },
+  { title: "服饰内容", desc: "模特穿搭、场景拍摄、比例适配", image: images.outfit },
+  { title: "视频内容", desc: "商品视频、自由生视频、短片封面", image: images.video },
+  { title: "数字人与翻译", desc: "口播视频、多语言翻译、素材复用", image: images.avatar },
 ];
 </script>
 
 <template>
-  <div class="min-h-screen bg-slate-50 text-slate-900">
-    <header class="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
-      <div class="flex items-center gap-3">
-        <div
-          class="flex h-10 w-10 items-center justify-center rounded-xl border border-primary/10 bg-white shadow-sm"
-        >
-          <img src="/logo.png" class="h-8 w-8 object-contain" alt="商图 AI Logo" />
-        </div>
-        <div>
-          <p class="text-sm font-bold text-slate-900">商图 AI</p>
-          <p class="text-xs text-slate-500">AI 电商内容生成工作台</p>
-        </div>
-      </div>
-    </header>
+  <div class="min-h-screen bg-slate-50 text-slate-950">
+    <header class="sticky top-0 z-30 border-b border-slate-200 bg-white/85 backdrop-blur">
+      <div class="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 lg:px-8">
+        <RouterLink to="/" class="flex items-center gap-3">
+          <span class="flex h-10 w-10 items-center justify-center rounded-xl border border-primary/15 bg-white shadow-sm">
+            <img src="/logo.png" class="h-8 w-8 object-contain" alt="NodePass AI Logo" />
+          </span>
+          <span>
+            <span class="block text-sm font-black text-slate-950">NodePass AI</span>
+            <span class="block text-xs font-medium text-slate-500">电商内容生成平台</span>
+          </span>
+        </RouterLink>
 
-    <main
-      class="mx-auto grid min-h-[calc(100vh-80px)] max-w-6xl content-center gap-10 px-6 py-10 lg:grid-cols-[1fr_420px] lg:items-center"
-    >
-      <section class="max-w-2xl">
-        <p class="mb-4 text-xs font-bold uppercase tracking-[0.18em] text-primary">
-          商图 AI 工作台
-        </p>
-        <h1 class="text-4xl font-black leading-tight text-slate-950 md:text-5xl">
-          AI 电商内容生成工作台
-        </h1>
-        <p class="mt-5 max-w-xl text-sm leading-7 text-slate-600">
-          上传商品图，批量生成商品套图、详情图、商品视频、服饰穿搭图和自由生图素材，让电商内容生产更快进入可用状态。
-        </p>
-        <div class="mt-8 flex flex-wrap items-center gap-3">
+        <nav class="hidden items-center gap-6 text-xs font-bold text-slate-500 md:flex">
+          <a href="#features" class="hover:text-primary">能力</a>
+          <a href="#workflow" class="hover:text-primary">流程</a>
+          <a href="#showcase" class="hover:text-primary">案例</a>
+        </nav>
+
+        <div class="flex items-center gap-2">
           <RouterLink
             v-if="authStore.isAuthenticated"
             to="/generator/product-suite"
-            class="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-bold text-white shadow-md transition-colors hover:bg-secondary"
+            class="rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-secondary"
           >
             进入工作台
-            <ArrowRight class="h-4 w-4" />
           </RouterLink>
           <template v-else>
             <RouterLink
-              :to="loginTarget"
-              class="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-bold text-white shadow-md transition-colors hover:bg-secondary"
+              to="/login"
+              class="hidden rounded-xl px-4 py-2 text-xs font-bold text-slate-600 transition-colors hover:text-primary sm:inline-flex"
             >
               登录
-              <ArrowRight class="h-4 w-4" />
             </RouterLink>
             <RouterLink
               to="/register"
-              class="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-primary/40 hover:text-primary"
+              class="rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-secondary"
             >
               注册
             </RouterLink>
           </template>
         </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="relative overflow-hidden bg-slate-950">
+        <img
+          :src="images.hero"
+          class="absolute inset-0 h-full w-full object-cover opacity-70"
+          alt="NodePass AI 电商内容生成主视觉"
+        />
+        <div class="absolute inset-0 bg-slate-950/55"></div>
+
+        <div class="relative mx-auto flex min-h-[78vh] max-w-7xl items-center px-5 py-20 lg:px-8">
+          <section class="max-w-3xl text-white">
+            <p class="mb-5 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-bold backdrop-blur">
+              <WandSparkles class="h-4 w-4 text-primary" />
+              AI 电商内容生成平台
+            </p>
+            <h1 class="text-4xl font-black leading-tight md:text-6xl">
+              NodePass AI
+            </h1>
+            <p class="mt-5 max-w-2xl text-base leading-8 text-slate-100 md:text-lg">
+              从商品图、详情页、短视频到数字人和视频翻译，把电商内容生产流程整合到一个工作台。
+            </p>
+            <div class="mt-8 flex flex-wrap items-center gap-3">
+              <RouterLink
+                :to="workspaceTarget"
+                class="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-black text-white shadow-lg transition-colors hover:bg-secondary"
+              >
+                开始创作
+                <ArrowRight class="h-4 w-4" />
+              </RouterLink>
+              <RouterLink
+                to="/generator/assets"
+                class="inline-flex items-center gap-2 rounded-xl border border-white/25 bg-white/10 px-5 py-3 text-sm font-bold text-white backdrop-blur transition-colors hover:bg-white/20"
+              >
+                查看资产库
+              </RouterLink>
+            </div>
+            <div class="mt-8 grid max-w-xl gap-3 text-xs font-semibold text-slate-100 sm:grid-cols-3">
+              <span class="inline-flex items-center gap-2">
+                <CheckCircle2 class="h-4 w-4 text-primary" />
+                图片与视频生成
+              </span>
+              <span class="inline-flex items-center gap-2">
+                <CheckCircle2 class="h-4 w-4 text-primary" />
+                素材资产复用
+              </span>
+              <span class="inline-flex items-center gap-2">
+                <CheckCircle2 class="h-4 w-4 text-primary" />
+                多语言内容扩展
+              </span>
+            </div>
+          </section>
+        </div>
       </section>
 
-      <section class="grid gap-3">
-        <div
-          v-for="item in featureItems"
-          :key="item.title"
-          class="flex gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
-        >
-          <div
-            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"
-          >
-            <component :is="item.icon" class="h-5 w-5" />
-          </div>
+      <section id="features" class="mx-auto max-w-7xl px-5 py-16 lg:px-8">
+        <div class="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
           <div>
-            <h2 class="text-sm font-bold text-slate-900">{{ item.title }}</h2>
-            <p class="mt-1 text-xs leading-5 text-slate-500">{{ item.desc }}</p>
+            <p class="text-xs font-black uppercase text-primary">Creative Workspace</p>
+            <h2 class="mt-2 text-2xl font-black text-slate-950 md:text-3xl">覆盖电商内容生产全链路</h2>
           </div>
+          <p class="max-w-xl text-sm leading-7 text-slate-500">
+            从素材上传到成品下载，功能入口集中在一个工作台，适合跨境电商、国内电商和短视频带货团队。
+          </p>
+        </div>
+
+        <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <RouterLink
+            v-for="item in featureItems"
+            :key="item.title"
+            :to="item.to"
+            class="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all hover:-translate-y-1 hover:border-primary/35 hover:shadow-md"
+          >
+            <div class="flex h-full gap-4 p-4">
+              <img :src="item.image" class="h-20 w-24 shrink-0 rounded-xl object-cover" :alt="item.title" />
+              <div class="min-w-0 flex-1">
+                <div class="mb-3 flex items-center justify-between gap-3">
+                  <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                    <component :is="item.icon" class="h-5 w-5" />
+                  </span>
+                  <ArrowRight class="h-4 w-4 text-slate-300 transition-colors group-hover:text-primary" />
+                </div>
+                <h3 class="text-sm font-black text-slate-950">{{ item.title }}</h3>
+                <p class="mt-1 text-xs leading-5 text-slate-500">{{ item.desc }}</p>
+              </div>
+            </div>
+          </RouterLink>
+        </div>
+      </section>
+
+      <section id="workflow" class="border-y border-slate-200 bg-white">
+        <div class="mx-auto grid max-w-7xl gap-10 px-5 py-16 lg:grid-cols-[0.9fr_1.1fr] lg:px-8">
+          <div>
+            <p class="text-xs font-black uppercase text-primary">Workflow</p>
+            <h2 class="mt-2 text-2xl font-black text-slate-950 md:text-3xl">从素材到资产，减少重复操作</h2>
+            <p class="mt-4 text-sm leading-7 text-slate-500">
+              NodePass AI 把生成流程拆成清晰步骤，既能快速试图，也能沉淀可复用的素材和成品。
+            </p>
+          </div>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <article
+              v-for="(item, index) in workflowItems"
+              :key="item.title"
+              class="rounded-2xl border border-slate-200 bg-slate-50 p-5"
+            >
+              <span class="mb-5 flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-sm font-black text-white">
+                {{ index + 1 }}
+              </span>
+              <h3 class="text-sm font-black text-slate-950">{{ item.title }}</h3>
+              <p class="mt-2 text-xs leading-6 text-slate-500">{{ item.desc }}</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="showcase" class="mx-auto max-w-7xl px-5 py-16 lg:px-8">
+        <div class="mb-8">
+          <p class="text-xs font-black uppercase text-primary">Showcase</p>
+          <h2 class="mt-2 text-2xl font-black text-slate-950 md:text-3xl">面向真实电商场景的视觉输出</h2>
+        </div>
+        <div class="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+          <article
+            v-for="item in showcaseItems"
+            :key="item.title"
+            class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+          >
+            <img :src="item.image" class="aspect-[4/3] w-full object-cover" :alt="item.title" />
+            <div class="p-4">
+              <h3 class="text-sm font-black text-slate-950">{{ item.title }}</h3>
+              <p class="mt-1 text-xs leading-5 text-slate-500">{{ item.desc }}</p>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="bg-slate-950 px-5 py-14 text-white lg:px-8">
+        <div class="mx-auto flex max-w-7xl flex-col justify-between gap-6 md:flex-row md:items-center">
+          <div>
+            <h2 class="text-2xl font-black">开始生成你的下一批电商内容</h2>
+            <p class="mt-2 text-sm text-slate-300">图片、视频、数字人与翻译能力已经在工作台内准备好。</p>
+          </div>
+          <RouterLink
+            :to="workspaceTarget"
+            class="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-black text-white shadow-lg transition-colors hover:bg-secondary"
+          >
+            进入 NodePass AI
+            <ArrowRight class="h-4 w-4" />
+          </RouterLink>
         </div>
       </section>
     </main>
