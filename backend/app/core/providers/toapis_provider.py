@@ -54,12 +54,13 @@ def build_create_payload(
     image_urls: list[str] | None = None,
 ) -> dict:
     reference_urls = [url for url in (image_urls or []) if url]
+    provider_resolution = str(resolution or "").lower()
     payload: dict[str, Any] = {
         "model": IMAGE_GENERATE_MODEL,
         "prompt": prompt,
         "n": 1,
         "size": ratio,
-        "resolution": resolution,
+        "resolution": provider_resolution,
         "response_format": "url",
     }
     if reference_urls:

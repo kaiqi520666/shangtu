@@ -27,6 +27,17 @@ async def generate_image(
     resolution: str = "1K",
     image_urls: list[str] | None = None,
 ):
+    def create_failure_message(exc):
+        resp = getattr(exc, "response", None)
+        if resp is None:
+            return f"创建 ToAPIS 任务失败: {type(exc).__name__}: {exc!r}"
+        try:
+            detail = (resp.text or "")[:500]
+        except Exception:
+            detail = ""
+        reason = f"{exc} | {detail}" if detail else str(exc)
+        return f"创建 ToAPIS 任务失败: {reason}"
+
     config = GenerationRunnerConfig(
         media_type="image",
         provider_media="image",
@@ -49,7 +60,7 @@ async def generate_image(
         validate_inputs=lambda: validate_size(ratio, resolution),
         config_missing_message=lambda: "TOAPIS_KEY 未配置，无法调用生图服务",
         task_missing_message=lambda: "任务不存在或已删除",
-        create_failure_message=lambda exc: f"创建 ToAPIS 任务失败: {exc}",
+        create_failure_message=create_failure_message,
         create_parse_failure_message=lambda exc: f"ToAPIS 创建响应解析失败: {exc}",
         result_missing_message=lambda: "ToAPIS 已完成但未返回结果图 URL",
         provider_failed_message="ToAPIS 任务失败",
