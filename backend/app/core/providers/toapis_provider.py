@@ -13,6 +13,8 @@ TOPENROUTER_BASE_URL = (
     os.getenv("TOPENROUTER_URL") or "https://tp-api.chinadatapay.com:8000"
 ).rstrip("/")
 TOPENROUTER_KEY = os.getenv("TOPENROUTER_KEY") or os.getenv("TOPENROUTER_API_KEY")
+VIDEO_PROVIDER = (os.getenv("VIDEO_PROVIDER") or "topenrouter").strip().lower()
+VIDEO_PROVIDER_LABELS = {"toapis": "ToAPIS", "topenrouter": "TopenRouter"}
 
 POLL_INTERVAL_SECONDS = 5
 MAX_WAIT_SECONDS = 20 * 60
@@ -38,6 +40,16 @@ TOAPIS_SIZE_TABLE: dict[str, dict[str, tuple[int, int]]] = {
 
 TOAPIS_STATUS_DONE = {"completed", "succeeded", "success"}
 TOAPIS_STATUS_FAILED = {"failed", "error", "cancelled", "canceled", "expired"}
+
+
+def get_video_provider_label() -> str:
+    return VIDEO_PROVIDER_LABELS.get(VIDEO_PROVIDER, VIDEO_PROVIDER)
+
+
+def is_video_provider_configured() -> bool:
+    if VIDEO_PROVIDER == "toapis":
+        return bool(TOAPIS_KEY)
+    return bool(TOPENROUTER_KEY)
 
 
 def validate_size(ratio: str, resolution: str) -> str | None:
@@ -89,7 +101,36 @@ def build_video_create_payload(
     cleaned_urls = [url for url in image_urls if url]
     cleaned_video_urls = [url for url in (video_urls or []) if url]
     cleaned_audio_urls = [url for url in (audio_urls or []) if url]
+    fallback_video_url = str(input_video_url or "").strip()
+    if fallback_video_url and fallback_video_url not in cleaned_video_urls:
+        cleaned_video_urls.append(fallback_video_url)
     provider_resolution = str(resolution or "").lower()
+
+    if VIDEO_PROVIDER == "toapis":
+        payload: dict[str, Any] = {
+            "model": VIDEO_GENERATE_MODEL,
+            "prompt": prompt,
+            "duration": int(duration),
+            "aspect_ratio": aspect_ratio,
+            "resolution": provider_resolution,
+            "generate_audio": bool(generate_audio),
+        }
+        if cleaned_urls:
+            payload["image_with_roles"] = [
+                {"url": url, "role": "reference_image"} for url in cleaned_urls[:9]
+            ]
+        if cleaned_video_urls:
+            payload["video_with_roles"] = [
+                {"url": url, "role": "reference_video"} for url in cleaned_video_urls[:3]
+            ]
+        if cleaned_audio_urls:
+            payload["audio_with_roles"] = [
+                {"url": url, "role": "reference_audio"} for url in cleaned_audio_urls[:3]
+            ]
+        if client_business_id:
+            payload["client_business_id"] = client_business_id
+        return payload
+
     content: list[dict[str, Any]] = []
     if prompt:
         content.append({"type": "text", "text": prompt})
@@ -101,9 +142,6 @@ def build_video_create_payload(
         }
         for url in cleaned_urls[:9]
     )
-    fallback_video_url = str(input_video_url or "").strip()
-    if fallback_video_url and fallback_video_url not in cleaned_video_urls:
-        cleaned_video_urls.append(fallback_video_url)
     for video_url in cleaned_video_urls[:3]:
         content.append(
             {
@@ -244,6 +282,18 @@ def extract_result_url(poll_response: dict) -> str | None:
 
 async def create_generation(client, *, media: str, payload: dict) -> dict:
     if media == "video":
+        if VIDEO_PROVIDER == "toapis":
+            resp = await client.post(
+                f"{TOAPIS_BASE_URL}/v1/videos/generations",
+                headers={
+                    "Authorization": f"Bearer {TOAPIS_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json=payload,
+            )
+            resp.raise_for_status()
+            return resp.json()
+
         resp = await client.post(
             f"{TOPENROUTER_BASE_URL}/v1/video/tasks",
             headers={
@@ -270,6 +320,14 @@ async def create_generation(client, *, media: str, payload: dict) -> dict:
 
 async def fetch_generation(client, *, media: str, provider_task_id: str) -> dict:
     if media == "video":
+        if VIDEO_PROVIDER == "toapis":
+            resp = await client.get(
+                f"{TOAPIS_BASE_URL}/v1/videos/generations/{provider_task_id}",
+                headers={"Authorization": f"Bearer {TOAPIS_KEY}"},
+            )
+            resp.raise_for_status()
+            return resp.json()
+
         resp = await client.get(
             f"{TOPENROUTER_BASE_URL}/v1/video/tasks/{provider_task_id}",
             headers={"Authorization": f"Bearer {TOPENROUTER_KEY}"},
