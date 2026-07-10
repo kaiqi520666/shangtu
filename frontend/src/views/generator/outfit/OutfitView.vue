@@ -1,4 +1,5 @@
 <script setup>
+import { defineAsyncComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ImageEditModal from '@/components/generation/image/ImageEditModal.vue'
 import GenerationHistoryDrawer from '@/components/generation/workspace/GenerationHistoryDrawer.vue'
@@ -6,7 +7,6 @@ import GenerationPreviewModal from '@/components/generation/workspace/Generation
 import GenerationWorkspace from '@/components/generation/workspace/GenerationWorkspace.vue'
 import GeneratorLayout from '@/components/layout/GeneratorLayout.vue'
 import OutfitSettingsPanel from '@/components/outfit/OutfitSettingsPanel.vue'
-import OutfitStrategyReviewPanel from '@/components/outfit/OutfitStrategyReviewPanel.vue'
 import { useGeneratorCardEdit } from '@/composables/generator/useGeneratorCardEdit.js'
 import { useGeneratorRouteJob } from '@/composables/generator/restore/useGeneratorRouteJob.js'
 import { useOutfitGenerator } from '@/composables/generator/useOutfitGenerator.js'
@@ -15,6 +15,7 @@ import { useToast } from '@/composables/useToast.js'
 
 const route = useRoute()
 const router = useRouter()
+const OutfitStrategyReviewPanel = defineAsyncComponent(() => import('@/components/outfit/OutfitStrategyReviewPanel.vue'))
 const confirm = useConfirm()
 const toast = useToast()
 
