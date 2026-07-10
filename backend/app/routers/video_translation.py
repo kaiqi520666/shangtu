@@ -1,38 +1,32 @@
 from __future__ import annotations
 
 import uuid
-from typing import Any
 
 import httpx
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_user, get_db
 from app.core.json_utils import dump_json_or_none, parse_json_or_none
 from app.core.media_projection import video_task_payload
 from app.core.providers.heygen_provider import (
-    create_video_translation,
-    get_video_translation,
     parse_heygen_error_message,
 )
 from app.core.system_settings import get_effective_video_translation_credit_costs
 from app.core.task_timeout import project_task_runtime_state
 from app.core.time import to_utc_iso, utc_now
-from app.core.user_credits import get_user_credits
+from app.core.user_credits import get_user_credits, refund_user_credits
 from app.models import GenerationJob, HeygenTranslationLanguage, User, VideoTask
 from app.schemas.response import Response, fail, success
-from app.services.generation_tasks import deduct_credits_or_fail
+from app.services.generation_tasks import deduct_credits_or_fail, enqueue_or_compensate
 from app.services.heygen_task_lifecycle import (
     clean_text as _clean_text,
     get_or_create_video_job,
     normalize_duration_seconds as _normalize_duration_seconds,
-    provider_task_status as _task_status_from_provider,
-    refund_video_task_if_needed as _refund_task_credits_if_needed,
     sync_video_job_status,
-    task_progress as _task_progress_from_status,
 )
 
 router = APIRouter(prefix="/video-translation", tags=["视频翻译"])
@@ -58,49 +52,6 @@ def _translation_consume_note(*, quality_tier: str, title: str | None) -> str:
     quality_label = "高质翻译" if quality_tier == "premium" else "标准翻译"
     title_text = _clean_text(title)
     return f"视频翻译 · {quality_label}" + (f" · {title_text}" if title_text else "")
-
-
-def _first_string(data: Any, keys: set[str]) -> str:
-    if isinstance(data, dict):
-        for key, value in data.items():
-            if key in keys:
-                text = _clean_text(value)
-                if text:
-                    return text
-            nested = _first_string(value, keys)
-            if nested:
-                return nested
-    if isinstance(data, list):
-        for item in data:
-            nested = _first_string(item, keys)
-            if nested:
-                return nested
-    return ""
-
-
-def _extract_translation_task_id(data: dict[str, Any]) -> str:
-    return _first_string(
-        data,
-        {
-            "video_translation_id",
-            "video_translate_id",
-            "translation_id",
-            "task_id",
-            "id",
-        },
-    )
-
-
-def _extract_result_video_url(data: dict[str, Any]) -> str:
-    return _first_string(data, {"video_url", "url", "result_url", "output_url", "translated_video_url"})
-
-
-def _extract_error_message(data: dict[str, Any]) -> str:
-    return _first_string(data, {"error_message", "failure_reason", "message"})
-
-
-def _extract_status(data: dict[str, Any]) -> str:
-    return _first_string(data, {"status", "video_status", "translation_status"})
 
 
 def _translation_language_payload(item: HeygenTranslationLanguage) -> dict:
@@ -192,39 +143,6 @@ async def _get_task(db: AsyncSession, *, task_id: str, user_id: int) -> VideoTas
     return result.scalar_one_or_none()
 
 
-async def _sync_task_from_provider(db: AsyncSession, task: VideoTask) -> VideoTask:
-    if not task.provider_task_id:
-        return task
-
-    async with httpx.AsyncClient(timeout=60) as client:
-        data = await get_video_translation(
-            client,
-            video_translation_id=task.provider_task_id,
-        )
-
-    video_url = _extract_result_video_url(data) or None
-    error_message = _extract_error_message(data) or None
-    local_status = _task_status_from_provider(
-        _extract_status(data),
-        video_url=video_url,
-        failure_message=error_message,
-    )
-    task.status = local_status
-    task.progress = _task_progress_from_status(local_status)
-    task.result_url = video_url
-    task.error_message = error_message
-    if local_status == "failed":
-        await _refund_task_credits_if_needed(
-            db,
-            task,
-            note=f"视频翻译失败退回 · {task.id}",
-        )
-    await _sync_job_status(db, task.job_id)
-    await db.commit()
-    await db.refresh(task)
-    return task
-
-
 def _task_payload(task: VideoTask) -> dict:
     payload = video_task_payload(task)
     payload["job_id"] = task.job_id
@@ -282,6 +200,7 @@ async def get_video_translation_config(
 @router.post("/tasks", response_model=Response)
 async def create_video_translation_task(
     req: CreateVideoTranslationTaskRequest,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -364,82 +283,46 @@ async def create_video_translation_task(
     job.updated_at = utc_now()
 
     try:
-        async with httpx.AsyncClient(timeout=60) as client:
-            provider_data = await create_video_translation(
-                client,
-                video_url=video_url,
-                title=title,
-                output_language=language.name,
-                mode=mode,
-                idempotency_key=task.id,
-            )
-        provider_task_id = _extract_translation_task_id(provider_data)
-        if not provider_task_id:
-            raise ValueError("HeyGen 未返回视频翻译任务 ID")
-        task.provider_task_id = provider_task_id
-        task.status = _task_status_from_provider(_extract_status(provider_data))
-        task.progress = _task_progress_from_status(task.status)
         await db.commit()
         await db.refresh(task)
-    except ValueError as exc:
-        task.status = "failed"
-        task.error_message = str(exc)
-        refunded = await _refund_task_credits_if_needed(
-            db,
-            task,
-            note=f"视频翻译创建失败退回 · {task.id}",
-        )
-        await _sync_job_status(db, job.id)
-        await db.commit()
-        return fail(
-            str(exc),
-            data={
-                "task_id": task.id,
-                "credits": refunded if refunded is not None else await get_user_credits(db, current_user.id),
-                "credit_cost": credit_cost,
-            },
-        )
-    except httpx.HTTPError as exc:
-        message = parse_heygen_error_message(exc)
-        task.status = "failed"
-        task.error_message = message
-        refunded = await _refund_task_credits_if_needed(
-            db,
-            task,
-            note=f"视频翻译创建失败退回 · {task.id}",
-        )
-        await _sync_job_status(db, job.id)
-        await db.commit()
-        return fail(
-            message,
-            data={
-                "task_id": task.id,
-                "credits": refunded if refunded is not None else await get_user_credits(db, current_user.id),
-                "credit_cost": credit_cost,
-            },
-        )
     except Exception:
-        task.status = "failed"
-        task.error_message = "HeyGen 视频翻译创建失败，请稍后重试"
-        refunded = await _refund_task_credits_if_needed(
-            db,
-            task,
-            note=f"视频翻译创建失败退回 · {task.id}",
-        )
-        await _sync_job_status(db, job.id)
-        await db.commit()
-        return fail(
-            "HeyGen 视频翻译创建失败，请稍后重试",
-            data={
-                "task_id": task.id,
-                "credits": refunded if refunded is not None else await get_user_credits(db, current_user.id),
-                "credit_cost": credit_cost,
-            },
+        await db.rollback()
+        return fail("视频翻译任务创建失败，请稍后重试")
+
+    async def mark_task_failed(_refunded_credits: int) -> None:
+        await db.execute(
+            update(VideoTask)
+            .where(VideoTask.id == task.id)
+            .values(status="failed", progress=0, credit_refunded=True)
         )
 
-    payload = _task_payload(task)
-    payload["credits"] = remaining_credits
-    return success(payload)
+    enqueue_fail = await enqueue_or_compensate(
+        get_redis_pool=lambda: request.app.state.redis_pool,
+        db=db,
+        job_name="submit_video_translation_task",
+        job_args=(task.id,),
+        user_id=current_user.id,
+        credit_cost=credit_cost,
+        remaining_credits=remaining_credits,
+        refund_credits=refund_user_credits,
+        mark_failed=mark_task_failed,
+        failure_message="视频翻译任务入队失败，请稍后重试",
+        failure_data={"task_id": task.id, "job_id": task.job_id},
+        refund_note=f"视频翻译任务入队失败退回 · {task.id}",
+    )
+    if enqueue_fail is not None:
+        return enqueue_fail
+
+    return success(
+        {
+            "task_id": task.id,
+            "job_id": task.job_id,
+            "provider_task_id": None,
+            "status": "pending",
+            "credits": remaining_credits,
+            "credit_cost": credit_cost,
+        }
+    )
 
 
 @router.get("/tasks/{task_id}", response_model=Response)
@@ -465,13 +348,6 @@ async def poll_video_translation_task(
     task = await _get_task(db, task_id=task_id, user_id=current_user.id)
     if not task:
         return fail("视频翻译任务不存在")
-    if task.status not in {"done", "failed", "timeout"}:
-        try:
-            task = await _sync_task_from_provider(db, task)
-        except httpx.HTTPError as exc:
-            return fail(parse_heygen_error_message(exc))
-        except Exception:
-            return fail("HeyGen 视频翻译状态查询失败，请稍后重试")
     payload = _task_payload(task)
     payload["credits"] = await get_user_credits(db, current_user.id)
     return success(payload)

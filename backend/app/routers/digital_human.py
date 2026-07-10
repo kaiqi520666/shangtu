@@ -5,10 +5,10 @@ from pathlib import Path
 import uuid
 
 import httpx
-from fastapi import APIRouter, Depends, File, Form, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.json_utils import dump_json_or_none
@@ -17,7 +17,6 @@ from app.core.pagination import page_payload
 from app.core.prompt_snapshot import build_prompt_snapshot, dump_prompt_snapshot
 from app.core.providers.heygen_provider import (
     create_photo_avatar,
-    create_avatar_video,
     parse_heygen_error_message,
 )
 from app.core.scenarios import SCENARIO_TITLE_PREFIX
@@ -27,7 +26,7 @@ from app.core.system_settings import (
     get_effective_digital_human_precharge_costs,
 )
 from app.core.time import to_utc_iso, utc_now
-from app.core.user_credits import get_user_credits
+from app.core.user_credits import get_user_credits, refund_user_credits
 from app.core.deps import get_current_user, get_db
 from app.models import (
     HeygenAvatar,
@@ -43,10 +42,7 @@ from app.schemas.response import Response, fail, success
 from app.services.digital_human import (
     get_or_create_job as _get_or_create_job,
     get_task as _get_task,
-    should_sync_provider_task as _should_sync_provider_task,
-    settle_task_credits_if_needed as _settle_task_credits_if_needed,
     sync_job_status as _sync_job_status,
-    sync_task_from_provider as _sync_task_from_provider,
     task_payload as _digital_human_task_payload,
 )
 from app.services.digital_human_assets import (
@@ -68,12 +64,9 @@ from app.services.digital_human_assets import (
     user_avatar_payload as _user_avatar_payload,
     user_avatar_task_payload as _user_avatar_task_payload,
 )
-from app.services.generation_tasks import deduct_credits_or_fail
+from app.services.generation_tasks import deduct_credits_or_fail, enqueue_or_compensate
 from app.services.heygen_task_lifecycle import (
     clean_text as _clean_text,
-    provider_task_status as _task_status_from_provider,
-    refund_video_task_if_needed as _refund_task_credits_if_needed,
-    task_progress as _task_progress_from_status,
 )
 
 router = APIRouter(prefix="/digital-human", tags=["数字人"])
@@ -734,6 +727,7 @@ async def get_digital_human_config(
 @router.post("/tasks", response_model=Response)
 async def create_digital_human_task(
     req: DigitalHumanGenerateRequest,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -865,140 +859,36 @@ async def create_digital_human_task(
         await db.rollback()
         return fail("数字人任务创建失败，请稍后重试")
 
-    try:
-        async with httpx.AsyncClient(timeout=60) as client:
-            provider_data = await create_avatar_video(
-                client,
-                avatar_id=avatar.avatar_id,
-                title=title,
-                aspect_ratio=aspect_ratio,
-                resolution=resolution,
-                script=script if audio_mode == "platform" else None,
-                voice_id=voice.voice_id if voice else None,
-                audio_url=audio_asset.audio_url if audio_asset else None,
-                engine_type=QUALITY_TIER_TO_ENGINE[quality_tier],
-                background_url=background_url,
-                voice_settings=voice_settings if audio_mode == "platform" else None,
-                idempotency_key=task.id,
-            )
-        provider_task_id = _clean_text(str(provider_data.get("video_id") or ""))
-        if not provider_task_id:
-            raise ValueError("HeyGen 未返回 video_id")
-        task.provider_task_id = provider_task_id
-        task.status = _task_status_from_provider(
-            _clean_text(str(provider_data.get("status") or "")),
+    async def mark_task_failed(_refunded_credits: int) -> None:
+        await db.execute(
+            update(VideoTask)
+            .where(VideoTask.id == task.id)
+            .values(status="failed", progress=0, credit_refunded=True)
         )
-        task.progress = _task_progress_from_status(task.status)
-        provider_error_message = _clean_text(
-            str(
-                provider_data.get("error_message")
-                or provider_data.get("failure_reason")
-                or provider_data.get("message")
-                or ""
-            )
-        ) or None
-        if provider_error_message:
-            task.error_message = provider_error_message
-        refunded_credits = None
-        if task.status == "failed":
-            refunded_credits = await _refund_task_credits_if_needed(
-                db,
-                task,
-                note=f"数字人任务失败退回 · {task.id}",
-            )
-        await _sync_job_status(db, task.job_id)
-        await db.commit()
-        await db.refresh(task)
-        if task.status == "failed":
-            latest_credits = refunded_credits
-            if latest_credits is None:
-                latest_credits = await get_user_credits(db, current_user.id)
-            return fail(
-                task.error_message or "HeyGen 任务创建失败，请稍后重试",
-                data={
-                    "task_id": task.id,
-                    "job_id": task.job_id,
-                    "credits": latest_credits,
-                    "credit_cost": credit_cost,
-                },
-            )
-    except ValueError as exc:
-        task.status = "failed"
-        task.progress = 0
-        task.error_message = str(exc)
-        refunded_credits = await _refund_task_credits_if_needed(
-            db,
-            task,
-            note=f"数字人任务创建失败退回 · {task.id}",
-        )
-        await _sync_job_status(db, task.job_id)
-        await db.commit()
-        latest_credits = refunded_credits
-        if latest_credits is None:
-            latest_credits = await get_user_credits(db, current_user.id)
-        return fail(
-            str(exc),
-            data={
-                "task_id": task.id,
-                "job_id": task.job_id,
-                "credits": latest_credits,
-                "credit_cost": credit_cost,
-            },
-        )
-    except httpx.HTTPError as exc:
-        message = parse_heygen_error_message(exc)
-        task.status = "failed"
-        task.progress = 0
-        task.error_message = message
-        refunded_credits = await _refund_task_credits_if_needed(
-            db,
-            task,
-            note=f"数字人任务创建失败退回 · {task.id}",
-        )
-        await _sync_job_status(db, task.job_id)
-        await db.commit()
-        latest_credits = refunded_credits
-        if latest_credits is None:
-            latest_credits = await get_user_credits(db, current_user.id)
-        return fail(
-            message,
-            data={
-                "task_id": task.id,
-                "job_id": task.job_id,
-                "credits": latest_credits,
-                "credit_cost": credit_cost,
-            },
-        )
-    except Exception:
-        task.status = "failed"
-        task.progress = 0
-        task.error_message = "HeyGen 任务创建失败，请稍后重试"
-        refunded_credits = await _refund_task_credits_if_needed(
-            db,
-            task,
-            note=f"数字人任务创建失败退回 · {task.id}",
-        )
-        await _sync_job_status(db, task.job_id)
-        await db.commit()
-        latest_credits = refunded_credits
-        if latest_credits is None:
-            latest_credits = await get_user_credits(db, current_user.id)
-        return fail(
-            "HeyGen 任务创建失败，请稍后重试",
-            data={
-                "task_id": task.id,
-                "job_id": task.job_id,
-                "credits": latest_credits,
-                "credit_cost": credit_cost,
-            },
-        )
+
+    enqueue_fail = await enqueue_or_compensate(
+        get_redis_pool=lambda: request.app.state.redis_pool,
+        db=db,
+        job_name="submit_digital_human_task",
+        job_args=(task.id,),
+        user_id=current_user.id,
+        credit_cost=credit_cost,
+        remaining_credits=remaining_credits,
+        refund_credits=refund_user_credits,
+        mark_failed=mark_task_failed,
+        failure_message="数字人任务入队失败，请稍后重试",
+        failure_data={"task_id": task.id, "job_id": task.job_id},
+        refund_note=f"数字人任务入队失败退回 · {task.id}",
+    )
+    if enqueue_fail is not None:
+        return enqueue_fail
 
     return success(
         {
             "task_id": task.id,
             "job_id": task.job_id,
-            "provider_task_id": task.provider_task_id,
-            "status": task.status,
+            "provider_task_id": None,
+            "status": "pending",
             "credits": remaining_credits,
             "credit_cost": credit_cost,
         }
@@ -1014,17 +904,6 @@ async def get_digital_human_task(
     task = await _get_task(db, task_id=task_id, user_id=current_user.id)
     if not task:
         return fail("数字人任务不存在")
-    if _should_sync_provider_task(task):
-        try:
-            task = await _sync_task_from_provider(db, task)
-        except httpx.HTTPError as exc:
-            return fail(parse_heygen_error_message(exc))
-        except Exception:
-            return fail("HeyGen 任务查询失败，请稍后重试")
-    if await _settle_task_credits_if_needed(db, task):
-        await _sync_job_status(db, task.job_id)
-        await db.commit()
-        await db.refresh(task)
     payload = _digital_human_task_payload(task)
     payload["credits"] = await get_user_credits(db, current_user.id)
     return success(payload)
@@ -1096,24 +975,6 @@ async def poll_digital_human_task(
     task = await _get_task(db, task_id=task_id, user_id=current_user.id)
     if not task:
         return fail("数字人任务不存在")
-    if _should_sync_provider_task(task):
-        try:
-            task = await _sync_task_from_provider(db, task)
-        except ValueError as exc:
-            task.status = "failed"
-            task.progress = 0
-            task.error_message = str(exc)
-            await _sync_job_status(db, task.job_id)
-            await db.commit()
-            await db.refresh(task)
-        except httpx.HTTPError as exc:
-            return fail(parse_heygen_error_message(exc))
-        except Exception:
-            return fail("HeyGen 任务查询失败，请稍后重试")
-    elif await _settle_task_credits_if_needed(db, task):
-        await _sync_job_status(db, task.job_id)
-        await db.commit()
-        await db.refresh(task)
     payload = _digital_human_task_payload(task)
     payload["credits"] = await get_user_credits(db, current_user.id)
     return success(payload)

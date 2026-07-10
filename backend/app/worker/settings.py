@@ -5,6 +5,7 @@ from arq.connections import RedisSettings
 from dotenv import load_dotenv
 
 from app.worker.tasks import generate_image, generate_video
+from app.worker.heygen_tasks import submit_digital_human_task, submit_video_translation_task
 
 load_dotenv()
 logging.basicConfig(
@@ -14,7 +15,12 @@ logging.basicConfig(
 
 
 class WorkerSettings:
-    functions = [generate_image, generate_video]
+    functions = [
+        generate_image,
+        generate_video,
+        submit_digital_human_task,
+        submit_video_translation_task,
+    ]
     redis_settings = RedisSettings.from_dsn(
         os.getenv("REDIS_URL", "redis://localhost:6379")
     )
