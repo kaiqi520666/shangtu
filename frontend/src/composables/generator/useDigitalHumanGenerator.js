@@ -314,7 +314,7 @@ export function useDigitalHumanGenerator({ toast, confirm, onJobCreated } = {}) 
           batchRunId,
         });
       },
-      createTask({ item, card, jobId }) {
+      createTask({ item, jobId }) {
         return createDigitalHumanTask({
           job_id: jobId,
           title,

@@ -1,6 +1,5 @@
 <script setup>
 import { computed, onBeforeUnmount, ref, watch } from "vue";
-import QRCode from "qrcode";
 import {
   CheckCircle2,
   CreditCard,
@@ -92,6 +91,7 @@ async function refreshQr(order) {
   const source = order?.qrcode || order?.pay_url || "";
   if (!source || order?.img) return;
   try {
+    const { default: QRCode } = await import("qrcode");
     qrDataUrl.value = await QRCode.toDataURL(source, {
       width: 240,
       margin: 1,

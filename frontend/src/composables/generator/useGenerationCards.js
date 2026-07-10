@@ -2,7 +2,6 @@ import { computed, ref, reactive } from "vue";
 import { getImageTask } from "@/api/image.js";
 
 const DEFAULT_POLL_INTERVAL_MS = 5000;
-const DEFAULT_STALL_WARNING_MS = 60000;
 const TERMINAL_STATUSES = new Set(["done", "failed", "timeout"]);
 
 function preloadImage(url) {
@@ -30,8 +29,8 @@ function resolveSettingsSnapshot(rawSnapshot, existingSnapshot = null) {
 
   if (!existing && !snapshot) return null;
   return {
-    ...(existing || {}),
-    ...(snapshot || {}),
+    ...existing,
+    ...snapshot,
   };
 }
 
@@ -81,7 +80,6 @@ export function createBatchFinishedHandler({
 export function useGenerationCards({
   getTask = getImageTask,
   pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
-  stallWarningMs = DEFAULT_STALL_WARNING_MS,
   mediaLabel = "",
   preloadResult = true,
   onCardDone,
@@ -123,7 +121,6 @@ export function useGenerationCards({
   function startPollingCard(card) {
     if (!card.taskId) return;
     stopPollingCard(card.id);
-    card.lastProgressAt = Date.now();
     card.stalledWarning = "";
     const timer = window.setInterval(() => {
       pollCardOnce(card).catch(() => {});
@@ -155,7 +152,6 @@ export function useGenerationCards({
       const resultUrl = data.result_url || "";
       const displayUrl = data.thumb_url || resultUrl;
       const previewUrl = data.preview_url || resultUrl;
-      const now = Date.now();
       const previousStatus = card.status;
       const previousProgress = typeof card.progress === "number" ? card.progress : 0;
       let taskAdvanced = status !== previousStatus;
@@ -221,11 +217,7 @@ export function useGenerationCards({
         // processing 或 done 但 result_url 仍未落库（worker 写入竞态/降级）
         card.status = status === "done" ? "processing" : status;
         if (taskAdvanced) {
-          card.lastProgressAt = now;
           card.stalledWarning = "";
-        } else if (!card.stalledWarning && now - (card.lastProgressAt || now) >= stallWarningMs) {
-          card.stalledWarning = `${mediaLabel || "任务"}长时间无进展，继续等待中...`;
-          genLogs.value.push(`[${logPrefix(card)}] ${card.stalledWarning}`);
         }
       }
 
@@ -279,7 +271,7 @@ export function useGenerationCards({
       maybeFinishBatch(batchRunId, options);
       return;
     }
-    for (const pendingBatchId of [...pendingBatchIds]) {
+    for (const pendingBatchId of pendingBatchIds) {
       maybeFinishBatch(pendingBatchId, options);
     }
   }
@@ -317,7 +309,6 @@ export function useGenerationCards({
       settingsSnapshot: settingsSnapshot || null,
       progress: 0,
       stalledWarning: "",
-      lastProgressAt: 0,
     });
   }
 
@@ -343,7 +334,6 @@ export function useGenerationCards({
       ),
       progress: typeof item.progress === "number" ? item.progress : 0,
       stalledWarning: "",
-      lastProgressAt: 0,
     });
   }
 

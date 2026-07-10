@@ -12,12 +12,9 @@ const DEFAULT_CREDIT_COSTS = {
   premium: 16,
 };
 
-const DEFAULT_PHOTO_AVATAR_CREATE_COST = 2000;
-
 const pricingState = {
   creditCosts: ref({ ...DEFAULT_CREDIT_COSTS }),
   prechargeCosts: ref({ ...DEFAULT_PRECHARGE_COSTS }),
-  photoAvatarCreateCost: ref(DEFAULT_PHOTO_AVATAR_CREATE_COST),
   loading: ref(false),
   loaded: ref(false),
 };
@@ -36,15 +33,12 @@ export function useDigitalHumanPricing() {
       }
       pricingState.creditCosts.value = {
         ...DEFAULT_CREDIT_COSTS,
-        ...(result.data?.credit_costs || {}),
+        ...result.data?.credit_costs,
       };
       pricingState.prechargeCosts.value = {
         ...DEFAULT_PRECHARGE_COSTS,
-        ...(result.data?.precharge_costs || {}),
+        ...result.data?.precharge_costs,
       };
-      pricingState.photoAvatarCreateCost.value = Number(
-        result.data?.photo_avatar_create_cost || DEFAULT_PHOTO_AVATAR_CREATE_COST,
-      );
       pricingState.loaded.value = true;
     } catch {
       toast.error("加载数字人价格失败");
@@ -69,7 +63,6 @@ export function useDigitalHumanPricing() {
   return {
     creditCosts: pricingState.creditCosts,
     prechargeCosts: pricingState.prechargeCosts,
-    photoAvatarCreateCost: pricingState.photoAvatarCreateCost,
     pricingLoading: pricingState.loading,
     pricingLoaded: pricingState.loaded,
     qualityOptions,
