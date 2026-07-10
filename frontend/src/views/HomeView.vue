@@ -2,11 +2,11 @@
 import { computed } from "vue";
 import { RouterLink } from "vue-router";
 import {
+  AudioLines,
   ArrowRight,
   Boxes,
   CheckCircle2,
   Clapperboard,
-  FolderOpen,
   ImagePlus,
   Languages,
   Layers3,
@@ -17,6 +17,7 @@ import {
   WandSparkles,
   Workflow,
 } from "lucide-vue-next";
+import voiceoverPreview from "@/assets/generator-previews/voiceover.webp";
 import { useAuthStore } from "@/stores/auth.js";
 
 const authStore = useAuthStore();
@@ -101,11 +102,11 @@ const featureItems = [
     image: images.avatar,
   },
   {
-    icon: FolderOpen,
-    title: "资产库",
-    desc: "统一管理上传素材和生成结果。",
-    to: "/generator/assets",
-    image: images.suite,
+    icon: AudioLines,
+    title: "AI 配音",
+    desc: "将文本生成自然流畅的 MP3 配音。",
+    to: "/generator/voiceover",
+    image: voiceoverPreview,
   },
 ];
 
@@ -120,7 +121,16 @@ const showcaseItems = [
   { title: "图片内容", desc: "商品套图、详情图、自由生图", image: images.suite },
   { title: "服饰内容", desc: "模特穿搭、场景拍摄、比例适配", image: images.outfit },
   { title: "视频内容", desc: "商品视频、自由生视频、短片封面", image: images.video },
-  { title: "数字人与翻译", desc: "口播视频、多语言翻译、素材复用", image: images.avatar },
+  {
+    title: "从声音到多语言视频",
+    desc: "AI 配音生成自然语音，数字人完成口播表达，视频翻译拓展全球市场。",
+    image: voiceoverPreview,
+    actions: [
+      { icon: AudioLines, title: "AI 配音", to: "/generator/voiceover" },
+      { icon: UserRound, title: "数字人", to: "/generator/digital-human" },
+      { icon: Languages, title: "视频翻译", to: "/generator/video-translation" },
+    ],
+  },
 ];
 </script>
 
@@ -189,7 +199,7 @@ const showcaseItems = [
               电商内容，一站生成
             </h1>
             <p class="mt-5 max-w-2xl text-base leading-8 text-slate-100 md:text-lg">
-              商品图、详情页、短视频、数字人和视频翻译，统一在一个工作台完成。
+              商品图、详情页、短视频、AI 配音、数字人和视频翻译，统一在一个工作台完成。
             </p>
             <div class="mt-8 flex flex-wrap items-center gap-3">
               <RouterLink
@@ -370,13 +380,20 @@ const showcaseItems = [
 
         <article class="mt-5 grid overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm lg:grid-cols-[0.85fr_1.15fr]">
           <div class="flex flex-col justify-center p-6">
-            <span class="w-fit rounded-full bg-primary/10 px-3 py-1 text-xs font-black text-primary">数字人与翻译</span>
+            <span class="w-fit rounded-full bg-primary/10 px-3 py-1 text-xs font-black text-primary">声音与全球化内容</span>
             <h3 class="mt-6 text-2xl font-black text-slate-950">{{ showcaseItems[3].title }}</h3>
             <p class="mt-3 max-w-xl text-sm leading-7 text-slate-500">{{ showcaseItems[3].desc }}</p>
-            <div class="mt-5 flex flex-wrap gap-2 text-xs font-bold text-slate-500">
-              <span class="rounded-full bg-slate-100 px-3 py-1">口播视频</span>
-              <span class="rounded-full bg-slate-100 px-3 py-1">多语言翻译</span>
-              <span class="rounded-full bg-slate-100 px-3 py-1">素材复用</span>
+            <div class="mt-5 flex flex-wrap gap-2">
+              <RouterLink
+                v-for="action in showcaseItems[3].actions"
+                :key="action.title"
+                :to="action.to"
+                class="group inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 transition-colors hover:border-primary/30 hover:bg-primary/5 hover:text-primary"
+              >
+                <component :is="action.icon" class="h-4 w-4" />
+                {{ action.title }}
+                <ArrowRight class="h-3.5 w-3.5 text-slate-300 transition-colors group-hover:text-primary" />
+              </RouterLink>
             </div>
           </div>
           <img :src="showcaseItems[3].image" class="h-full min-h-72 w-full object-cover" :alt="showcaseItems[3].title" />
@@ -387,7 +404,7 @@ const showcaseItems = [
         <div class="mx-auto flex max-w-7xl flex-col justify-between gap-6 md:flex-row md:items-center">
           <div>
             <h2 class="text-2xl font-black">开始生成你的下一批电商内容</h2>
-            <p class="mt-2 text-sm text-slate-300">图片、视频、数字人与翻译能力已经在工作台内准备好。</p>
+            <p class="mt-2 text-sm text-slate-300">图片、视频、AI 配音、数字人与翻译能力已经在工作台内准备好。</p>
           </div>
           <RouterLink
             :to="workspaceTarget"
