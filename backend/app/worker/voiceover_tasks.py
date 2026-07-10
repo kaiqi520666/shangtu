@@ -15,10 +15,10 @@ logger = logging.getLogger("app.worker.voiceover")
 
 
 def provider_url() -> str:
-    workspace_id = os.getenv("DASHSCOPE_WORKSPACE_ID", "").strip()
-    if not workspace_id:
-        raise RuntimeError("未配置DASHSCOPE_WORKSPACE_ID")
-    return f"https://{workspace_id}.cn-beijing.maas.aliyuncs.com/api/v1/services/audio/tts/SpeechSynthesizer"
+    return os.getenv(
+        "DASHSCOPE_TTS_URL",
+        "https://dashscope.aliyuncs.com/api/v1/services/audio/tts/SpeechSynthesizer",
+    ).strip()
 
 
 async def refund_task_if_needed(db, task: VoiceoverTask) -> int | None:
