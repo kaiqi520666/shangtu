@@ -10,7 +10,6 @@ const props = defineProps({ settings: { type: Object, required: true }, config: 
 const emit = defineEmits(["update:settings", "generate", "notify"]);
 const pickerOpen = ref(false);
 const characterCount = computed(() => String(props.settings.text || "").replace(/\s/g, "").length);
-const estimatedCredits = computed(() => Math.ceil(characterCount.value / 100) * Number(props.config.creditCostPer100Chars || 1));
 const primaryText = computed(() => props.creating ? "正在创建..." : "生成配音");
 
 function update(key, value) { emit("update:settings", { [key]: value }); }
@@ -31,7 +30,6 @@ function update(key, value) { emit("update:settings", { [key]: value }); }
     </div>
     <template #footer>
       <GeneratorActionFooter :primary-text="primaryText" :primary-disabled="!canGenerate || creating" @primary="emit('generate')">
-        <template #meta><div class="flex items-center justify-between text-xs"><span class="text-slate-500">预计消耗</span><strong class="text-primary">{{ estimatedCredits }} 积分</strong></div></template>
         <template #primary-icon><LoaderCircle v-if="creating" class="h-4 w-4 animate-spin" /><AudioLines v-else class="h-4 w-4" /></template>
       </GeneratorActionFooter>
     </template>

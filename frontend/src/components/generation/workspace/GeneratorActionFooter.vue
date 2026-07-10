@@ -19,9 +19,6 @@ const emit = defineEmits(['primary', 'secondary'])
 
 <template>
   <div class="shrink-0 border-t border-slate-200 bg-white/95 p-4 shadow-[0_-4px_12px_rgba(0,0,0,0.02)] backdrop-blur-sm">
-    <div v-if="$slots.meta" class="mb-3">
-      <slot name="meta" />
-    </div>
     <div class="flex gap-2.5">
       <button
         v-if="secondaryText"
