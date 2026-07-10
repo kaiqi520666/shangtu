@@ -48,6 +48,15 @@ def test_asset_projections_share_normalized_columns():
     assert list(image_asset_select(1, None).selected_columns.keys()) == expected
     assert list(video_asset_select(1, None).selected_columns.keys()) == expected
     assert list(audio_asset_select(1, None).selected_columns.keys()) == expected
+    size_types = {
+        str(projection.selected_columns.size.type)
+        for projection in (
+            image_asset_select(1, None),
+            video_asset_select(1, None),
+            audio_asset_select(1, None),
+        )
+    }
+    assert size_types == {"VARCHAR"}
 
 
 def test_unfiltered_assets_include_audio():

@@ -109,7 +109,7 @@ def image_asset_select(user_id: int, scenario: str | None):
             ImageTask.created_at.label("created_at"),
             literal("generated").label("source"),
             cast(literal(None), Integer).label("duration_seconds"),
-            ImageTask.size.label("size"),
+            cast(ImageTask.size, String).label("size"),
             cast(literal(None), String).label("content_type"),
         )
         .outerjoin(GenerationJob, GenerationJob.id == ImageTask.job_id)
@@ -139,7 +139,7 @@ def video_asset_select(user_id: int, scenario: str | None):
             VideoTask.created_at.label("created_at"),
             literal("generated").label("source"),
             VideoTask.duration.label("duration_seconds"),
-            cast(literal(None), Integer).label("size"),
+            cast(literal(None), String).label("size"),
             cast(literal(None), String).label("content_type"),
         )
         .outerjoin(GenerationJob, GenerationJob.id == VideoTask.job_id)
@@ -169,7 +169,7 @@ def audio_asset_select(user_id: int, scenario: str | None):
             UserAudioAsset.created_at.label("created_at"),
             UserAudioAsset.source.label("source"),
             UserAudioAsset.duration_seconds.label("duration_seconds"),
-            UserAudioAsset.size.label("size"),
+            cast(UserAudioAsset.size, String).label("size"),
             UserAudioAsset.content_type.label("content_type"),
         )
         .where(
