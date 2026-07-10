@@ -14,13 +14,6 @@ from app.models import GenerationJob, UserAudioAsset, VoiceoverTask
 logger = logging.getLogger("app.worker.voiceover")
 
 
-def provider_url() -> str:
-    return os.getenv(
-        "DASHSCOPE_TTS_URL",
-        "https://dashscope.aliyuncs.com/api/v1/services/audio/tts/SpeechSynthesizer",
-    ).strip()
-
-
 async def refund_task_if_needed(db, task: VoiceoverTask) -> int | None:
     if task.credit_refunded or task.credit_cost < 1:
         return None
@@ -71,11 +64,13 @@ async def generate_voiceover(ctx, task_id: str):
         settings = parse_json_or_none(task.settings_snapshot_json) or {}
 
     api_key = os.getenv("DASHSCOPE_API_KEY", "").strip()
-    if not api_key:
+    provider_url = os.getenv("DASHSCOPE_TTS_URL", "").strip()
+    provider_model = os.getenv("DASHSCOPE_TTS_MODEL", "").strip()
+    if not api_key or not provider_url or not provider_model:
         await mark_failed(task_id, "语音服务配置缺失")
         return
     payload = {
-        "model": "cosyvoice-v3-flash",
+        "model": provider_model,
         "input": {
             "text": text,
             "voice": voice_id,
@@ -92,7 +87,7 @@ async def generate_voiceover(ctx, task_id: str):
     try:
         async with httpx.AsyncClient(timeout=300, follow_redirects=True) as client:
             response = await client.post(
-                provider_url(),
+                provider_url,
                 headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
                 json=payload,
             )
