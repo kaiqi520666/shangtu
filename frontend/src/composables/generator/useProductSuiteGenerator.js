@@ -2,8 +2,6 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import {
   createDefaultGenerationSettings,
   formatImageLabel,
-  resolutionMap,
-  resolveQuality,
 } from "@/constants/generator.js";
 import { useToast } from "@/composables/useToast.js";
 import {
@@ -18,8 +16,11 @@ import { buildProductAnalyzeImages, hasUploadingImages } from "@/utils/analyzeIm
 import { getApiErrorMessage } from "@/utils/apiError.js";
 import {
   cloneGenerationSettingsSnapshot,
+  cloneUploadedImages,
   createGenerationSettingsSnapshot,
   getSnapshotScene,
+  restoreImageGenerationSettings,
+  syncImageQuality,
 } from "@/utils/generationSnapshots.js";
 import { generateImageStrategy } from "@/api/image.js";
 import { useCatalogStore } from "@/stores/catalog.js";
@@ -29,17 +30,6 @@ function createSuiteStructureFromCatalog(items) {
     ...item,
     enabled: true,
     count: item.defaultCount,
-  }));
-}
-
-function cloneUploadedImages(images) {
-  return images.map((img) => ({
-    id: img.id,
-    url: img.url,
-    objectKey: img.objectKey,
-    contentType: img.contentType,
-    size: img.size,
-    previewUrl: img.url || img.previewUrl,
   }));
 }
 
@@ -195,7 +185,7 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
       !hasRunningTasks.value,
   );
   const selectedImageLabel = computed(() => {
-    syncQualityForRatio();
+    syncImageQuality(settings);
     return formatImageLabel({ ratio: settings.ratio, quality: settings.quality });
   });
 
@@ -228,16 +218,9 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
     if (data.settings && typeof data.settings === "object") {
       const s = data.settings;
       const scene = getSnapshotScene(s);
-      const { platform, language, ratio, quality } = s;
       const { structureConfig, strategyBrief: nextStrategyBrief } = scene;
       restoredStrategyBrief = typeof nextStrategyBrief === "string" ? nextStrategyBrief : "";
-      if (typeof platform === "string") settings.platform = platform;
-      if (typeof language === "string") settings.language = language;
-      if (typeof ratio === "string" && resolutionMap[ratio]) {
-        settings.ratio = ratio;
-      }
-      const desiredQuality = typeof quality === "string" ? quality : settings.quality;
-      settings.quality = resolveQuality(settings.ratio, desiredQuality) || "1K";
+      restoreImageGenerationSettings(settings, s);
       if (Array.isArray(structureConfig) && structureConfig.length > 0) {
         suiteStructure.value = structureConfig;
       }
@@ -485,13 +468,6 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
         enabled: true,
       };
     });
-  }
-
-  function syncQualityForRatio() {
-    const effectiveQuality = resolveQuality(settings.ratio, settings.quality) || settings.quality;
-    if (effectiveQuality !== settings.quality) {
-      settings.quality = effectiveQuality;
-    }
   }
 
   function getStructureName(id) {

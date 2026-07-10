@@ -15,6 +15,14 @@ defineProps({
     type: Boolean,
     default: false,
   },
+  showDelete: {
+    type: Boolean,
+    default: true,
+  },
+  metaLabel: {
+    type: Function,
+    default: () => '',
+  },
 })
 
 const emit = defineEmits(['toggle-card', 'download-card', 'zoom-card', 'delete-card'])
@@ -48,7 +56,7 @@ function formatDate(isoStr) {
       </div>
 
       <!-- 右上：hover 操作 -->
-      <div class="absolute right-2.5 top-2.5 z-10 flex gap-1.5 opacity-0 transition-opacity group-hover:opacity-100">
+      <div v-if="showDelete" class="absolute right-2.5 top-2.5 z-10 flex gap-1.5 opacity-0 transition-opacity group-hover:opacity-100">
         <button
           type="button"
           class="rounded-lg border border-slate-200 bg-white/95 p-1.5 text-slate-600 shadow transition-colors hover:bg-white hover:text-rose-500"
@@ -87,10 +95,15 @@ function formatDate(isoStr) {
       </button>
 
       <!-- 底部信息 -->
-      <div class="flex items-center justify-between border-t border-slate-100 bg-white p-3">
-        <span class="truncate text-xs font-medium text-slate-500">
-          {{ formatDate(card.createdAt) }}
-        </span>
+      <div class="flex items-center justify-between gap-3 border-t border-slate-100 bg-white p-3">
+        <div class="min-w-0">
+          <p class="truncate text-xs font-medium text-slate-500">
+            {{ formatDate(card.createdAt) }}
+          </p>
+          <p v-if="metaLabel(card)" class="mt-0.5 truncate text-[11px] font-semibold text-slate-400">
+            {{ metaLabel(card) }}
+          </p>
+        </div>
         <button
           type="button"
           class="ml-2 flex shrink-0 items-center gap-1 text-xs font-bold text-primary hover:text-secondary"

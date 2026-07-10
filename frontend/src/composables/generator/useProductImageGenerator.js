@@ -2,8 +2,6 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import {
   createDefaultGenerationSettings,
   formatImageLabel,
-  resolutionMap,
-  resolveQuality,
 } from "@/constants/generator.js";
 import { useCardActions } from "@/composables/useCardActions.js";
 import {
@@ -20,6 +18,8 @@ import {
   cloneGenerationSettingsSnapshot,
   createGenerationSettingsSnapshot,
   getSnapshotScene,
+  restoreImageGenerationSettings,
+  syncImageQuality,
 } from "@/utils/generationSnapshots.js";
 import { generateImageStrategy } from "@/api/image.js";
 import { useCatalogStore } from "@/stores/catalog.js";
@@ -183,7 +183,7 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
       !hasRunningTasks.value,
   );
   const selectedImageLabel = computed(() => {
-    syncQualityForRatio();
+    syncImageQuality(settings);
     return formatImageLabel({ ratio: settings.ratio, quality: settings.quality });
   });
 
@@ -209,16 +209,9 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
     if (data.settings && typeof data.settings === "object") {
       const s = data.settings;
       const scene = getSnapshotScene(s);
-      const { platform, language, ratio, quality } = s;
       const { selectedModules, strategyBrief: nextStrategyBrief } = scene;
       restoredStrategyBrief = typeof nextStrategyBrief === "string" ? nextStrategyBrief : "";
-      if (typeof platform === "string") settings.platform = platform;
-      if (typeof language === "string") settings.language = language;
-      if (typeof ratio === "string" && resolutionMap[ratio]) {
-        settings.ratio = ratio;
-      }
-      const desiredQuality = typeof quality === "string" ? quality : settings.quality;
-      settings.quality = resolveQuality(settings.ratio, desiredQuality) || "1K";
+      restoreImageGenerationSettings(settings, s);
       if (Array.isArray(selectedModules) && selectedModules.length > 0) {
         selectedModules.value = selectedModules;
       }
@@ -482,13 +475,6 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
 
   function getModuleStrategy(id) {
     return catalog.findModule(id)?.strategy || "";
-  }
-
-  function syncQualityForRatio() {
-    const effectiveQuality = resolveQuality(settings.ratio, settings.quality) || settings.quality;
-    if (effectiveQuality !== settings.quality) {
-      settings.quality = effectiveQuality;
-    }
   }
 
   function findModuleContent(typeId) {

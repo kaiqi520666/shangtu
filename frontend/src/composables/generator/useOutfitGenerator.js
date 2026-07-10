@@ -2,12 +2,9 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import {
   createDefaultGenerationSettings,
   formatImageLabel,
-  resolutionMap,
-  resolveQuality,
 } from "@/constants/generator.js";
 import { outfitPreviewSlides } from "@/constants/outfit.js";
 import { generateImageStrategy } from "@/api/image.js";
-import { deleteOutfitModel, listOutfitModels, uploadOutfitModel } from "@/api/outfit.js";
 import { useCardActions } from "@/composables/useCardActions.js";
 import {
   createBatchFinishedHandler,
@@ -15,26 +12,18 @@ import {
 } from "@/composables/generator/useGenerationCards.js";
 import { useMediaBatchRunner } from "@/composables/generator/batch/useMediaBatchRunner.js";
 import { useGenerationStrategyFlow } from "@/composables/generator/strategy/useGenerationStrategyFlow.js";
+import { useOutfitModels } from "@/composables/outfit/useOutfitModels.js";
 import { useToast } from "@/composables/useToast.js";
 import {
   cloneGenerationSettingsSnapshot,
+  cloneUploadedImages,
   createGenerationSettingsSnapshot,
   getSnapshotScene,
+  restoreImageGenerationSettings,
+  syncImageQuality,
 } from "@/utils/generationSnapshots.js";
 import { buildOutfitAnalyzeImages, hasUploadingImages } from "@/utils/analyzeImages.js";
-import { getApiErrorMessage } from "@/utils/apiError.js";
 import { useCatalogStore } from "@/stores/catalog.js";
-
-function cloneUploadedImages(images) {
-  return images.map((img) => ({
-    id: img.id,
-    url: img.url,
-    objectKey: img.objectKey,
-    contentType: img.contentType,
-    size: img.size,
-    previewUrl: img.url || img.previewUrl,
-  }));
-}
 
 export function useOutfitGenerator({ onJobCreated } = {}) {
   const toast = useToast();
@@ -72,20 +61,21 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
 
   const garmentImages = ref([]);
   const mainGarmentIndex = ref(0);
-  const modelLibrary = ref([]);
-  const modelsLoading = ref(false);
-  const modelUploading = ref(false);
-  const modelDeletingId = ref("");
-  const selectedModelId = ref("");
-  const restoredModelSnapshot = ref(null);
+  const {
+    deleteModel,
+    loadOutfitModels,
+    modelDeletingId,
+    modelLibrary,
+    modelUploading,
+    modelsLoading,
+    restoredModelSnapshot,
+    selectedModel,
+    selectedModelId,
+    uploadModel,
+  } = useOutfitModels({ toast });
   const selectedScenes = ref([]);
   const sceneDescription = ref("");
   const settings = reactive(createDefaultGenerationSettings({ ratio: "3:4" }));
-
-  const selectedModel = computed(() =>
-    modelLibrary.value.find((model) => model.id === selectedModelId.value) ||
-    (restoredModelSnapshot.value?.id === selectedModelId.value ? restoredModelSnapshot.value : null),
-  );
 
   const strategyFlow = useGenerationStrategyFlow({
     buildInputSnapshot: buildOutfitStrategySnapshot,
@@ -186,7 +176,7 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
       !hasRunningTasks.value,
   );
   const selectedImageLabel = computed(() => {
-    syncQualityForRatio();
+    syncImageQuality(settings);
     return formatImageLabel({ ratio: settings.ratio, quality: settings.quality });
   });
   const previewSlides = computed(() => {
@@ -219,84 +209,11 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
     return createDefaultSelectedScenes();
   }
 
-  async function loadOutfitModels() {
-    modelsLoading.value = true;
-    try {
-      const result = await listOutfitModels();
-      if (result.code !== 0) {
-        toast.error(result.message || "加载模特失败");
-        modelLibrary.value = [];
-        selectedModelId.value = "";
-        return;
-      }
-
-      modelLibrary.value = (result.data || []).map(normalizeModel);
-      if (!selectedModel.value && modelLibrary.value.length > 0) {
-        selectedModelId.value = modelLibrary.value[0].id;
-      }
-    } catch (error) {
-      toast.error(getApiErrorMessage(error, "加载模特失败"));
-      modelLibrary.value = [];
-      selectedModelId.value = "";
-    } finally {
-      modelsLoading.value = false;
-    }
-  }
-
-  async function uploadModel(file) {
-    if (!file) return;
-    modelUploading.value = true;
-    try {
-      const result = await uploadOutfitModel(file);
-      if (result.code !== 0) {
-        toast.error(result.message || "模特上传失败");
-        return;
-      }
-
-      const model = normalizeModel(result.data);
-      modelLibrary.value = [model, ...modelLibrary.value];
-      selectedModelId.value = model.id;
-      toast.success("模特已上传");
-    } catch (error) {
-      toast.error(getApiErrorMessage(error, "模特上传失败"));
-    } finally {
-      modelUploading.value = false;
-    }
-  }
-
-  async function deleteModel(modelId) {
-    const model = modelLibrary.value.find((item) => item.id === modelId);
-    if (!model || !model.canDelete) {
-      toast.info("系统默认模特不能删除");
-      return;
-    }
-
-    modelDeletingId.value = modelId;
-    try {
-      const result = await deleteOutfitModel(modelId);
-      if (result.code !== 0) {
-        toast.error(result.message || "删除模特失败");
-        return;
-      }
-
-      modelLibrary.value = modelLibrary.value.filter((item) => item.id !== modelId);
-      if (selectedModelId.value === modelId) {
-        selectedModelId.value = modelLibrary.value[0]?.id || "";
-      }
-      toast.success("模特已删除");
-    } catch (error) {
-      toast.error(getApiErrorMessage(error, "删除模特失败"));
-    } finally {
-      modelDeletingId.value = "";
-    }
-  }
-
   function restoreOutfitJobData(data) {
     let restoredStrategyBrief = "";
     if (data.settings && typeof data.settings === "object") {
       const s = data.settings;
       const scene = getSnapshotScene(s);
-      const { platform, language, ratio, quality } = s;
       const {
         selectedScenes: nextSelectedScenes,
         sceneDescription: nextSceneDescription,
@@ -306,13 +223,7 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
         strategyBrief: nextStrategyBrief,
       } = scene;
       restoredStrategyBrief = typeof nextStrategyBrief === "string" ? nextStrategyBrief : "";
-      if (typeof platform === "string") settings.platform = platform;
-      if (typeof language === "string") settings.language = language;
-      if (typeof ratio === "string" && resolutionMap[ratio]) {
-        settings.ratio = ratio;
-      }
-      const desiredQuality = typeof quality === "string" ? quality : settings.quality;
-      settings.quality = resolveQuality(settings.ratio, desiredQuality) || "1K";
+      restoreImageGenerationSettings(settings, s);
       if (Array.isArray(nextSelectedScenes) && nextSelectedScenes.length > 0) {
         selectedScenes.value = nextSelectedScenes;
       }
@@ -587,13 +498,6 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
     });
   }
 
-  function syncQualityForRatio() {
-    const effectiveQuality = resolveQuality(settings.ratio, settings.quality) || settings.quality;
-    if (effectiveQuality !== settings.quality) {
-      settings.quality = effectiveQuality;
-    }
-  }
-
   function findScene(id) {
     const preset = catalog.findOutfitScene(id);
     return {
@@ -706,17 +610,4 @@ function getImageSrc(image) {
   if (!image) return "";
   if (typeof image === "string") return image;
   return image.previewUrl || image.url || "";
-}
-
-function normalizeModel(model) {
-  return {
-    id: model.id,
-    name: model.name,
-    image: model.image_url,
-    objectKey: model.object_key,
-    sortOrder: model.sort_order || 0,
-    isSystem: Boolean(model.is_system),
-    canDelete: Boolean(model.can_delete),
-    createdAt: model.created_at || "",
-  };
 }
