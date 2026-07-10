@@ -1,9 +1,10 @@
 <script setup>
-import { computed, nextTick, onBeforeUnmount, ref } from "vue";
+import { computed } from "vue";
 import { FileAudio, LoaderCircle, Trash2, Video } from "lucide-vue-next";
 import { uploadAudio, uploadVideo } from "@/api/video.js";
 import AssetPickerModal from "@/components/assets/AssetPickerModal.vue";
 import ImageUploadSourcePanel from "@/components/generation/image/ImageUploadSourcePanel.vue";
+import { useMediaUploader } from "@/composables/generator/useMediaUploader.js";
 
 const props = defineProps({
   items: {
@@ -43,137 +44,42 @@ const props = defineProps({
 
 const emit = defineEmits(["update:items", "notify"]);
 
-const fileInput = ref(null);
-const dragOver = ref(false);
-const assetPickerOpen = ref(false);
-
 const icon = computed(() => (props.mediaType === "audio" ? FileAudio : Video));
 const accept = computed(() => `${props.mediaType}/*`);
-const remainingCount = computed(() => Math.max(0, props.maxCount - props.items.length));
 const canPickAsset = computed(() => props.showAssetButton);
-
-function triggerFileInput() {
-  fileInput.value?.click();
-}
-
-function openAssetPicker() {
-  if (!canPickAsset.value) return;
-  if (remainingCount.value <= 0) {
-    emit("notify", props.limitMessage);
-    return;
-  }
-  assetPickerOpen.value = true;
-}
-
-function makeLocalItem(file, index) {
-  return {
-    id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${index}`,
-    previewUrl: URL.createObjectURL(file),
-    url: "",
-    objectKey: "",
-    contentType: file.type,
-    size: file.size,
-    name: file.name || "",
-    uploading: true,
-    error: "",
-    source: "upload",
-  };
-}
-
-function patchItem(id, patch) {
-  emit(
-    "update:items",
-    props.items.map((item) => (item.id === id ? { ...item, ...patch } : item)),
-  );
-}
-
-async function uploadItem(file, item) {
-  try {
-    const result = await (props.mediaType === "audio" ? uploadAudio(file) : uploadVideo(file));
-    if (result.code !== 0) {
-      patchItem(item.id, { uploading: false, error: result.message || "素材上传失败" });
-      emit("notify", result.message || "素材上传失败");
-      return;
-    }
-    patchItem(item.id, {
-      uploading: false,
-      error: "",
-      url: result.data.url,
-      objectKey: result.data.object_key,
-      contentType: result.data.content_type,
-      size: result.data.size,
-    });
-  } catch (error) {
-    patchItem(item.id, { uploading: false, error: "素材上传失败" });
-    emit("notify", error.response?.data?.message || "素材上传失败");
-  }
-}
-
-async function processFiles(files) {
-  const matchedFiles = files.filter((file) => file.type.startsWith(`${props.mediaType}/`));
-  if (remainingCount.value <= 0) {
-    emit("notify", props.limitMessage);
-    return;
-  }
-
-  const selected = matchedFiles.slice(0, remainingCount.value);
-  if (matchedFiles.length > selected.length) {
-    emit("notify", `已达到 ${props.maxCount} 个上限，多余素材未添加`);
-  }
-  if (selected.length === 0) return;
-
-  const placeholders = selected.map(makeLocalItem);
-  emit("update:items", [...props.items, ...placeholders]);
-  await nextTick();
-  await Promise.all(selected.map((file, index) => uploadItem(file, placeholders[index])));
-}
-
-function handleFileChange(event) {
-  processFiles(Array.from(event.target.files || []));
-  event.target.value = "";
-}
-
-function handleDrop(event) {
-  dragOver.value = false;
-  processFiles(Array.from(event.dataTransfer.files || []));
-}
-
-function addAssetItems(assets) {
-  const fallbackName = props.mediaType === "audio" ? "资产库音频" : "资产库视频";
-  const selected = assets.slice(0, remainingCount.value).map((asset) => ({
+const {
+  addAssetItems,
+  assetPickerOpen,
+  clearItems,
+  dragOver,
+  fileInput,
+  handleDrop,
+  handleFileChange,
+  openAssetPicker,
+  remainingCount,
+  removeItem,
+  triggerFileInput,
+} = useMediaUploader({
+  props,
+  emit,
+  itemsKey: "items",
+  updateEvent: "update:items",
+  mediaType: props.mediaType,
+  uploadFile: (file) => props.mediaType === "audio" ? uploadAudio(file) : uploadVideo(file),
+  createPreview: (file) => URL.createObjectURL(file),
+  mapAsset: (asset) => ({
     id: `asset_${asset.taskId || asset.id}`,
     previewUrl: asset.url,
     url: asset.url,
     objectKey: "",
     contentType: "",
     size: 0,
-    name: asset.title || fallbackName,
+    name: asset.title || (props.mediaType === "audio" ? "资产库音频" : "资产库视频"),
     uploading: false,
     error: "",
     source: "asset",
     assetTaskId: asset.taskId || asset.id,
-  }));
-  emit("update:items", [...props.items, ...selected]);
-  assetPickerOpen.value = false;
-}
-
-function removeItem(index) {
-  const item = props.items[index];
-  if (item?.previewUrl?.startsWith("blob:")) URL.revokeObjectURL(item.previewUrl);
-  emit("update:items", props.items.filter((_, itemIndex) => itemIndex !== index));
-}
-
-function clearItems() {
-  props.items.forEach((item) => {
-    if (item?.previewUrl?.startsWith("blob:")) URL.revokeObjectURL(item.previewUrl);
-  });
-  emit("update:items", []);
-}
-
-onBeforeUnmount(() => {
-  props.items.forEach((item) => {
-    if (item?.previewUrl?.startsWith("blob:")) URL.revokeObjectURL(item.previewUrl);
-  });
+  }),
 });
 </script>
 
