@@ -36,7 +36,7 @@ export function useAiSellingPointsWriter({
     try {
       const result = await analyzeImage({
         images,
-        ...(getAnalyzePayload?.() || {}),
+        ...getAnalyzePayload?.(),
       });
       if (result.code !== 0) {
         toast?.error?.(result.message || "AI 分析失败，请稍后重试");

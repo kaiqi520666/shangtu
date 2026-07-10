@@ -63,7 +63,7 @@ function attachVideoStrategyBrief(snapshot, brief) {
   return {
     ...snapshot,
     scene: {
-      ...(snapshot.scene || {}),
+      ...snapshot.scene,
       strategyBrief: brief,
     },
   };

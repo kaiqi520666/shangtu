@@ -1,6 +1,7 @@
 <script setup>
 import { onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import freeVideoPreview from "@/assets/generator-previews/free-video.webp";
 import GenerationHistoryDrawer from "@/components/generation/workspace/GenerationHistoryDrawer.vue";
 import GenerationPreviewModal from "@/components/generation/workspace/GenerationPreviewModal.vue";
 import GenerationWorkspace from "@/components/generation/workspace/GenerationWorkspace.vue";
@@ -94,6 +95,8 @@ function closeHistoryDrawer() {
       title-badge="本次自由生视频"
       empty-title="自由生视频"
       empty-subtitle="输入提示词，可选参考图、参考视频或参考音频，直接生成动态视频。"
+      :empty-image="freeVideoPreview"
+      empty-image-alt="户外拍摄现场的电影场记板"
       media-type="video"
       media-unit="个"
       loading-title="AI 自由生视频生成中"

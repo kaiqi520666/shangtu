@@ -75,7 +75,7 @@ watch(
 function syncLocalForm() {
   Object.assign(localForm, {
     ...defaultForm,
-    ...(props.form || {}),
+    ...props.form,
     active: Boolean(props.form?.active ?? defaultForm.active),
     version: Number(props.form?.version || defaultForm.version),
   });

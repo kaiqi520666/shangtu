@@ -21,6 +21,10 @@ uv run uvicorn app.main:app --reload
 
 # 终端2：启动 Worker
 uv run arq app.worker.settings.WorkerSettings
+
+# 修改.env重启
+docker compose --env-file .env -f docker-compose.yml up -d --force-recreate backend worker frontend
+
 ```
 
 打开 Swagger：http://127.0.0.1:8000/docs

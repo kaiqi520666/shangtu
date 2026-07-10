@@ -1,6 +1,7 @@
 <script setup>
 import { onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import videoTranslationPreview from "@/assets/generator-previews/video-translation.webp";
 import VideoTranslationSettingsPanel from "@/components/video-translation/VideoTranslationSettingsPanel.vue";
 import GenerationHistoryDrawer from "@/components/generation/workspace/GenerationHistoryDrawer.vue";
 import GenerationPreviewModal from "@/components/generation/workspace/GenerationPreviewModal.vue";
@@ -86,7 +87,8 @@ onMounted(() => {
       :get-module-name="videoTranslation.getVideoTranslationModuleName"
       empty-title="视频翻译工作台"
       empty-subtitle="上传视频并选择目标语言后，这里会显示翻译进度和结果。"
-      :empty-slides="[]"
+      :empty-image="videoTranslationPreview"
+      empty-image-alt="象征多语言和全球传播的地球仪"
       media-type="video"
       media-unit="个"
       loading-title="视频翻译中"

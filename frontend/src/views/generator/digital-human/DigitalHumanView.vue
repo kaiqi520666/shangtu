@@ -1,6 +1,7 @@
 <script setup>
 import { onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import digitalHumanPreview from "@/assets/generator-previews/digital-human.webp";
 import AvatarPickerModal from "@/components/digital-human/AvatarPickerModal.vue";
 import DigitalHumanSettingsPanel from "@/components/digital-human/DigitalHumanSettingsPanel.vue";
 import VoicePickerModal from "@/components/digital-human/VoicePickerModal.vue";
@@ -110,7 +111,8 @@ onMounted(() => {
       :get-module-name="digitalHuman.getDigitalHumanModuleName"
       empty-title="数字人工作台"
       empty-subtitle="选择数字人和声音，或上传音频后，这里会显示生成进度和成片结果。"
-      :empty-slides="[]"
+      :empty-image="digitalHumanPreview"
+      empty-image-alt="科技灯光下的数字人形象"
       media-type="video"
       media-unit="个"
       loading-title="数字人视频生成中"

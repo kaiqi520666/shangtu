@@ -1,5 +1,5 @@
 <script setup>
-import { Clock3, Download, ImageIcon, Plus, RefreshCw } from 'lucide-vue-next'
+import { Clock3, Download, Plus, RefreshCw } from 'lucide-vue-next'
 import GeneratedCardGrid from '@/components/generation/cards/GeneratedCardGrid.vue'
 import GeneratorPreviewShowcase from '@/components/generation/workspace/GeneratorPreviewShowcase.vue'
 import GeneratorWorkspaceShell from '@/components/generation/workspace/GeneratorWorkspaceShell.vue'
@@ -82,6 +82,14 @@ defineProps({
   emptySlides: {
     type: Array,
     default: () => [],
+  },
+  emptyImage: {
+    type: String,
+    default: '',
+  },
+  emptyImageAlt: {
+    type: String,
+    default: '',
   },
   mediaType: {
     type: String,
@@ -214,6 +222,8 @@ const emit = defineEmits([
         :title="emptyTitle"
         :subtitle="emptySubtitle"
         :slides="emptySlides"
+        :image-url="emptyImage"
+        :image-alt="emptyImageAlt"
         :media-type="mediaType"
       />
 
@@ -269,10 +279,6 @@ const emit = defineEmits([
           @zoom-card="emit('zoom-card', $event)"
           @delete-card="emit('delete-card', $event)"
         />
-      </div>
-
-      <div v-if="outputCards.length === 0 && !generating && !creatingBatch && emptySlides.length === 0" class="flex h-full items-center justify-center text-slate-300">
-        <ImageIcon class="h-8 w-8" />
       </div>
     </template>
   </GeneratorWorkspaceShell>

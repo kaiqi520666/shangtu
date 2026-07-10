@@ -47,7 +47,7 @@ watch(
 function syncLocalForm() {
   Object.assign(localForm, {
     ...defaultForm,
-    ...(props.form || {}),
+    ...props.form,
     active: Boolean(props.form?.active ?? defaultForm.active),
     sort_order: Number(props.form?.sort_order || 0),
   });
