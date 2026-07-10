@@ -37,7 +37,7 @@ function isNavActive(nav) {
 
 <template>
   <aside class="flex w-20 flex-col items-center gap-6 border-r border-slate-200 bg-slate-100/50 py-4">
-    <div class="flex min-h-0 w-full flex-1 flex-col items-center gap-3 overflow-y-auto">
+    <div class="flex min-h-0 w-full flex-1 flex-col items-center gap-3 overflow-x-hidden overflow-y-auto">
       <div v-for="nav in mainNavs" :key="nav.to" class="group relative flex w-full flex-col items-center">
         <RouterLink
           :to="nav.to"
