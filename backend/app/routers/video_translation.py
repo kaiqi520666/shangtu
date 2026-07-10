@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import uuid
 
-import httpx
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.deps import get_current_user, get_db
 from app.core.json_utils import dump_json_or_none, parse_json_or_none
 from app.core.media_projection import video_task_payload
+from app.core.media_download import remote_media_download_response
 from app.core.providers.heygen_provider import (
     parse_heygen_error_message,
 )
@@ -382,15 +381,8 @@ async def download_video_translation_task(
     if not task or not task.result_url:
         return fail("视频不存在或尚未生成完成")
 
-    async def stream():
-        async with httpx.AsyncClient(timeout=60) as client:
-            async with client.stream("GET", task.result_url) as resp:
-                resp.raise_for_status()
-                async for chunk in resp.aiter_bytes(chunk_size=65536):
-                    yield chunk
-
-    return StreamingResponse(
-        stream(),
-        media_type="video/mp4",
-        headers={"Content-Disposition": f'attachment; filename="{task_id}.mp4"'},
+    return remote_media_download_response(
+        task.result_url,
+        filename_stem=task_id,
+        fallback_extension="mp4",
     )

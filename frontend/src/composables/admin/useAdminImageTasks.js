@@ -3,9 +3,8 @@ import { getAdminImageTasks } from "@/api/admin.js";
 import { createAdminPageState, useAdminPageLoader } from "@/composables/admin/useAdminPageState.js";
 import { useToast } from "@/composables/useToast.js";
 
-const imageTasksState = reactive(createAdminPageState({ status: "", scenario: "", mediaType: "" }));
-
 export function useAdminImageTasks() {
+  const imageTasksState = reactive(createAdminPageState({ status: "", scenario: "", mediaType: "" }));
   const toast = useToast();
   const { loadPage, applyFilter, changePage } = useAdminPageLoader(toast);
 

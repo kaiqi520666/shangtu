@@ -3,9 +3,8 @@ import { getAdminAuditLogs } from "@/api/admin.js";
 import { createAdminPageState, useAdminPageLoader } from "@/composables/admin/useAdminPageState.js";
 import { useToast } from "@/composables/useToast.js";
 
-const auditLogsState = reactive(createAdminPageState({ action: "" }));
-
 export function useAdminAuditLogs() {
+  const auditLogsState = reactive(createAdminPageState({ action: "" }));
   const toast = useToast();
   const { loadPage, applyFilter, changePage } = useAdminPageLoader(toast);
 

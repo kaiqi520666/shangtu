@@ -7,12 +7,11 @@ import { useAdminTransactions } from "@/composables/admin/useAdminTransactions.j
 import { useConfirm } from "@/composables/useConfirm.js";
 import { useToast } from "@/composables/useToast.js";
 
-const usersState = reactive(createAdminPageState({ role: "", status: "" }));
-const adjustModalOpen = ref(false);
-const adjustTarget = ref(null);
-const adjustSaving = ref(false);
-
 export function useAdminUsers() {
+  const usersState = reactive(createAdminPageState({ role: "", status: "" }));
+  const adjustModalOpen = ref(false);
+  const adjustTarget = ref(null);
+  const adjustSaving = ref(false);
   const confirm = useConfirm();
   const toast = useToast();
   const { loadPage, applyFilter, changePage } = useAdminPageLoader(toast);

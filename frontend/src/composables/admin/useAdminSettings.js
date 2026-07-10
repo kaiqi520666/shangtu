@@ -11,21 +11,20 @@ import {
   defaultVideoCreditCosts,
 } from "@/constants/billing.js";
 
-const settingsState = reactive({
-  imageCreditCosts: { ...defaultImageCreditCosts },
-  videoCreditCosts: { ...defaultVideoCreditCosts },
-  digitalHumanCreditCosts: { ...defaultDigitalHumanCreditCosts },
-  digitalHumanPrechargeCosts: { ...defaultDigitalHumanPrechargeCosts },
-  videoTranslationCreditCosts: { ...defaultVideoTranslationCreditCosts },
-  rechargePackages: [],
-  paymentConfig: {},
-  loading: false,
-  saving: false,
-});
-
 export function useAdminSettings() {
   const toast = useToast();
   const { loadAuditLogs } = useAdminAuditLogs();
+  const settingsState = reactive({
+    imageCreditCosts: { ...defaultImageCreditCosts },
+    videoCreditCosts: { ...defaultVideoCreditCosts },
+    digitalHumanCreditCosts: { ...defaultDigitalHumanCreditCosts },
+    digitalHumanPrechargeCosts: { ...defaultDigitalHumanPrechargeCosts },
+    videoTranslationCreditCosts: { ...defaultVideoTranslationCreditCosts },
+    rechargePackages: [],
+    paymentConfig: {},
+    loading: false,
+    saving: false,
+  });
 
   async function loadSettings() {
     settingsState.loading = true;

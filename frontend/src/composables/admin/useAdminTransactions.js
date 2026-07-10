@@ -3,9 +3,8 @@ import { getAdminCreditTransactions } from "@/api/admin.js";
 import { createAdminPageState, useAdminPageLoader } from "@/composables/admin/useAdminPageState.js";
 import { useToast } from "@/composables/useToast.js";
 
-const transactionsState = reactive(createAdminPageState({ type: "" }));
-
 export function useAdminTransactions() {
+  const transactionsState = reactive(createAdminPageState({ type: "" }));
   const toast = useToast();
   const { loadPage, applyFilter, changePage } = useAdminPageLoader(toast);
 

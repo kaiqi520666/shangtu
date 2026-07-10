@@ -1,11 +1,10 @@
-import httpx
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_user, get_db
 from app.core.json_utils import parse_json_or_none
+from app.core.media_download import remote_media_download_response
 from app.core.oss import image_url_variants
 from app.core.prompt_snapshot import parse_prompt_snapshot
 from app.core.task_state import merge_task_state
@@ -91,29 +90,11 @@ async def download_task_image(
     if not task or not task.result_url:
         return fail("图片不存在或尚未生成完成")
 
-    async def stream():
-        async with httpx.AsyncClient(timeout=30) as client:
-            async with client.stream("GET", task.result_url) as resp:
-                resp.raise_for_status()
-                async for chunk in resp.aiter_bytes(chunk_size=65536):
-                    yield chunk
-
-    url_lower = task.result_url.lower()
-    if url_lower.endswith(".jpg") or url_lower.endswith(".jpeg"):
-        media_type = "image/jpeg"
-        ext = "jpg"
-    elif url_lower.endswith(".webp"):
-        media_type = "image/webp"
-        ext = "webp"
-    else:
-        media_type = "image/png"
-        ext = "png"
-
-    filename = f"{task_id}.{ext}"
-    return StreamingResponse(
-        stream(),
-        media_type=media_type,
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    return remote_media_download_response(
+        task.result_url,
+        filename_stem=task_id,
+        fallback_extension="png",
+        timeout_seconds=30,
     )
 
 

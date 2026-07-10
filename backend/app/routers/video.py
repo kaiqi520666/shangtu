@@ -1,8 +1,6 @@
 import uuid
 
-import httpx
 from fastapi import APIRouter, Depends, File, Request, UploadFile
-from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.credits import normalize_video_resolution
 from app.core.deps import get_current_user, get_db
 from app.core.json_utils import dump_json_or_none, parse_json_or_none
+from app.core.media_download import remote_media_download_response
 from app.core.oss import OssConfigError, upload_audio_bytes, upload_video_bytes
 from app.core.scenarios import SCENARIO_TITLE_PREFIX, VIDEO_SCENARIOS
 from app.core.strategy.dashscope_client import (
@@ -638,26 +637,8 @@ async def download_video_task(
     if not task or not task.result_url:
         return fail("视频不存在或尚未生成完成")
 
-    async def stream():
-        async with httpx.AsyncClient(timeout=60) as client:
-            async with client.stream("GET", task.result_url) as resp:
-                resp.raise_for_status()
-                async for chunk in resp.aiter_bytes(chunk_size=65536):
-                    yield chunk
-
-    url_lower = task.result_url.lower()
-    if url_lower.endswith(".webm"):
-        media_type = "video/webm"
-        ext = "webm"
-    elif url_lower.endswith(".mov"):
-        media_type = "video/quicktime"
-        ext = "mov"
-    else:
-        media_type = "video/mp4"
-        ext = "mp4"
-
-    return StreamingResponse(
-        stream(),
-        media_type=media_type,
-        headers={"Content-Disposition": f'attachment; filename="{task_id}.{ext}"'},
+    return remote_media_download_response(
+        task.result_url,
+        filename_stem=task_id,
+        fallback_extension="mp4",
     )

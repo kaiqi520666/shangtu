@@ -2,31 +2,26 @@ from __future__ import annotations
 
 import mimetypes
 from pathlib import Path
-import uuid
 
 import httpx
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
-from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from sqlalchemy import func, or_, select, update
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.json_utils import dump_json_or_none
+from app.core.media_download import remote_media_download_response
 from app.core.oss import OssConfigError, upload_audio_bytes, upload_image_bytes
 from app.core.pagination import page_payload
-from app.core.prompt_snapshot import build_prompt_snapshot, dump_prompt_snapshot
 from app.core.providers.heygen_provider import (
     create_photo_avatar,
     parse_heygen_error_message,
 )
-from app.core.scenarios import SCENARIO_TITLE_PREFIX
 from app.core.system_settings import (
     get_effective_digital_human_credit_costs,
-    get_effective_digital_human_precharge_cost,
     get_effective_digital_human_precharge_costs,
 )
 from app.core.time import to_utc_iso, utc_now
-from app.core.user_credits import get_user_credits, refund_user_credits
+from app.core.user_credits import get_user_credits
 from app.core.deps import get_current_user, get_db
 from app.models import (
     HeygenAvatar,
@@ -35,48 +30,37 @@ from app.models import (
     UserAudioAsset,
     UserAvatar,
     UserAvatarTask,
-    VideoTask,
 )
 from app.routers.admin.utils import heygen_avatar_payload, heygen_voice_payload
 from app.schemas.response import Response, fail, success
 from app.services.digital_human import (
-    get_or_create_job as _get_or_create_job,
+    create_task as _create_task,
     get_task as _get_task,
     sync_job_status as _sync_job_status,
     task_payload as _digital_human_task_payload,
 )
 from app.services.digital_human_assets import (
-    ResolvedAvatar,
     extract_provider_avatar_identity as _extract_provider_avatar_identity,
     extract_provider_avatar_error_message as _extract_provider_avatar_error_message,
     extract_provider_avatar_status as _extract_provider_avatar_status,
     extract_provider_avatar_urls as _extract_provider_avatar_urls,
     get_available_audio_asset as _get_available_audio_asset,
-    get_enabled_voice as _get_enabled_voice,
     get_photo_avatar_asset as _get_photo_avatar_asset,
     get_user_avatar_task as _get_user_avatar_task,
     get_user_avatars_by_ids as _get_user_avatars_by_ids,
     provider_avatar_status as _provider_avatar_status,
     refund_user_avatar_task_if_needed as _refund_user_avatar_task_if_needed,
-    resolve_avatar as _resolve_avatar,
     sync_user_avatar_task_from_provider as _sync_user_avatar_task_from_provider,
     upsert_user_avatar_from_task as _upsert_user_avatar_from_task,
     user_avatar_payload as _user_avatar_payload,
     user_avatar_task_payload as _user_avatar_task_payload,
 )
-from app.services.generation_tasks import deduct_credits_or_fail, enqueue_or_compensate
 from app.services.heygen_task_lifecycle import (
     clean_text as _clean_text,
 )
 
 router = APIRouter(prefix="/digital-human", tags=["数字人"])
 
-QUALITY_TIER_TO_ENGINE = {
-    "standard": "avatar_iii",
-    "premium": "avatar_iv",
-}
-SUPPORTED_ASPECT_RATIOS = {"16:9", "9:16", "1:1"}
-SUPPORTED_RESOLUTIONS = {"720p", "1080p"}
 DEFAULT_RESOLUTION = "1080p"
 PHOTO_AVATAR_TYPE = "photo"
 
@@ -103,26 +87,6 @@ class DigitalHumanGenerateRequest(BaseModel):
     voice_settings: DigitalHumanVoiceSettings | None = None
 
 
-def _default_job_title(script: str, audio_name: str | None = None) -> str:
-    prefix = SCENARIO_TITLE_PREFIX.get("digital_human", "数字人")
-    excerpt = _clean_text(script).replace("\n", " ")[:20]
-    if not excerpt:
-        excerpt = _clean_text(audio_name)[:20]
-    if excerpt:
-        return f"{prefix}_{excerpt}"
-    return f"{prefix}_{utc_now():%Y%m%d_%H%M%S}"
-
-
-def _normalize_voice_speed(value: float | int | None) -> float:
-    try:
-        speed = float(value or 1.0)
-    except (TypeError, ValueError):
-        return 1.0
-    if speed <= 0:
-        return 1.0
-    return round(speed, 2)
-
-
 def _normalize_duration_seconds(value: float | int | None) -> int:
     try:
         duration = float(value or 0)
@@ -147,15 +111,6 @@ def _clean_avatar_name(value: str | None, fallback: str = "照片数字人") -> 
     return fallback
 
 
-def _digital_human_consume_note(*, quality_tier: str, title: str | None) -> str:
-    quality_label = "高质档" if quality_tier == "premium" else "标准档"
-    parts = ["数字人", quality_label]
-    clean_title = _clean_text(title)
-    if clean_title:
-        parts.append(clean_title)
-    return " · ".join(parts)
-
-
 def _audio_asset_payload(asset: UserAudioAsset) -> dict:
     return {
         "id": asset.id,
@@ -169,52 +124,6 @@ def _audio_asset_payload(asset: UserAudioAsset) -> dict:
         "enabled": bool(asset.enabled),
         "created_at": to_utc_iso(asset.created_at),
         "updated_at": to_utc_iso(asset.updated_at),
-    }
-
-
-def _build_settings_snapshot(
-    *,
-    avatar: ResolvedAvatar,
-    voice: HeygenVoice | None,
-    audio_asset: UserAudioAsset | None,
-    script: str,
-    background_url: str | None,
-    quality_tier: str,
-    resolution: str,
-    aspect_ratio: str,
-    voice_settings: dict,
-) -> dict:
-    audio_mode = "upload" if audio_asset else "platform"
-    return {
-        "scenario": "digital_human",
-        "media_type": "video",
-        "language": voice.language if voice else "",
-        "ratio": aspect_ratio,
-        "quality": resolution,
-        "scene": {
-            "avatarId": avatar.avatar_id,
-            "avatarName": avatar.name,
-            "avatarPreviewImageUrl": avatar.preview_image_url,
-            "avatarPreviewVideoUrl": avatar.preview_video_url,
-            "avatarSource": avatar.source,
-            "avatarAssetId": avatar.asset_id,
-            "avatarType": avatar.avatar_type,
-            "audioMode": audio_mode,
-            "voiceId": voice.voice_id if voice else "",
-            "voiceName": voice.name if voice else "",
-            "voiceLanguage": voice.language if voice else "",
-            "voicePreviewAudioUrl": voice.preview_audio_url if voice else "",
-            "audioAssetId": audio_asset.id if audio_asset else "",
-            "audioName": audio_asset.name if audio_asset else "",
-            "audioUrl": audio_asset.audio_url if audio_asset else "",
-            "audioDurationSeconds": int(audio_asset.duration_seconds or 0) if audio_asset else 0,
-            "backgroundUrl": background_url,
-            "script": script,
-            "qualityTier": quality_tier,
-            "resolution": resolution,
-            "aspectRatio": aspect_ratio,
-            "voiceSettings": voice_settings if audio_mode == "platform" else {},
-        },
     }
 
 
@@ -731,167 +640,21 @@ async def create_digital_human_task(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    avatar_id = _clean_text(req.avatar_id)
-    voice_id = _clean_text(req.voice_id)
-    audio_asset_id = _clean_text(req.audio_asset_id)
-    script = _clean_text(req.script)
-    background_url = _clean_text(req.background.url if req.background else None) or None
-    quality_tier = _clean_text(req.quality_tier) or "standard"
-    resolution = _clean_text(req.resolution) or DEFAULT_RESOLUTION
-    aspect_ratio = _clean_text(req.aspect_ratio) or "9:16"
-    voice_settings = {
-        "speed": _normalize_voice_speed(req.voice_settings.speed if req.voice_settings else 1.0),
-    }
-
-    if not avatar_id:
-        return fail("请选择数字人")
-    if not voice_id and not audio_asset_id:
-        return fail("请选择系统声音或上传音频")
-    if voice_id and audio_asset_id:
-        return fail("系统声音和上传音频不能同时使用")
-    if quality_tier not in QUALITY_TIER_TO_ENGINE:
-        return fail("不支持的生成档位")
-    if resolution not in SUPPORTED_RESOLUTIONS:
-        return fail("不支持的视频清晰度")
-    if aspect_ratio not in SUPPORTED_ASPECT_RATIOS:
-        return fail("不支持的视频比例")
-
-    avatar = await _resolve_avatar(db, avatar_id=avatar_id, user_id=current_user.id)
-    if not avatar:
-        return fail("数字人不存在或已停用")
-    voice = None
-    audio_asset = None
-    audio_mode = "platform"
-    if audio_asset_id:
-        audio_asset = await _get_available_audio_asset(
-            db,
-            audio_asset_id=audio_asset_id,
-            user_id=current_user.id,
-        )
-        if not audio_asset:
-            return fail("上传音频不存在或已删除")
-        audio_mode = "upload"
-    else:
-        voice = await _get_enabled_voice(db, voice_id)
-        if not voice:
-            return fail("系统声音不存在或已停用")
-        if not script:
-            return fail("请输入口播文案")
-
-    title = _clean_text(req.title) or _default_job_title(
-        script,
-        audio_name=audio_asset.name if audio_asset else None,
-    )
-    try:
-        credit_cost = await get_effective_digital_human_precharge_cost(db, quality_tier)
-    except ValueError as exc:
-        return fail(str(exc))
-    settings_snapshot = _build_settings_snapshot(
-        avatar=avatar,
-        voice=voice,
-        audio_asset=audio_asset,
-        script=script,
-        background_url=background_url,
-        quality_tier=quality_tier,
-        resolution=resolution,
-        aspect_ratio=aspect_ratio,
-        voice_settings=voice_settings if audio_mode == "platform" else {},
-    )
-
-    job = await _get_or_create_job(
+    return await _create_task(
         db,
         user_id=current_user.id,
-        job_id=req.job_id,
-        title=title,
-        settings_snapshot=settings_snapshot,
-        script=script,
-    )
-    if req.job_id and job is None:
-        return fail("任务不存在")
-    remaining_credits, fail_response = await deduct_credits_or_fail(
-        db,
-        current_user.id,
-        credit_cost,
-        note=_digital_human_consume_note(quality_tier=quality_tier, title=title),
-    )
-    if fail_response is not None:
-        return fail_response
-
-    prompt_text = script or (f"自定义音频：{audio_asset.name}" if audio_asset else "")
-    task = VideoTask(
-        id=str(uuid.uuid4()),
-        user_id=current_user.id,
-        job_id=job.id if job else None,
-        scenario="digital_human",
-        type_id=quality_tier,
-        title=title,
-        sort_order=0,
-        prompt=prompt_text,
-        input_mode="avatar",
-        input_images_json=None,
-        input_video_url=None,
-        audio_setting=None,
-        duration=0,
-        resolution=resolution,
-        aspect_ratio=aspect_ratio,
-        status="pending",
-        progress=10,
-        provider="heygen",
-        provider_task_id=None,
-        credit_cost=credit_cost,
-        prompt_snapshot_json=dump_prompt_snapshot(
-            build_prompt_snapshot(
-                user=prompt_text,
-                final=prompt_text,
-            )
-        ),
-        settings_snapshot_json=dump_json_or_none(settings_snapshot),
-    )
-    db.add(task)
-    if job is not None:
-        job.status = "generating"
-        job.updated_at = utc_now()
-
-    try:
-        await db.commit()
-        await db.refresh(task)
-    except Exception:
-        await db.rollback()
-        return fail("数字人任务创建失败，请稍后重试")
-
-    async def mark_task_failed(_refunded_credits: int) -> None:
-        await db.execute(
-            update(VideoTask)
-            .where(VideoTask.id == task.id)
-            .values(status="failed", progress=0, credit_refunded=True)
-        )
-
-    enqueue_fail = await enqueue_or_compensate(
         get_redis_pool=lambda: request.app.state.redis_pool,
-        db=db,
-        job_name="submit_digital_human_task",
-        job_args=(task.id,),
-        user_id=current_user.id,
-        credit_cost=credit_cost,
-        remaining_credits=remaining_credits,
-        refund_credits=refund_user_credits,
-        mark_failed=mark_task_failed,
-        failure_message="数字人任务入队失败，请稍后重试",
-        failure_data={"task_id": task.id, "job_id": task.job_id},
-        refund_note=f"数字人任务入队失败退回 · {task.id}",
-    )
-    if enqueue_fail is not None:
-        return enqueue_fail
-
-    return success(
-        {
-            "task_id": task.id,
-            "job_id": task.job_id,
-            "provider_task_id": None,
-            "status": "pending",
-            "credits": remaining_credits,
-            "credit_cost": credit_cost,
-        }
+        job_id=req.job_id,
+        requested_title=req.title,
+        avatar_id=req.avatar_id,
+        voice_id=req.voice_id,
+        audio_asset_id=req.audio_asset_id,
+        script=req.script,
+        background_url=req.background.url if req.background else None,
+        quality_tier=req.quality_tier,
+        resolution=req.resolution,
+        aspect_ratio=req.aspect_ratio,
+        voice_speed=req.voice_settings.speed if req.voice_settings else 1.0,
     )
 
 
@@ -941,28 +704,10 @@ async def download_digital_human_task(
     if not task or not task.result_url:
         return fail("数字人视频不存在或尚未生成完成")
 
-    async def stream():
-        async with httpx.AsyncClient(timeout=60) as client:
-            async with client.stream("GET", task.result_url) as resp:
-                resp.raise_for_status()
-                async for chunk in resp.aiter_bytes(chunk_size=65536):
-                    yield chunk
-
-    url_lower = task.result_url.lower()
-    if url_lower.endswith(".webm"):
-        media_type = "video/webm"
-        ext = "webm"
-    elif url_lower.endswith(".mov"):
-        media_type = "video/quicktime"
-        ext = "mov"
-    else:
-        media_type = "video/mp4"
-        ext = "mp4"
-
-    return StreamingResponse(
-        stream(),
-        media_type=media_type,
-        headers={"Content-Disposition": f'attachment; filename="{task_id}.{ext}"'},
+    return remote_media_download_response(
+        task.result_url,
+        filename_stem=task_id,
+        fallback_extension="mp4",
     )
 
 
