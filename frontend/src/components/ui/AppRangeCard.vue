@@ -78,7 +78,7 @@ function updateValue(event) {
           :min="props.min"
           :max="props.max"
           :step="props.step"
-          class="relative h-6 w-full cursor-pointer appearance-none bg-transparent accent-primary"
+          class="app-range-input relative h-6 w-full cursor-pointer appearance-none bg-transparent"
           @input="updateValue"
         />
       </div>
@@ -94,3 +94,34 @@ function updateValue(event) {
     </div>
   </div>
 </template>
+
+<style scoped>
+.app-range-input::-webkit-slider-runnable-track {
+  height: 6px;
+  background: transparent;
+}
+
+.app-range-input::-webkit-slider-thumb {
+  width: 16px;
+  height: 16px;
+  margin-top: -5px;
+  -webkit-appearance: none;
+  appearance: none;
+  border: 0;
+  border-radius: 9999px;
+  background: var(--color-primary);
+}
+
+.app-range-input::-moz-range-track {
+  height: 6px;
+  background: transparent;
+}
+
+.app-range-input::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border: 0;
+  border-radius: 9999px;
+  background: var(--color-primary);
+}
+</style>
