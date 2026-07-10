@@ -1,6 +1,7 @@
 from app.models.admin_audit_log import AdminAuditLog
 from app.models.credit_order import CreditOrder
 from app.models.credit_transaction import CreditTransaction
+from app.models.cosyvoice_voice import CosyVoiceVoice
 from app.models.generation_job import GenerationJob
 from app.models.heygen_avatar import HeygenAvatar
 from app.models.heygen_translation_language import HeygenTranslationLanguage
@@ -20,6 +21,7 @@ __all__ = [
     "AdminAuditLog",
     "CreditOrder",
     "CreditTransaction",
+    "CosyVoiceVoice",
     "GenerationJob",
     "HeygenAvatar",
     "HeygenTranslationLanguage",
