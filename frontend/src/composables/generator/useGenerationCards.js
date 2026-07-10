@@ -164,6 +164,9 @@ export function useGenerationCards({
       if (typeof data.credit_cost === "number") {
         card.creditCost = data.credit_cost;
       }
+      if (data.asset_id) {
+        card.assetId = data.asset_id;
+      }
       const promptSnapshotUser = getPromptSnapshotUser(data);
       if (promptSnapshotUser) {
         card.userPrompt = promptSnapshotUser;
@@ -307,6 +310,7 @@ export function useGenerationCards({
       creditRefunded: false,
       userPrompt: userPrompt || "",
       settingsSnapshot: settingsSnapshot || null,
+      assetId: "",
       progress: 0,
       stalledWarning: "",
     });
@@ -332,6 +336,7 @@ export function useGenerationCards({
       settingsSnapshot: resolveSettingsSnapshot(
         extra.settingsSnapshot ?? item.settings_snapshot,
       ),
+      assetId: item.asset_id || "",
       progress: typeof item.progress === "number" ? item.progress : 0,
       stalledWarning: "",
     });

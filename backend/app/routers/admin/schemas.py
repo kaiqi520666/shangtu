@@ -39,6 +39,7 @@ class AdminSettingsRequest(BaseModel):
     digital_human_credit_costs: dict[str, int]
     digital_human_precharge_costs: dict[str, int]
     video_translation_credit_costs: dict[str, int]
+    voiceover_credit_cost_per_100_chars: int = Field(..., ge=1, le=100000)
     recharge_packages: list[RechargePackageConfig]
 
 

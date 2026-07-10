@@ -16,6 +16,7 @@ from app.models.user_audio_asset import UserAudioAsset
 from app.models.user_avatar import UserAvatar
 from app.models.user_avatar_task import UserAvatarTask
 from app.models.video_task import VideoTask
+from app.models.voiceover_task import VoiceoverTask
 
 __all__ = [
     "AdminAuditLog",
@@ -36,4 +37,5 @@ __all__ = [
     "UserAvatar",
     "UserAvatarTask",
     "VideoTask",
+    "VoiceoverTask",
 ]

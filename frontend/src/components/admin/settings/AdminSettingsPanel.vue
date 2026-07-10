@@ -101,6 +101,17 @@ const paymentConfigLabels = {
       </div>
 
       <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div class="mb-4">
+          <h2 class="text-sm font-black text-slate-800">AI 配音扣费</h2>
+          <p class="mt-1 text-xs text-slate-400">按每100个非空白字符配置积分，不足100字符按100字符计。</p>
+        </div>
+        <label class="block max-w-sm">
+          <span class="text-xs font-bold text-slate-600">每100字符扣费</span>
+          <input v-model.number="state.voiceoverCreditCostPer100Chars" type="number" min="1" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary" />
+        </label>
+      </div>
+
+      <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <div class="mb-4 flex items-center justify-between gap-3">
           <div>
             <h2 class="text-sm font-black text-slate-800">充值套餐</h2>

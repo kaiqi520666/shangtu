@@ -17,6 +17,8 @@ SETTING_DIGITAL_HUMAN_CREDIT_COSTS = "digital_human_credit_costs"
 SETTING_DIGITAL_HUMAN_PRECHARGE_COSTS = "digital_human_precharge_costs"
 SETTING_VIDEO_TRANSLATION_CREDIT_COSTS = "video_translation_credit_costs"
 SETTING_RECHARGE_PACKAGES = "credit_recharge_packages"
+SETTING_VOICEOVER_CREDIT_COST = "voiceover_credit_cost_per_100_chars"
+DEFAULT_VOICEOVER_CREDIT_COST = 1
 
 DEFAULT_DIGITAL_HUMAN_CREDIT_COSTS = {
     "standard": 7,
@@ -221,6 +223,16 @@ def normalize_digital_human_precharge_costs(raw: dict[str, Any]) -> dict[str, in
     return costs
 
 
+def normalize_voiceover_credit_cost(raw: Any) -> int:
+    try:
+        cost = int(raw)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("AI配音每100字符扣费必须是正整数") from exc
+    if cost < 1:
+        raise ValueError("AI配音每100字符扣费必须大于等于1")
+    return cost
+
+
 async def get_setting(db: AsyncSession, key: str) -> SystemSetting | None:
     return await db.get(SystemSetting, key)
 
@@ -327,6 +339,13 @@ async def get_effective_recharge_packages(
     )
 
 
+async def get_effective_voiceover_credit_cost(db: AsyncSession) -> int:
+    setting = await get_setting(db, SETTING_VOICEOVER_CREDIT_COST)
+    if setting:
+        return normalize_voiceover_credit_cost(parse_json_or_none(setting.value_json))
+    return DEFAULT_VOICEOVER_CREDIT_COST
+
+
 async def upsert_setting(
     db: AsyncSession,
     key: str,
@@ -375,6 +394,11 @@ async def seed_default_billing_settings(
             SETTING_VIDEO_TRANSLATION_CREDIT_COSTS,
             normalize_video_translation_credit_costs(DEFAULT_VIDEO_TRANSLATION_CREDIT_COSTS),
             "视频翻译每秒扣费配置",
+        ),
+        (
+            SETTING_VOICEOVER_CREDIT_COST,
+            DEFAULT_VOICEOVER_CREDIT_COST,
+            "AI配音每100字符扣费配置",
         ),
         (
             SETTING_RECHARGE_PACKAGES,

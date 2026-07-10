@@ -8,15 +8,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_user, get_db
 from app.core.json_utils import dump_json, parse_json_or_none
-from app.core.media_projection import image_task_payload, video_task_payload
+from app.core.media_projection import image_task_payload, video_task_payload, voiceover_task_payload
 from app.core.scenarios import (
     SCENARIO_TITLE_PREFIX,
     SUPPORTED_GENERATION_SCENARIOS,
     VIDEO_SCENARIOS,
+    AUDIO_SCENARIOS,
 )
 from app.core.task_timeout import project_task_runtime_state
 from app.core.time import to_utc_iso, utc_now
-from app.models import GenerationJob, ImageTask, User, VideoTask
+from app.models import GenerationJob, ImageTask, User, UserAudioAsset, VideoTask, VoiceoverTask
 from app.schemas.response import Response, fail, success
 
 router = APIRouter(prefix="/generation", tags=["生成任务"])
@@ -63,6 +64,8 @@ def _default_title(scenario: str) -> str:
 
 
 def _task_model_for_scenario(scenario: str):
+    if scenario in AUDIO_SCENARIOS:
+        return VoiceoverTask
     return VideoTask if scenario in VIDEO_SCENARIOS else ImageTask
 
 
@@ -132,9 +135,9 @@ async def list_jobs(
     ]
     if task_model is ImageTask:
         task_conditions.append(ImageTask.replaced_by_task_id.is_(None))
-    else:
+    elif task_model is VideoTask:
         task_conditions.append(VideoTask.scenario == scenario)
-    media_type = "video" if task_model is VideoTask else "image"
+    media_type = "audio" if task_model is VoiceoverTask else "video" if task_model is VideoTask else "image"
     tasks_rows = await db.execute(
         select(task_model.job_id, task_model.status, task_model.created_at).where(*task_conditions)
     )
@@ -207,17 +210,25 @@ async def get_job(
     ]
     if task_model is ImageTask:
         task_conditions.append(ImageTask.replaced_by_task_id.is_(None))
-    else:
+    elif task_model is VideoTask:
         task_conditions.append(VideoTask.scenario == job.scenario)
     tasks_result = await db.execute(
         select(task_model)
         .where(*task_conditions)
         .order_by(task_model.sort_order.asc(), task_model.created_at.asc())
     )
+    tasks = tasks_result.scalars().all()
     if task_model is VideoTask:
-        items = [video_task_payload(task) for task in tasks_result.scalars().all()]
+        items = [video_task_payload(task) for task in tasks]
+    elif task_model is VoiceoverTask:
+        asset_ids = [task.result_asset_id for task in tasks if task.result_asset_id]
+        assets = {}
+        if asset_ids:
+            asset_rows = await db.execute(select(UserAudioAsset).where(UserAudioAsset.id.in_(asset_ids)))
+            assets = {asset.id: asset for asset in asset_rows.scalars().all()}
+        items = [voiceover_task_payload(task, assets.get(task.result_asset_id)) for task in tasks]
     else:
-        items = [image_task_payload(task) for task in tasks_result.scalars().all()]
+        items = [image_task_payload(task) for task in tasks]
 
     total = len(items)
     completed = sum(1 for t in items if t["status"] == TERMINAL_DONE)

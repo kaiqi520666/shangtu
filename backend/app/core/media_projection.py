@@ -6,7 +6,7 @@ from app.core.prompt_snapshot import parse_prompt_snapshot
 from app.core.scenarios import VIDEO_SCENARIOS
 from app.core.task_timeout import project_task_runtime_state, user_visible_task_error
 from app.core.time import to_utc_iso
-from app.models import GenerationJob, ImageTask, User, UserAudioAsset, VideoTask
+from app.models import GenerationJob, ImageTask, User, UserAudioAsset, VideoTask, VoiceoverTask
 
 
 def image_task_payload(task: ImageTask) -> dict:
@@ -71,6 +71,26 @@ def video_task_payload(task: VideoTask) -> dict:
         "prompt": task.prompt,
         "prompt_snapshot": parse_prompt_snapshot(task.prompt_snapshot_json),
         "settings_snapshot": parse_json_or_none(task.settings_snapshot_json),
+    }
+
+
+def voiceover_task_payload(task: VoiceoverTask, asset: UserAudioAsset | None = None) -> dict:
+    settings = parse_json_or_none(task.settings_snapshot_json) or {}
+    return {
+        "task_id": task.id,
+        "media_type": "audio",
+        "type_id": "voiceover",
+        "title": settings.get("voice_name") or "AI配音",
+        "sort_order": task.sort_order,
+        "status": task.status,
+        "progress": task.progress,
+        "result_url": asset.audio_url if asset else "",
+        "asset_id": asset.id if asset else None,
+        "error_message": task.error_message,
+        "credit_cost": task.credit_cost,
+        "credit_refunded": bool(task.credit_refunded),
+        "settings_snapshot": settings,
+        "created_at": to_utc_iso(task.created_at),
     }
 
 

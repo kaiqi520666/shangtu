@@ -11,6 +11,7 @@ from app.core.system_settings import (
     SETTING_RECHARGE_PACKAGES,
     SETTING_VIDEO_TRANSLATION_CREDIT_COSTS,
     SETTING_VIDEO_CREDIT_COSTS,
+    SETTING_VOICEOVER_CREDIT_COST,
     get_effective_digital_human_credit_costs,
     get_effective_digital_human_precharge_costs,
     normalize_digital_human_credit_costs,
@@ -19,10 +20,12 @@ from app.core.system_settings import (
     get_effective_recharge_packages,
     get_effective_video_translation_credit_costs,
     get_effective_video_credit_costs,
+    get_effective_voiceover_credit_cost,
     normalize_image_credit_costs,
     normalize_recharge_packages,
     normalize_video_translation_credit_costs,
     normalize_video_credit_costs,
+    normalize_voiceover_credit_cost,
     upsert_setting,
 )
 from app.models import User
@@ -45,6 +48,7 @@ async def get_settings(
         digital_human_credit_costs = await get_effective_digital_human_credit_costs(db)
         digital_human_precharge_costs = await get_effective_digital_human_precharge_costs(db)
         video_translation_credit_costs = await get_effective_video_translation_credit_costs(db)
+        voiceover_credit_cost = await get_effective_voiceover_credit_cost(db)
         recharge_packages = await get_effective_recharge_packages(db, include_disabled=True)
     except ValueError as exc:
         return fail(str(exc))
@@ -61,6 +65,7 @@ async def get_settings(
             "digital_human_credit_costs": digital_human_credit_costs,
             "digital_human_precharge_costs": digital_human_precharge_costs,
             "video_translation_credit_costs": video_translation_credit_costs,
+            "voiceover_credit_cost_per_100_chars": voiceover_credit_cost,
             "recharge_packages": recharge_packages,
             "payment_config": payment_config,
         }
@@ -85,6 +90,9 @@ async def update_settings(
         video_translation_credit_costs = normalize_video_translation_credit_costs(
             req.video_translation_credit_costs
         )
+        voiceover_credit_cost = normalize_voiceover_credit_cost(
+            req.voiceover_credit_cost_per_100_chars
+        )
         recharge_packages = normalize_recharge_packages(
             [item.model_dump() for item in req.recharge_packages],
             include_disabled=True,
@@ -98,6 +106,13 @@ async def update_settings(
         image_credit_costs,
         current_admin.id,
         "生图分辨率扣费配置",
+    )
+    await upsert_setting(
+        db,
+        SETTING_VOICEOVER_CREDIT_COST,
+        voiceover_credit_cost,
+        current_admin.id,
+        "AI配音每100字符扣费配置",
     )
     await upsert_setting(
         db,
@@ -146,6 +161,7 @@ async def update_settings(
                 "digital_human_credit_costs": digital_human_credit_costs,
                 "digital_human_precharge_costs": digital_human_precharge_costs,
                 "video_translation_credit_costs": video_translation_credit_costs,
+                "voiceover_credit_cost_per_100_chars": voiceover_credit_cost,
                 "recharge_packages_count": len(recharge_packages),
             },
         )
@@ -158,6 +174,7 @@ async def update_settings(
             "digital_human_credit_costs": digital_human_credit_costs,
             "digital_human_precharge_costs": digital_human_precharge_costs,
             "video_translation_credit_costs": video_translation_credit_costs,
+            "voiceover_credit_cost_per_100_chars": voiceover_credit_cost,
             "recharge_packages": recharge_packages,
         }
     )

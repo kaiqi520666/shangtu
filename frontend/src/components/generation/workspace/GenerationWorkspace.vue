@@ -4,6 +4,7 @@ import GeneratedCardGrid from '@/components/generation/cards/GeneratedCardGrid.v
 import GeneratorPreviewShowcase from '@/components/generation/workspace/GeneratorPreviewShowcase.vue'
 import GeneratorWorkspaceShell from '@/components/generation/workspace/GeneratorWorkspaceShell.vue'
 import VideoGeneratedCardGrid from '@/components/generation/cards/VideoGeneratedCardGrid.vue'
+import AudioGeneratedCardGrid from '@/components/generation/cards/AudioGeneratedCardGrid.vue'
 
 defineProps({
   settings: {
@@ -244,6 +245,14 @@ const emit = defineEmits([
           @toggle-card="emit('toggle-card', $event)"
           @download-card="emit('download-card', $event)"
           @zoom-card="emit('zoom-card', $event)"
+          @delete-card="emit('delete-card', $event)"
+        />
+        <AudioGeneratedCardGrid
+          v-else-if="mediaType === 'audio'"
+          :cards="outputCards"
+          :downloading="downloading"
+          @toggle-card="emit('toggle-card', $event)"
+          @download-card="emit('download-card', $event)"
           @delete-card="emit('delete-card', $event)"
         />
         <GeneratedCardGrid

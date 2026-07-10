@@ -1,5 +1,5 @@
 <script setup>
-import { Clapperboard, Film, HelpCircle, Image, Images, Languages, PackageCheck, ShieldCheck, Sparkles, UserRoundCheck, WandSparkles } from 'lucide-vue-next'
+import { AudioLines, Clapperboard, Film, HelpCircle, Image, Images, Languages, PackageCheck, ShieldCheck, Sparkles, UserRoundCheck, WandSparkles } from 'lucide-vue-next'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth.js'
 
@@ -9,6 +9,7 @@ const mainNavs = [
   { name: '商品视频', desc: '商品图一键生成电商短视频素材', icon: Clapperboard, to: '/generator/product-video' },
   { name: '数字人', desc: '系统数字人和系统声音生成口播视频', icon: UserRoundCheck, to: '/generator/digital-human' },
   { name: '视频翻译', desc: '上传视频并翻译为目标语言', icon: Languages, to: '/generator/video-translation' },
+  { name: 'AI配音', desc: '预置音色生成 MP3 配音', icon: AudioLines, to: '/generator/voiceover' },
   { name: '服饰穿搭', desc: '真人模特试衣与穿搭场景生成模块', icon: WandSparkles, to: '/generator/outfit' },
   { name: '自由生图', desc: '输入提示词，自由生成或参考图片改图', icon: Sparkles, to: '/generator/free-image' },
   { name: '自由生视频', desc: '提示词、首帧图或参考图生成视频', icon: Film, to: '/generator/free-video' },
@@ -36,7 +37,7 @@ function isNavActive(nav) {
 
 <template>
   <aside class="flex w-20 flex-col items-center gap-6 border-r border-slate-200 bg-slate-100/50 py-4">
-    <div class="flex w-full flex-col items-center gap-3">
+    <div class="flex min-h-0 w-full flex-1 flex-col items-center gap-3 overflow-y-auto">
       <div v-for="nav in mainNavs" :key="nav.to" class="group relative flex w-full flex-col items-center">
         <RouterLink
           :to="nav.to"
@@ -75,7 +76,6 @@ function isNavActive(nav) {
         </div>
       </template>
     </div>
-    <div class="flex-1"></div>
     <button type="button" class="rounded-lg p-2 text-slate-400 transition-colors hover:text-slate-600">
       <HelpCircle class="h-5 w-5" />
     </button>

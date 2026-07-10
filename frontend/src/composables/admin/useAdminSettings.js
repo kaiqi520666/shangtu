@@ -20,6 +20,7 @@ export function useAdminSettings() {
     digitalHumanCreditCosts: { ...defaultDigitalHumanCreditCosts },
     digitalHumanPrechargeCosts: { ...defaultDigitalHumanPrechargeCosts },
     videoTranslationCreditCosts: { ...defaultVideoTranslationCreditCosts },
+    voiceoverCreditCostPer100Chars: 1,
     rechargePackages: [],
     paymentConfig: {},
     loading: false,
@@ -51,6 +52,7 @@ export function useAdminSettings() {
         ...defaultVideoTranslationCreditCosts,
         ...result.data?.video_translation_credit_costs,
       };
+      settingsState.voiceoverCreditCostPer100Chars = Number(result.data?.voiceover_credit_cost_per_100_chars || 1);
       settingsState.rechargePackages = (result.data?.recharge_packages || []).map((item) => ({ ...item }));
       settingsState.paymentConfig = result.data?.payment_config || {};
     } catch {
@@ -100,6 +102,7 @@ export function useAdminSettings() {
           standard: Number(settingsState.videoTranslationCreditCosts.standard),
           premium: Number(settingsState.videoTranslationCreditCosts.premium),
         },
+        voiceover_credit_cost_per_100_chars: Number(settingsState.voiceoverCreditCostPer100Chars),
         recharge_packages: settingsState.rechargePackages.map((item) => ({
           id: String(item.id || "").trim(),
           name: String(item.name || "").trim(),

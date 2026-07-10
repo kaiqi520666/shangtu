@@ -2,7 +2,7 @@
 import { computed, ref, watch } from "vue";
 import { Mic2 } from "lucide-vue-next";
 import { getDigitalHumanVoices } from "@/api/digitalHuman.js";
-import HeygenPickerModalShell from "@/components/digital-human/HeygenPickerModalShell.vue";
+import PickerModalShell from "@/components/ui/PickerModalShell.vue";
 import UploadedAudioPanel from "@/components/digital-human/UploadedAudioPanel.vue";
 import AppSelect from "@/components/ui/AppSelect.vue";
 import { normalizeUploadAudio, useAudioAssets } from "@/composables/digital-human/useAudioAssets.js";
@@ -69,7 +69,7 @@ function confirmSelection() {
 </script>
 
 <template>
-  <HeygenPickerModalShell :open="open" title="选择声音" subtitle="平台声音和上传音频共用一个选择入口" :tabs="tabs" :active-tab="activeTab" :keyword="platformPicker.state.keyword" search-placeholder="搜索名称、voice_id、语言" :summary="summary" :show-toolbar="activeTab === 'platform'" :loading-more="activeTab === 'platform' ? platformPicker.state.loadingMore : audio.picker.state.loadingMore" @close="emit('close')" @change-tab="changeTab" @update:keyword="platformPicker.state.keyword = $event" @search="applyFilters" @reach-end="reachEnd">
+  <PickerModalShell :open="open" title="选择声音" subtitle="平台声音和上传音频共用一个选择入口" :tabs="tabs" :active-tab="activeTab" :keyword="platformPicker.state.keyword" search-placeholder="搜索名称、voice_id、语言" :summary="summary" :show-toolbar="activeTab === 'platform'" :loading-more="activeTab === 'platform' ? platformPicker.state.loadingMore : audio.picker.state.loadingMore" @close="emit('close')" @change-tab="changeTab" @update:keyword="platformPicker.state.keyword = $event" @search="applyFilters" @reach-end="reachEnd">
     <template #filters><div class="w-32"><AppSelect v-model="platformPicker.filters.language" :options="heygenVoiceLanguageOptions" @update:model-value="applyFilters" /></div><div class="w-28"><AppSelect v-model="platformPicker.filters.gender" :options="heygenGenderOptions" @update:model-value="applyFilters" /></div><div class="w-36"><AppSelect v-model="platformPicker.filters.support_locale" :options="heygenVoiceLocaleOptions" @update:model-value="applyFilters" /></div></template>
     <UploadedAudioPanel v-if="activeTab === 'upload'" :controller="audio" :is-selected="isUploadSelected" @select="pendingVoice = normalizeUploadAudio($event)" />
     <div v-else-if="platformPicker.state.loading" class="flex min-h-[420px] items-center justify-center rounded-2xl border border-slate-200 bg-white text-sm text-slate-400">正在加载平台声音...</div>
@@ -80,5 +80,5 @@ function confirmSelection() {
       </article>
     </div>
     <template #footer><div class="flex items-center justify-between gap-3"><p class="text-xs text-slate-400">{{ pendingVoice?.name ? `已选：${pendingVoice.name}` : "请选择 1 个声音或音频" }}</p><div class="flex items-center gap-2"><button type="button" class="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50" @click="emit('close')">取消</button><button type="button" class="rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white hover:bg-secondary" @click="confirmSelection">确认选择</button></div></div></template>
-  </HeygenPickerModalShell>
+  </PickerModalShell>
 </template>

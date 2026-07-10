@@ -2,7 +2,7 @@
 import { computed, ref, watch } from "vue";
 import { PlayCircle } from "lucide-vue-next";
 import { getDigitalHumanAvatars } from "@/api/digitalHuman.js";
-import HeygenPickerModalShell from "@/components/digital-human/HeygenPickerModalShell.vue";
+import PickerModalShell from "@/components/ui/PickerModalShell.vue";
 import PhotoAvatarsPanel from "@/components/digital-human/PhotoAvatarsPanel.vue";
 import AppModal from "@/components/ui/AppModal.vue";
 import AppSelect from "@/components/ui/AppSelect.vue";
@@ -78,7 +78,7 @@ function confirmSelection() {
 </script>
 
 <template>
-  <HeygenPickerModalShell :open="open" title="选择数字人" subtitle="" :tabs="tabs" :active-tab="activeTab" :keyword="systemPicker.state.keyword" search-placeholder="搜索名称、avatar_id、group_id" :summary="summary" :show-toolbar="activeTab === 'system'" :loading-more="activeTab === 'system' ? systemPicker.state.loadingMore : photo.avatars.state.loadingMore || photo.tasks.state.loadingMore" @close="emit('close')" @change-tab="changeTab" @update:keyword="systemPicker.state.keyword = $event" @search="applyFilters" @reach-end="reachEnd">
+  <PickerModalShell :open="open" title="选择数字人" subtitle="" :tabs="tabs" :active-tab="activeTab" :keyword="systemPicker.state.keyword" search-placeholder="搜索名称、avatar_id、group_id" :summary="summary" :show-toolbar="activeTab === 'system'" :loading-more="activeTab === 'system' ? systemPicker.state.loadingMore : photo.avatars.state.loadingMore || photo.tasks.state.loadingMore" @close="emit('close')" @change-tab="changeTab" @update:keyword="systemPicker.state.keyword = $event" @search="applyFilters" @reach-end="reachEnd">
     <template #filters><div class="w-28"><AppSelect v-model="systemPicker.filters.gender" :options="avatarGenderOptions" @update:model-value="applyFilters" /></div><div class="w-28"><AppSelect v-model="systemPicker.filters.orientation" :options="heygenAvatarOrientationOptions" @update:model-value="applyFilters" /></div></template>
 
     <PhotoAvatarsPanel v-if="activeTab === 'photo'" :controller="photo" @preview="previewItem = $event" />
@@ -92,7 +92,7 @@ function confirmSelection() {
     </div>
 
     <template #footer><div class="flex items-center justify-between gap-3"><p class="text-xs text-slate-400">{{ pendingAvatar?.name ? `已选：${pendingAvatar.name}` : "请选择 1 个数字人" }}</p><div class="flex items-center gap-2"><button type="button" class="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50" @click="emit('close')">取消</button><button type="button" class="rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white hover:bg-secondary" @click="confirmSelection">确认数字人</button></div></div></template>
-  </HeygenPickerModalShell>
+  </PickerModalShell>
 
   <AppModal :open="Boolean(previewItem)" title="数字人预览" panel-class="w-full max-w-3xl" @close="previewItem = null"><div v-if="previewItem" class="space-y-4 p-5"><video v-if="previewItem.preview_video_url" :src="previewItem.preview_video_url" class="max-h-[70vh] w-full rounded-xl bg-black object-contain" controls autoplay playsinline></video><img v-else-if="previewItem.preview_image_url" :src="previewItem.preview_image_url" class="max-h-[70vh] w-full rounded-xl bg-slate-100 object-contain" alt="数字人预览" /></div></AppModal>
 </template>
