@@ -6,16 +6,16 @@
   <title>NodePass AI - Premium UI Preview</title>
   <style>
     :root {
-      --ink: #16181b;
-      --muted: #687078;
-      --subtle: #929aa2;
-      --canvas: #f4f5f6;
+      --ink: #18201d;
+      --muted: #68736e;
+      --subtle: #929c97;
+      --canvas: #f5f8f7;
       --surface: #ffffff;
-      --line: #e1e4e6;
-      --line-strong: #cbd0d4;
-      --brand: #0b8f6a;
-      --brand-dark: #087354;
-      --brand-soft: #e8f5f0;
+      --line: #dfe5e2;
+      --line-strong: #c8d2cd;
+      --brand: #17a779;
+      --brand-dark: #0d805e;
+      --brand-soft: #eaf7f2;
       --blue: #3973e6;
       --danger: #d64545;
       --radius: 8px;
@@ -46,24 +46,24 @@
       align-items: center;
       justify-content: space-between;
       padding: 0 18px;
-      color: #dce1e4;
-      background: #111315;
-      border-bottom: 1px solid #292d30;
+      color: var(--muted);
+      background: rgba(255,255,255,.96);
+      border-bottom: 1px solid var(--line);
     }
-    .prototype-note { font-size: 12px; color: #8f989f; }
+    .prototype-note { font-size: 12px; color: var(--subtle); }
     .prototype-tabs { display: flex; align-items: center; gap: 2px; }
     .prototype-tab {
       min-width: 74px;
       height: 32px;
       border: 0;
       border-radius: 6px;
-      color: #9fa7ad;
+      color: var(--muted);
       background: transparent;
       font-size: 12px;
       font-weight: 650;
     }
-    .prototype-tab:hover { color: #fff; background: #202427; }
-    .prototype-tab.is-active { color: #101815; background: #dff5ec; }
+    .prototype-tab:hover { color: var(--brand-dark); background: var(--brand-soft); }
+    .prototype-tab.is-active { color: var(--brand-dark); background: #dff5ec; }
 
     .view { min-height: calc(100vh - 52px); }
 
@@ -120,17 +120,18 @@
       align-items: center;
       justify-content: space-between;
       padding: 0 clamp(20px, 5vw, 72px);
-      border-bottom: 1px solid rgba(255,255,255,.2);
-      color: #fff;
-      background: #151918;
+      border-bottom: 1px solid var(--line);
+      color: var(--ink);
+      background: rgba(255,255,255,.97);
     }
     .home-nav-links { display: flex; align-items: center; gap: 30px; }
-    .home-nav-link { border: 0; color: rgba(255,255,255,.72); background: transparent; font-size: 12px; font-weight: 620; }
-    .home-nav-link:hover { color: #fff; }
+    .home-nav-link { border: 0; color: var(--muted); background: transparent; font-size: 12px; font-weight: 620; }
+    .home-nav-link:hover { color: var(--brand-dark); }
     .home-nav-actions { display: flex; align-items: center; gap: 10px; }
-    .home-login { border: 0; color: #fff; background: transparent; font-size: 12px; font-weight: 650; }
-    .home-enter { min-height: 36px; padding: 0 14px; border: 1px solid rgba(255,255,255,.5); border-radius: 7px; color: #fff; background: transparent; font-size: 12px; font-weight: 680; }
-    .home-enter:hover { background: #fff; color: #111; }
+    .home-login { border: 0; color: var(--muted); background: transparent; font-size: 12px; font-weight: 650; }
+    .home-login:hover { color: var(--brand-dark); }
+    .home-enter { min-height: 36px; padding: 0 14px; border: 1px solid var(--brand); border-radius: 7px; color: #fff; background: var(--brand); font-size: 12px; font-weight: 680; }
+    .home-enter:hover { border-color: var(--brand-dark); background: var(--brand-dark); }
 
     .hero {
       position: relative;
@@ -138,11 +139,11 @@
       min-height: 540px;
       max-height: 780px;
       overflow: hidden;
-      color: #fff;
-      background: #151918;
+      color: var(--ink);
+      background: #eaf0ed;
     }
     .hero-media { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 48%; }
-    .hero::after { content: ""; position: absolute; inset: 0; background: rgba(8, 13, 11, .51); }
+    .hero::after { content: ""; position: absolute; inset: 0; background: rgba(247, 251, 249, .58); }
     .hero-content {
       position: relative;
       z-index: 1;
@@ -155,13 +156,14 @@
       align-items: flex-start;
       padding: 40px 0 72px;
     }
-    .hero-kicker { margin: 0 0 18px; color: #9de1ca; font-size: 12px; font-weight: 740; text-transform: uppercase; }
-    .hero h1 { max-width: 820px; margin: 0; font-size: clamp(48px, 7vw, 92px); line-height: .98; font-weight: 720; }
-    .hero-copy { max-width: 610px; margin: 24px 0 0; color: rgba(255,255,255,.78); font-size: 17px; line-height: 1.8; }
+    .hero-kicker { margin: 0 0 15px; color: var(--brand-dark); font-size: 12px; font-weight: 740; text-transform: uppercase; }
+    .hero h1 { max-width: 820px; margin: 0; color: var(--ink); font-size: clamp(48px, 7vw, 82px); line-height: 1; font-weight: 700; }
+    .hero-statement { max-width: 720px; margin: 18px 0 0; color: var(--ink); font-size: clamp(24px, 3vw, 38px); line-height: 1.25; font-weight: 620; }
+    .hero-copy { max-width: 610px; margin: 18px 0 0; color: #53605a; font-size: 16px; line-height: 1.8; }
     .hero-actions { display: flex; gap: 10px; margin-top: 32px; }
     .hero .primary-btn { min-height: 46px; padding: 0 22px; }
-    .hero-ghost { min-height: 46px; padding: 0 22px; border: 1px solid rgba(255,255,255,.42); border-radius: 7px; color: #fff; background: rgba(16,20,19,.18); font-size: 13px; font-weight: 680; }
-    .hero-ghost:hover { background: rgba(255,255,255,.12); }
+    .hero-ghost { min-height: 46px; padding: 0 22px; border: 1px solid var(--line-strong); border-radius: 7px; color: var(--ink); background: rgba(255,255,255,.76); font-size: 13px; font-weight: 680; }
+    .hero-ghost:hover { border-color: var(--brand); color: var(--brand-dark); background: #fff; }
     .hero-foot {
       position: absolute;
       z-index: 2;
@@ -171,8 +173,8 @@
       display: flex;
       justify-content: space-between;
       padding-top: 16px;
-      border-top: 1px solid rgba(255,255,255,.28);
-      color: rgba(255,255,255,.65);
+      border-top: 1px solid rgba(24,32,29,.22);
+      color: rgba(24,32,29,.62);
       font-size: 11px;
     }
 
@@ -185,19 +187,19 @@
     .case-item { position: relative; min-height: 310px; overflow: hidden; border-radius: var(--radius); background: #ecefee; }
     .case-item img { width: 100%; height: 100%; object-fit: cover; transition: transform 400ms ease; }
     .case-item:hover img { transform: scale(1.025); }
-    .case-caption { position: absolute; left: 0; right: 0; bottom: 0; padding: 46px 18px 16px; color: #fff; background: rgba(12,15,14,.68); }
+    .case-caption { position: absolute; left: 0; right: 0; bottom: 0; padding: 14px 18px; color: var(--ink); background: rgba(255,255,255,.92); border-top: 1px solid rgba(255,255,255,.7); }
     .case-caption strong { display: block; font-size: 15px; }
-    .case-caption span { display: block; margin-top: 4px; color: rgba(255,255,255,.7); font-size: 11px; }
+    .case-caption span { display: block; margin-top: 4px; color: var(--muted); font-size: 11px; }
 
     /* 登录 */
-    .auth-view { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(390px, 470px); min-height: calc(100vh - 52px); background: #101412; }
-    .auth-visual { position: relative; min-height: 600px; overflow: hidden; color: #fff; }
+    .auth-view { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(390px, 470px); min-height: calc(100vh - 52px); background: var(--canvas); }
+    .auth-visual { position: relative; min-height: 600px; overflow: hidden; color: var(--ink); }
     .auth-visual > img { width: 100%; height: 100%; object-fit: cover; }
-    .auth-visual::after { content: ""; position: absolute; inset: 0; background: rgba(6,10,8,.38); }
+    .auth-visual::after { content: ""; position: absolute; inset: 0; background: rgba(244,249,247,.28); }
     .auth-brand { position: absolute; z-index: 2; top: 30px; left: 38px; }
     .auth-statement { position: absolute; z-index: 2; left: 38px; right: 38px; bottom: 38px; max-width: 640px; }
     .auth-statement h2 { margin: 0; font-size: clamp(34px, 4vw, 60px); line-height: 1.05; font-weight: 680; }
-    .auth-statement p { max-width: 520px; margin: 15px 0 0; color: rgba(255,255,255,.74); font-size: 14px; line-height: 1.7; }
+    .auth-statement p { max-width: 520px; margin: 15px 0 0; color: #4f5b55; font-size: 14px; line-height: 1.7; }
     .auth-panel { display: flex; flex-direction: column; justify-content: center; padding: 52px clamp(34px, 5vw, 64px); background: #fff; }
     .auth-panel h1 { margin: 0; font-size: 28px; font-weight: 680; }
     .auth-subtitle { margin: 10px 0 30px; color: var(--muted); font-size: 13px; line-height: 1.6; }
@@ -223,17 +225,17 @@
     .workspace-actions { display: flex; align-items: center; gap: 9px; }
     .credit-meter { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 11px; border: 1px solid var(--line); border-radius: 7px; color: var(--muted); background: #f8f9f9; font-size: 11px; }
     .credit-meter strong { color: var(--ink); }
-    .avatar { width: 31px; height: 31px; display: grid; place-items: center; border-radius: 50%; color: #fff; background: #252a2d; font-size: 11px; font-weight: 750; }
+    .avatar { width: 31px; height: 31px; display: grid; place-items: center; border-radius: 50%; color: #fff; background: var(--brand); font-size: 11px; font-weight: 750; }
     .workspace-shell { height: calc(100% - 58px); display: grid; grid-template-columns: 68px 360px minmax(0, 1fr); }
-    .tool-rail { display: flex; flex-direction: column; align-items: center; padding: 12px 8px; border-right: 1px solid var(--line); background: #191d1f; }
+    .tool-rail { display: flex; flex-direction: column; align-items: center; padding: 12px 8px; border-right: 1px solid var(--line); background: #f8fbfa; }
     .tool-logo { width: 36px; height: 36px; margin-bottom: 14px; object-fit: contain; border-radius: 7px; background: #fff; }
     .tool-nav { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 5px; }
-    .tool-item { position: relative; width: 44px; height: 44px; display: grid; place-items: center; border: 0; border-radius: 7px; color: #8f999f; background: transparent; font-size: 18px; }
-    .tool-item:hover { color: #fff; background: #282e31; }
-    .tool-item.is-active { color: #a7ead4; background: #263d35; }
-    .tool-item::after { content: attr(data-label); position: absolute; left: 52px; z-index: 30; padding: 7px 9px; border: 1px solid #30363a; border-radius: 6px; color: #fff; background: #202427; font-size: 11px; white-space: nowrap; opacity: 0; pointer-events: none; transform: translateX(-4px); transition: opacity 140ms ease, transform 140ms ease; }
+    .tool-item { position: relative; width: 44px; height: 44px; display: grid; place-items: center; border: 0; border-radius: 7px; color: #7d8983; background: transparent; font-size: 18px; }
+    .tool-item:hover { color: var(--brand-dark); background: #eef7f3; }
+    .tool-item.is-active { color: var(--brand-dark); background: #dff3eb; }
+    .tool-item::after { content: attr(data-label); position: absolute; left: 52px; z-index: 30; padding: 7px 9px; border: 1px solid var(--line); border-radius: 6px; color: var(--ink); background: #fff; box-shadow: 0 8px 24px rgba(41,65,55,.1); font-size: 11px; white-space: nowrap; opacity: 0; pointer-events: none; transform: translateX(-4px); transition: opacity 140ms ease, transform 140ms ease; }
     .tool-item:hover::after { opacity: 1; transform: translateX(0); }
-    .tool-divider { width: 28px; height: 1px; margin: 7px 0; background: #353b3e; }
+    .tool-divider { width: 28px; height: 1px; margin: 7px 0; background: var(--line); }
     .tool-bottom { margin-top: auto; }
 
     .settings-panel { overflow-y: auto; border-right: 1px solid var(--line); background: #fff; }
@@ -294,7 +296,8 @@
       .home-nav-actions .home-login { display: none; }
       .hero { height: calc(100vh - 260px); min-height: 560px; }
       .hero-content { width: calc(100% - 32px); padding-bottom: 88px; }
-      .hero h1 { font-size: 48px; }
+      .hero h1 { font-size: 46px; }
+      .hero-statement { font-size: 25px; }
       .hero-copy { font-size: 14px; }
       .hero-foot { left: 16px; right: 16px; }
       .hero-foot span:last-child { display: none; }
@@ -314,7 +317,7 @@
       .workspace-header { grid-template-columns: 1fr auto; gap: 10px; min-width: 0; padding: 0 12px; }
       .workspace-title, .credit-meter, .workspace-actions .secondary-btn { display: none; }
       .workspace-shell { height: auto; min-width: 0; grid-template-columns: 1fr; }
-      .tool-rail { width: 100%; height: 58px; flex-direction: row; padding: 7px 10px; border-right: 0; border-bottom: 1px solid #303638; overflow-x: auto; }
+      .tool-rail { width: 100%; height: 58px; flex-direction: row; padding: 7px 10px; border-right: 0; border-bottom: 1px solid var(--line); overflow-x: auto; }
       .tool-logo, .tool-bottom { display: none; }
       .tool-nav { width: auto; flex: 1; flex-direction: row; justify-content: space-between; gap: 3px; }
       .tool-item { flex: 0 0 42px; height: 42px; }
@@ -363,8 +366,9 @@
         <img class="hero-media" src="https://image.nodepass.net/generated/2/2026/07/d9566b18c3db4989a598f0db4fafd486.png" alt="NodePass AI 商品视觉案例" />
         <div class="hero-content">
           <p class="hero-kicker">AI Commerce Content, Built for Production</p>
-          <h1>让每件商品，拥有完整的内容表达。</h1>
-          <p class="hero-copy">从商品图、详情视觉到短视频与数字人口播，在同一个专业工作台完成内容生产。</p>
+          <h1>NodePass AI</h1>
+          <p class="hero-statement">让每件商品，拥有完整的内容表达。</p>
+          <p class="hero-copy">从商品图、详情视觉到短视频与数字人口播，在同一个清晰、专业的工作台完成内容生产。</p>
           <div class="hero-actions">
             <button class="primary-btn" data-open-view="workspace">开始创作&nbsp; →</button>
             <button class="hero-ghost" data-scroll-cases>查看真实案例</button>
