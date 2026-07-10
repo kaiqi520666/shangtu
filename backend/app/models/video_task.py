@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -9,6 +9,24 @@ from app.core.time import utc_now
 
 class VideoTask(Base):
     __tablename__ = "video_tasks"
+    __table_args__ = (
+        Index(
+            "ix_video_tasks_user_active_status_scenario_created",
+            "user_id",
+            "archived",
+            "status",
+            "scenario",
+            "created_at",
+        ),
+        Index(
+            "ix_video_tasks_job_user_active_scenario",
+            "job_id",
+            "user_id",
+            "archived",
+            "scenario",
+        ),
+        Index("ix_video_tasks_status_created", "status", "created_at"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     user_id: Mapped[int] = mapped_column(Integer, nullable=False)

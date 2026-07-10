@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -9,6 +9,17 @@ from app.core.time import utc_now
 
 class ImageTask(Base):
     __tablename__ = "image_tasks"
+    __table_args__ = (
+        Index("ix_image_tasks_user_active_created", "user_id", "archived", "created_at"),
+        Index(
+            "ix_image_tasks_job_active_current",
+            "job_id",
+            "user_id",
+            "archived",
+            "replaced_by_task_id",
+        ),
+        Index("ix_image_tasks_status_created", "status", "created_at"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     user_id: Mapped[int] = mapped_column(Integer, nullable=False)
