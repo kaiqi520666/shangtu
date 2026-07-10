@@ -1,5 +1,5 @@
 <script setup>
-import { AudioLines, Clapperboard, Film, HelpCircle, Image, Images, Languages, PackageCheck, ShieldCheck, Sparkles, UserRoundCheck, WandSparkles } from 'lucide-vue-next'
+import { AudioLines, Clapperboard, Film, Image, Images, Languages, PackageCheck, ShieldCheck, Sparkles, UserRoundCheck, WandSparkles } from 'lucide-vue-next'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth.js'
 
@@ -76,8 +76,5 @@ function isNavActive(nav) {
         </div>
       </template>
     </div>
-    <button type="button" class="rounded-lg p-2 text-slate-400 transition-colors hover:text-slate-600">
-      <HelpCircle class="h-5 w-5" />
-    </button>
   </aside>
 </template>
