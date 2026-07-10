@@ -56,7 +56,6 @@ function isNavActive(nav) {
         </span>
       </div>
       <template v-if="authStore.isSuperAdmin">
-        <div class="my-1 h-px w-10 bg-slate-200"></div>
         <div class="group relative flex w-full flex-col items-center">
           <RouterLink
             :to="adminNav.to"
