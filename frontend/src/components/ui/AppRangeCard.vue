@@ -70,8 +70,15 @@ function updateValue(event) {
 
     <div class="mt-4">
       <div class="relative">
-        <div class="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-slate-200"></div>
-        <div class="absolute left-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-primary" :style="{ width: `${progressPercent}%` }"></div>
+        <div class="absolute inset-x-2 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-slate-200"></div>
+        <div
+          class="absolute left-2 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-primary"
+          :style="{ width: `calc((100% - 16px) * ${progressPercent / 100})` }"
+        ></div>
+        <span
+          class="pointer-events-none absolute top-1/2 z-10 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary"
+          :style="{ left: `calc(8px + (100% - 16px) * ${progressPercent / 100})` }"
+        ></span>
         <input
           :value="props.modelValue"
           type="range"
@@ -109,7 +116,8 @@ function updateValue(event) {
   appearance: none;
   border: 0;
   border-radius: 9999px;
-  background: var(--color-primary);
+  background: transparent;
+  opacity: 0;
 }
 
 .app-range-input::-moz-range-track {
@@ -122,6 +130,7 @@ function updateValue(event) {
   height: 16px;
   border: 0;
   border-radius: 9999px;
-  background: var(--color-primary);
+  background: transparent;
+  opacity: 0;
 }
 </style>
