@@ -8,6 +8,10 @@ const props = defineProps({
     required: true,
     validator: (value) => ['login', 'register'].includes(value),
   },
+  loading: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 const emit = defineEmits(['submit'])
@@ -18,7 +22,6 @@ const form = reactive({
   password: '',
 })
 const showPassword = ref(false)
-const loading = ref(false)
 const message = ref('')
 
 const isRegister = computed(() => props.mode === 'register')
@@ -26,7 +29,8 @@ const title = computed(() => (isRegister.value ? '创建账号' : '欢迎回来'
 const subtitle = computed(() => (isRegister.value ? '开通你的商图 AI 工作台' : '登录后继续你的内容生产任务'))
 const buttonText = computed(() => (isRegister.value ? '创建账号' : '进入工作台'))
 
-async function handleSubmit() {
+function handleSubmit() {
+  if (props.loading) return
   message.value = ''
 
   if (isRegister.value && !form.username.trim()) {
@@ -49,11 +53,6 @@ async function handleSubmit() {
     return
   }
 
-  loading.value = true
-  await new Promise((resolve) => {
-    window.setTimeout(resolve, 450)
-  })
-  loading.value = false
   emit('submit', { ...form })
 }
 </script>

@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { login } from '@/api/auth.js'
 import AuthForm from '@/components/auth/AuthForm.vue'
@@ -11,6 +11,7 @@ const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 const toast = useToast()
+const loading = ref(false)
 
 onMounted(() => {
   if (route.query.loggedOut === '1') {
@@ -20,6 +21,8 @@ onMounted(() => {
 })
 
 async function handleLogin(payload) {
+  if (loading.value) return
+  loading.value = true
   try {
     const result = await login({
       email: payload.email,
@@ -42,12 +45,14 @@ async function handleLogin(payload) {
     router.push(typeof route.query.redirect === 'string' ? route.query.redirect : '/generator')
   } catch (error) {
     toast.error(error.response?.data?.message || '登录失败，请稍后重试')
+  } finally {
+    loading.value = false
   }
 }
 </script>
 
 <template>
   <AuthPageShell>
-    <AuthForm mode="login" @submit="handleLogin" />
+    <AuthForm mode="login" :loading="loading" @submit="handleLogin" />
   </AuthPageShell>
 </template>

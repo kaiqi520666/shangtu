@@ -3,6 +3,7 @@ import { computed, ref, watch } from "vue";
 import { Check, ChevronLeft, ChevronRight, FileAudio, ImageOff, LoaderCircle } from "lucide-vue-next";
 import { listAssets } from "@/api/assets.js";
 import AppModal from "@/components/ui/AppModal.vue";
+import { generationScenarios, scenarioOptions } from "@/constants/scenarios.js";
 
 const props = defineProps({
   open: {
@@ -37,16 +38,6 @@ const total = ref(0);
 const selectedMap = ref({});
 const scenario = ref("");
 
-const scenarioOptions = [
-  { value: "", label: "全部" },
-  { value: "product_suite", label: "商品套图" },
-  { value: "product_image", label: "商品详情图" },
-  { value: "outfit", label: "服饰穿搭" },
-  { value: "free_image", label: "自由生图" },
-  { value: "product_video", label: "商品视频" },
-  { value: "free_video", label: "自由生视频" },
-];
-
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)));
 const selectedAssets = computed(() => Object.values(selectedMap.value));
 const selectedCount = computed(() => selectedAssets.value.length);
@@ -55,7 +46,12 @@ const mediaLabel = computed(() => {
   if (props.mediaType === "audio") return "音频";
   return "图片";
 });
-const scenarioFilters = computed(() => (props.mediaType === "audio" ? scenarioOptions.slice(0, 1) : scenarioOptions));
+const scenarioFilters = computed(() => {
+  if (props.mediaType === "audio") return scenarioOptions.slice(0, 1);
+  return scenarioOptions.filter(
+    (option) => !option.value || generationScenarios.find((item) => item.value === option.value)?.mediaType === props.mediaType,
+  );
+});
 
 watch(
   () => props.open,

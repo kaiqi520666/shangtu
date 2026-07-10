@@ -3,15 +3,7 @@ import { getAdminAssets } from "@/api/admin.js";
 import { createAdminPageState, useAdminPageLoader } from "@/composables/admin/useAdminPageState.js";
 import { useCardActions } from "@/composables/useCardActions.js";
 import { useToast } from "@/composables/useToast.js";
-
-const scenarioLabelMap = {
-  product_suite: "商品套图",
-  product_image: "商品详情图",
-  outfit: "服饰穿搭",
-  free_image: "自由生图",
-  product_video: "商品视频",
-  free_video: "自由生视频",
-};
+import { scenarioLabelMap } from "@/constants/scenarios.js";
 
 export function mapAdminAsset(item) {
   return {

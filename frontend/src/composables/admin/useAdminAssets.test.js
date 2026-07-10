@@ -40,4 +40,10 @@ describe("useAdminAssets", () => {
     expect(mocks.getAdminAssets).toHaveBeenCalledWith(expect.objectContaining({ scenario: "outfit", page: 1 }));
     expect(controller.state.items[0]).toMatchObject({ taskId: "task-1", dataUrl: "image", userEmail: "a@example.com" });
   });
+
+  it("labels digital human and translation assets", () => {
+    const controller = useAdminAssets();
+    expect(controller.scenarioLabel({ scenario: "digital_human" })).toBe("数字人");
+    expect(controller.scenarioLabel({ scenario: "video_translation" })).toBe("视频翻译");
+  });
 });

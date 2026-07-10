@@ -51,18 +51,6 @@ export const imageTaskStatusOptions = [
   { label: "超时", value: "timeout" },
 ];
 
-export const scenarioOptions = [
-  { label: "全部场景", value: "" },
-  { label: "商品套图", value: "product_suite" },
-  { label: "商品详情图", value: "product_image" },
-  { label: "服饰穿搭", value: "outfit" },
-  { label: "自由生图", value: "free_image" },
-  { label: "商品视频", value: "product_video" },
-  { label: "自由生视频", value: "free_video" },
-  { label: "数字人", value: "digital_human" },
-  { label: "视频翻译", value: "video_translation" },
-];
-
 export const taskMediaTypeOptions = [
   { label: "全部媒体", value: "" },
   { label: "图片", value: "image" },
@@ -255,3 +243,6 @@ export function heygenAvatarEngineLabel(engine) {
 export function totalPages(state) {
   return Math.max(1, Math.ceil(Number(state.total || 0) / Number(state.pageSize || 20)));
 }
+import { scenarioOptions } from "@/constants/scenarios.js";
+
+export { scenarioOptions };

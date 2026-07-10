@@ -44,6 +44,9 @@ async def overview(
     today_image_tasks = await db.scalar(
         select(func.count()).select_from(ImageTask).where(ImageTask.created_at >= today_start)
     )
+    today_video_tasks = await db.scalar(
+        select(func.count()).select_from(VideoTask).where(VideoTask.created_at >= today_start)
+    )
     failed_image_tasks = await db.scalar(
         select(func.count())
         .select_from(ImageTask)
@@ -64,7 +67,7 @@ async def overview(
             "total_credit_balance": int(total_credit_balance or 0),
             "paid_amount_cents": int(paid_amount_cents or 0),
             "today_paid_amount_cents": int(today_paid_amount_cents or 0),
-            "today_image_tasks": int(today_image_tasks or 0),
+            "today_tasks": int(today_image_tasks or 0) + int(today_video_tasks or 0),
             "failed_tasks": int(failed_image_tasks or 0) + int(failed_video_tasks or 0),
         }
     )

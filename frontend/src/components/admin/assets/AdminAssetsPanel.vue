@@ -1,5 +1,5 @@
 <script setup>
-import { Boxes, Download, FileVideo, ImageOff, Images, LayoutGrid, LoaderCircle, Search, Shirt, Sparkles, Video } from "lucide-vue-next";
+import { Download, ImageOff, LayoutGrid, LoaderCircle, Search } from "lucide-vue-next";
 import { taskMediaTypeOptions } from "@/constants/admin.js";
 import AdminPagination from "@/components/admin/AdminPagination.vue";
 import AssetCardGrid from "@/components/assets/AssetCardGrid.vue";
@@ -7,28 +7,15 @@ import AppCheckbox from "@/components/ui/AppCheckbox.vue";
 import AppModal from "@/components/ui/AppModal.vue";
 import AppSelect from "@/components/ui/AppSelect.vue";
 import AppTabNav from "@/components/ui/AppTabNav.vue";
+import { scenarioIcons as generationScenarioIcons, scenarioTabs } from "@/constants/scenarios.js";
 
 defineProps({
   controller: { type: Object, required: true },
 });
 
-const scenarioTabs = [
-  { value: "", label: "全部" },
-  { value: "product_suite", label: "商品套图" },
-  { value: "product_image", label: "商品详情图" },
-  { value: "outfit", label: "服饰穿搭" },
-  { value: "free_image", label: "自由生图" },
-  { value: "product_video", label: "商品视频" },
-  { value: "free_video", label: "自由生视频" },
-];
 const scenarioIcons = {
   "": LayoutGrid,
-  product_suite: Boxes,
-  product_image: Images,
-  outfit: Shirt,
-  free_image: Sparkles,
-  product_video: Video,
-  free_video: FileVideo,
+  ...generationScenarioIcons,
 };
 </script>
 
