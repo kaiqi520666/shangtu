@@ -23,7 +23,7 @@ class VoiceoverTask(Base):
     text: Mapped[str] = mapped_column(Text, nullable=False)
     rate: Mapped[float] = mapped_column(Float, default=1.0, nullable=False)
     pitch: Mapped[float] = mapped_column(Float, default=1.0, nullable=False)
-    volume: Mapped[int] = mapped_column(Integer, default=50, nullable=False)
+    volume: Mapped[int] = mapped_column(Integer, default=100, nullable=False)
     instruction: Mapped[str | None] = mapped_column(String(100), nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)
     progress: Mapped[int] = mapped_column(Integer, default=0, nullable=False)

@@ -17,7 +17,7 @@ export function useVoiceoverGenerator({ onJobCreated } = {}) {
   const confirm = useConfirm();
   const authStore = useAuthStore();
   const config = reactive({ textLimit: 5000, creditCostPer100Chars: 1, format: "mp3", sampleRate: 24000 });
-  const settings = reactive({ text: "", voice: null, rate: 1, pitch: 1, volume: 50, instruction: "" });
+  const settings = reactive({ text: "", voice: null, rate: 1, pitch: 1, volume: 100, instruction: "" });
 
   async function pollTask(taskId) {
     const result = await getVoiceoverTask(taskId);
@@ -47,13 +47,13 @@ export function useVoiceoverGenerator({ onJobCreated } = {}) {
     toast,
     onJobCreated,
     mediaUnit: "条",
-    resetSceneState() { Object.assign(settings, { text: "", voice: null, rate: 1, pitch: 1, volume: 50, instruction: "" }); },
+    resetSceneState() { Object.assign(settings, { text: "", voice: null, rate: 1, pitch: 1, volume: 100, instruction: "" }); },
     applyJobData(data) {
       const snapshot = data.settings || {};
       settings.text = data.input_text || "";
       settings.rate = Number(snapshot.rate ?? 1);
       settings.pitch = Number(snapshot.pitch ?? 1);
-      settings.volume = Number(snapshot.volume ?? 50);
+      settings.volume = Number(snapshot.volume ?? 100);
       settings.instruction = snapshot.instruction || "";
       settings.voice = snapshot.voice_id ? { voice_id: snapshot.voice_id, name: snapshot.voice_name, trait: snapshot.voice_trait, category: snapshot.voice_category, supports_instruct: Boolean(snapshot.supports_instruct) } : null;
     },

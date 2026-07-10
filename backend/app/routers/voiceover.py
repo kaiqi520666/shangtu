@@ -30,7 +30,7 @@ class CreateVoiceoverTaskRequest(BaseModel):
     voice_id: str = Field(..., min_length=1, max_length=128)
     rate: float = Field(default=1.0, ge=0.5, le=2.0)
     pitch: float = Field(default=1.0, ge=0.5, le=2.0)
-    volume: int = Field(default=50, ge=0, le=100)
+    volume: int = Field(default=100, ge=0, le=100)
     instruction: str | None = Field(default=None, max_length=100)
 
 
