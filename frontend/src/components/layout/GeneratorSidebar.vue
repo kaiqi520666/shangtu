@@ -1,4 +1,5 @@
 <script setup>
+import { ref } from 'vue'
 import { AudioLines, Clapperboard, Film, Image, Images, Languages, PackageCheck, ShieldCheck, Sparkles, UserRoundCheck, WandSparkles } from 'lucide-vue-next'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth.js'
@@ -18,6 +19,7 @@ const mainNavs = [
 
 const route = useRoute()
 const authStore = useAuthStore()
+const tooltip = ref(null)
 
 const adminNav = {
   name: '管理后台',
@@ -33,6 +35,11 @@ function isNavActive(nav) {
 
   return currentPath === navPath || currentPath.startsWith(`${navPath}/`)
 }
+
+function showTooltip(nav, event) {
+  const rect = event.currentTarget.getBoundingClientRect()
+  tooltip.value = { ...nav, top: rect.top + rect.height / 2 }
+}
 </script>
 
 <template>
@@ -43,8 +50,12 @@ function isNavActive(nav) {
           :to="nav.to"
           class="flex h-12 w-12 items-center justify-center rounded-xl transition-colors duration-200"
           :aria-label="nav.name"
-          :title="`${nav.name}：${nav.desc}`"
           :class="isNavActive(nav) ? 'bg-primary/10 text-primary' : 'text-slate-500 hover:bg-white hover:text-primary'"
+          @mouseenter="showTooltip(nav, $event)"
+          @mouseleave="tooltip = null"
+          @focus="showTooltip(nav, $event)"
+          @blur="tooltip = null"
+          @click="tooltip = null"
         >
           <component :is="nav.icon" class="h-5 w-5 stroke-[1.8]" />
         </RouterLink>
@@ -55,13 +66,28 @@ function isNavActive(nav) {
             :to="adminNav.to"
             class="flex h-12 w-12 items-center justify-center rounded-xl transition-colors duration-200"
             :aria-label="adminNav.name"
-            :title="`${adminNav.name}：${adminNav.desc}`"
             :class="isNavActive(adminNav) ? 'bg-primary/10 text-primary' : 'text-slate-500 hover:bg-white hover:text-primary'"
+            @mouseenter="showTooltip(adminNav, $event)"
+            @mouseleave="tooltip = null"
+            @focus="showTooltip(adminNav, $event)"
+            @blur="tooltip = null"
+            @click="tooltip = null"
           >
             <component :is="adminNav.icon" class="h-5 w-5 stroke-[1.8]" />
           </RouterLink>
         </div>
       </template>
     </div>
+    <Teleport to="body">
+      <div
+        v-if="tooltip"
+        class="pointer-events-none fixed left-[72px] z-50 w-max max-w-72 -translate-y-1/2 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-lg"
+        :style="{ top: `${tooltip.top}px` }"
+        role="tooltip"
+      >
+        <p class="text-xs font-bold text-slate-800">{{ tooltip.name }}</p>
+        <p class="mt-1 text-xs leading-5 text-slate-500">{{ tooltip.desc }}</p>
+      </div>
+    </Teleport>
   </aside>
 </template>
