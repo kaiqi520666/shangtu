@@ -1,5 +1,6 @@
 <script setup>
 import AppCheckbox from '@/components/ui/AppCheckbox.vue'
+import GeneratorPanelSection from '@/components/generation/workspace/GeneratorPanelSection.vue'
 
 const props = defineProps({
   scenes: {
@@ -31,8 +32,7 @@ function toggleScene(id) {
 </script>
 
 <template>
-  <section class="space-y-3 border-b border-slate-100 p-5">
-    <h3 class="text-xs font-bold text-slate-900">拍摄场景</h3>
+  <GeneratorPanelSection title="拍摄场景">
     <div class="grid grid-cols-3 gap-2">
       <article
         v-for="scene in scenes"
@@ -69,5 +69,5 @@ function toggleScene(id) {
         @input="emit('update:description', $event.target.value)"
       ></textarea>
     </div>
-  </section>
+  </GeneratorPanelSection>
 </template>

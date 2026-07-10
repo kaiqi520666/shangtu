@@ -11,6 +11,10 @@ const props = defineProps({
     type: String,
     default: "参考视频",
   },
+  description: {
+    type: String,
+    default: "",
+  },
   addText: {
     type: String,
     default: "添加参考视频",
@@ -35,11 +39,14 @@ function updateItems(nextItems) {
     :items="items"
     media-type="video"
     :title="title"
+    :description="description"
     :add-text="addText"
     :hint-text="hintText"
     :max-count="1"
     limit-message="最多只能选择 1 条视频"
     @update:items="updateItems"
     @notify="emit('notify', $event)"
-  />
+  >
+    <template v-if="$slots.after" #after><slot name="after" /></template>
+  </MediaUploader>
 </template>

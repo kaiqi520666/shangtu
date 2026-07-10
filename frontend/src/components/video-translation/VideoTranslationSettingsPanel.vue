@@ -3,6 +3,7 @@ import { computed, toRefs } from "vue";
 import { Languages, Sparkles } from "lucide-vue-next";
 import VideoUploader from "@/components/generation/video/VideoUploader.vue";
 import GeneratorActionFooter from "@/components/generation/workspace/GeneratorActionFooter.vue";
+import GeneratorPanelSection from "@/components/generation/workspace/GeneratorPanelSection.vue";
 import GeneratorSidePanelShell from "@/components/generation/workspace/GeneratorSidePanelShell.vue";
 import AppOptionCards from "@/components/ui/AppOptionCards.vue";
 import AppSelect from "@/components/ui/AppSelect.vue";
@@ -61,28 +62,21 @@ function updateSettings(patch) {
 
 <template>
   <GeneratorSidePanelShell>
-    <section class="space-y-4 border-b border-slate-100 p-5">
-      <div>
-        <h2 class="text-sm font-black text-slate-900">视频翻译</h2>
-        <p class="mt-1 text-xs leading-relaxed text-slate-400">上传视频或从资产库选择视频，系统自动识别源语言。</p>
-      </div>
+    <VideoUploader
+      :video="selectedVideo"
+      title="视频素材"
+      description="上传视频或从资产库选择视频，系统自动识别源语言。"
+      add-text="添加视频"
+      hint-text="支持本地上传或资产库选择"
+      @update:video="emit('update:selectedVideo', $event)"
+      @notify="emit('notify', $event)"
+    >
+      <template #after>
+        <p class="text-xs text-slate-400">{{ durationText }}</p>
+      </template>
+    </VideoUploader>
 
-      <VideoUploader
-        :video="selectedVideo"
-        title="视频素材"
-        add-text="添加视频"
-        hint-text="支持本地上传或资产库选择"
-        @update:video="emit('update:selectedVideo', $event)"
-        @notify="emit('notify', $event)"
-      />
-      <p class="text-xs text-slate-400">{{ durationText }}</p>
-    </section>
-
-    <section class="space-y-4 p-5">
-      <div>
-        <h2 class="text-sm font-black text-slate-900">翻译设置</h2>
-      </div>
-
+    <GeneratorPanelSection title="翻译设置" :divider="false">
       <div>
         <div class="mb-2 flex items-center justify-between">
           <h3 class="text-xs font-bold text-slate-800">目标语言</h3>
@@ -117,7 +111,7 @@ function updateSettings(patch) {
           </div>
         </div>
       </div>
-    </section>
+    </GeneratorPanelSection>
 
     <template #footer>
       <GeneratorActionFooter

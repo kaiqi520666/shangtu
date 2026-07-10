@@ -4,6 +4,7 @@ import { Clapperboard, LoaderCircle, Search, Sparkles, Volume2 } from "lucide-vu
 import AppSelect from "@/components/ui/AppSelect.vue";
 import AppCheckbox from "@/components/ui/AppCheckbox.vue";
 import GeneratorActionFooter from "@/components/generation/workspace/GeneratorActionFooter.vue";
+import GeneratorPanelSection from "@/components/generation/workspace/GeneratorPanelSection.vue";
 import GeneratorSidePanelShell from "@/components/generation/workspace/GeneratorSidePanelShell.vue";
 import ImageUploader from "@/components/generation/image/ImageUploader.vue";
 import MediaUploader from "@/components/generation/media/MediaUploader.vue";
@@ -136,7 +137,7 @@ function updateSetting(key, value) {
       @notify="emit('notify', $event)"
     />
 
-    <section class="space-y-4 border-b border-slate-100 p-5">
+    <GeneratorPanelSection title="生成设置">
       <div>
         <div class="mb-1.5 flex items-center justify-between gap-3">
           <label class="text-xs font-bold text-slate-800">视频提示词</label>
@@ -213,7 +214,7 @@ function updateSetting(key, value) {
       <p class="rounded-lg bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">
         当前输出：{{ selectedVideoLabel }}
       </p>
-    </section>
+    </GeneratorPanelSection>
 
     <template #footer>
       <GeneratorActionFooter

@@ -3,6 +3,7 @@ import { computed, toRefs } from "vue";
 import { Bot, Mic2, Sparkles } from "lucide-vue-next";
 import ImageUploader from "@/components/generation/image/ImageUploader.vue";
 import GeneratorActionFooter from "@/components/generation/workspace/GeneratorActionFooter.vue";
+import GeneratorPanelSection from "@/components/generation/workspace/GeneratorPanelSection.vue";
 import GeneratorSidePanelShell from "@/components/generation/workspace/GeneratorSidePanelShell.vue";
 import VideoQualitySelector from "@/components/product-video/VideoQualitySelector.vue";
 import AppOptionCards from "@/components/ui/AppOptionCards.vue";
@@ -103,12 +104,7 @@ function getVoiceSpeedHint(speed) {
 
 <template>
   <GeneratorSidePanelShell>
-    <section class="space-y-4 border-b border-slate-100 p-5">
-      <div>
-        <h2 class="text-sm font-black text-slate-900">数字人</h2>
-        <p class="mt-1 text-xs leading-relaxed text-slate-400">先选数字人和系统声音，然后生成视频</p>
-      </div>
-
+    <GeneratorPanelSection title="数字人" description="选择用于口播的视频形象">
       <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
         <button
           type="button"
@@ -139,23 +135,25 @@ function getVoiceSpeedHint(speed) {
           <img :src="selectedAvatar.preview_image_url" class="h-40 w-full rounded-xl object-cover" alt="已选数字人预览" />
         </div>
       </section>
+    </GeneratorPanelSection>
 
-      <ImageUploader
-        :images="backgroundImages"
-        :main-index="0"
-        title="背景图"
-        :max-count="1"
-        add-text="添加图片"
-        hint-text="拖拽或点击"
-        alt-text="数字人背景图"
-        main-badge-text="背景"
-        limit-message="背景图只能上传 1 张"
-        :show-placeholders="false"
-        :show-main-action="false"
-        @update:images="emit('update:backgroundImages', $event)"
-        @notify="emit('notify', $event)"
-      />
+    <ImageUploader
+      :images="backgroundImages"
+      :main-index="0"
+      title="背景图"
+      :max-count="1"
+      add-text="添加图片"
+      hint-text="拖拽或点击"
+      alt-text="数字人背景图"
+      main-badge-text="背景"
+      limit-message="背景图只能上传 1 张"
+      :show-placeholders="false"
+      :show-main-action="false"
+      @update:images="emit('update:backgroundImages', $event)"
+      @notify="emit('notify', $event)"
+    />
 
+    <GeneratorPanelSection title="声音选择">
       <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
         <button
           type="button"
@@ -184,11 +182,10 @@ function getVoiceSpeedHint(speed) {
           <audio :src="selectedVoicePreviewUrl" controls preload="none" class="h-10 w-full"></audio>
         </div>
       </section>
-    </section>
+    </GeneratorPanelSection>
 
-    <section v-if="!uploadAudioMode" class="space-y-4 border-b border-slate-100 p-5">
+    <GeneratorPanelSection v-if="!uploadAudioMode" title="口播文案">
       <label class="block">
-        <span class="mb-1.5 block text-xs font-bold text-slate-800">口播文案</span>
         <textarea
           :value="settings.script"
           class="h-36 w-full resize-none rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs leading-relaxed text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-primary focus:ring-1 focus:ring-primary"
@@ -205,14 +202,9 @@ function getVoiceSpeedHint(speed) {
           </span>
         </div>
       </label>
+    </GeneratorPanelSection>
 
-    </section>
-
-    <section class="space-y-4 p-5">
-      <div>
-        <h2 class="text-sm font-black text-slate-900">视频设置</h2>
-      </div>
-
+    <GeneratorPanelSection title="视频设置" :divider="false">
       <div class="space-y-4">
         <div>
           <div class="mb-2 flex items-center justify-between">
@@ -251,7 +243,7 @@ function getVoiceSpeedHint(speed) {
           @update:model-value="updateVoiceSpeed"
         />
       </div>
-    </section>
+    </GeneratorPanelSection>
 
     <template #footer>
       <GeneratorActionFooter

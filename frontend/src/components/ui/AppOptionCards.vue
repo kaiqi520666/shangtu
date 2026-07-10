@@ -27,9 +27,12 @@ const emit = defineEmits(["update:modelValue"]);
       v-for="option in props.options"
       :key="option.value"
       type="button"
+      :disabled="option.disabled"
       class="rounded-xl border px-3 py-3 transition-all"
       :class="
-        props.modelValue === option.value
+        option.disabled
+          ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-300'
+          : props.modelValue === option.value
           ? 'border-primary bg-primary/8 text-primary shadow-sm'
           : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
       "
@@ -41,7 +44,10 @@ const emit = defineEmits(["update:modelValue"]);
       <span
         v-if="option.description"
         class="mt-1 block text-xs"
-        :class="[props.modelValue === option.value ? 'text-primary/80' : 'text-slate-400', props.align === 'center' ? 'text-center' : 'text-left']"
+        :class="[
+          option.disabled ? 'text-slate-300' : props.modelValue === option.value ? 'text-primary/80' : 'text-slate-400',
+          props.align === 'center' ? 'text-center' : 'text-left',
+        ]"
       >
         {{ option.description }}
       </span>

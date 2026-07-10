@@ -1,5 +1,6 @@
 <script setup>
 import AppCheckbox from '@/components/ui/AppCheckbox.vue'
+import GeneratorPanelSection from '@/components/generation/workspace/GeneratorPanelSection.vue'
 
 const props = defineProps({
   modules: {
@@ -31,15 +32,17 @@ function toggleAll(enabled) {
 </script>
 
 <template>
-  <section class="flex-1 space-y-3 bg-slate-50/20 p-5">
-    <div class="flex items-center justify-between">
-      <label class="text-xs font-bold text-slate-500">选择生成图种类型 ({{ selected.length }}项)</label>
+  <GeneratorPanelSection title="选择生成图种类型" :divider="false">
+    <template #meta>
+      <span class="text-xs font-normal text-slate-400">({{ selected.length }}项)</span>
+    </template>
+    <template #actions>
       <div class="flex gap-2">
         <button type="button" class="text-xs font-semibold text-slate-400 hover:text-primary" @click="toggleAll(true)">全选</button>
         <span class="text-xs text-slate-300">|</span>
         <button type="button" class="text-xs font-semibold text-slate-400 hover:text-slate-600" @click="toggleAll(false)">取消</button>
       </div>
-    </div>
+    </template>
 
     <div class="grid grid-cols-2 gap-2 pb-6">
       <article
@@ -66,5 +69,5 @@ function toggleAll(enabled) {
         </p>
       </article>
     </div>
-  </section>
+  </GeneratorPanelSection>
 </template>

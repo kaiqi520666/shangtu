@@ -1,5 +1,6 @@
 <script setup>
 import { Play } from "lucide-vue-next";
+import GeneratorPanelSection from "@/components/generation/workspace/GeneratorPanelSection.vue";
 import { videoDemoTypes } from "@/constants/product-video.js";
 
 defineProps({
@@ -13,11 +14,7 @@ const emit = defineEmits(["update:modelValue"]);
 </script>
 
 <template>
-  <section class="space-y-3 border-b border-slate-100 p-5">
-    <div>
-      <h2 class="text-sm font-black text-slate-900">选择视频方向</h2>
-      <p class="mt-1 text-xs text-slate-400">选方向后，系统会自动切换需要上传的素材类型。</p>
-    </div>
+  <GeneratorPanelSection title="选择视频方向" description="选方向后，系统会自动切换需要上传的素材类型。">
     <div class="grid grid-cols-2 gap-2.5">
       <button
         v-for="item in videoDemoTypes"
@@ -43,5 +40,5 @@ const emit = defineEmits(["update:modelValue"]);
         <p class="mt-1 line-clamp-1 text-xs text-slate-400">{{ item.subtitle }}</p>
       </button>
     </div>
-  </section>
+  </GeneratorPanelSection>
 </template>

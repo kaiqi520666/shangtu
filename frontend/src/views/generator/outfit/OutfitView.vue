@@ -106,7 +106,6 @@ async function handleDeleteModel(modelId) {
       :catalog-loading="outfit.catalogLoading.value"
       :scene-description="outfit.sceneDescription.value"
       :selected-image-label="outfit.selectedImageLabel.value"
-      :loading="outfit.generating.value"
       :creating-batch="outfit.creatingBatch.value"
       :has-running-tasks="outfit.hasRunningTasks.value"
       :can-generate-strategy="outfit.canGenerateStrategy.value"

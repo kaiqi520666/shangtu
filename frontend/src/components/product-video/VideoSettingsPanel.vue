@@ -2,6 +2,7 @@
 import { computed } from "vue";
 import { WandSparkles } from "lucide-vue-next";
 import GeneratorActionFooter from "@/components/generation/workspace/GeneratorActionFooter.vue";
+import GeneratorPanelSection from "@/components/generation/workspace/GeneratorPanelSection.vue";
 import GeneratorSidePanelShell from "@/components/generation/workspace/GeneratorSidePanelShell.vue";
 import ImageUploader from "@/components/generation/image/ImageUploader.vue";
 import AppSelect from "@/components/ui/AppSelect.vue";
@@ -52,27 +53,6 @@ const emit = defineEmits([
 ]);
 
 const selectedType = computed(() => getVideoDemoType(props.settings.videoType));
-const maxUploadCount = computed(() => {
-  return 9;
-});
-const uploadAddText = computed(() => {
-  return "添加参考图";
-});
-const uploadHintText = computed(() => {
-  return "支持 1-9 张";
-});
-const uploadRoleText = computed(() => {
-  return "当前将参考多张图片生成视频";
-});
-const uploadRequirementText = computed(() => {
-  return "至少上传 1 张产品参考图，最多 9 张；图片越完整，产品还原越稳定。";
-});
-const uploadLimitMessage = computed(() => {
-  return "参考图最多只能上传 9 张";
-});
-const showUploadPlaceholders = computed(() => false);
-const showMainImageAction = computed(() => false);
-const badgeTextResolver = computed(() => null);
 const generateDisabled = computed(() => {
   if (props.strategyLoading) return true;
   if (props.uploadedImages.some((img) => img?.uploading)) return true;
@@ -105,9 +85,6 @@ function updateVideoType(typeId) {
   emit("update:mainImageIndex", 0);
 }
 
-function notifyPending(featureName) {
-  emit("notify", `${featureName}会在后续版本开放`);
-}
 </script>
 
 <template>
@@ -118,28 +95,27 @@ function notifyPending(featureName) {
       :images="uploadedImages"
       :main-index="mainImageIndex"
       :title="selectedType.uploadTitle"
-      :max-count="maxUploadCount"
-      :add-text="uploadAddText"
-      :hint-text="uploadHintText"
+      :max-count="9"
+      add-text="添加参考图"
+      hint-text="支持 1-9 张"
       alt-text="商品视频素材"
       main-badge-text="素材"
-      :limit-message="uploadLimitMessage"
-      :show-placeholders="showUploadPlaceholders"
-      :show-main-action="showMainImageAction"
-      :badge-text-resolver="badgeTextResolver"
+      limit-message="参考图最多只能上传 9 张"
+      :show-placeholders="false"
+      :show-main-action="false"
       @update:images="emit('update:uploadedImages', $event)"
       @update:main-index="emit('update:mainImageIndex', $event)"
       @notify="emit('notify', $event)"
     />
 
-    <section class="space-y-4 border-b border-slate-100 p-5">
+    <GeneratorPanelSection title="视频设置">
       <div class="space-y-1.5 rounded-xl border border-primary/15 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary">
-        <p>{{ uploadRoleText }}</p>
-        <p class="font-medium leading-relaxed text-primary/80">{{ uploadRequirementText }}</p>
+        <p>当前将参考多张图片生成视频</p>
+        <p class="font-medium leading-relaxed text-primary/80">至少上传 1 张产品参考图，最多 9 张；图片越完整，产品还原越稳定。</p>
       </div>
 
       <div>
-        <h2 class="text-sm font-black text-slate-900">目标市场与语言</h2>
+        <h3 class="text-xs font-bold text-slate-800">目标市场与语言</h3>
         <div class="mt-3 grid grid-cols-2 gap-3">
           <AppSelect :model-value="settings.market" :options="videoMarketOptions" @update:model-value="updateSetting('market', $event)" />
           <AppSelect :model-value="settings.language" :options="videoLanguageOptions" @update:model-value="updateSetting('language', $event)" />
@@ -167,15 +143,13 @@ function notifyPending(featureName) {
           @input="updateSetting('productInput', $event.target.value)"
         ></textarea>
       </div>
-    </section>
+    </GeneratorPanelSection>
 
     <template #footer>
       <GeneratorActionFooter
         :primary-text="generateText"
         :primary-disabled="!canGenerateStrategy || generateDisabled"
-        secondary-text="保存草稿"
         @primary="emit('generate-strategy')"
-        @secondary="notifyPending('草稿保存')"
       >
         <template #primary-icon>
           <WandSparkles class="h-4 w-4" />

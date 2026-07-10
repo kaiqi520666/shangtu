@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { BadgeCheck, Image, Layers3, ListChecks, Minus, Plus, Search } from 'lucide-vue-next'
+import GeneratorPanelSection from '@/components/generation/workspace/GeneratorPanelSection.vue'
 import AppCheckbox from '@/components/ui/AppCheckbox.vue'
 
 const props = defineProps({
@@ -58,21 +59,12 @@ function changeCount(index, step) {
 </script>
 
 <template>
-  <section class="space-y-3 border-b border-slate-100 p-5">
-    <div class="flex items-center justify-between">
-      <div class="flex items-center gap-2">
-        <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
-          <ListChecks class="h-4 w-4" />
-        </span>
-        <div>
-          <h3 class="text-xs font-bold text-slate-900">套图结构配置</h3>
-          <p class="text-xs text-slate-400">勾选需要生成的图片类型和张数</p>
-        </div>
-      </div>
+  <GeneratorPanelSection title="套图结构配置" description="勾选需要生成的图片类型和张数">
+    <template #actions>
       <span class="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-bold text-primary">
         共 {{ totalCount }} 张
       </span>
-    </div>
+    </template>
 
     <div class="space-y-2.5">
       <article
@@ -129,5 +121,5 @@ function changeCount(index, step) {
         </div>
       </article>
     </div>
-  </section>
+  </GeneratorPanelSection>
 </template>

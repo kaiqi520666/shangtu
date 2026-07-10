@@ -4,6 +4,7 @@ import AssetPickerModal from "@/components/assets/AssetPickerModal.vue";
 import ImageUploadAddTile from "@/components/generation/image/ImageUploadAddTile.vue";
 import ImageUploadItem from "@/components/generation/image/ImageUploadItem.vue";
 import ImageUploadSourcePanel from "@/components/generation/image/ImageUploadSourcePanel.vue";
+import GeneratorPanelSection from "@/components/generation/workspace/GeneratorPanelSection.vue";
 import AppModal from "@/components/ui/AppModal.vue";
 import { useImageUploader } from "@/composables/generator/useImageUploader.js";
 
@@ -19,6 +20,10 @@ const props = defineProps({
   title: {
     type: String,
     default: "商品详情图",
+  },
+  description: {
+    type: String,
+    default: "",
   },
   maxCount: {
     type: Number,
@@ -91,26 +96,20 @@ function shouldShowBadge(index) {
 </script>
 
 <template>
-  <section class="border-b border-slate-100 bg-slate-50/40 p-5">
-    <div class="mb-3 flex items-center justify-between">
-      <label class="flex items-center gap-1.5 text-xs font-bold text-slate-700">
-        <span class="h-1.5 w-1.5 rounded-full bg-primary"></span>
-        {{ title }}
-        <span class="font-normal text-slate-400"
-          >(支持最多 {{ maxCount }} 张，已选 {{ images.length }}/{{ maxCount }})</span
-        >
-      </label>
-      <div class="flex shrink-0 items-center gap-2">
-        <button
-          v-if="images.length > 0"
-          type="button"
-          class="text-xs text-slate-400 transition-colors hover:text-rose-500"
-          @click="clearImages"
-        >
-          清空
-        </button>
-      </div>
-    </div>
+  <GeneratorPanelSection :title="title" :description="description" tone="muted">
+    <template #meta>
+      <span class="text-xs font-normal text-slate-400">(支持最多 {{ maxCount }} 张，已选 {{ images.length }}/{{ maxCount }})</span>
+    </template>
+    <template #actions>
+      <button
+        v-if="images.length > 0"
+        type="button"
+        class="text-xs text-slate-400 transition-colors hover:text-rose-500"
+        @click="clearImages"
+      >
+        清空
+      </button>
+    </template>
 
     <input
       ref="fileInput"
@@ -196,5 +195,5 @@ function shouldShowBadge(index) {
       @confirm="addAssetImages"
       @notify="emit('notify', $event)"
     />
-  </section>
+  </GeneratorPanelSection>
 </template>

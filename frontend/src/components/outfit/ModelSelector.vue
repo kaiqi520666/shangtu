@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref } from "vue";
 import { ImagePlus, LoaderCircle, Trash2 } from "lucide-vue-next";
+import GeneratorPanelSection from "@/components/generation/workspace/GeneratorPanelSection.vue";
 import AppCheckbox from "@/components/ui/AppCheckbox.vue";
 
 defineProps({
@@ -88,8 +89,7 @@ function selectModel(model) {
 </script>
 
 <template>
-  <section class="space-y-3 border-b border-slate-100 p-5">
-    <h3 class="text-xs font-bold text-slate-900">模特形象</h3>
+  <GeneratorPanelSection title="模特形象">
     <div class="max-h-[324px] overflow-y-auto pr-1 [scrollbar-width:thin]">
       <div class="grid grid-cols-4 gap-2">
         <button
@@ -180,5 +180,5 @@ function selectModel(model) {
         <img :src="hoveredModel.image" class="h-[320px] w-full object-cover" />
       </div>
     </Teleport>
-  </section>
+  </GeneratorPanelSection>
 </template>

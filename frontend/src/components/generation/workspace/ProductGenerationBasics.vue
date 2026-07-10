@@ -1,12 +1,12 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { HelpCircle, LoaderCircle, Sparkles, X } from 'lucide-vue-next'
+import ImageQualitySelector from '@/components/generation/image/ImageQualitySelector.vue'
+import GeneratorPanelSection from '@/components/generation/workspace/GeneratorPanelSection.vue'
 import AppSelect from '@/components/ui/AppSelect.vue'
 import {
-  isQualitySupported,
   languageOptions,
   platformOptions,
-  qualityOptions,
   ratioOptions,
   resolveQuality,
 } from '@/constants/generator.js'
@@ -45,8 +45,6 @@ const aiDraft = ref('')
 
 const hasAiDraft = computed(() => aiDraft.value.trim().length > 0)
 
-const isQualityEnabled = (quality) => isQualitySupported(props.settings.ratio, quality)
-
 watch(
   () => props.settings.ratio,
   (ratio) => {
@@ -71,11 +69,6 @@ function confirmAiDraft() {
   showAiPopover.value = false
 }
 
-function selectQuality(quality) {
-  if (!isQualityEnabled(quality)) return
-  updateSetting('quality', quality)
-}
-
 function updateSetting(key, value) {
   emit('update:settings', {
     ...props.settings,
@@ -85,7 +78,7 @@ function updateSetting(key, value) {
 </script>
 
 <template>
-  <div class="space-y-4 border-b border-slate-100 p-5">
+  <GeneratorPanelSection title="生成设置">
     <div>
       <label class="mb-1.5 block text-xs font-bold text-slate-500">投放平台</label>
       <AppSelect
@@ -114,41 +107,12 @@ function updateSetting(key, value) {
       </div>
     </div>
 
-    <div>
-      <label class="mb-1.5 block text-xs font-bold text-slate-500">图片质量</label>
-      <div class="grid grid-cols-3 gap-2">
-        <button
-          v-for="quality in qualityOptions"
-          :key="quality.value"
-          type="button"
-          :disabled="!isQualityEnabled(quality.value)"
-          class="rounded-lg border px-3 py-2 text-center transition-all"
-          :class="
-            !isQualityEnabled(quality.value)
-              ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-300'
-              : settings.quality === quality.value
-                ? 'border-primary bg-primary/10 text-primary shadow-sm'
-                : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50'
-          "
-          @click="selectQuality(quality.value)"
-        >
-          <span class="block text-sm font-bold leading-tight">{{ quality.title }}</span>
-          <span
-            class="mt-0.5 block text-xs leading-tight"
-            :class="
-              !isQualityEnabled(quality.value)
-                ? 'text-slate-300'
-                : settings.quality === quality.value
-                  ? 'text-primary'
-                  : 'text-slate-400'
-            "
-          >
-            {{ isQualityEnabled(quality.value) ? quality.subtitle : '不支持' }}
-          </span>
-        </button>
-      </div>
-      <p class="mt-2 text-xs text-slate-400">当前输出：{{ selectedImageLabel }}</p>
-    </div>
+    <ImageQualitySelector
+      :model-value="settings.quality"
+      :ratio="settings.ratio"
+      :output-label="selectedImageLabel"
+      @update:model-value="updateSetting('quality', $event)"
+    />
 
     <div v-if="showProductInput">
       <div class="relative mb-1.5 flex items-center justify-between">
@@ -226,5 +190,5 @@ function updateSetting(key, value) {
         @input="updateSetting('productInput', $event.target.value)"
       ></textarea>
     </div>
-  </div>
+  </GeneratorPanelSection>
 </template>

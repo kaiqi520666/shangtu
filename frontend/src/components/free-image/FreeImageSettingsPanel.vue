@@ -2,15 +2,12 @@
 import { computed, watch } from "vue";
 import { ImagePlus, LoaderCircle, Sparkles } from "lucide-vue-next";
 import AppSelect from "@/components/ui/AppSelect.vue";
+import ImageQualitySelector from "@/components/generation/image/ImageQualitySelector.vue";
 import GeneratorActionFooter from "@/components/generation/workspace/GeneratorActionFooter.vue";
+import GeneratorPanelSection from "@/components/generation/workspace/GeneratorPanelSection.vue";
 import GeneratorSidePanelShell from "@/components/generation/workspace/GeneratorSidePanelShell.vue";
 import ImageUploader from "@/components/generation/image/ImageUploader.vue";
-import {
-  isQualitySupported,
-  qualityOptions,
-  ratioOptions,
-  resolveQuality,
-} from "@/constants/generator.js";
+import { ratioOptions, resolveQuality } from "@/constants/generator.js";
 
 const props = defineProps({
   settings: {
@@ -45,22 +42,6 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
-  generating: {
-    type: Boolean,
-    default: false,
-  },
-  generatedCount: {
-    type: Number,
-    default: 0,
-  },
-  totalCount: {
-    type: Number,
-    default: 1,
-  },
-  jobTotal: {
-    type: Number,
-    default: 0,
-  },
   selectedImageLabel: {
     type: String,
     required: true,
@@ -84,8 +65,6 @@ const primaryText = computed(() => {
   return "生成图片";
 });
 
-const isQualityEnabled = (quality) => isQualitySupported(props.settings.ratio, quality);
-
 watch(
   () => props.settings.ratio,
   (ratio) => {
@@ -103,10 +82,6 @@ function updateSetting(key, value) {
   });
 }
 
-function selectQuality(quality) {
-  if (!isQualityEnabled(quality)) return;
-  updateSetting("quality", quality);
-}
 </script>
 
 <template>
@@ -127,7 +102,7 @@ function selectQuality(quality) {
       @notify="emit('notify', $event)"
     />
 
-    <section class="space-y-4 border-b border-slate-100 p-5">
+    <GeneratorPanelSection title="生成设置">
       <div>
         <div class="mb-1.5 flex items-center justify-between">
           <label class="text-xs font-bold text-slate-800">提示词</label>
@@ -159,42 +134,13 @@ function selectQuality(quality) {
         />
       </div>
 
-      <div>
-        <label class="mb-1.5 block text-xs font-bold text-slate-500">图片质量</label>
-        <div class="grid grid-cols-3 gap-2">
-          <button
-            v-for="quality in qualityOptions"
-            :key="quality.value"
-            type="button"
-            :disabled="!isQualityEnabled(quality.value)"
-            class="rounded-lg border px-3 py-2 text-center transition-all"
-            :class="
-              !isQualityEnabled(quality.value)
-                ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-300'
-                : settings.quality === quality.value
-                  ? 'border-primary bg-primary/10 text-primary shadow-sm'
-                  : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50'
-            "
-            @click="selectQuality(quality.value)"
-          >
-            <span class="block text-sm font-bold leading-tight">{{ quality.title }}</span>
-            <span
-              class="mt-0.5 block text-xs leading-tight"
-              :class="
-                !isQualityEnabled(quality.value)
-                  ? 'text-slate-300'
-                  : settings.quality === quality.value
-                    ? 'text-primary'
-                    : 'text-slate-400'
-              "
-            >
-              {{ isQualityEnabled(quality.value) ? quality.subtitle : "不支持" }}
-            </span>
-          </button>
-        </div>
-        <p class="mt-2 text-xs text-slate-400">当前输出：{{ selectedImageLabel }}</p>
-      </div>
-    </section>
+      <ImageQualitySelector
+        :model-value="settings.quality"
+        :ratio="settings.ratio"
+        :output-label="selectedImageLabel"
+        @update:model-value="updateSetting('quality', $event)"
+      />
+    </GeneratorPanelSection>
 
     <template #footer>
       <GeneratorActionFooter

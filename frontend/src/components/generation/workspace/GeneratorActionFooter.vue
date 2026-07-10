@@ -8,26 +8,14 @@ defineProps({
     type: Boolean,
     default: false,
   },
-  secondaryText: {
-    type: String,
-    default: '',
-  },
 })
 
-const emit = defineEmits(['primary', 'secondary'])
+const emit = defineEmits(['primary'])
 </script>
 
 <template>
   <div class="shrink-0 border-t border-slate-200 bg-white/95 p-4 shadow-[0_-4px_12px_rgba(0,0,0,0.02)] backdrop-blur-sm">
     <div class="flex gap-2.5">
-      <button
-        v-if="secondaryText"
-        type="button"
-        class="min-w-28 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs font-bold text-slate-700 transition-colors hover:border-primary/30 hover:bg-primary/5 hover:text-primary"
-        @click="emit('secondary')"
-      >
-        {{ secondaryText }}
-      </button>
       <button
         type="button"
         :disabled="primaryDisabled"

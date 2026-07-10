@@ -4,6 +4,7 @@ import { FileAudio, LoaderCircle, Trash2, Video } from "lucide-vue-next";
 import { uploadAudio, uploadVideo } from "@/api/video.js";
 import AssetPickerModal from "@/components/assets/AssetPickerModal.vue";
 import ImageUploadSourcePanel from "@/components/generation/image/ImageUploadSourcePanel.vue";
+import GeneratorPanelSection from "@/components/generation/workspace/GeneratorPanelSection.vue";
 import { useMediaUploader } from "@/composables/generator/useMediaUploader.js";
 
 const props = defineProps({
@@ -19,6 +20,10 @@ const props = defineProps({
   title: {
     type: String,
     required: true,
+  },
+  description: {
+    type: String,
+    default: "",
   },
   addText: {
     type: String,
@@ -84,13 +89,11 @@ const {
 </script>
 
 <template>
-  <section class="border-b border-slate-100 bg-slate-50/40 p-5">
-    <div class="mb-3 flex items-center justify-between">
-      <label class="flex items-center gap-1.5 text-xs font-bold text-slate-700">
-        <span class="h-1.5 w-1.5 rounded-full bg-primary"></span>
-        {{ title }}
-        <span class="font-normal text-slate-400">(已选 {{ items.length }}/{{ maxCount }})</span>
-      </label>
+  <GeneratorPanelSection :title="title" :description="description" tone="muted">
+    <template #meta>
+      <span class="text-xs font-normal text-slate-400">(已选 {{ items.length }}/{{ maxCount }})</span>
+    </template>
+    <template #actions>
       <button
         v-if="items.length > 0"
         type="button"
@@ -99,7 +102,7 @@ const {
       >
         清空
       </button>
-    </div>
+    </template>
 
     <input ref="fileInput" type="file" :accept="accept" class="hidden" multiple @change="handleFileChange" />
 
@@ -199,5 +202,6 @@ const {
       @confirm="addAssetItems"
       @notify="emit('notify', $event)"
     />
-  </section>
+    <slot name="after" />
+  </GeneratorPanelSection>
 </template>

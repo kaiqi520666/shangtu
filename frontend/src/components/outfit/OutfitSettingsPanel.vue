@@ -57,10 +57,6 @@ const props = defineProps({
     required: true,
     type: String,
   },
-  loading: {
-    type: Boolean,
-    default: false,
-  },
   creatingBatch: {
     type: Boolean,
     default: false,
