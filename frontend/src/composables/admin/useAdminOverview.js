@@ -15,7 +15,7 @@ const overviewCards = computed(() => {
     { label: "累计充值", value: formatMoney(data.paid_amount_cents || 0), icon: ReceiptText },
     { label: "今日充值", value: formatMoney(data.today_paid_amount_cents || 0), icon: Coins },
     { label: "总积分余额", value: `${data.total_credit_balance || 0} 点`, icon: Coins },
-    { label: "失败任务", value: data.failed_image_tasks || 0, icon: Ban },
+    { label: "失败任务", value: data.failed_tasks || 0, icon: Ban },
   ];
 });
 

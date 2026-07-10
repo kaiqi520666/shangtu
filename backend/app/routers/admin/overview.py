@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_super_admin, get_db
 from app.core.time import utc_now
-from app.models import CreditOrder, ImageTask, User
+from app.models import CreditOrder, ImageTask, User, VideoTask
 from app.schemas.response import Response, success
 
 router = APIRouter()
@@ -49,6 +49,11 @@ async def overview(
         .select_from(ImageTask)
         .where(ImageTask.status.in_(["failed", "timeout"]))
     )
+    failed_video_tasks = await db.scalar(
+        select(func.count())
+        .select_from(VideoTask)
+        .where(VideoTask.status.in_(["failed", "timeout"]))
+    )
     return success(
         {
             "total_users": int(total_users or 0),
@@ -60,6 +65,6 @@ async def overview(
             "paid_amount_cents": int(paid_amount_cents or 0),
             "today_paid_amount_cents": int(today_paid_amount_cents or 0),
             "today_image_tasks": int(today_image_tasks or 0),
-            "failed_image_tasks": int(failed_image_tasks or 0),
+            "failed_tasks": int(failed_image_tasks or 0) + int(failed_video_tasks or 0),
         }
     )
