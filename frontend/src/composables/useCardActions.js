@@ -1,5 +1,4 @@
 import { computed, ref } from "vue";
-import JSZip from "jszip";
 import { getImageDownloadUrl } from "@/api/image.js";
 import { useAuthStore } from "@/stores/auth.js";
 
@@ -45,6 +44,7 @@ export function useCardActions({
   currentTaskTitle,
   getCardName,
   getDownloadUrl = (card) => getImageDownloadUrl(card.taskId),
+  getFetchHeaders = null,
   getBlobExtension = defaultBlobExtension,
   toast,
   mediaLabel = "图片",
@@ -54,6 +54,11 @@ export function useCardActions({
   const zoomCard = ref(null);
   const downloading = ref(false);
   const authStore = useAuthStore();
+
+  function buildFetchHeaders(card) {
+    if (getFetchHeaders) return getFetchHeaders(card) || {};
+    return { Authorization: `Bearer ${authStore.token}` };
+  }
 
   const selectedCards = computed(() => outputCards.value.filter((card) => card.selected));
   const selectedCardsCount = computed(() => selectedCards.value.length);
@@ -71,7 +76,7 @@ export function useCardActions({
 
   // --- 下载 ---
 
-  function batchDownload() {
+  async function batchDownload() {
     if (downloading.value) {
       toast.info("下载处理中，请稍候");
       return;
@@ -86,11 +91,10 @@ export function useCardActions({
     }
 
     if (downloadable.length === 1) {
-      downloadSingleMedia(downloadable[0]);
-      return;
+      return downloadSingleMedia(downloadable[0]);
     }
 
-    downloadAsZip(downloadable);
+    return downloadAsZip(downloadable);
   }
 
   async function downloadAsZip(cards) {
@@ -105,13 +109,13 @@ export function useCardActions({
     });
     try {
       toast.info(`正在打包 ${cards.length} ${mediaUnit}${mediaLabel}...`);
+      const { default: JSZip } = await import("jszip");
       const zip = new JSZip();
-      const token = authStore.token;
 
       const results = await Promise.allSettled(
         cards.map(async (card, index) => {
           const url = getDownloadUrl(card);
-          const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+          const res = await fetch(url, { headers: buildFetchHeaders(card) });
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const blob = await res.blob();
           const ext = getBlobExtension(blob, card);
@@ -160,8 +164,7 @@ export function useCardActions({
     try {
       toast.info(`正在准备${mediaLabel}下载...`);
       const url = getDownloadUrl(card);
-      const token = authStore.token;
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(url, { headers: buildFetchHeaders(card) });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const blob = await res.blob();
       const ext = getBlobExtension(blob, card);
