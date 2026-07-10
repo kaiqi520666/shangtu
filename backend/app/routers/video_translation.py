@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import math
 import uuid
 from typing import Any
 
@@ -22,10 +21,19 @@ from app.core.providers.heygen_provider import (
 from app.core.system_settings import get_effective_video_translation_credit_costs
 from app.core.task_timeout import project_task_runtime_state
 from app.core.time import to_utc_iso, utc_now
-from app.core.user_credits import get_user_credits, refund_user_credits
+from app.core.user_credits import get_user_credits
 from app.models import GenerationJob, HeygenTranslationLanguage, User, VideoTask
 from app.schemas.response import Response, fail, success
 from app.services.generation_tasks import deduct_credits_or_fail
+from app.services.heygen_task_lifecycle import (
+    clean_text as _clean_text,
+    get_or_create_video_job,
+    normalize_duration_seconds as _normalize_duration_seconds,
+    provider_task_status as _task_status_from_provider,
+    refund_video_task_if_needed as _refund_task_credits_if_needed,
+    sync_video_job_status,
+    task_progress as _task_progress_from_status,
+)
 
 router = APIRouter(prefix="/video-translation", tags=["视频翻译"])
 
@@ -46,50 +54,10 @@ class CreateVideoTranslationTaskRequest(BaseModel):
     title: str | None = None
 
 
-def _clean_text(value: Any) -> str:
-    return str(value or "").strip()
-
-
-def _normalize_duration_seconds(value: float | int | None) -> int:
-    try:
-        duration = math.ceil(float(value or 0))
-    except (TypeError, ValueError):
-        return 0
-    return max(0, duration)
-
-
 def _translation_consume_note(*, quality_tier: str, title: str | None) -> str:
     quality_label = "高质翻译" if quality_tier == "premium" else "标准翻译"
     title_text = _clean_text(title)
     return f"视频翻译 · {quality_label}" + (f" · {title_text}" if title_text else "")
-
-
-def _task_status_from_provider(
-    provider_status: str | None,
-    *,
-    video_url: str | None = None,
-    failure_message: str | None = None,
-) -> str:
-    normalized = _clean_text(provider_status).lower()
-    if video_url:
-        return "done"
-    if normalized in {"completed", "done", "success", "succeeded"}:
-        return "done"
-    if normalized in {"failed", "error", "canceled", "cancelled"} or failure_message:
-        return "failed"
-    if normalized in {"pending", "queued", "processing", "rendering", "in_progress"}:
-        return "processing" if normalized != "pending" else "pending"
-    return "processing"
-
-
-def _task_progress_from_status(status: str) -> int:
-    if status == "done":
-        return 100
-    if status == "failed":
-        return 0
-    if status == "processing":
-        return 65
-    return 10
 
 
 def _first_string(data: Any, keys: set[str]) -> str:
@@ -199,89 +167,18 @@ async def _get_or_create_job(
     title: str,
     settings_snapshot: dict,
 ) -> GenerationJob | None:
-    if job_id:
-        result = await db.execute(
-            select(GenerationJob).where(
-                GenerationJob.id == job_id,
-                GenerationJob.user_id == current_user.id,
-                GenerationJob.scenario == "video_translation",
-            )
-        )
-        job = result.scalar_one_or_none()
-        if not job:
-            return None
-        job.title = title
-        job.settings_json = dump_json_or_none(settings_snapshot)
-        job.updated_at = utc_now()
-        return job
-
-    job = GenerationJob(
-        id=str(uuid.uuid4()),
+    return await get_or_create_video_job(
+        db,
         user_id=current_user.id,
+        job_id=job_id,
         scenario="video_translation",
         title=title,
-        status="draft",
-        settings_json=dump_json_or_none(settings_snapshot),
+        settings_snapshot=settings_snapshot,
     )
-    db.add(job)
-    return job
 
 
 async def _sync_job_status(db: AsyncSession, job_id: str | None) -> None:
-    if not job_id:
-        return
-    job = await db.get(GenerationJob, job_id)
-    if not job:
-        return
-    result = await db.execute(
-        select(VideoTask.status, VideoTask.result_url, VideoTask.error_message, VideoTask.created_at).where(
-            VideoTask.job_id == job_id,
-            VideoTask.archived == False,  # noqa: E712
-            VideoTask.scenario == "video_translation",
-        )
-    )
-    rows = result.all()
-    if not rows:
-        job.status = "draft"
-        job.updated_at = utc_now()
-        return
-
-    completed = 0
-    failed = 0
-    for status, result_url, error_message, created_at in rows:
-        runtime = project_task_runtime_state(
-            "video",
-            status=status,
-            error_message=error_message,
-            progress=0,
-            result_url=result_url,
-            created_at=created_at,
-        )
-        if runtime.status == "done":
-            completed += 1
-        elif runtime.status in {"failed", "timeout"}:
-            failed += 1
-
-    if completed == len(rows):
-        job.status = "done"
-    elif failed == len(rows):
-        job.status = "failed"
-    else:
-        job.status = "generating"
-    job.updated_at = utc_now()
-
-
-async def _refund_task_credits_if_needed(
-    db: AsyncSession,
-    task: VideoTask,
-    *,
-    note: str,
-) -> int | None:
-    if task.credit_refunded or int(task.credit_cost or 0) <= 0:
-        return None
-    refunded = await refund_user_credits(db, task.user_id, int(task.credit_cost), note=note)
-    task.credit_refunded = True
-    return refunded
+    await sync_video_job_status(db, job_id=job_id, scenario="video_translation")
 
 
 async def _get_task(db: AsyncSession, *, task_id: str, user_id: int) -> VideoTask | None:

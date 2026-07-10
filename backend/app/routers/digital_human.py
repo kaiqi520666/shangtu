@@ -11,15 +11,13 @@ from pydantic import BaseModel
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.json_utils import dump_json_or_none, parse_json_or_none
+from app.core.json_utils import dump_json_or_none
 from app.core.oss import OssConfigError, upload_audio_bytes, upload_image_bytes
 from app.core.pagination import page_payload
-from app.core.prompt_snapshot import build_prompt_snapshot, dump_prompt_snapshot, parse_prompt_snapshot
+from app.core.prompt_snapshot import build_prompt_snapshot, dump_prompt_snapshot
 from app.core.providers.heygen_provider import (
     create_photo_avatar,
     create_avatar_video,
-    get_avatar_look,
-    get_video,
     parse_heygen_error_message,
 )
 from app.core.scenarios import SCENARIO_TITLE_PREFIX
@@ -27,18 +25,11 @@ from app.core.system_settings import (
     get_effective_digital_human_credit_costs,
     get_effective_digital_human_precharge_cost,
     get_effective_digital_human_precharge_costs,
-    get_effective_photo_avatar_create_cost,
 )
 from app.core.time import to_utc_iso, utc_now
-from app.core.user_credits import (
-    deduct_user_credits_allow_negative,
-    get_user_credits,
-    refund_user_credits,
-)
+from app.core.user_credits import get_user_credits
 from app.core.deps import get_current_user, get_db
-from app.core.task_timeout import project_task_runtime_state
 from app.models import (
-    GenerationJob,
     HeygenAvatar,
     HeygenVoice,
     User,
@@ -49,7 +40,41 @@ from app.models import (
 )
 from app.routers.admin.utils import heygen_avatar_payload, heygen_voice_payload
 from app.schemas.response import Response, fail, success
+from app.services.digital_human import (
+    get_or_create_job as _get_or_create_job,
+    get_task as _get_task,
+    should_sync_provider_task as _should_sync_provider_task,
+    settle_task_credits_if_needed as _settle_task_credits_if_needed,
+    sync_job_status as _sync_job_status,
+    sync_task_from_provider as _sync_task_from_provider,
+    task_payload as _digital_human_task_payload,
+)
+from app.services.digital_human_assets import (
+    ResolvedAvatar,
+    extract_provider_avatar_identity as _extract_provider_avatar_identity,
+    extract_provider_avatar_error_message as _extract_provider_avatar_error_message,
+    extract_provider_avatar_status as _extract_provider_avatar_status,
+    extract_provider_avatar_urls as _extract_provider_avatar_urls,
+    get_available_audio_asset as _get_available_audio_asset,
+    get_enabled_voice as _get_enabled_voice,
+    get_photo_avatar_asset as _get_photo_avatar_asset,
+    get_user_avatar_task as _get_user_avatar_task,
+    get_user_avatars_by_ids as _get_user_avatars_by_ids,
+    provider_avatar_status as _provider_avatar_status,
+    refund_user_avatar_task_if_needed as _refund_user_avatar_task_if_needed,
+    resolve_avatar as _resolve_avatar,
+    sync_user_avatar_task_from_provider as _sync_user_avatar_task_from_provider,
+    upsert_user_avatar_from_task as _upsert_user_avatar_from_task,
+    user_avatar_payload as _user_avatar_payload,
+    user_avatar_task_payload as _user_avatar_task_payload,
+)
 from app.services.generation_tasks import deduct_credits_or_fail
+from app.services.heygen_task_lifecycle import (
+    clean_text as _clean_text,
+    provider_task_status as _task_status_from_provider,
+    refund_video_task_if_needed as _refund_task_credits_if_needed,
+    task_progress as _task_progress_from_status,
+)
 
 router = APIRouter(prefix="/digital-human", tags=["数字人"])
 
@@ -61,16 +86,6 @@ SUPPORTED_ASPECT_RATIOS = {"16:9", "9:16", "1:1"}
 SUPPORTED_RESOLUTIONS = {"720p", "1080p"}
 DEFAULT_RESOLUTION = "1080p"
 PHOTO_AVATAR_TYPE = "photo"
-
-
-class ResolvedAvatar(BaseModel):
-    avatar_id: str
-    name: str
-    preview_image_url: str = ""
-    preview_video_url: str = ""
-    source: str = "system"
-    asset_id: str = ""
-    avatar_type: str = "studio_avatar"
 
 
 class DigitalHumanVoiceSettings(BaseModel):
@@ -95,10 +110,6 @@ class DigitalHumanGenerateRequest(BaseModel):
     voice_settings: DigitalHumanVoiceSettings | None = None
 
 
-def _clean_text(value: str | None) -> str:
-    return str(value or "").strip()
-
-
 def _default_job_title(script: str, audio_name: str | None = None) -> str:
     prefix = SCENARIO_TITLE_PREFIX.get("digital_human", "数字人")
     excerpt = _clean_text(script).replace("\n", " ")[:20]
@@ -107,34 +118,6 @@ def _default_job_title(script: str, audio_name: str | None = None) -> str:
     if excerpt:
         return f"{prefix}_{excerpt}"
     return f"{prefix}_{utc_now():%Y%m%d_%H%M%S}"
-
-
-def _task_status_from_provider(
-    provider_status: str | None,
-    *,
-    video_url: str | None = None,
-    failure_message: str | None = None,
-) -> str:
-    normalized = _clean_text(provider_status).lower()
-    if video_url:
-        return "done"
-    if normalized in {"completed", "done", "success", "succeeded"}:
-        return "done"
-    if normalized in {"failed", "error", "canceled", "cancelled"} or failure_message:
-        return "failed"
-    if normalized in {"pending", "queued", "processing", "rendering", "in_progress"}:
-        return "processing" if normalized != "pending" else "pending"
-    return "processing"
-
-
-def _task_progress_from_status(status: str) -> int:
-    if status == "done":
-        return 100
-    if status == "failed":
-        return 0
-    if status == "processing":
-        return 65
-    return 10
 
 
 def _normalize_voice_speed(value: float | int | None) -> float:
@@ -171,31 +154,6 @@ def _clean_avatar_name(value: str | None, fallback: str = "照片数字人") -> 
     return fallback
 
 
-def _provider_avatar_status(
-    provider_status: str | None,
-    *,
-    failure_message: str | None = None,
-) -> str:
-    normalized = _clean_text(provider_status).lower()
-    if normalized in {"completed", "done", "success", "succeeded", "ready", "active"}:
-        return "done"
-    if normalized in {"failed", "error", "canceled", "cancelled"} or failure_message:
-        return "failed"
-    if normalized in {"pending", "queued", "processing", "rendering", "training", "in_progress"}:
-        return "processing" if normalized != "pending" else "pending"
-    return "processing"
-
-
-def _provider_avatar_progress(status: str) -> int:
-    if status == "done":
-        return 100
-    if status == "failed":
-        return 0
-    if status == "processing":
-        return 65
-    return 10
-
-
 def _digital_human_consume_note(*, quality_tier: str, title: str | None) -> str:
     quality_label = "高质档" if quality_tier == "premium" else "标准档"
     parts = ["数字人", quality_label]
@@ -203,15 +161,6 @@ def _digital_human_consume_note(*, quality_tier: str, title: str | None) -> str:
     if clean_title:
         parts.append(clean_title)
     return " · ".join(parts)
-
-
-def _snapshot_scene(snapshot: dict | None) -> dict:
-    if not isinstance(snapshot, dict):
-        return {}
-    scene = snapshot.get("scene")
-    if isinstance(scene, dict):
-        return scene
-    return {}
 
 
 def _audio_asset_payload(asset: UserAudioAsset) -> dict:
@@ -228,71 +177,6 @@ def _audio_asset_payload(asset: UserAudioAsset) -> dict:
         "created_at": to_utc_iso(asset.created_at),
         "updated_at": to_utc_iso(asset.updated_at),
     }
-
-
-def _user_avatar_payload(asset: UserAvatar) -> dict:
-    return {
-        "id": asset.id,
-        "avatar_id": asset.heygen_avatar_id,
-        "asset_id": asset.id,
-        "name": asset.name,
-        "source": "photo",
-        "avatar_type": asset.avatar_type,
-        "preview_image_url": asset.preview_image_url or asset.source_image_url,
-        "preview_video_url": asset.preview_video_url,
-        "source_image_url": asset.source_image_url,
-        "status": asset.status,
-        "enabled": bool(asset.enabled),
-        "created_at": to_utc_iso(asset.created_at),
-        "updated_at": to_utc_iso(asset.updated_at),
-    }
-
-
-def _user_avatar_task_payload(
-    task: UserAvatarTask,
-    asset: UserAvatar | None = None,
-) -> dict:
-    preview_image_url = (
-        asset.preview_image_url if asset and asset.preview_image_url else task.source_image_url
-    )
-    preview_video_url = asset.preview_video_url if asset else ""
-    avatar_id = asset.heygen_avatar_id if asset else (task.provider_avatar_id or "")
-    return {
-        "id": task.id,
-        "name": task.name,
-        "avatar_type": task.avatar_type,
-        "status": task.status,
-        "progress": _provider_avatar_progress(task.status),
-        "error_message": task.error_message,
-        "source_image_url": task.source_image_url,
-        "preview_image_url": preview_image_url,
-        "preview_video_url": preview_video_url,
-        "provider": task.provider,
-        "provider_task_id": task.provider_task_id,
-        "provider_avatar_id": task.provider_avatar_id,
-        "avatar_id": avatar_id,
-        "result_avatar_id": task.result_avatar_id,
-        "credit_cost": int(task.credit_cost or 0),
-        "credit_refunded": bool(task.credit_refunded),
-        "created_at": to_utc_iso(task.created_at),
-        "updated_at": to_utc_iso(task.updated_at),
-    }
-
-
-def _task_quality_tier(task: VideoTask) -> str:
-    quality_tier = _clean_text(task.type_id)
-    if quality_tier:
-        return quality_tier
-    scene = _snapshot_scene(parse_json_or_none(task.settings_snapshot_json))
-    return _clean_text(scene.get("qualityTier")) or "standard"
-
-
-def _should_sync_provider_task(task: VideoTask) -> bool:
-    if not task.provider_task_id:
-        return False
-    if task.status not in {"done", "failed", "timeout"}:
-        return True
-    return task.status == "done" and int(task.duration or 0) < 1
 
 
 def _build_settings_snapshot(
@@ -339,597 +223,6 @@ def _build_settings_snapshot(
             "voiceSettings": voice_settings if audio_mode == "platform" else {},
         },
     }
-
-
-async def _get_enabled_avatar(db: AsyncSession, avatar_id: str) -> HeygenAvatar | None:
-    result = await db.execute(
-        select(HeygenAvatar).where(
-            HeygenAvatar.avatar_id == avatar_id,
-            HeygenAvatar.enabled == True,  # noqa: E712
-        )
-    )
-    return result.scalar_one_or_none()
-
-
-async def _get_enabled_user_avatar(
-    db: AsyncSession,
-    *,
-    avatar_id: str,
-    user_id: int,
-) -> UserAvatar | None:
-    result = await db.execute(
-        select(UserAvatar).where(
-            UserAvatar.user_id == user_id,
-            UserAvatar.heygen_avatar_id == avatar_id,
-            UserAvatar.enabled == True,  # noqa: E712
-            UserAvatar.status == "active",
-            UserAvatar.archived_at.is_(None),
-        )
-    )
-    return result.scalar_one_or_none()
-
-
-async def _get_photo_avatar_asset(
-    db: AsyncSession,
-    *,
-    asset_id: str,
-    user_id: int,
-) -> UserAvatar | None:
-    result = await db.execute(
-        select(UserAvatar).where(
-            UserAvatar.id == asset_id,
-            UserAvatar.user_id == user_id,
-            UserAvatar.enabled == True,  # noqa: E712
-            UserAvatar.status == "active",
-            UserAvatar.archived_at.is_(None),
-        )
-    )
-    return result.scalar_one_or_none()
-
-
-async def _resolve_avatar(
-    db: AsyncSession,
-    *,
-    avatar_id: str,
-    user_id: int,
-) -> ResolvedAvatar | None:
-    user_avatar = await _get_enabled_user_avatar(
-        db,
-        avatar_id=avatar_id,
-        user_id=user_id,
-    )
-    if user_avatar:
-        return ResolvedAvatar(
-            avatar_id=user_avatar.heygen_avatar_id,
-            name=user_avatar.name,
-            preview_image_url=user_avatar.preview_image_url or user_avatar.source_image_url or "",
-            preview_video_url=user_avatar.preview_video_url or "",
-            source="photo",
-            asset_id=user_avatar.id,
-            avatar_type=user_avatar.avatar_type,
-        )
-
-    avatar = await _get_enabled_avatar(db, avatar_id)
-    if not avatar:
-        return None
-    return ResolvedAvatar(
-        avatar_id=avatar.avatar_id,
-        name=avatar.name,
-        preview_image_url=avatar.preview_image_url or "",
-        preview_video_url=avatar.preview_video_url or "",
-        source="system",
-        asset_id=avatar.id,
-        avatar_type=avatar.avatar_type,
-    )
-
-
-async def _get_enabled_voice(db: AsyncSession, voice_id: str) -> HeygenVoice | None:
-    result = await db.execute(
-        select(HeygenVoice).where(
-            HeygenVoice.voice_id == voice_id,
-            HeygenVoice.enabled == True,  # noqa: E712
-        )
-    )
-    return result.scalar_one_or_none()
-
-
-async def _get_available_audio_asset(
-    db: AsyncSession,
-    *,
-    audio_asset_id: str,
-    user_id: int,
-) -> UserAudioAsset | None:
-    result = await db.execute(
-        select(UserAudioAsset).where(
-            UserAudioAsset.id == audio_asset_id,
-            UserAudioAsset.user_id == user_id,
-            UserAudioAsset.enabled == True,  # noqa: E712
-            UserAudioAsset.archived_at.is_(None),
-        )
-    )
-    return result.scalar_one_or_none()
-
-
-async def _get_user_avatar_task(
-    db: AsyncSession,
-    *,
-    task_id: str,
-    user_id: int,
-) -> UserAvatarTask | None:
-    result = await db.execute(
-        select(UserAvatarTask).where(
-            UserAvatarTask.id == task_id,
-            UserAvatarTask.user_id == user_id,
-            UserAvatarTask.archived_at.is_(None),
-        )
-    )
-    return result.scalar_one_or_none()
-
-
-async def _refund_user_avatar_task_if_needed(
-    db: AsyncSession,
-    task: UserAvatarTask,
-    *,
-    note: str,
-) -> int | None:
-    if task.credit_refunded or int(task.credit_cost or 0) <= 0:
-        return None
-    refunded_credits = await refund_user_credits(
-        db,
-        task.user_id,
-        int(task.credit_cost),
-        note=note,
-    )
-    task.credit_refunded = True
-    return refunded_credits
-
-
-async def _get_user_avatars_by_ids(
-    db: AsyncSession,
-    avatar_ids: list[str],
-) -> dict[str, UserAvatar]:
-    ids = [item for item in avatar_ids if item]
-    if not ids:
-        return {}
-    result = await db.execute(select(UserAvatar).where(UserAvatar.id.in_(ids)))
-    return {item.id: item for item in result.scalars().all()}
-
-
-def _extract_provider_avatar_identity(data: dict) -> tuple[str, str]:
-    look = data.get("avatar_item")
-    if not isinstance(look, dict):
-        look = data.get("avatar")
-    avatar_look_id = _clean_text(
-        str(
-            (look or {}).get("id")
-            or data.get("avatar_look_id")
-            or data.get("avatar_id")
-            or ""
-        )
-    )
-    avatar_group_id = _clean_text(
-        str(data.get("avatar_group_id") or data.get("group_id") or "")
-    )
-    return avatar_group_id, avatar_look_id
-
-
-def _extract_provider_avatar_urls(data: dict) -> tuple[str, str]:
-    preview_image_url = _clean_text(
-        str(
-            data.get("preview_image_url")
-            or data.get("image_url")
-            or data.get("thumbnail_url")
-            or ""
-        )
-    )
-    preview_video_url = _clean_text(
-        str(
-            data.get("preview_video_url")
-            or data.get("video_url")
-            or data.get("preview_url")
-            or ""
-        )
-    )
-    return preview_image_url, preview_video_url
-
-
-def _extract_provider_avatar_status(data: dict) -> str:
-    avatar_item = data.get("avatar_item")
-    avatar_group = data.get("avatar_group")
-    if isinstance(avatar_item, dict):
-        status = _clean_text(str(avatar_item.get("status") or ""))
-        if status:
-            return status
-    if isinstance(avatar_group, dict):
-        status = _clean_text(str(avatar_group.get("status") or ""))
-        if status:
-            return status
-    return _clean_text(str(data.get("status") or ""))
-
-
-def _extract_provider_avatar_error_message(data: dict) -> str | None:
-    avatar_item = data.get("avatar_item")
-    avatar_group = data.get("avatar_group")
-    candidates = []
-    if isinstance(avatar_item, dict):
-        error = avatar_item.get("error")
-        if isinstance(error, dict):
-            candidates.append(error.get("message"))
-    if isinstance(avatar_group, dict):
-        error = avatar_group.get("error")
-        if isinstance(error, dict):
-            candidates.append(error.get("message"))
-    candidates.extend(
-        [
-            data.get("error_message"),
-            data.get("failure_reason"),
-            data.get("message"),
-        ]
-    )
-    for item in candidates:
-        message = _clean_text(str(item or ""))
-        if message:
-            return message
-    return None
-
-
-async def _upsert_user_avatar_from_task(
-    db: AsyncSession,
-    *,
-    task: UserAvatarTask,
-    heygen_avatar_id: str,
-    preview_image_url: str,
-    preview_video_url: str,
-) -> UserAvatar:
-    asset = None
-    if task.result_avatar_id:
-        asset = await db.get(UserAvatar, task.result_avatar_id)
-    if not asset:
-        result = await db.execute(
-            select(UserAvatar).where(
-                UserAvatar.user_id == task.user_id,
-                UserAvatar.heygen_avatar_id == heygen_avatar_id,
-            )
-        )
-        asset = result.scalar_one_or_none()
-    if not asset:
-        asset = UserAvatar(
-            user_id=task.user_id,
-            avatar_type=task.avatar_type,
-            name=task.name,
-            heygen_avatar_id=heygen_avatar_id,
-            preview_image_url=preview_image_url or task.source_image_url,
-            preview_video_url=preview_video_url or None,
-            source_image_url=task.source_image_url,
-            source_object_key=task.source_object_key,
-            status="active",
-            enabled=True,
-        )
-        db.add(asset)
-    else:
-        asset.avatar_type = task.avatar_type
-        asset.name = task.name
-        asset.heygen_avatar_id = heygen_avatar_id
-        asset.preview_image_url = preview_image_url or task.source_image_url
-        asset.preview_video_url = preview_video_url or None
-        asset.source_image_url = task.source_image_url
-        asset.source_object_key = task.source_object_key
-        asset.status = "active"
-        asset.enabled = True
-        asset.archived_at = None
-        asset.updated_at = utc_now()
-    return asset
-
-
-async def _sync_user_avatar_task_from_provider(
-    db: AsyncSession,
-    task: UserAvatarTask,
-) -> UserAvatarTask:
-    if not task.provider_avatar_id:
-        task.status = "failed"
-        task.error_message = "HeyGen 未返回照片数字人 ID"
-        await _refund_user_avatar_task_if_needed(
-            db,
-            task,
-            note=f"照片数字人创建失败退回 · {task.id}",
-        )
-        await db.commit()
-        await db.refresh(task)
-        return task
-
-    async with httpx.AsyncClient(timeout=60) as client:
-        data = await get_avatar_look(client, avatar_look_id=task.provider_avatar_id)
-
-    provider_status = _extract_provider_avatar_status(data)
-    error_message = _extract_provider_avatar_error_message(data)
-    task.status = _provider_avatar_status(provider_status, failure_message=error_message)
-    task.error_message = error_message
-
-    if task.status == "done":
-        preview_image_url, preview_video_url = _extract_provider_avatar_urls(data)
-        heygen_avatar_id = _clean_text(str(data.get("id") or task.provider_avatar_id))
-        asset = await _upsert_user_avatar_from_task(
-            db,
-            task=task,
-            heygen_avatar_id=heygen_avatar_id,
-            preview_image_url=preview_image_url,
-            preview_video_url=preview_video_url,
-        )
-        await db.flush()
-        task.result_avatar_id = asset.id
-        task.error_message = None
-    elif task.status == "failed":
-        await _refund_user_avatar_task_if_needed(
-            db,
-            task,
-            note=f"照片数字人创建失败退回 · {task.id}",
-        )
-
-    await db.commit()
-    await db.refresh(task)
-    return task
-
-
-async def _get_or_create_job(
-    db: AsyncSession,
-    *,
-    current_user: User,
-    job_id: str | None,
-    title: str,
-    settings_snapshot: dict,
-    script: str,
-) -> GenerationJob | None:
-    if job_id:
-        result = await db.execute(
-            select(GenerationJob).where(
-                GenerationJob.id == job_id,
-                GenerationJob.user_id == current_user.id,
-                GenerationJob.scenario == "digital_human",
-            )
-        )
-        job = result.scalar_one_or_none()
-        if not job:
-            return None
-        job.title = title
-        job.settings_json = dump_json_or_none(settings_snapshot)
-        job.input_text = script
-        job.updated_at = utc_now()
-        return job
-
-    job = GenerationJob(
-        id=str(uuid.uuid4()),
-        user_id=current_user.id,
-        scenario="digital_human",
-        title=title,
-        status="draft",
-        settings_json=dump_json_or_none(settings_snapshot),
-        input_text=script,
-    )
-    db.add(job)
-    return job
-
-
-async def _sync_job_status(db: AsyncSession, job_id: str | None) -> None:
-    if not job_id:
-        return
-    job_result = await db.execute(select(GenerationJob).where(GenerationJob.id == job_id))
-    job = job_result.scalar_one_or_none()
-    if not job:
-        return
-
-    task_result = await db.execute(
-        select(VideoTask.status, VideoTask.result_url, VideoTask.error_message, VideoTask.created_at).where(
-            VideoTask.job_id == job_id,
-            VideoTask.archived == False,  # noqa: E712
-            VideoTask.scenario == "digital_human",
-        )
-    )
-    rows = task_result.all()
-    if not rows:
-        job.status = "draft"
-        job.updated_at = utc_now()
-        return
-
-    total = len(rows)
-    completed = 0
-    failed = 0
-    for status, result_url, error_message, created_at in rows:
-        runtime = project_task_runtime_state(
-            "video",
-            status=status,
-            error_message=error_message,
-            progress=0,
-            result_url=result_url,
-            created_at=created_at,
-        )
-        if runtime.status == "done":
-            completed += 1
-        elif runtime.status in {"failed", "timeout"}:
-            failed += 1
-
-    if completed == total:
-        job.status = "done"
-    elif failed == total:
-        job.status = "failed"
-    elif completed > 0 or failed > 0:
-        job.status = "generating"
-    else:
-        job.status = "generating"
-    job.updated_at = utc_now()
-
-
-def _digital_human_task_payload(task: VideoTask) -> dict:
-    settings_snapshot = parse_json_or_none(task.settings_snapshot_json) or {}
-    scene = _snapshot_scene(settings_snapshot)
-    runtime = project_task_runtime_state(
-        "video",
-        status=task.status,
-        error_message=task.error_message,
-        progress=task.progress,
-        result_url=task.result_url,
-        created_at=task.created_at,
-    )
-    return {
-        "task_id": task.id,
-        "job_id": task.job_id,
-        "scenario": task.scenario,
-        "status": runtime.status,
-        "progress": runtime.progress,
-        "result_url": runtime.result_url,
-        "title": task.title,
-        "provider": task.provider,
-        "provider_task_id": task.provider_task_id,
-        "avatar_id": scene.get("avatarId"),
-        "avatar_source": scene.get("avatarSource") or "system",
-        "avatar_asset_id": scene.get("avatarAssetId"),
-        "avatar_type": scene.get("avatarType"),
-        "audio_mode": scene.get("audioMode") or "platform",
-        "voice_id": scene.get("voiceId"),
-        "audio_asset_id": scene.get("audioAssetId"),
-        "audio_name": scene.get("audioName"),
-        "audio_url": scene.get("audioUrl"),
-        "audio_duration_seconds": scene.get("audioDurationSeconds"),
-        "background_url": scene.get("backgroundUrl"),
-        "script": scene.get("script"),
-        "quality_tier": scene.get("qualityTier"),
-        "voice_settings": scene.get("voiceSettings") or {},
-        "prompt": task.prompt,
-        "prompt_snapshot": parse_prompt_snapshot(task.prompt_snapshot_json),
-        "settings_snapshot": settings_snapshot,
-        "duration": task.duration,
-        "resolution": task.resolution,
-        "aspect_ratio": task.aspect_ratio,
-        "credit_cost": task.credit_cost,
-        "credit_refunded": bool(task.credit_refunded),
-        "error_message": runtime.error_message,
-        "created_at": to_utc_iso(task.created_at),
-    }
-
-
-async def _get_task(
-    db: AsyncSession,
-    *,
-    task_id: str,
-    user_id: int,
-) -> VideoTask | None:
-    result = await db.execute(
-        select(VideoTask).where(
-            VideoTask.id == task_id,
-            VideoTask.user_id == user_id,
-            VideoTask.scenario == "digital_human",
-        )
-    )
-    return result.scalar_one_or_none()
-
-
-async def _sync_task_from_provider(db: AsyncSession, task: VideoTask) -> VideoTask:
-    if not task.provider_task_id:
-        return task
-
-    async with httpx.AsyncClient(timeout=60) as client:
-        data = await get_video(client, video_id=task.provider_task_id)
-
-    provider_status = _clean_text(
-        str(data.get("status") or data.get("video_status") or "")
-    )
-    video_url = _clean_text(
-        str(data.get("video_url") or data.get("url") or data.get("result_url") or "")
-    ) or None
-    error_message = _clean_text(
-        str(
-            data.get("error_message")
-            or data.get("failure_reason")
-            or data.get("message")
-            or ""
-        )
-    ) or None
-    local_status = _task_status_from_provider(
-        provider_status,
-        video_url=video_url,
-        failure_message=error_message,
-    )
-
-    duration_value = data.get("duration") or data.get("video_duration") or 0
-    try:
-        duration = max(0, int(float(duration_value or 0)))
-    except (TypeError, ValueError):
-        duration = task.duration
-
-    task.status = local_status
-    task.progress = _task_progress_from_status(local_status)
-    task.result_url = video_url
-    task.error_message = error_message
-    task.duration = duration
-    if local_status == "failed":
-        await _refund_task_credits_if_needed(
-            db,
-            task,
-            note=f"数字人任务失败退回 · {task.id}",
-        )
-    elif local_status == "done":
-        await _settle_task_credits_if_needed(db, task)
-
-    await _sync_job_status(db, task.job_id)
-    await db.commit()
-    await db.refresh(task)
-    return task
-
-
-async def _refund_task_credits_if_needed(
-    db: AsyncSession,
-    task: VideoTask,
-    *,
-    note: str,
-) -> int | None:
-    if task.credit_refunded or int(task.credit_cost or 0) <= 0:
-        return None
-    refunded_credits = await refund_user_credits(db, task.user_id, int(task.credit_cost), note=note)
-    task.credit_refunded = True
-    return refunded_credits
-
-
-async def _settle_task_credits_if_needed(db: AsyncSession, task: VideoTask) -> bool:
-    if task.scenario != "digital_human" or task.status != "done" or task.credit_refunded:
-        return False
-
-    duration = int(task.duration or 0)
-    if duration < 1:
-        return False
-
-    try:
-        costs = await get_effective_digital_human_credit_costs(db)
-    except ValueError:
-        return False
-
-    quality_tier = _task_quality_tier(task)
-    per_second_cost = costs.get(quality_tier)
-    if per_second_cost is None:
-        return False
-
-    final_cost = int(per_second_cost) * duration
-    current_cost = int(task.credit_cost or 0)
-    delta = final_cost - current_cost
-    if delta == 0:
-        return False
-
-    if delta < 0:
-        await refund_user_credits(
-            db,
-            task.user_id,
-            abs(delta),
-            note=f"数字人结算退回 · {task.id}",
-        )
-        task.credit_cost = final_cost
-        return True
-
-    await deduct_user_credits_allow_negative(
-        db,
-        task.user_id,
-        delta,
-        note=f"数字人结算补扣 · {task.id}",
-    )
-    task.credit_cost = final_cost
-    return True
 
 
 @router.get("/avatars", response_model=Response)
@@ -1151,7 +444,6 @@ async def upload_photo_avatar(
             content_type=detected_content_type,
             source="photo-avatars",
         )
-        credit_cost = await get_effective_photo_avatar_create_cost(db)
     except (ValueError, OssConfigError) as exc:
         await db.rollback()
         return fail(str(exc))
@@ -1161,15 +453,6 @@ async def upload_photo_avatar(
     finally:
         await file.close()
 
-    remaining_credits, fail_response = await deduct_credits_or_fail(
-        db,
-        current_user.id,
-        credit_cost,
-        note=f"照片数字人创建 · {avatar_name}",
-    )
-    if fail_response is not None:
-        return fail_response
-
     task = UserAvatarTask(
         user_id=current_user.id,
         avatar_type=PHOTO_AVATAR_TYPE,
@@ -1178,7 +461,7 @@ async def upload_photo_avatar(
         source_object_key=uploaded.object_key,
         provider="heygen",
         status="pending",
-        credit_cost=credit_cost,
+        credit_cost=0,
         credit_refunded=False,
     )
     db.add(task)
@@ -1438,14 +721,12 @@ async def get_digital_human_config(
     try:
         credit_costs = await get_effective_digital_human_credit_costs(db)
         precharge_costs = await get_effective_digital_human_precharge_costs(db)
-        photo_avatar_create_cost = await get_effective_photo_avatar_create_cost(db)
     except ValueError as exc:
         return fail(str(exc))
     return success(
         {
             "credit_costs": credit_costs,
             "precharge_costs": precharge_costs,
-            "photo_avatar_create_cost": photo_avatar_create_cost,
         }
     )
 
@@ -1525,7 +806,7 @@ async def create_digital_human_task(
 
     job = await _get_or_create_job(
         db,
-        current_user=current_user,
+        user_id=current_user.id,
         job_id=req.job_id,
         title=title,
         settings_snapshot=settings_snapshot,
