@@ -1,5 +1,5 @@
 <script setup>
-import { Download, LoaderCircle, Trash2 } from 'lucide-vue-next'
+import { Download, FileAudio, LoaderCircle, Trash2 } from 'lucide-vue-next'
 import AppCheckbox from '@/components/ui/AppCheckbox.vue'
 
 defineProps({
@@ -34,6 +34,12 @@ function formatDate(isoStr) {
   const pad = (n) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
+
+function mediaLabel(mediaType) {
+  if (mediaType === 'video') return '视频'
+  if (mediaType === 'audio') return '音频'
+  return '图片'
+}
 </script>
 
 <template>
@@ -60,7 +66,7 @@ function formatDate(isoStr) {
         <button
           type="button"
           class="rounded-lg border border-slate-200 bg-white/95 p-1.5 text-slate-600 shadow transition-colors hover:bg-white hover:text-rose-500"
-          :title="card.mediaType === 'video' ? '删除视频' : '删除图片'"
+          :title="`删除${mediaLabel(card.mediaType)}`"
           @click="emit('delete-card', card)"
         >
           <Trash2 class="h-3.5 w-3.5" />
@@ -68,7 +74,22 @@ function formatDate(isoStr) {
       </div>
 
       <!-- 媒体区域 -->
+      <div
+        v-if="card.mediaType === 'audio'"
+        class="relative flex aspect-square items-center justify-center overflow-hidden bg-slate-100 p-4"
+      >
+        <div class="flex w-full flex-col items-center gap-4" @click.stop @keydown.stop>
+          <span class="flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-primary shadow-sm">
+            <FileAudio class="h-7 w-7" />
+          </span>
+          <audio :src="card.resultUrl || card.dataUrl" controls preload="none" class="h-10 w-full"></audio>
+        </div>
+        <span class="absolute bottom-2 left-2 rounded-full bg-slate-900/70 px-2 py-0.5 text-[11px] font-bold text-white">
+          音频
+        </span>
+      </div>
       <button
+        v-else
         type="button"
         class="relative flex aspect-square cursor-pointer items-center justify-center overflow-hidden bg-slate-100 p-3"
         @click="emit('zoom-card', card)"
@@ -89,8 +110,8 @@ function formatDate(isoStr) {
           class="max-h-full max-w-full object-contain drop-shadow-md transition-transform duration-300 group-hover:scale-[1.03]"
           alt="资产图片"
         />
-        <span v-if="card.mediaType === 'video'" class="absolute bottom-2 left-2 rounded-full bg-black/60 px-2 py-0.5 text-[11px] font-bold text-white">
-          视频
+        <span class="absolute bottom-2 left-2 rounded-full bg-black/60 px-2 py-0.5 text-[11px] font-bold text-white">
+          {{ mediaLabel(card.mediaType) }}
         </span>
       </button>
 

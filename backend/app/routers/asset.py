@@ -4,6 +4,7 @@ from sqlalchemy import delete, func, select, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_user, get_db
+from app.core.media_download import remote_media_download_response
 from app.core.media_projection import (
     audio_asset_select,
     image_asset_select,
@@ -75,6 +76,10 @@ async def list_assets(
             "scenario": row["scenario"] or "",
             "job_title": row["job_title"] or "",
             "created_at": to_utc_iso(row["created_at"]),
+            "source": row["source"],
+            "duration_seconds": row["duration_seconds"],
+            "size": row["size"],
+            "content_type": row["content_type"],
         }
         if row["media_type"] == "image":
             item.update(image_url_variants(row["result_url"]))
@@ -86,6 +91,71 @@ async def list_assets(
         "page": page,
         "page_size": page_size,
     })
+
+
+@router.get("/{media_type}/{asset_id}/download")
+async def download_asset(
+    media_type: str,
+    asset_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if media_type == "image":
+        result = await db.execute(
+            select(ImageTask).where(
+                ImageTask.id == asset_id,
+                ImageTask.user_id == current_user.id,
+                ImageTask.status == "done",
+                ImageTask.archived.is_(False),
+            )
+        )
+        asset = result.scalar_one_or_none()
+        url = asset.result_url if asset else ""
+        fallback_extension = "png"
+    elif media_type == "video":
+        result = await db.execute(
+            select(VideoTask).where(
+                VideoTask.id == asset_id,
+                VideoTask.user_id == current_user.id,
+                VideoTask.status == "done",
+                VideoTask.archived.is_(False),
+            )
+        )
+        asset = result.scalar_one_or_none()
+        url = asset.result_url if asset else ""
+        fallback_extension = "mp4"
+    elif media_type == "audio":
+        result = await db.execute(
+            select(UserAudioAsset).where(
+                UserAudioAsset.id == asset_id,
+                UserAudioAsset.user_id == current_user.id,
+                UserAudioAsset.enabled.is_(True),
+                UserAudioAsset.archived_at.is_(None),
+            )
+        )
+        asset = result.scalar_one_or_none()
+        url = asset.audio_url if asset else ""
+        fallback_extension = {
+            "audio/aac": "aac",
+            "audio/flac": "flac",
+            "audio/mp4": "m4a",
+            "audio/mpeg": "mp3",
+            "audio/ogg": "ogg",
+            "audio/wav": "wav",
+            "audio/webm": "webm",
+            "audio/x-wav": "wav",
+        }.get(asset.content_type if asset else "", "mp3")
+    else:
+        return fail("不支持的资产类型")
+
+    if not url:
+        return fail("资产不存在或不可下载")
+    return remote_media_download_response(
+        url,
+        filename_stem=asset_id,
+        fallback_extension=fallback_extension,
+        media_type_override=asset.content_type if media_type == "audio" else None,
+    )
 
 
 class BatchDeleteRequest(BaseModel):

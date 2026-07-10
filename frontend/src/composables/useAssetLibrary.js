@@ -1,40 +1,20 @@
-import { computed, ref } from "vue";
+import { ref } from "vue";
 import { useToast } from "@/composables/useToast.js";
 import { useCardActions } from "@/composables/useCardActions.js";
-import { listAssets, deleteAssets } from "@/api/assets.js";
-import { getImageDownloadUrl } from "@/api/image.js";
-import { getVideoDownloadUrl } from "@/api/video.js";
-
-const SCENARIO_OPTIONS = [
-  { value: "", label: "全部" },
-  { value: "product_suite", label: "商品套图" },
-  { value: "product_image", label: "商品详情图" },
-  { value: "outfit", label: "服饰穿搭" },
-  { value: "free_image", label: "自由生图" },
-  { value: "product_video", label: "商品视频" },
-  { value: "free_video", label: "自由生视频" },
-];
+import { deleteAssets, getAssetDownloadUrl } from "@/api/assets.js";
+import { assetMediaTypeOptions, useAssetQuery } from "@/composables/useAssetQuery.js";
 
 export function useAssetLibrary() {
   const toast = useToast();
-  const assets = ref([]);
-  const loading = ref(false);
-  const total = ref(0);
-  const page = ref(1);
-  const pageSize = ref(20);
-  const scenario = ref("");
   const currentTaskTitle = ref("资产库");
-
-  const totalPages = computed(() => Math.ceil(total.value / pageSize.value) || 1);
+  const query = useAssetQuery({ onError: (message) => toast.error(message || "加载资产列表失败") });
+  const { assets, loading, total, page, pageSize, mediaType, scenario, totalPages, scenarioFilters } = query;
 
   const actions = useCardActions({
     outputCards: assets,
     currentTaskTitle,
     getCardName: (card) => card.title || card.typeId || "asset",
-    getDownloadUrl: (card) =>
-      card.mediaType === "video"
-        ? getVideoDownloadUrl(card.taskId)
-        : getImageDownloadUrl(card.taskId),
+    getDownloadUrl: (card) => getAssetDownloadUrl(card.mediaType, card.taskId),
     mediaLabel: "资产",
     mediaUnit: "个",
     archiveName: "资产库",
@@ -51,65 +31,6 @@ export function useAssetLibrary() {
     batchDownload,
     downloadSingleMedia: downloadAsset,
   } = actions;
-
-  async function loadAssets() {
-    loading.value = true;
-    try {
-      const result = await listAssets({
-        scenario: scenario.value,
-        page: page.value,
-        page_size: pageSize.value,
-      });
-      if (result.code !== 0) {
-        toast.error(result.message || "加载资产列表失败");
-        assets.value = [];
-        total.value = 0;
-        return;
-      }
-      const data = result.data || {};
-      total.value = data.total || 0;
-      // 映射为资产卡片统一字段，图片和视频共用同一套选择/预览逻辑。
-      assets.value = (data.items || []).map((item) => ({
-        id: item.task_id,
-        taskId: item.task_id,
-        dataUrl: item.thumb_url || item.result_url || "",
-        resultUrl: item.result_url || "",
-        thumbUrl: item.thumb_url || item.result_url || "",
-        previewUrl: item.preview_url || item.result_url || "",
-        title: item.title || "",
-        typeId: item.type_id || "",
-        scenario: item.scenario || "",
-        mediaType: item.media_type || "image",
-        jobTitle: item.job_title || "",
-        createdAt: item.created_at || "",
-        selected: false,
-        status: "done",
-      }));
-    } catch (error) {
-      const status = error.response?.status;
-      if (status === 401) {
-        toast.error("登录已过期，请重新登录");
-      } else {
-        toast.error(error.response?.data?.message || "加载资产列表失败");
-      }
-      assets.value = [];
-      total.value = 0;
-    } finally {
-      loading.value = false;
-    }
-  }
-
-  function changeScenario(value) {
-    scenario.value = value;
-    page.value = 1;
-    loadAssets();
-  }
-
-  function changePage(p) {
-    if (p < 1 || p > totalPages.value) return;
-    page.value = p;
-    loadAssets();
-  }
 
   async function deleteSelected() {
     const ids = selectedCards.value.map((card) => card.taskId);
@@ -130,7 +51,7 @@ export function useAssetLibrary() {
       if (assets.value.length === deletedCount && page.value > 1) {
         page.value -= 1;
       }
-      await loadAssets();
+      await query.loadAssets();
       return true;
     } catch (error) {
       const status = error.response?.status;
@@ -150,8 +71,10 @@ export function useAssetLibrary() {
     total,
     page,
     pageSize,
+    mediaType,
     scenario,
     totalPages,
+    scenarioFilters,
     // 选择/下载
     zoomCard,
     downloading,
@@ -162,11 +85,12 @@ export function useAssetLibrary() {
     batchDownload,
     downloadAsset,
     // 操作
-    loadAssets,
-    changeScenario,
-    changePage,
+    loadAssets: query.loadAssets,
+    changeMediaType: query.changeMediaType,
+    changeScenario: query.changeScenario,
+    changePage: query.changePage,
     deleteSelected,
     // 常量
-    SCENARIO_OPTIONS,
+    mediaTypeOptions: assetMediaTypeOptions,
   };
 }

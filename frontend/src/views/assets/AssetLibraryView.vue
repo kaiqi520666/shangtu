@@ -1,15 +1,12 @@
 <script setup>
 import { onMounted } from 'vue'
 import {
-  Boxes,
   Download,
-  FileVideo,
+  FileAudio,
   ImageOff,
   Images,
   LayoutGrid,
   LoaderCircle,
-  Shirt,
-  Sparkles,
   Trash2,
   Video,
 } from 'lucide-vue-next'
@@ -20,6 +17,7 @@ import AssetCardGrid from '@/components/assets/AssetCardGrid.vue'
 import GeneratorLayout from '@/components/layout/GeneratorLayout.vue'
 import { useAssetLibrary } from '@/composables/useAssetLibrary.js'
 import { useConfirm } from '@/composables/useConfirm.js'
+import { scenarioIcons as generationScenarioIcons, scenarioLabelMap } from '@/constants/scenarios.js'
 
 const confirm = useConfirm()
 
@@ -29,8 +27,10 @@ const {
   total,
   page,
   pageSize,
+  mediaType,
   scenario,
   totalPages,
+  scenarioFilters,
   zoomCard,
   selectedCards,
   selectedCardsCount,
@@ -39,32 +39,32 @@ const {
   batchDownload,
   downloadAsset,
   loadAssets,
+  changeMediaType,
   changeScenario,
   changePage,
   deleteSelected,
-  SCENARIO_OPTIONS,
+  mediaTypeOptions,
 } = useAssetLibrary()
 
-const SCENARIO_LABEL_MAP = {
-  product_suite: '商品套图',
-  product_image: '商品详情图',
-  outfit: '服饰穿搭',
-  free_image: '自由生图',
-  product_video: '商品视频',
-  free_video: '自由生视频',
-}
 const scenarioIcons = {
   "": LayoutGrid,
-  product_suite: Boxes,
-  product_image: Images,
-  outfit: Shirt,
-  free_image: Sparkles,
-  product_video: Video,
-  free_video: FileVideo,
+  ...generationScenarioIcons,
+}
+const mediaTypeIcons = {
+  "": LayoutGrid,
+  image: Images,
+  video: Video,
+  audio: FileAudio,
 }
 
 function getScenarioLabel(card) {
-  return SCENARIO_LABEL_MAP[card.scenario] || ''
+  return scenarioLabelMap[card.scenario] || ''
+}
+
+function getMediaLabel(card) {
+  if (card.mediaType === 'video') return '视频'
+  if (card.mediaType === 'audio') return '音频'
+  return '图片'
 }
 
 function isAllSelected() {
@@ -90,8 +90,8 @@ async function handleBatchDelete() {
 
 async function handleDeleteSingle(card) {
   const ok = await confirm.open({
-    title: card.mediaType === 'video' ? '删除视频' : '删除图片',
-    message: `确定永久删除这个${card.mediaType === 'video' ? '视频' : '图片'}资产吗？此操作不可撤销。`,
+    title: `删除${getMediaLabel(card)}`,
+    message: `确定永久删除这个${getMediaLabel(card)}资产吗？此操作不可撤销。`,
     confirmText: '删除',
     cancelText: '取消',
     tone: 'danger',
@@ -160,9 +160,16 @@ onMounted(() => {
             </button>
           </div>
         </div>
-        <div class="flex min-w-0 items-center">
+        <div class="flex min-w-0 flex-col items-start gap-2">
           <AppTabNav
-            :tabs="SCENARIO_OPTIONS"
+            :tabs="mediaTypeOptions"
+            :active-key="mediaType"
+            :icons="mediaTypeIcons"
+            @change="changeMediaType"
+          />
+          <AppTabNav
+            v-if="scenarioFilters.length"
+            :tabs="scenarioFilters"
             :active-key="scenario"
             :icons="scenarioIcons"
             @change="changeScenario"
@@ -182,7 +189,7 @@ onMounted(() => {
         <div v-else-if="!loading && assets.length === 0" class="flex flex-col items-center justify-center py-20">
           <ImageOff class="h-12 w-12 text-slate-300" />
           <p class="mt-3 text-sm text-slate-500">暂无资产</p>
-          <p class="mt-1 text-xs text-slate-400">完成图片或视频生成后，资源将自动出现在这里</p>
+          <p class="mt-1 text-xs text-slate-400">完成生成或上传后，图片、视频和音频将自动出现在这里</p>
         </div>
 
         <!-- 卡片网格 -->
@@ -231,6 +238,10 @@ onMounted(() => {
           autoplay
           playsinline
         ></video>
+        <div v-else-if="zoomCard.mediaType === 'audio'" class="flex min-w-[320px] flex-col items-center gap-4 p-6">
+          <FileAudio class="h-12 w-12 text-primary" />
+          <audio :src="zoomCard.resultUrl || zoomCard.dataUrl" controls autoplay preload="metadata" class="w-full"></audio>
+        </div>
         <img
           v-else
           :src="zoomCard.previewUrl || zoomCard.resultUrl || zoomCard.dataUrl"

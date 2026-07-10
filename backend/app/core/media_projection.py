@@ -87,6 +87,10 @@ def image_asset_select(user_id: int, scenario: str | None):
             func.coalesce(GenerationJob.scenario, literal("")).label("scenario"),
             func.coalesce(GenerationJob.title, literal("")).label("job_title"),
             ImageTask.created_at.label("created_at"),
+            literal("generated").label("source"),
+            cast(literal(None), Integer).label("duration_seconds"),
+            ImageTask.size.label("size"),
+            cast(literal(None), String).label("content_type"),
         )
         .outerjoin(GenerationJob, GenerationJob.id == ImageTask.job_id)
         .where(
@@ -113,6 +117,10 @@ def video_asset_select(user_id: int, scenario: str | None):
             VideoTask.scenario.label("scenario"),
             func.coalesce(GenerationJob.title, literal("")).label("job_title"),
             VideoTask.created_at.label("created_at"),
+            literal("generated").label("source"),
+            VideoTask.duration.label("duration_seconds"),
+            cast(literal(None), Integer).label("size"),
+            cast(literal(None), String).label("content_type"),
         )
         .outerjoin(GenerationJob, GenerationJob.id == VideoTask.job_id)
         .where(
@@ -139,6 +147,10 @@ def audio_asset_select(user_id: int, scenario: str | None):
             literal("").label("scenario"),
             literal("").label("job_title"),
             UserAudioAsset.created_at.label("created_at"),
+            UserAudioAsset.source.label("source"),
+            UserAudioAsset.duration_seconds.label("duration_seconds"),
+            UserAudioAsset.size.label("size"),
+            UserAudioAsset.content_type.label("content_type"),
         )
         .where(
             UserAudioAsset.user_id == user_id,
@@ -260,4 +272,4 @@ def includes_video(media_type: str | None) -> bool:
 
 
 def includes_audio(media_type: str | None) -> bool:
-    return media_type == "audio"
+    return media_type in (None, "", "audio")

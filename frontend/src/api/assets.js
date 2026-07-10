@@ -13,3 +13,7 @@ export function deleteAssets(taskIds, mediaType = "") {
     timeout: 15000,
   });
 }
+
+export function getAssetDownloadUrl(mediaType, assetId) {
+  return `${request.defaults.baseURL}/asset/${mediaType}/${assetId}/download`;
+}

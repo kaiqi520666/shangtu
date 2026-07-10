@@ -54,4 +54,20 @@ describe("useCardActions", () => {
     expect(zip.constructor).toHaveBeenCalledOnce();
     expect(zip.file).toHaveBeenCalledTimes(2);
   });
+
+  it("uses the audio response type as the downloaded file extension", async () => {
+    const cards = ref([{ id: "1", selected: true, status: "done", dataUrl: "audio", downloading: false }]);
+    const actions = useCardActions({
+      outputCards: cards,
+      currentTaskTitle: ref("配音"),
+      getCardName: () => "口播",
+      getDownloadUrl: () => "/asset/audio/1/download",
+      toast: { error: vi.fn(), info: vi.fn(), success: vi.fn() },
+    });
+    fetch.mockResolvedValueOnce({ ok: true, blob: async () => new Blob(["audio"], { type: "audio/mpeg" }) });
+
+    await actions.downloadSingleMedia(cards.value[0]);
+
+    expect(HTMLAnchorElement.prototype.click).toHaveBeenCalled();
+  });
 });

@@ -1,9 +1,8 @@
 <script setup>
 import { computed, ref, watch } from "vue";
 import { Check, ChevronLeft, ChevronRight, FileAudio, ImageOff, LoaderCircle } from "lucide-vue-next";
-import { listAssets } from "@/api/assets.js";
 import AppModal from "@/components/ui/AppModal.vue";
-import { generationScenarios, scenarioOptions } from "@/constants/scenarios.js";
+import { useAssetQuery } from "@/composables/useAssetQuery.js";
 
 const props = defineProps({
   open: {
@@ -13,6 +12,7 @@ const props = defineProps({
   mediaType: {
     type: String,
     default: "image",
+    validator: (value) => ["image", "video", "audio"].includes(value),
   },
   maxCount: {
     type: Number,
@@ -30,89 +30,33 @@ const props = defineProps({
 
 const emit = defineEmits(["close", "confirm", "notify"]);
 
-const assets = ref([]);
-const loading = ref(false);
-const page = ref(1);
-const pageSize = ref(18);
-const total = ref(0);
 const selectedMap = ref({});
-const scenario = ref("");
-
-const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)));
+const query = useAssetQuery({
+  initialMediaType: props.mediaType,
+  pageSize: 18,
+  onError: (message) => emit("notify", message),
+});
+const { assets, loading, page, mediaType, scenario, totalPages, scenarioFilters } = query;
 const selectedAssets = computed(() => Object.values(selectedMap.value));
 const selectedCount = computed(() => selectedAssets.value.length);
 const mediaLabel = computed(() => {
-  if (props.mediaType === "video") return "视频";
-  if (props.mediaType === "audio") return "音频";
+  if (mediaType.value === "video") return "视频";
+  if (mediaType.value === "audio") return "音频";
   return "图片";
-});
-const scenarioFilters = computed(() => {
-  if (props.mediaType === "audio") return scenarioOptions.slice(0, 1);
-  return scenarioOptions.filter(
-    (option) => !option.value || generationScenarios.find((item) => item.value === option.value)?.mediaType === props.mediaType,
-  );
 });
 
 watch(
-  () => props.open,
-  (open) => {
+  [() => props.open, () => props.mediaType],
+  ([open, nextMediaType]) => {
     if (!open) return;
+    mediaType.value = nextMediaType;
+    scenario.value = "";
     page.value = 1;
     selectedMap.value = {};
-    loadAssets();
+    query.loadAssets();
   },
+  { immediate: true },
 );
-
-async function loadAssets() {
-  loading.value = true;
-  try {
-    const result = await listAssets({
-      scenario: scenario.value,
-      media_type: props.mediaType,
-      page: page.value,
-      page_size: pageSize.value,
-    });
-    if (result.code !== 0) {
-      emit("notify", result.message || "资产加载失败");
-      assets.value = [];
-      total.value = 0;
-      return;
-    }
-    const data = result.data || {};
-    total.value = data.total || 0;
-    assets.value = (data.items || []).map((item) => ({
-      id: item.task_id,
-      taskId: item.task_id,
-      url: item.result_url || "",
-      resultUrl: item.result_url || "",
-      thumbUrl: item.thumb_url || item.result_url || "",
-      previewUrl: item.preview_url || item.result_url || "",
-      title: item.title || item.job_title || mediaLabel.value,
-      typeId: item.type_id || "",
-      scenario: item.scenario || "",
-      mediaType: item.media_type || props.mediaType,
-      createdAt: item.created_at || "",
-    }));
-  } catch (error) {
-    emit("notify", error.response?.data?.message || "资产加载失败");
-    assets.value = [];
-    total.value = 0;
-  } finally {
-    loading.value = false;
-  }
-}
-
-function changeScenario(value) {
-  scenario.value = value;
-  page.value = 1;
-  loadAssets();
-}
-
-function changePage(nextPage) {
-  if (nextPage < 1 || nextPage > totalPages.value) return;
-  page.value = nextPage;
-  loadAssets();
-}
 
 function isExcluded(asset) {
   return props.excludeUrls.includes(asset.url);
@@ -157,7 +101,7 @@ function confirmSelection() {
   >
     <div class="flex min-h-[620px] flex-col overflow-hidden">
       <div class="flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 px-5 py-3">
-        <div class="flex flex-wrap gap-2">
+        <div v-if="scenarioFilters.length" class="flex flex-wrap gap-2">
           <button
             v-for="option in scenarioFilters"
             :key="option.value"
@@ -168,7 +112,7 @@ function confirmSelection() {
                 ? 'border-primary bg-primary/10 text-primary'
                 : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50'
             "
-            @click="changeScenario(option.value)"
+            @click="query.changeScenario(option.value)"
           >
             {{ option.label }}
           </button>
@@ -188,10 +132,9 @@ function confirmSelection() {
           <p class="mt-3 text-sm font-semibold">暂无可选{{ mediaLabel }}资产</p>
         </div>
         <div v-else class="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
-          <button
+          <article
             v-for="asset in assets"
             :key="asset.id"
-            type="button"
             class="group relative overflow-hidden rounded-xl border bg-white text-left shadow-sm transition-all"
             :class="
               isSelected(asset)
@@ -211,7 +154,12 @@ function confirmSelection() {
                 playsinline
                 preload="metadata"
               ></video>
-              <div v-else-if="asset.mediaType === 'audio'" class="flex w-full flex-col items-center gap-3 px-2">
+              <div
+                v-else-if="asset.mediaType === 'audio'"
+                class="flex w-full flex-col items-center gap-3 px-2"
+                @click.stop
+                @keydown.stop
+              >
                 <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-primary shadow-sm">
                   <FileAudio class="h-6 w-6" />
                 </div>
@@ -223,12 +171,16 @@ function confirmSelection() {
                 class="max-h-full max-w-full rounded-lg object-contain"
                 alt="资产图片"
               />
-              <span
+              <button
+                type="button"
                 class="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full border bg-white shadow-sm"
                 :class="isSelected(asset) ? 'border-primary text-primary' : 'border-slate-200 text-slate-300'"
+                :disabled="isExcluded(asset)"
+                :aria-label="isSelected(asset) ? `取消选择${asset.title}` : `选择${asset.title}`"
+                @click.stop="toggleAsset(asset)"
               >
                 <Check class="h-3.5 w-3.5" />
-              </span>
+              </button>
               <span
                 v-if="isExcluded(asset)"
                 class="absolute inset-x-3 bottom-3 rounded-lg bg-slate-900/70 px-2 py-1 text-center text-xs font-bold text-white"
@@ -240,7 +192,7 @@ function confirmSelection() {
               <p class="truncate text-xs font-bold text-slate-700">{{ asset.title }}</p>
               <p class="truncate text-xs text-slate-400">{{ asset.createdAt }}</p>
             </div>
-          </button>
+          </article>
         </div>
       </div>
 
@@ -250,7 +202,7 @@ function confirmSelection() {
             type="button"
             class="rounded-lg border border-slate-200 p-2 text-slate-500 disabled:cursor-not-allowed disabled:opacity-40"
             :disabled="page <= 1"
-            @click="changePage(page - 1)"
+            @click="query.changePage(page - 1)"
           >
             <ChevronLeft class="h-4 w-4" />
           </button>
@@ -259,7 +211,7 @@ function confirmSelection() {
             type="button"
             class="rounded-lg border border-slate-200 p-2 text-slate-500 disabled:cursor-not-allowed disabled:opacity-40"
             :disabled="page >= totalPages"
-            @click="changePage(page + 1)"
+            @click="query.changePage(page + 1)"
           >
             <ChevronRight class="h-4 w-4" />
           </button>

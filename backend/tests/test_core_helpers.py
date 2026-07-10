@@ -13,6 +13,17 @@ def test_remote_media_download_uses_url_extension_without_query_string():
     assert response.headers["content-disposition"] == 'attachment; filename="task-1.webm"'
 
 
+def test_remote_media_download_allows_audio_media_type_override():
+    response = remote_media_download_response(
+        "https://cdn.example.com/audio/result.webm",
+        filename_stem="audio-1",
+        fallback_extension="webm",
+        media_type_override="audio/webm",
+    )
+
+    assert response.media_type == "audio/webm"
+
+
 def test_pagination_params_exposes_offset():
     pagination = PaginationParams(page=3, page_size=20)
 

@@ -3,6 +3,13 @@ import { getImageDownloadUrl } from "@/api/image.js";
 import { useAuthStore } from "@/stores/auth.js";
 
 function defaultBlobExtension(blob) {
+  if (blob.type === "audio/aac") return "aac";
+  if (blob.type === "audio/flac") return "flac";
+  if (blob.type === "audio/mp4") return "m4a";
+  if (blob.type === "audio/mpeg") return "mp3";
+  if (blob.type === "audio/ogg") return "ogg";
+  if (blob.type === "audio/wav" || blob.type === "audio/x-wav") return "wav";
+  if (blob.type === "audio/webm") return "webm";
   if (blob.type === "image/jpeg") return "jpg";
   if (blob.type === "image/webp") return "webp";
   if (blob.type === "video/webm") return "webm";
