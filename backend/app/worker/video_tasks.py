@@ -14,7 +14,7 @@ from app.worker.task_failures import (
     mark_video_timeout,
 )
 from app.worker.generation_runner import GenerationRunnerConfig, run_generation_task
-from app.worker.task_state_sync import fetch_video_task_user_id, update_video_task_in_db
+from app.worker.task_state_sync import fetch_video_task_context, update_video_task_in_db
 
 logger = logging.getLogger("app.worker.video_tasks")
 
@@ -61,7 +61,7 @@ async def generate_video(
         poll_interval_seconds=VIDEO_POLL_INTERVAL_SECONDS,
         set_progress=_set_video_progress,
         update_task=update_video_task_in_db,
-        fetch_user_id=fetch_video_task_user_id,
+        fetch_task_context=fetch_video_task_context,
         mark_failed=mark_video_failed,
         mark_timeout=mark_video_timeout,
         build_payload=lambda: build_video_create_payload(

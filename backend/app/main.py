@@ -10,12 +10,14 @@ from fastapi.requests import Request
 from fastapi.responses import JSONResponse
 
 from app.core.database import Base, SessionLocal, engine
+from app.core.logging_config import configure_logging
 from app.core.system_settings import seed_default_billing_settings
 from app.routers import account, admin, asset, auth, billing, digital_human, generation, image_generation, outfit, video, video_translation
 from app.schemas.response import fail
 import app.models
 
 load_dotenv()
+configure_logging()
 
 logger = logging.getLogger("app.api")
 

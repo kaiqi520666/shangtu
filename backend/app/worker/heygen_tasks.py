@@ -1,4 +1,6 @@
 import asyncio
+from datetime import timezone
+import logging
 import time
 from typing import Any
 
@@ -7,6 +9,7 @@ from sqlalchemy import select
 
 from app.core.database import SessionLocal
 from app.core.json_utils import parse_json_or_none
+from app.core.logging_config import task_log_extra
 from app.core.providers.heygen_provider import (
     create_avatar_video,
     create_video_translation,
@@ -14,6 +17,7 @@ from app.core.providers.heygen_provider import (
     get_video_translation,
 )
 from app.core.task_state import set_task_progress, set_task_status
+from app.core.time import utc_now
 from app.models import VideoTask
 from app.services.digital_human import settle_task_credits_if_needed
 from app.services.heygen_task_lifecycle import (
@@ -24,6 +28,7 @@ from app.services.heygen_task_lifecycle import (
 )
 from app.worker.task_failures import mark_video_failed, mark_video_timeout
 
+logger = logging.getLogger("app.worker.heygen_tasks")
 POLL_INTERVAL_SECONDS = 5
 MAX_WAIT_SECONDS = 1800
 MAX_TRANSIENT_ERRORS = 3
@@ -49,6 +54,24 @@ def _first_string(data: Any, keys: set[str]) -> str:
             if nested:
                 return nested
     return ""
+
+
+def _task_extra(task: VideoTask, **values) -> dict:
+    queue_duration_ms = None
+    if getattr(task, "created_at", None):
+        created_at = task.created_at
+        if created_at.tzinfo is None:
+            created_at = created_at.replace(tzinfo=timezone.utc)
+        queue_duration_ms = (utc_now() - created_at).total_seconds() * 1000
+    return task_log_extra(
+        task_id=task.id,
+        job_id=task.job_id,
+        provider_task_id=values.pop("provider_task_id", task.provider_task_id),
+        scenario=task.scenario,
+        media_type="video",
+        queue_duration_ms=values.pop("queue_duration_ms", queue_duration_ms),
+        **values,
+    )
 
 
 async def _load_task(task_id: str, scenario: str) -> VideoTask | None:
@@ -90,7 +113,19 @@ async def _persist_terminal(
         if duration is not None:
             task.duration = duration
         if status == "done" and task.scenario == "digital_human":
+            settlement_started = time.monotonic()
             await settle_task_credits_if_needed(db, task)
+            logger.info(
+                "digital human credits settled",
+                extra=_task_extra(
+                    task,
+                    event="settlement_completed",
+                    phase="settlement",
+                    status="done",
+                    retry_count=0,
+                    duration_ms=(time.monotonic() - settlement_started) * 1000,
+                ),
+            )
         await sync_video_job_status(db, job_id=task.job_id, scenario=task.scenario)
         await db.commit()
 
@@ -204,9 +239,22 @@ async def _run_heygen_task(ctx, task_id: str, scenario: str) -> None:
     task = await _load_task(task_id, scenario)
     if not task or task.archived or task.status in {"done", "failed", "timeout"}:
         return
+    started = time.monotonic()
+    logger.info(
+        "heygen task started",
+        extra=_task_extra(
+            task,
+            event="task_started",
+            phase="queue",
+            status="processing",
+            retry_count=0,
+            duration_ms=0,
+        ),
+    )
     transient_errors = 0
     try:
         provider_task_id = task.provider_task_id
+        create_started = time.monotonic()
         while not provider_task_id:
             try:
                 provider_task_id = (
@@ -216,15 +264,40 @@ async def _run_heygen_task(ctx, task_id: str, scenario: str) -> None:
                 )
             except (httpx.HTTPError, OSError):
                 transient_errors += 1
+                logger.warning(
+                    "heygen provider create retry",
+                    extra=_task_extra(
+                        task,
+                        event="provider_create_retry",
+                        phase="provider_create",
+                        status="processing",
+                        retry_count=transient_errors,
+                        duration_ms=(time.monotonic() - create_started) * 1000,
+                    ),
+                )
                 if transient_errors >= MAX_TRANSIENT_ERRORS:
                     raise
                 await asyncio.sleep(POLL_INTERVAL_SECONDS * transient_errors)
 
+        task.provider_task_id = provider_task_id
+        logger.info(
+            "heygen provider task created",
+            extra=_task_extra(
+                task,
+                event="provider_created",
+                provider_task_id=provider_task_id,
+                phase="provider_create",
+                status="processing",
+                retry_count=transient_errors,
+                duration_ms=(time.monotonic() - create_started) * 1000,
+            ),
+        )
+
         await set_task_status(ctx["redis"], "video", task_id, "processing", ttl=7200)
         await set_task_progress(ctx["redis"], "video", task_id, 65)
-        started = time.monotonic()
+        provider_wait_started = time.monotonic()
         transient_errors = 0
-        while time.monotonic() - started < MAX_WAIT_SECONDS:
+        while time.monotonic() - provider_wait_started < MAX_WAIT_SECONDS:
             try:
                 status, result_url, error, duration = (
                     await _poll_digital_human(provider_task_id)
@@ -234,6 +307,18 @@ async def _run_heygen_task(ctx, task_id: str, scenario: str) -> None:
                 transient_errors = 0
             except (httpx.HTTPError, OSError):
                 transient_errors += 1
+                logger.warning(
+                    "heygen provider poll retry",
+                    extra=_task_extra(
+                        task,
+                        event="provider_poll_retry",
+                        provider_task_id=provider_task_id,
+                        phase="provider_poll",
+                        status="processing",
+                        retry_count=transient_errors,
+                        duration_ms=(time.monotonic() - provider_wait_started) * 1000,
+                    ),
+                )
                 if transient_errors >= MAX_TRANSIENT_ERRORS:
                     raise
                 await asyncio.sleep(POLL_INTERVAL_SECONDS * transient_errors)
@@ -248,13 +333,62 @@ async def _run_heygen_task(ctx, task_id: str, scenario: str) -> None:
                 )
                 await set_task_status(ctx["redis"], "video", task_id, "done", ttl=86400)
                 await set_task_progress(ctx["redis"], "video", task_id, 100)
+                logger.info(
+                    "heygen provider task completed",
+                    extra=_task_extra(
+                        task,
+                        event="provider_completed",
+                        provider_task_id=provider_task_id,
+                        phase="provider_poll",
+                        status="done",
+                        retry_count=transient_errors,
+                        duration_ms=(time.monotonic() - provider_wait_started) * 1000,
+                    ),
+                )
                 return
             if status == "failed":
+                logger.error(
+                    "heygen task failed: %s",
+                    error or "HeyGen 任务失败",
+                    extra=_task_extra(
+                        task,
+                        event="task_failed",
+                        provider_task_id=provider_task_id,
+                        phase="provider_poll",
+                        status="failed",
+                        retry_count=transient_errors,
+                        duration_ms=(time.monotonic() - started) * 1000,
+                    ),
+                )
                 await _mark_failed(ctx, task, error or "HeyGen 任务失败")
                 return
             await asyncio.sleep(POLL_INTERVAL_SECONDS)
+        logger.warning(
+            "heygen task timeout",
+            extra=_task_extra(
+                task,
+                event="task_timeout",
+                provider_task_id=provider_task_id,
+                phase="provider_poll",
+                status="timeout",
+                retry_count=transient_errors,
+                duration_ms=(time.monotonic() - started) * 1000,
+            ),
+        )
         await _mark_timeout(ctx, task, "HeyGen 任务处理超时")
     except Exception as exc:
+        logger.exception(
+            "heygen task failed: %s",
+            exc,
+            extra=_task_extra(
+                task,
+                event="task_failed",
+                phase="unexpected",
+                status="failed",
+                retry_count=transient_errors,
+                duration_ms=(time.monotonic() - started) * 1000,
+            ),
+        )
         await _mark_failed(ctx, task, str(exc) or "HeyGen 任务创建失败")
 
 

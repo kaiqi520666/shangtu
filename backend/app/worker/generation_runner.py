@@ -7,6 +7,7 @@ from typing import Any
 
 import httpx
 
+from app.core.logging_config import task_log_extra
 from app.core.providers.toapis_provider import (
     TOAPIS_KEY,
     TOAPIS_STATUS_DONE,
@@ -20,12 +21,14 @@ from app.core.providers.toapis_provider import (
     fetch_generation,
 )
 from app.core.task_state import set_task_result, set_task_status
+from app.core.time import utc_now
 
 logger = logging.getLogger("app.worker.generation_runner")
 
 SetProgressFn = Callable[[Any, str, int], Awaitable[None]]
 UpdateTaskFn = Callable[..., Awaitable[None]]
 FetchUserIdFn = Callable[[str], Awaitable[int | None]]
+FetchTaskContextFn = Callable[[str], Awaitable[dict[str, Any] | None]]
 MarkTerminalFn = Callable[..., Awaitable[None]]
 PayloadBuilderFn = Callable[[], dict[str, Any]]
 MaterializeFn = Callable[..., Awaitable[Any]]
@@ -52,6 +55,7 @@ class GenerationRunnerConfig:
     set_progress: SetProgressFn | None = None
     update_task: UpdateTaskFn | None = None
     fetch_user_id: FetchUserIdFn | None = None
+    fetch_task_context: FetchTaskContextFn | None = None
     mark_failed: MarkTerminalFn | None = None
     mark_timeout: MarkTerminalFn | None = None
     build_payload: PayloadBuilderFn | None = None
@@ -86,11 +90,13 @@ class GenerationRunnerConfig:
     monotonic_fn: Callable[[], float] = time.monotonic
 
 
-def _media_log_extra(media_type: str, task_id: str, provider_task_id: str | None = None) -> dict[str, Any]:
-    extra = {"task_id": task_id, "media_type": media_type}
-    if provider_task_id:
-        extra["provider_task_id"] = provider_task_id
-    return extra
+def _queue_duration_ms(created_at) -> float | None:
+    if not created_at:
+        return None
+    value = created_at
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=utc_now().tzinfo)
+    return max(0, (utc_now() - value).total_seconds() * 1000)
 
 
 async def _mark_processing(
@@ -158,32 +164,112 @@ async def run_generation_task(
 ) -> None:
     redis = ctx["redis"]
     task_logger = logging.getLogger(config.logger_name)
+    started_at = config.monotonic_fn()
+    provider_task_id = None
+    context = (
+        await config.fetch_task_context(task_id)
+        if config.fetch_task_context is not None
+        else None
+    )
+    user_id = context.get("user_id") if context else None
+    if user_id is None and config.fetch_user_id is not None:
+        user_id = await config.fetch_user_id(task_id)
+    base_fields = {
+        "task_id": task_id,
+        "job_id": context.get("job_id") if context else None,
+        "scenario": context.get("scenario") if context else config.media_type,
+        "media_type": config.media_type,
+    }
+
+    def elapsed_ms(since: float = started_at) -> float:
+        return (config.monotonic_fn() - since) * 1000
+
+    async def fail_task(
+        message: str,
+        *,
+        phase: str,
+        failure_final_url: str | None = None,
+    ) -> None:
+        task_logger.error(
+            "generation task failed: %s",
+            message,
+            extra=task_log_extra(
+                event="task_failed",
+                provider_task_id=provider_task_id,
+                phase=phase,
+                status="failed",
+                retry_count=0,
+                duration_ms=elapsed_ms(),
+                **base_fields,
+            ),
+        )
+        if config.mark_failed is not None:
+            failure_details = {}
+            if provider_task_id:
+                failure_details["provider_task_id"] = provider_task_id
+            if failure_final_url:
+                failure_details["final_url"] = failure_final_url
+            await config.mark_failed(
+                redis,
+                task_id,
+                message,
+                **failure_details,
+            )
+
+    async def timeout_task(message: str, *, phase: str) -> None:
+        task_logger.warning(
+            "generation task timeout: %s",
+            message,
+            extra=task_log_extra(
+                event="task_timeout",
+                provider_task_id=provider_task_id,
+                phase=phase,
+                status="timeout",
+                retry_count=0,
+                duration_ms=elapsed_ms(),
+                **base_fields,
+            ),
+        )
+        if config.mark_timeout is not None:
+            await config.mark_timeout(redis, task_id, message)
+
+    task_logger.info(
+        "generation task started",
+        extra=task_log_extra(
+            event="task_started",
+            phase="queue",
+            status="processing",
+            retry_count=0,
+            duration_ms=0,
+            queue_duration_ms=_queue_duration_ms(context.get("created_at")) if context else None,
+            **base_fields,
+        ),
+    )
 
     try:
         await _mark_processing(redis, task_id, config)
 
         if not config.provider_configured():
-            if config.mark_failed is not None and config.config_missing_message is not None:
-                await config.mark_failed(redis, task_id, config.config_missing_message())
+            if config.config_missing_message is not None:
+                await fail_task(config.config_missing_message(), phase="provider_config")
             return
 
-        user_id = await config.fetch_user_id(task_id) if config.fetch_user_id is not None else None
         if not user_id:
-            if config.mark_failed is not None and config.task_missing_message is not None:
-                await config.mark_failed(redis, task_id, config.task_missing_message())
+            if config.task_missing_message is not None:
+                await fail_task(config.task_missing_message(), phase="task_load")
             return
 
         if config.validate_inputs is not None:
             validation_error = config.validate_inputs()
             if validation_error:
-                if config.mark_failed is not None:
-                    await config.mark_failed(redis, task_id, validation_error)
+                await fail_task(validation_error, phase="validation")
                 return
 
         payload = config.build_payload() if config.build_payload is not None else {}
         transport = config.transport_factory() if config.transport_factory is not None else httpx.AsyncHTTPTransport(proxy=None)
         client_factory = config.client_factory or httpx.AsyncClient
         async with client_factory(timeout=config.client_timeout, transport=transport) as client:
+            provider_create_started = config.monotonic_fn()
             try:
                 create_result = await config.create_generation_fn(
                     client,
@@ -191,33 +277,41 @@ async def run_generation_task(
                     payload=payload,
                 )
             except httpx.HTTPError as exc:
-                if config.mark_failed is not None and config.create_failure_message is not None:
-                    await config.mark_failed(redis, task_id, config.create_failure_message(exc))
+                if config.create_failure_message is not None:
+                    await fail_task(config.create_failure_message(exc), phase="provider_create")
                 return
             except ValueError as exc:
-                if config.mark_failed is not None and config.create_parse_failure_message is not None:
-                    await config.mark_failed(redis, task_id, config.create_parse_failure_message(exc))
+                if config.create_parse_failure_message is not None:
+                    await fail_task(config.create_parse_failure_message(exc), phase="provider_create")
                 return
-
-            task_logger.debug(
-                "toapis 创建响应: %s",
-                create_result,
-                extra=_media_log_extra(config.media_type, task_id),
-            )
 
             provider_task_id = config.extract_provider_task_id_fn(create_result)
             if not provider_task_id:
                 err = config.extract_provider_error_fn(create_result) or config.missing_provider_task_message
-                if config.mark_failed is not None:
-                    await config.mark_failed(redis, task_id, err)
+                await fail_task(err, phase="provider_create")
                 return
 
             if config.update_task is not None:
                 await config.update_task(task_id, provider_task_id=provider_task_id)
 
+            task_logger.info(
+                "provider task created",
+                extra=task_log_extra(
+                    event="provider_created",
+                    provider_task_id=provider_task_id,
+                    phase="provider_create",
+                    status="processing",
+                    retry_count=0,
+                    duration_ms=elapsed_ms(provider_create_started),
+                    **base_fields,
+                ),
+            )
+
             deadline = config.monotonic_fn() + config.max_wait_seconds
+            provider_wait_started = config.monotonic_fn()
             final_url: str | None = None
             final_error: str | None = None
+            poll_retry_count = 0
 
             while config.monotonic_fn() < deadline:
                 await config.sleep_fn(config.poll_interval_seconds)
@@ -228,17 +322,35 @@ async def run_generation_task(
                         provider_task_id=provider_task_id,
                     )
                 except httpx.HTTPError as exc:
+                    poll_retry_count += 1
                     task_logger.warning(
                         config.poll_failure_log_message,
                         exc,
-                        extra=_media_log_extra(config.media_type, task_id, provider_task_id),
+                        extra=task_log_extra(
+                            event="provider_poll_retry",
+                            provider_task_id=provider_task_id,
+                            phase="provider_poll",
+                            status="processing",
+                            retry_count=poll_retry_count,
+                            duration_ms=elapsed_ms(provider_wait_started),
+                            **base_fields,
+                        ),
                     )
                     continue
                 except ValueError as exc:
+                    poll_retry_count += 1
                     task_logger.warning(
                         config.poll_parse_log_message,
                         exc,
-                        extra=_media_log_extra(config.media_type, task_id, provider_task_id),
+                        extra=task_log_extra(
+                            event="provider_poll_retry",
+                            provider_task_id=provider_task_id,
+                            phase="provider_poll",
+                            status="processing",
+                            retry_count=poll_retry_count,
+                            duration_ms=elapsed_ms(provider_wait_started),
+                            **base_fields,
+                        ),
                     )
                     continue
 
@@ -256,15 +368,27 @@ async def run_generation_task(
                     final_error = config.extract_provider_error_fn(poll_result) or config.provider_failed_message
                     break
             else:
-                if config.mark_timeout is not None:
-                    await config.mark_timeout(redis, task_id, config.wait_timeout_message)
+                await timeout_task(config.wait_timeout_message, phase="provider_poll")
                 return
 
             if not final_url:
-                if config.mark_failed is not None:
-                    await config.mark_failed(redis, task_id, final_error or config.provider_failed_message)
+                await fail_task(final_error or config.provider_failed_message, phase="provider_poll")
                 return
 
+            task_logger.info(
+                "provider task completed",
+                extra=task_log_extra(
+                    event="provider_completed",
+                    provider_task_id=provider_task_id,
+                    phase="provider_poll",
+                    status="done",
+                    retry_count=poll_retry_count,
+                    duration_ms=elapsed_ms(provider_wait_started),
+                    **base_fields,
+                ),
+            )
+
+            persist_started = config.monotonic_fn()
             try:
                 uploaded = await config.materialize_result(
                     user_id=user_id,
@@ -273,8 +397,8 @@ async def run_generation_task(
                 )
             except Exception as exc:
                 if config.is_download_error is not None and config.is_download_error(exc):
-                    if config.mark_failed is not None and config.download_failure_message is not None:
-                        await config.mark_failed(redis, task_id, config.download_failure_message(exc))
+                    if config.download_failure_message is not None:
+                        await fail_task(config.download_failure_message(exc), phase="result_persist")
                     return
                 error_message = (
                     config.upload_failure_message(exc)
@@ -283,28 +407,39 @@ async def run_generation_task(
                 )
                 task_logger.exception(
                     error_message,
-                    extra=_media_log_extra(config.media_type, task_id),
-                )
-                if config.mark_failed is not None:
-                    await config.mark_failed(
-                        redis,
-                        task_id,
-                        error_message,
+                    extra=task_log_extra(
+                        event="result_persist_error",
                         provider_task_id=provider_task_id,
-                        final_url=final_url,
-                    )
+                        phase="result_persist",
+                        status="failed",
+                        retry_count=poll_retry_count,
+                        duration_ms=elapsed_ms(persist_started),
+                        **base_fields,
+                    ),
+                )
+                await fail_task(
+                    error_message,
+                    phase="result_persist",
+                    failure_final_url=final_url,
+                )
                 return
 
         await _finalize_success(redis, task_id, uploaded, config)
 
     except httpx.TimeoutException:
-        if config.mark_timeout is not None:
-            await config.mark_timeout(redis, task_id, config.request_timeout_message)
+        await timeout_task(config.request_timeout_message, phase="provider_request")
     except Exception as exc:
         task_logger.exception(
             config.unexpected_failure_log_message,
             exc,
-            extra=_media_log_extra(config.media_type, task_id),
+            extra=task_log_extra(
+                event="task_exception",
+                provider_task_id=provider_task_id,
+                phase="unexpected",
+                status="failed",
+                retry_count=0,
+                duration_ms=elapsed_ms(),
+                **base_fields,
+            ),
         )
-        if config.mark_failed is not None:
-            await config.mark_failed(redis, task_id, str(exc))
+        await fail_task(str(exc), phase="unexpected")

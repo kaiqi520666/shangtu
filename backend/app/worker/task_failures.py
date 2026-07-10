@@ -1,5 +1,6 @@
 import logging
 
+from app.core.logging_config import task_log_extra
 from app.core.task_state import set_task_error, set_task_status
 from app.worker.provider_errors import normalize_provider_error
 from app.worker.task_state_sync import (
@@ -22,11 +23,16 @@ async def mark_terminal(
     final_url: str | None = None,
 ) -> None:
     logger.warning(
-        "generation %s %s (raw): %s",
-        media_type,
-        status,
+        "generation task terminal failure: %s",
         raw_message,
-        extra={"task_id": task_id, "media_type": media_type, "status": status},
+        extra=task_log_extra(
+            event="task_failure_detail",
+            task_id=task_id,
+            provider_task_id=provider_task_id,
+            media_type=media_type,
+            phase="terminal_persist",
+            status=status,
+        ),
     )
     friendly = normalize_provider_error(raw_message, media_type=media_type)
     persisted_error = friendly

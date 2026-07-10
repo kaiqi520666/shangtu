@@ -10,7 +10,7 @@ from app.core.providers.toapis_provider import (
 from app.core.task_state import set_task_progress, set_task_result, set_task_status
 from app.worker.task_failures import mark_failed, mark_timeout
 from app.worker.generation_runner import GenerationRunnerConfig, run_generation_task
-from app.worker.task_state_sync import fetch_task_user_id, update_task_in_db
+from app.worker.task_state_sync import fetch_image_task_context, update_task_in_db
 
 logger = logging.getLogger("app.worker.image_tasks")
 
@@ -47,7 +47,7 @@ async def generate_image(
         poll_interval_seconds=POLL_INTERVAL_SECONDS,
         set_progress=_set_progress,
         update_task=update_task_in_db,
-        fetch_user_id=fetch_task_user_id,
+        fetch_task_context=fetch_image_task_context,
         mark_failed=mark_failed,
         mark_timeout=mark_timeout,
         build_payload=lambda: build_create_payload(

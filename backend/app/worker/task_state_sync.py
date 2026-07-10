@@ -123,6 +123,48 @@ async def fetch_video_task_user_id(task_id: str) -> int | None:
     return await fetch_generation_task_user_id("video", task_id)
 
 
+async def fetch_generation_task_context(media_type: str, task_id: str) -> dict | None:
+    from app.models import GenerationJob
+
+    model = task_model(media_type)
+    async with SessionLocal() as session:
+        if media_type == "video":
+            statement = select(
+                model.user_id,
+                model.job_id,
+                model.scenario,
+                model.created_at,
+            ).where(model.id == task_id)
+        else:
+            statement = (
+                select(
+                    model.user_id,
+                    model.job_id,
+                    GenerationJob.scenario,
+                    model.created_at,
+                )
+                .outerjoin(GenerationJob, GenerationJob.id == model.job_id)
+                .where(model.id == task_id)
+            )
+        row = (await session.execute(statement)).one_or_none()
+        if not row:
+            return None
+        return {
+            "user_id": row.user_id,
+            "job_id": row.job_id,
+            "scenario": row.scenario or media_type,
+            "created_at": row.created_at,
+        }
+
+
+async def fetch_image_task_context(task_id: str) -> dict | None:
+    return await fetch_generation_task_context("image", task_id)
+
+
+async def fetch_video_task_context(task_id: str) -> dict | None:
+    return await fetch_generation_task_context("video", task_id)
+
+
 async def refund_generation_credit(media_type: str, task_id: str) -> bool:
     """幂等退款：按任务实际扣费退回积分，已退过直接 no-op。返回是否本次执行了退款。"""
     from app.models import User
