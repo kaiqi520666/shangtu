@@ -82,6 +82,33 @@ export function useGenerationStrategyFlow({
     workflowStep.value = step;
   }
 
+  async function runStrategy({
+    snapshot = null,
+    request,
+    normalizeResult,
+    emptyMessage,
+    failureMessage,
+  }) {
+    startStrategyLoading({ snapshot });
+    try {
+      const response = await request();
+      if (response.code !== 0) {
+        setStrategyStep("config");
+        return { ok: false, message: response.message || failureMessage };
+      }
+      const result = normalizeResult(response.data || {});
+      if (!Array.isArray(result.items) || result.items.length === 0) {
+        setStrategyStep("config");
+        return { ok: false, message: emptyMessage };
+      }
+      setStrategyResult({ ...result, snapshot });
+      return { ok: true, ...result };
+    } catch (error) {
+      setStrategyStep("config");
+      return { ok: false, message: failureMessage, error };
+    }
+  }
+
   function updateStrategyItem(index, patch) {
     const current = strategyItems.value[index];
     if (!current) return;
@@ -120,6 +147,7 @@ export function useGenerationStrategyFlow({
     setStrategyResult,
     resetStrategy,
     setStrategyStep,
+    runStrategy,
     updateStrategyItem,
     reorderStrategyItems,
     removeStrategyItem,

@@ -85,7 +85,7 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
     strategyLoading,
     strategyPanelVisible,
     canGenerateWithStrategy,
-    startStrategyLoading,
+    runStrategy,
     setStrategyResult,
     resetStrategy,
     setStrategyStep,
@@ -282,45 +282,31 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
       return;
     }
 
-    startStrategyLoading({ snapshot: inputSnapshot });
-
-    try {
-      const result = await generateImageStrategy({
+    const outcome = await runStrategy({
+      snapshot: inputSnapshot,
+      request: () => generateImageStrategy({
         scenario: inputSnapshot.scenario,
         images: inputSnapshot.images,
         platform: settings.platform,
         language: settings.language,
         product_input: settings.productInput,
         structure: suiteStructure.value,
-      });
-
-      if (result.code !== 0) {
-        toast.error(result.message || "套图策略生成失败，请稍后重试");
-        setStrategyStep("config");
-        return;
-      }
-
-      const items = Array.isArray(result.data?.items) ? result.data.items : [];
-      if (items.length === 0) {
-        toast.error("AI 未返回有效套图策略");
-        setStrategyStep("config");
-        return;
-      }
-
-      const normalizedItems = normalizeSuiteStrategyItems(items);
-      const brief =
-        result.data?.brief ||
-        `${settings.platform} / ${settings.language} / ${selectedImageLabel.value}，已为 ${normalizedItems.length} 个套图类型生成可编辑策略。`;
-      setStrategyResult({
-        brief,
-        items: normalizedItems,
-        snapshot: inputSnapshot,
-      });
-      toast.success("套图策略已生成，可编辑后继续出图");
-    } catch (error) {
-      toast.error(getApiErrorMessage(error, "套图策略生成失败，请稍后重试"));
-      setStrategyStep("config");
+      }),
+      normalizeResult(data) {
+        const items = normalizeSuiteStrategyItems(Array.isArray(data.items) ? data.items : []);
+        return {
+          brief: data.brief || `${settings.platform} / ${settings.language} / ${selectedImageLabel.value}，已为 ${items.length} 个套图类型生成可编辑策略。`,
+          items,
+        };
+      },
+      emptyMessage: "AI 未返回有效套图策略",
+      failureMessage: "套图策略生成失败，请稍后重试",
+    });
+    if (!outcome.ok) {
+      toast.error(outcome.error ? getApiErrorMessage(outcome.error, outcome.message) : outcome.message);
+      return;
     }
+    toast.success("套图策略已生成，可编辑后继续出图");
   }
 
   async function confirmStrategyAndGenerate() {

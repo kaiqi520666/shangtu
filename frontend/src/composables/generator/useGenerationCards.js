@@ -1,42 +1,16 @@
 import { computed, ref, reactive } from "vue";
 import { getImageTask } from "@/api/image.js";
+import {
+  getPromptSnapshotUser,
+  resolveSettingsSnapshot,
+  TERMINAL_STATUSES,
+  useTaskPolling,
+} from "@/composables/generator/polling/useTaskPolling.js";
 
 const DEFAULT_POLL_INTERVAL_MS = 5000;
-const TERMINAL_STATUSES = new Set(["done", "failed", "timeout"]);
-
-function preloadImage(url) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = resolve;
-    img.onerror = reject;
-    img.src = url;
-  });
-}
 
 function makeId() {
   return `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function resolveSettingsSnapshot(rawSnapshot, existingSnapshot = null) {
-  const snapshot =
-    rawSnapshot && typeof rawSnapshot === "object" && !Array.isArray(rawSnapshot)
-      ? rawSnapshot
-      : null;
-  const existing =
-    existingSnapshot && typeof existingSnapshot === "object" && !Array.isArray(existingSnapshot)
-      ? existingSnapshot
-      : null;
-
-  if (!existing && !snapshot) return null;
-  return {
-    ...existing,
-    ...snapshot,
-  };
-}
-
-function getPromptSnapshotUser(item) {
-  const snapshot = item?.prompt_snapshot;
-  return snapshot && typeof snapshot.user === "string" ? snapshot.user : "";
 }
 
 export function createBatchFinishedHandler({
@@ -107,8 +81,6 @@ export function useGenerationCards({
   const generating = hasRunningTasks;
   const activeBatchRunId = ref("");
 
-  const pollTimers = new Map();
-  const pollInFlight = new Set();
   const pendingBatchIds = new Set();
 
   function logPrefix(card) {
@@ -116,142 +88,27 @@ export function useGenerationCards({
     return card.strategyTitle || card.typeId || "";
   }
 
-  // --- 轮询引擎 ---
-
-  function startPollingCard(card) {
-    if (!card.taskId) return;
-    stopPollingCard(card.id);
-    card.stalledWarning = "";
-    card.pollFailureCount = 0;
-    const timer = window.setInterval(() => {
-      pollCardOnce(card).catch(() => {});
-    }, pollIntervalMs);
-    pollTimers.set(card.id, timer);
-    pollCardOnce(card).catch(() => {});
-  }
-
-  async function pollCardOnce(card) {
-    if (!card.taskId) return;
-    if (TERMINAL_STATUSES.has(card.status)) {
-      stopPollingCard(card.id);
-      return;
-    }
-    if (pollInFlight.has(card.id)) return;
-    pollInFlight.add(card.id);
-    try {
-      const result = await getTask(card.taskId);
-      if (result.code !== 0) throw new Error(result.message || "任务状态查询失败");
-      card.pollFailureCount = 0;
-      card.stalledWarning = "";
-
-      // 处理本次响应前再校验一次终态，避免并发响应叠加导致 generatedCount 重复 +1
-      if (TERMINAL_STATUSES.has(card.status)) {
-        stopPollingCard(card.id);
-        return;
-      }
-
-      const data = result.data || {};
-      const status = data.status || "processing";
-      const resultUrl = data.result_url || "";
-      const displayUrl = data.thumb_url || resultUrl;
-      const previewUrl = data.preview_url || resultUrl;
-      const previousStatus = card.status;
-      const previousProgress = typeof card.progress === "number" ? card.progress : 0;
-      let taskAdvanced = status !== previousStatus;
-      if (typeof data.progress === "number") {
-        if (data.progress !== previousProgress) {
-          taskAdvanced = true;
-        }
-        card.progress = data.progress;
-      }
-      if (typeof data.credit_cost === "number") {
-        card.creditCost = data.credit_cost;
-      }
-      if (data.asset_id) {
-        card.assetId = data.asset_id;
-      }
-      const promptSnapshotUser = getPromptSnapshotUser(data);
-      if (promptSnapshotUser) {
-        card.userPrompt = promptSnapshotUser;
-      }
-      const nextSettingsSnapshot = resolveSettingsSnapshot(
-        data.settings_snapshot,
-        card.settingsSnapshot,
-      );
-      if (nextSettingsSnapshot) {
-        card.settingsSnapshot = nextSettingsSnapshot;
-      }
-
-      if (status === "done" && resultUrl) {
-        // 防御：重新生成场景下，如果返回的 resultUrl 跟旧图一样，说明后端还没拿到新图
-        if (card.previousResultUrl && resultUrl === card.previousResultUrl) {
-          card.status = "processing";
-        } else {
-          stopPollingCard(card.id);
-          if (preloadResult) {
-            // 保持遮罩：预加载新图完成后再切换状态。视频等媒体可关闭预加载。
-            try {
-              await preloadImage(displayUrl);
-            } catch {
-              // 预加载失败也继续
-            }
-          }
-          card.resultUrl = resultUrl;
-          card.dataUrl = displayUrl;
-          card.previewUrl = previewUrl;
-          card.previousResultUrl = "";
-          card.status = "done";
-          card.stalledWarning = "";
-          genLogs.value.push(`[${logPrefix(card)}] 已完成`);
-          genLogs.value.push(`已完成 ${generatedCount.value}/${jobTotal.value}`);
-          onCardDone?.(card);
-        }
-      } else if (status === "failed" || status === "timeout") {
-        card.status = status;
-        card.stalledWarning = "";
-        const fallbackMessage =
-          status === "timeout"
-            ? `${mediaLabel}生成超时`
-            : `${mediaLabel}生成失败`;
-        card.errorMessage = data.error_message || fallbackMessage;
-        genLogs.value.push(
-          `[${logPrefix(card)}] ${status === "timeout" ? "超时" : "失败"}：${card.errorMessage}`,
-        );
-        stopPollingCard(card.id);
-        onCardFailed?.(card);
-      } else {
-        // processing 或 done 但 result_url 仍未落库（worker 写入竞态/降级）
-        card.status = status === "done" ? "processing" : status;
-        if (taskAdvanced) {
-          card.stalledWarning = "";
-        }
-      }
-
-      maybeFinishBatch(card.batchRunId);
-    } catch {
-      card.pollFailureCount += 1;
-      if (card.pollFailureCount >= 3) {
-        card.stalledWarning = "连接异常，正在重试";
-      }
-    } finally {
-      pollInFlight.delete(card.id);
-    }
-  }
-
-  function stopPollingCard(cardId) {
-    const timer = pollTimers.get(cardId);
-    if (timer) {
-      window.clearInterval(timer);
-      pollTimers.delete(cardId);
-    }
-  }
+  const {
+    startPollingCard,
+    pollCardOnce,
+    stopPollingCard,
+    clearPollTimers,
+  } = useTaskPolling({
+    getTask,
+    pollIntervalMs,
+    preloadResult,
+    mediaLabel,
+    genLogs,
+    generatedCount,
+    jobTotal,
+    logPrefix,
+    onCardDone,
+    onCardFailed,
+    onCardSettled: (card) => maybeFinishBatch(card.batchRunId),
+  });
 
   function clearAllPollTimers() {
-    for (const timer of pollTimers.values()) {
-      window.clearInterval(timer);
-    }
-    pollTimers.clear();
-    pollInFlight.clear();
+    clearPollTimers();
     pendingBatchIds.clear();
   }
 

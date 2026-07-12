@@ -143,7 +143,7 @@ export function useProductVideoGenerator({ toast, confirm, onJobCreated } = {}) 
     strategyLoading,
     strategyPanelVisible,
     canGenerateWithStrategy,
-    startStrategyLoading,
+    runStrategy,
     setStrategyResult,
     resetStrategy,
     setStrategyStep,
@@ -360,10 +360,9 @@ export function useProductVideoGenerator({ toast, confirm, onJobCreated } = {}) 
     }
 
     const inputSnapshot = buildVideoStrategySnapshot();
-    startStrategyLoading({ snapshot: inputSnapshot });
-
-    try {
-      const result = await generateVideoStrategy({
+    const outcome = await runStrategy({
+      snapshot: inputSnapshot,
+      request: () => generateVideoStrategy({
         type_id: selectedType.value.typeId,
         name: selectedType.value.title,
         input_mode: selectedType.value.inputMode,
@@ -373,32 +372,21 @@ export function useProductVideoGenerator({ toast, confirm, onJobCreated } = {}) 
         duration: settings.duration,
         aspect_ratio: selectedSize.value.aspectRatio,
         product_input: settings.productInput,
-      });
-
-      if (result.code !== 0) {
-        toast?.error?.(result.message || "视频提示词生成失败，请稍后重试");
-        setStrategyStep("config");
-        return;
-      }
-
-      const items = Array.isArray(result.data?.items) ? result.data.items : [];
-      if (items.length === 0) {
-        toast?.error?.("AI 未返回有效视频提示词");
-        setStrategyStep("config");
-        return;
-      }
-
-      const normalizedItems = normalizeVideoStrategyItems(items);
-      setStrategyResult({
-        brief: result.data?.brief || `已生成「${selectedType.value.title}」视频提示词。`,
-        items: normalizedItems,
-        snapshot: inputSnapshot,
-      });
-      toast?.success?.("视频提示词已生成，可编辑后继续出片");
-    } catch (error) {
-      toast?.error?.(getApiErrorMessage(error, "视频提示词生成失败，请稍后重试"));
-      setStrategyStep("config");
+      }),
+      normalizeResult(data) {
+        return {
+          brief: data.brief || `已生成「${selectedType.value.title}」视频提示词。`,
+          items: normalizeVideoStrategyItems(Array.isArray(data.items) ? data.items : []),
+        };
+      },
+      emptyMessage: "AI 未返回有效视频提示词",
+      failureMessage: "视频提示词生成失败，请稍后重试",
+    });
+    if (!outcome.ok) {
+      toast?.error?.(outcome.error ? getApiErrorMessage(outcome.error, outcome.message) : outcome.message);
+      return;
     }
+    toast?.success?.("视频提示词已生成，可编辑后继续出片");
   }
 
   async function confirmStrategyAndGenerate() {

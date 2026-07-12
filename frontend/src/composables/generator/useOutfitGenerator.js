@@ -14,6 +14,7 @@ import { useMediaBatchRunner } from "@/composables/generator/batch/useMediaBatch
 import { useGenerationStrategyFlow } from "@/composables/generator/strategy/useGenerationStrategyFlow.js";
 import { useOutfitModels } from "@/composables/outfit/useOutfitModels.js";
 import { useToast } from "@/composables/useToast.js";
+import { getApiErrorMessage } from "@/utils/apiError.js";
 import {
   cloneGenerationSettingsSnapshot,
   cloneUploadedImages,
@@ -90,7 +91,7 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
     strategyLoading,
     strategyPanelVisible,
     canGenerateWithStrategy,
-    startStrategyLoading,
+    runStrategy,
     setStrategyResult,
     resetStrategy,
     setStrategyStep,
@@ -303,10 +304,9 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
       return;
     }
 
-    startStrategyLoading({ snapshot: inputSnapshot });
-
-    try {
-      const result = await generateImageStrategy({
+    const outcome = await runStrategy({
+      snapshot: inputSnapshot,
+      request: () => generateImageStrategy({
         scenario: inputSnapshot.scenario,
         images: inputSnapshot.images,
         platform: settings.platform,
@@ -314,35 +314,22 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
         scene_description: sceneDescription.value,
         selected_model_name: selectedModel.value.name,
         scene_ids: selectedScenes.value,
-      });
-
-      if (result.code !== 0) {
-        toast.error(result.message || "穿搭策略生成失败，请稍后重试");
-        setStrategyStep("config");
-        return;
-      }
-
-      const items = Array.isArray(result.data?.items) ? result.data.items : [];
-      if (items.length === 0) {
-        toast.error("AI 未返回有效穿搭策略");
-        setStrategyStep("config");
-        return;
-      }
-
-      const normalizedItems = normalizeOutfitStrategyItems(items);
-      const brief =
-        result.data?.brief ||
-        `${settings.platform} / ${settings.language} / ${selectedImageLabel.value}，已为 ${normalizedItems.length} 个场景生成可编辑穿搭策略。`;
-      setStrategyResult({
-        brief,
-        items: normalizedItems,
-        snapshot: inputSnapshot,
-      });
-      toast.success("穿搭方案已生成，可编辑后继续出图");
-    } catch (error) {
-      toast.error(getApiErrorMessage(error, "穿搭策略生成失败，请稍后重试"));
-      setStrategyStep("config");
+      }),
+      normalizeResult(data) {
+        const items = normalizeOutfitStrategyItems(Array.isArray(data.items) ? data.items : []);
+        return {
+          brief: data.brief || `${settings.platform} / ${settings.language} / ${selectedImageLabel.value}，已为 ${items.length} 个场景生成可编辑穿搭策略。`,
+          items,
+        };
+      },
+      emptyMessage: "AI 未返回有效穿搭策略",
+      failureMessage: "穿搭策略生成失败，请稍后重试",
+    });
+    if (!outcome.ok) {
+      toast.error(outcome.error ? getApiErrorMessage(outcome.error, outcome.message) : outcome.message);
+      return;
     }
+    toast.success("穿搭方案已生成，可编辑后继续出图");
   }
 
   async function confirmStrategyAndGenerate() {

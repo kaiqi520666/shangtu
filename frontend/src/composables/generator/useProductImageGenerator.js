@@ -89,7 +89,7 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
     strategyLoading,
     strategyPanelVisible,
     canGenerateWithStrategy,
-    startStrategyLoading,
+    runStrategy,
     setStrategyResult,
     resetStrategy,
     setStrategyStep,
@@ -275,46 +275,32 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
       return;
     }
 
-    startStrategyLoading({ snapshot: inputSnapshot });
-
-    try {
-      const result = await generateImageStrategy({
+    const outcome = await runStrategy({
+      snapshot: inputSnapshot,
+      request: () => generateImageStrategy({
         scenario: inputSnapshot.scenario,
         images,
         platform: settings.platform,
         language: settings.language,
         product_input: settings.productInput,
         module_ids: selectedModules.value,
-      });
-
-      if (result.code !== 0) {
-        toast.error(result.message || "模块策略生成失败，请稍后重试");
-        setStrategyStep("config");
-        return;
-      }
-
-      const modules = Array.isArray(result.data?.modules) ? result.data.modules : [];
-      if (modules.length === 0) {
-        toast.error("AI 未返回有效模块策略");
-        setStrategyStep("config");
-        return;
-      }
-
-      const normalizedModules = normalizeStrategyModules(modules);
-      selectedModules.value = normalizedModules.map((module) => module.id).filter(Boolean);
-      const brief =
-        result.data?.brief ||
-        `${settings.platform} / ${settings.language} / ${selectedImageLabel.value}，已为 ${normalizedModules.length} 个图种生成可编辑模块内容。`;
-      setStrategyResult({
-        brief,
-        items: normalizedModules,
-        snapshot: inputSnapshot,
-      });
-      toast.success("模块策略已生成，可编辑后继续出图");
-    } catch (error) {
-      toast.error(getApiErrorMessage(error, "模块策略生成失败，请稍后重试"));
-      setStrategyStep("config");
+      }),
+      normalizeResult(data) {
+        const items = normalizeStrategyModules(Array.isArray(data.modules) ? data.modules : []);
+        selectedModules.value = items.map((module) => module.id).filter(Boolean);
+        return {
+          brief: data.brief || `${settings.platform} / ${settings.language} / ${selectedImageLabel.value}，已为 ${items.length} 个图种生成可编辑模块内容。`,
+          items,
+        };
+      },
+      emptyMessage: "AI 未返回有效模块策略",
+      failureMessage: "模块策略生成失败，请稍后重试",
+    });
+    if (!outcome.ok) {
+      toast.error(outcome.error ? getApiErrorMessage(outcome.error, outcome.message) : outcome.message);
+      return;
     }
+    toast.success("模块策略已生成，可编辑后继续出图");
   }
 
   async function confirmStrategyAndGenerate() {
