@@ -5,7 +5,12 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_user, get_db
-from app.core.pagination import page_payload
+from app.core.pagination import (
+    PaginationParams,
+    create_pagination_params,
+    execute_pagination,
+    page_payload,
+)
 from app.core.time import utc_now
 from app.models import User, UserAvatar, UserAvatarTask
 from app.schemas.response import Response, fail, success
@@ -21,6 +26,10 @@ from app.services.photo_avatar import (
 from app.services.heygen_task_lifecycle import clean_text
 
 router = APIRouter()
+PHOTO_AVATAR_PAGINATION = create_pagination_params(
+    default_page_size=12,
+    max_page_size=50,
+)
 
 
 @router.post("/photo-avatars/upload", response_model=Response)
@@ -53,13 +62,10 @@ async def upload_photo_avatar(
 
 @router.get("/photo-avatars/tasks", response_model=Response)
 async def list_photo_avatar_tasks(
-    page: int = 1,
-    page_size: int = 12,
+    pagination: PaginationParams = Depends(PHOTO_AVATAR_PAGINATION),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    page = max(1, page)
-    page_size = min(max(1, page_size), 50)
     conditions = [
         UserAvatarTask.user_id == current_user.id,
         UserAvatarTask.archived_at.is_(None),
@@ -71,11 +77,16 @@ async def list_photo_avatar_tasks(
         .where(*conditions)
         .order_by(UserAvatarTask.created_at.desc(), UserAvatarTask.id.desc())
     )
-    total = int((await db.execute(total_stmt)).scalar_one() or 0)
-    tasks = (await db.execute(data_stmt.offset((page - 1) * page_size).limit(page_size))).scalars().all()
+    total, result = await execute_pagination(
+        db,
+        count_statement=total_stmt,
+        data_statement=data_stmt,
+        pagination=pagination,
+    )
+    tasks = result.scalars().all()
     assets = await get_user_avatars_by_ids(db, [item.result_avatar_id or "" for item in tasks])
     items = [user_avatar_task_payload(item, assets.get(item.result_avatar_id or "")) for item in tasks]
-    return success(page_payload(items, total, page, page_size))
+    return success(page_payload(items, total, pagination.page, pagination.page_size))
 
 
 @router.get("/photo-avatars/tasks/{task_id}/poll", response_model=Response)
@@ -109,13 +120,10 @@ async def delete_photo_avatar_task(
 
 @router.get("/photo-avatars", response_model=Response)
 async def list_photo_avatars(
-    page: int = 1,
-    page_size: int = 12,
+    pagination: PaginationParams = Depends(PHOTO_AVATAR_PAGINATION),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    page = max(1, page)
-    page_size = min(max(1, page_size), 50)
     conditions = [
         UserAvatar.user_id == current_user.id,
         UserAvatar.avatar_type == "photo",
@@ -129,9 +137,20 @@ async def list_photo_avatars(
         .where(*conditions)
         .order_by(UserAvatar.created_at.desc(), UserAvatar.id.desc())
     )
-    total = int((await db.execute(total_stmt)).scalar_one() or 0)
-    result = await db.execute(data_stmt.offset((page - 1) * page_size).limit(page_size))
-    return success(page_payload([user_avatar_payload(item) for item in result.scalars().all()], total, page, page_size))
+    total, result = await execute_pagination(
+        db,
+        count_statement=total_stmt,
+        data_statement=data_stmt,
+        pagination=pagination,
+    )
+    return success(
+        page_payload(
+            [user_avatar_payload(item) for item in result.scalars().all()],
+            total,
+            pagination.page,
+            pagination.page_size,
+        )
+    )
 
 
 @router.delete("/photo-avatars/{asset_id}", response_model=Response)

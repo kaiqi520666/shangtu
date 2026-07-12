@@ -14,11 +14,21 @@ class PaginationParams:
         return (self.page - 1) * self.page_size
 
 
-def pagination_params(
-    page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
-) -> PaginationParams:
-    return PaginationParams(page=page, page_size=page_size)
+def create_pagination_params(
+    *,
+    default_page_size: int = 20,
+    max_page_size: int = 100,
+):
+    def dependency(
+        page: int = Query(1, ge=1),
+        page_size: int = Query(default_page_size, ge=1, le=max_page_size),
+    ) -> PaginationParams:
+        return PaginationParams(page=page, page_size=page_size)
+
+    return dependency
+
+
+pagination_params = create_pagination_params()
 
 
 async def execute_pagination(

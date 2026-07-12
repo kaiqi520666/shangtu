@@ -7,6 +7,7 @@ from app.core.cosyvoice_catalog import COSYVOICE_V3_FLASH
 from app.core.deps import get_current_user, get_db
 from app.core.json_utils import dump_json
 from app.core.media_projection import voiceover_task_payload
+from app.core.pagination import PaginationParams, create_pagination_params, execute_pagination
 from app.core.system_settings import get_effective_voiceover_credit_cost
 from app.core.time import utc_now
 from app.core.user_credits import get_user_credits, refund_user_credits
@@ -22,6 +23,7 @@ from app.schemas.response import Response, fail, success
 from app.services.generation_tasks import deduct_credits_or_fail, enqueue_or_compensate
 
 router = APIRouter(prefix="/voiceover", tags=["AI配音"])
+VOICE_PAGINATION = create_pagination_params(default_page_size=24)
 
 
 class CreateVoiceoverTaskRequest(BaseModel):
@@ -67,8 +69,7 @@ async def get_task_asset(db: AsyncSession, task: VoiceoverTask) -> UserAudioAsse
 
 @router.get("/voices", response_model=Response)
 async def list_voices(
-    page: int = 1,
-    page_size: int = 24,
+    pagination: PaginationParams = Depends(VOICE_PAGINATION),
     keyword: str | None = None,
     category: str | None = None,
     language: str | None = None,
@@ -76,8 +77,6 @@ async def list_voices(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    page = max(1, page)
-    page_size = min(max(1, page_size), 100)
     conditions = [
         CosyVoiceVoice.model_id == COSYVOICE_V3_FLASH,
         CosyVoiceVoice.enabled.is_(True),
@@ -99,16 +98,13 @@ async def list_voices(
     if supports_instruct is not None:
         conditions.append(CosyVoiceVoice.supports_instruct == supports_instruct)
 
-    total = int(
-        (await db.execute(select(func.count()).select_from(CosyVoiceVoice).where(*conditions))).scalar_one()
-        or 0
-    )
-    result = await db.execute(
-        select(CosyVoiceVoice)
+    total, result = await execute_pagination(
+        db,
+        count_statement=select(func.count()).select_from(CosyVoiceVoice).where(*conditions),
+        data_statement=select(CosyVoiceVoice)
         .where(*conditions)
-        .order_by(CosyVoiceVoice.sort_order, CosyVoiceVoice.id)
-        .offset((page - 1) * page_size)
-        .limit(page_size)
+        .order_by(CosyVoiceVoice.sort_order, CosyVoiceVoice.id),
+        pagination=pagination,
     )
     categories = (
         await db.execute(
@@ -118,7 +114,7 @@ async def list_voices(
             .order_by(CosyVoiceVoice.category)
         )
     ).scalars().all()
-    return success({"items": [voice_payload(item) for item in result.scalars().all()], "total": total, "page": page, "page_size": page_size, "categories": list(categories)})
+    return success({"items": [voice_payload(item) for item in result.scalars().all()], "total": total, "page": pagination.page, "page_size": pagination.page_size, "categories": list(categories)})
 
 
 @router.get("/config", response_model=Response)

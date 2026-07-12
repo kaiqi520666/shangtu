@@ -10,7 +10,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.media_download import remote_media_download_response
 from app.core.oss import OssConfigError, upload_audio_bytes
-from app.core.pagination import page_payload
+from app.core.pagination import (
+    PaginationParams,
+    create_pagination_params,
+    execute_pagination,
+    page_payload,
+)
 from app.core.system_settings import (
     get_effective_digital_human_credit_costs,
     get_effective_digital_human_precharge_costs,
@@ -41,6 +46,11 @@ router = APIRouter(prefix="/digital-human", tags=["数字人"])
 router.include_router(photo_avatar_router)
 
 DEFAULT_RESOLUTION = "1080p"
+DIGITAL_HUMAN_PAGINATION = create_pagination_params(default_page_size=24)
+AUDIO_ASSET_PAGINATION = create_pagination_params(
+    default_page_size=12,
+    max_page_size=50,
+)
 
 
 class DigitalHumanVoiceSettings(BaseModel):
@@ -84,8 +94,7 @@ def _clean_audio_asset_name(filename: str | None) -> str:
 
 @router.get("/avatars", response_model=Response)
 async def list_digital_human_avatars(
-    page: int = 1,
-    page_size: int = 24,
+    pagination: PaginationParams = Depends(DIGITAL_HUMAN_PAGINATION),
     gender: str | None = None,
     orientation: str | None = None,
     engine: str | None = None,
@@ -93,8 +102,6 @@ async def list_digital_human_avatars(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    page = max(1, page)
-    page_size = min(max(1, page_size), 100)
     conditions = [HeygenAvatar.enabled == True]  # noqa: E712
     if gender in {"male", "female"}:
         conditions.append(func.lower(HeygenAvatar.gender) == gender)
@@ -122,16 +129,19 @@ async def list_digital_human_avatars(
         total_stmt = total_stmt.where(condition)
         data_stmt = data_stmt.where(condition)
 
-    total = int((await db.execute(total_stmt)).scalar_one() or 0)
-    result = await db.execute(data_stmt.offset((page - 1) * page_size).limit(page_size))
+    total, result = await execute_pagination(
+        db,
+        count_statement=total_stmt,
+        data_statement=data_stmt,
+        pagination=pagination,
+    )
     items = [heygen_avatar_payload(item) for item in result.scalars().all()]
-    return success(page_payload(items, total, page, page_size))
+    return success(page_payload(items, total, pagination.page, pagination.page_size))
 
 
 @router.get("/voices", response_model=Response)
 async def list_digital_human_voices(
-    page: int = 1,
-    page_size: int = 24,
+    pagination: PaginationParams = Depends(DIGITAL_HUMAN_PAGINATION),
     gender: str | None = None,
     language: str | None = None,
     support_locale: str | None = None,
@@ -140,8 +150,6 @@ async def list_digital_human_voices(
     db: AsyncSession = Depends(get_db),
 ):
     _ = current_user
-    page = max(1, page)
-    page_size = min(max(1, page_size), 100)
     conditions = [HeygenVoice.enabled == True]  # noqa: E712
     if gender in {"male", "female", "unknown"}:
         conditions.append(func.lower(HeygenVoice.gender) == gender)
@@ -172,10 +180,14 @@ async def list_digital_human_voices(
         total_stmt = total_stmt.where(condition)
         data_stmt = data_stmt.where(condition)
 
-    total = int((await db.execute(total_stmt)).scalar_one() or 0)
-    result = await db.execute(data_stmt.offset((page - 1) * page_size).limit(page_size))
+    total, result = await execute_pagination(
+        db,
+        count_statement=total_stmt,
+        data_statement=data_stmt,
+        pagination=pagination,
+    )
     items = [heygen_voice_payload(item) for item in result.scalars().all()]
-    return success(page_payload(items, total, page, page_size))
+    return success(page_payload(items, total, pagination.page, pagination.page_size))
 
 
 @router.post("/audio-assets/upload", response_model=Response)
@@ -224,13 +236,10 @@ async def upload_digital_human_audio_asset(
 
 @router.get("/audio-assets", response_model=Response)
 async def list_digital_human_audio_assets(
-    page: int = 1,
-    page_size: int = 12,
+    pagination: PaginationParams = Depends(AUDIO_ASSET_PAGINATION),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    page = max(1, page)
-    page_size = min(max(1, page_size), 50)
     conditions = [
         UserAudioAsset.user_id == current_user.id,
         UserAudioAsset.enabled == True,  # noqa: E712
@@ -246,10 +255,14 @@ async def list_digital_human_audio_assets(
         total_stmt = total_stmt.where(condition)
         data_stmt = data_stmt.where(condition)
 
-    total = int((await db.execute(total_stmt)).scalar_one() or 0)
-    result = await db.execute(data_stmt.offset((page - 1) * page_size).limit(page_size))
+    total, result = await execute_pagination(
+        db,
+        count_statement=total_stmt,
+        data_statement=data_stmt,
+        pagination=pagination,
+    )
     items = [_audio_asset_payload(item) for item in result.scalars().all()]
-    return success(page_payload(items, total, page, page_size))
+    return success(page_payload(items, total, pagination.page, pagination.page_size))
 
 
 @router.delete("/audio-assets/{audio_asset_id}", response_model=Response)
