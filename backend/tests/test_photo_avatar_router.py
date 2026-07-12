@@ -7,7 +7,7 @@ import httpx
 import pytest
 from starlette.datastructures import Headers, UploadFile
 
-from app.routers.digital_human import upload_photo_avatar
+from app.routers.photo_avatar import upload_photo_avatar
 
 
 def make_file() -> UploadFile:
@@ -66,12 +66,12 @@ async def test_upload_photo_avatar_returns_current_credits_for_all_provider_path
     )
 
     with (
-        patch("app.routers.digital_human.upload_image_bytes", AsyncMock(return_value=uploaded)),
-        patch("app.routers.digital_human.httpx.AsyncClient", return_value=client_context()),
-        patch("app.routers.digital_human.create_photo_avatar", create_mock),
-        patch("app.routers.digital_human.parse_heygen_error_message", return_value="HeyGen 暂时不可用"),
-        patch("app.routers.digital_human._get_user_avatars_by_ids", AsyncMock(return_value={})),
-        patch("app.routers.digital_human.get_user_credits", AsyncMock(return_value=73)) as credits,
+        patch("app.services.photo_avatar.upload_image_bytes", AsyncMock(return_value=uploaded)),
+        patch("app.services.photo_avatar.httpx.AsyncClient", return_value=client_context()),
+        patch("app.services.photo_avatar.create_photo_avatar", create_mock),
+        patch("app.services.photo_avatar.parse_heygen_error_message", return_value="HeyGen 暂时不可用"),
+        patch("app.services.photo_avatar.get_user_avatars_by_ids", AsyncMock(return_value={})),
+        patch("app.services.photo_avatar.get_user_credits", AsyncMock(return_value=73)) as credits,
     ):
         response = await upload_photo_avatar(
             file=make_file(),
