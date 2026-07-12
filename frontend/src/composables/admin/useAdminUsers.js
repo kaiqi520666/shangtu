@@ -4,6 +4,7 @@ import { roleLabel } from "@/constants/admin.js";
 import { createAdminPageState, useAdminPageLoader } from "@/composables/admin/useAdminPageState.js";
 import { useAdminOverview } from "@/composables/admin/useAdminOverview.js";
 import { useAdminTransactions } from "@/composables/admin/useAdminTransactions.js";
+import { useAdminPasswordReset } from "@/composables/admin/useAdminPasswordReset.js";
 import { useConfirm } from "@/composables/useConfirm.js";
 import { useToast } from "@/composables/useToast.js";
 
@@ -32,6 +33,8 @@ export function useAdminUsers() {
       "加载用户失败",
     );
   }
+
+  const passwordReset = useAdminPasswordReset(loadUsers);
 
   function applyUsersFilter() {
     applyFilter(usersState, loadUsers);
@@ -155,6 +158,7 @@ export function useAdminUsers() {
     businessModalOpen,
     businessTarget,
     businessSaving,
+    passwordReset,
     loadUsers,
     applyUsersFilter,
     changeUserRole,

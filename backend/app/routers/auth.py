@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth import create_token, hash_password, verify_password
+from app.core.auth import create_token, hash_password, validate_password, verify_password
 from app.core.deps import get_current_user, get_db
 from app.core.distribution import generate_invite_code
 from app.core.time import to_utc_iso
@@ -42,13 +42,17 @@ def _user_payload(user: User) -> dict:
 
 def _auth_payload(user: User) -> dict:
     return {
-        "token": create_token(user.id),
+        "token": create_token(user.id, user.auth_version),
         **_user_payload(user),
     }
 
 
 @router.post("/register", response_model=Response)
 async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
+    try:
+        validate_password(req.password)
+    except ValueError as exc:
+        return fail(str(exc))
     result = await db.execute(select(User).where(User.email == req.email))
     if result.scalar_one_or_none():
         return fail("邮箱已注册")

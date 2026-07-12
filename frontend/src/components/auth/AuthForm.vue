@@ -1,6 +1,7 @@
 <script setup>
 import { computed, reactive, ref } from 'vue'
 import { Eye, EyeOff, LoaderCircle, Lock, Mail, UserRound } from 'lucide-vue-next'
+import { validateNewPassword } from '@/utils/password.js'
 
 const props = defineProps({
   mode: {
@@ -48,8 +49,11 @@ function handleSubmit() {
     return
   }
 
-  if (form.password.length < 6) {
-    message.value = '密码至少 6 位'
+  const passwordMessage = isRegister.value
+    ? validateNewPassword(form.password, form.password)
+    : form.password.length < 6 ? '密码至少 6 位' : ''
+  if (passwordMessage) {
+    message.value = passwordMessage
     return
   }
 

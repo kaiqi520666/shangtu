@@ -2,16 +2,43 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth import set_user_password
 from app.core.deps import get_current_super_admin, get_db
 from app.core.distribution import update_root_distribution
 from app.core.time import utc_now
 from app.models import CreditTransaction, User
 from app.schemas.response import Response, fail, success
 
-from .schemas import AdjustCreditsRequest, UpdateUserBusinessRequest, UpdateUserRequest
+from .schemas import (
+    AdjustCreditsRequest,
+    ResetUserPasswordRequest,
+    UpdateUserBusinessRequest,
+    UpdateUserRequest,
+)
 from .utils import audit_log, page_payload, super_admin_count, user_payload
 
 router = APIRouter()
+
+
+@router.put("/users/{user_id}/password", response_model=Response)
+async def reset_user_password(
+    user_id: int,
+    req: ResetUserPasswordRequest,
+    current_admin: User = Depends(get_current_super_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    target = (
+        await db.execute(select(User).where(User.id == user_id).with_for_update())
+    ).scalar_one_or_none()
+    if not target:
+        return fail("用户不存在")
+    try:
+        set_user_password(target, req.new_password)
+    except ValueError as exc:
+        return fail(str(exc))
+    db.add(audit_log(current_admin, "reset_user_password", "user", str(target.id), None))
+    await db.commit()
+    return success(message="密码已重置")
 
 
 @router.get("/users", response_model=Response)

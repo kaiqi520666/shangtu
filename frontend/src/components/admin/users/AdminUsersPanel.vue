@@ -21,6 +21,7 @@ const emit = defineEmits([
   "apply-filter",
   "adjust-credits",
   "business-settings",
+  "reset-password",
   "change-role",
   "change-status",
   "change-page",
@@ -101,6 +102,7 @@ const emit = defineEmits([
                   调积分
                 </button>
                 <button type="button" class="rounded-lg border border-slate-200 px-2.5 py-1.5 font-semibold text-slate-600 hover:bg-slate-50" @click="emit('business-settings', user)">业务</button>
+                <button type="button" class="rounded-lg border border-slate-200 px-2.5 py-1.5 font-semibold text-slate-600 hover:bg-slate-50" @click="emit('reset-password', user)">重置密码</button>
                 <button type="button" class="rounded-lg border border-slate-200 px-2.5 py-1.5 font-semibold text-slate-600 hover:bg-slate-50" @click="emit('change-role', user)">
                   {{ user.role === 'super_admin' ? '取消超管' : '设为超管' }}
                 </button>

@@ -16,6 +16,10 @@ export function updateAdminUserBusiness(userId, payload) {
   return request.patch(`/admin/users/${userId}/business`, payload, { timeout: 15000 });
 }
 
+export function resetAdminUserPassword(userId, payload) {
+  return request.put(`/admin/users/${userId}/password`, payload, { timeout: 15000 });
+}
+
 export function adjustAdminUserCredits(userId, payload) {
   return request.post(`/admin/users/${userId}/credits/adjust`, payload, { timeout: 15000 });
 }

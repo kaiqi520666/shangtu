@@ -1,14 +1,17 @@
 <script setup>
 import { computed, onMounted } from "vue";
-import { CalendarDays, CreditCard, Mail, ShieldCheck, UserRound, WalletCards } from "lucide-vue-next";
+import { CalendarDays, CreditCard, KeyRound, Mail, ShieldCheck, UserRound, WalletCards } from "lucide-vue-next";
+import ChangePasswordModal from "@/components/account/ChangePasswordModal.vue";
 import { useRechargeModal } from "@/composables/useRechargeModal.js";
 import { useAccountProfile } from "@/composables/account/useAccountProfile.js";
+import { useChangePassword } from "@/composables/account/useChangePassword.js";
 import { formatTime, roleLabel, statusLabel } from "@/constants/admin.js";
 import { useAuthStore } from "@/stores/auth.js";
 
 const authStore = useAuthStore();
 const { openRechargeModal } = useRechargeModal();
 const { profile, loading, loadProfile } = useAccountProfile();
+const changePassword = useChangePassword();
 
 const account = computed(() => profile.value || authStore.user || {});
 const initials = computed(() => {
@@ -83,7 +86,17 @@ onMounted(() => {
           <Mail class="h-4 w-4 text-slate-400" />
           登录账号
         </div>
-        <p class="mt-3 break-all text-sm font-semibold text-slate-600">{{ account.email || "-" }}</p>
+        <div class="mt-3 flex items-center justify-between gap-3">
+          <p class="min-w-0 break-all text-sm font-semibold text-slate-600">{{ account.email || "-" }}</p>
+          <button
+            type="button"
+            class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
+            @click="changePassword.open.value = true"
+          >
+            <KeyRound class="h-4 w-4" />
+            修改密码
+          </button>
+        </div>
       </div>
       <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <div class="flex items-center gap-2 text-sm font-black text-slate-900">
@@ -93,5 +106,11 @@ onMounted(() => {
         <p class="mt-3 text-sm leading-6 text-slate-500">积分用于图片和视频生成，扣费按当前系统配置执行。充值、生成消耗、失败退回都会记录在积分明细中。</p>
       </div>
     </div>
+    <ChangePasswordModal
+      :open="changePassword.open.value"
+      :saving="changePassword.saving.value"
+      @close="changePassword.open.value = false"
+      @submit="changePassword.submit"
+    />
   </section>
 </template>

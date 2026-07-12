@@ -36,6 +36,7 @@ class User(Base):
     username: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     email: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    auth_version: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     credits: Mapped[int] = mapped_column(Integer, default=0)
     consumption_multiplier: Mapped[Decimal] = mapped_column(
         Numeric(3, 2), default=Decimal("1.00"), nullable=False

@@ -33,6 +33,10 @@ class AdjustCreditsRequest(BaseModel):
         return cleaned
 
 
+class ResetUserPasswordRequest(BaseModel):
+    new_password: str
+
+
 class RechargePackageConfig(BaseModel):
     id: str = Field(..., min_length=1, max_length=64)
     name: str = Field(..., min_length=1, max_length=100)

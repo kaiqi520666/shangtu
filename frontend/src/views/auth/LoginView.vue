@@ -17,6 +17,9 @@ onMounted(() => {
   if (route.query.loggedOut === '1') {
     toast.success('已退出登录')
     router.replace('/login')
+  } else if (route.query.passwordChanged === '1') {
+    toast.success('密码已修改，请重新登录')
+    router.replace('/login')
   }
 })
 

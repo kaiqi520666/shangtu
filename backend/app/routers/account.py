@@ -1,15 +1,22 @@
 from fastapi import APIRouter, Depends
+from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth import set_user_password, validate_password, verify_password
 from app.core.credit_transactions import transaction_payload
 from app.core.deps import get_current_user, get_db
 from app.core.pagination import page_payload
 from app.core.time import to_utc_iso
 from app.models import CreditTransaction, User
-from app.schemas.response import Response, success
+from app.schemas.response import Response, fail, success
 
 router = APIRouter(prefix="/account", tags=["账号中心"])
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
 
 
 def account_profile_payload(user: User) -> dict:
@@ -30,6 +37,28 @@ def account_profile_payload(user: User) -> dict:
 @router.get("/profile", response_model=Response)
 async def account_profile(current_user: User = Depends(get_current_user)):
     return success(account_profile_payload(current_user))
+
+
+@router.put("/password", response_model=Response)
+async def change_password(
+    req: ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    user = (
+        await db.execute(select(User).where(User.id == current_user.id).with_for_update())
+    ).scalar_one()
+    if not verify_password(req.current_password, user.password_hash):
+        return fail("当前密码错误")
+    try:
+        validate_password(req.new_password)
+    except ValueError as exc:
+        return fail(str(exc))
+    if req.new_password == req.current_password:
+        return fail("新密码不能与当前密码相同")
+    set_user_password(user, req.new_password)
+    await db.commit()
+    return success(message="密码已修改，请重新登录")
 
 
 @router.get("/credit-transactions", response_model=Response)

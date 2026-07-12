@@ -20,7 +20,7 @@ async def get_current_user(
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        user_id = decode_token(credentials.credentials)
+        user_id, auth_version = decode_token(credentials.credentials)
     except Exception:
         raise HTTPException(status_code=401, detail="token无效")
     result = await db.execute(select(User).where(User.id == user_id))
@@ -29,6 +29,8 @@ async def get_current_user(
         raise HTTPException(status_code=401, detail="用户不存在")
     if user.status != "active":
         raise HTTPException(status_code=403, detail="账号已被禁用")
+    if user.auth_version != auth_version:
+        raise HTTPException(status_code=401, detail="登录状态已失效，请重新登录")
     return user
 
 
