@@ -2,11 +2,10 @@ import uuid
 
 from fastapi import APIRouter, Depends, File, Request, UploadFile
 from pydantic import BaseModel, Field
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_user, get_db
-from app.core.json_utils import dump_json_or_none, parse_json_or_none
+from app.core.json_utils import dump_json_or_none
 from app.core.media_download import remote_media_download_response
 from app.core.oss import OssConfigError, upload_audio_bytes, upload_video_bytes
 from app.core.strategy.dashscope_client import (
@@ -14,14 +13,7 @@ from app.core.strategy.dashscope_client import (
     optimize_free_video_prompt,
 )
 from app.core.prompt_template_builder import build_strategy_template_prompt
-from app.core.prompt_snapshot import parse_prompt_snapshot
-from app.core.system_settings import (
-    get_effective_video_credit_costs,
-)
-from app.core.task_state import merge_task_state
-from app.core.task_timeout import project_task_runtime_state
-from app.core.time import to_utc_iso, utc_now
-from app.core.user_credits import get_user_credits
+from app.core.system_settings import get_effective_video_credit_costs
 from app.core.video_strategy_generation import generate_video_strategy
 from app.models import User, UserAudioAsset, VideoTask
 from app.schemas.response import Response, fail, success
@@ -32,6 +24,11 @@ from app.services.video_generation import (
     validate_aspect_ratio,
     validate_video_duration,
     validate_video_inputs,
+)
+from app.services.video_tasks import (
+    archive_video_task,
+    get_user_video_task,
+    get_video_task_details,
 )
 
 router = APIRouter(prefix="/video", tags=["视频生成"])
@@ -296,59 +293,15 @@ async def get_video_task(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(
-        select(VideoTask).where(
-            VideoTask.id == task_id,
-            VideoTask.user_id == current_user.id,
-        )
+    details = await get_video_task_details(
+        db,
+        user_id=current_user.id,
+        task_id=task_id,
+        redis_pool=getattr(request.app.state, "redis_pool", None),
     )
-    task = result.scalar_one_or_none()
-    if not task:
+    if details is None:
         return fail("视频任务不存在")
-
-    redis_pool = getattr(request.app.state, "redis_pool", None)
-    state = await merge_task_state(
-        redis_pool,
-        "video",
-        task_id,
-        db_status=task.status,
-        db_result_url=task.result_url,
-        db_error_message=task.error_message,
-        db_progress=task.progress,
-    )
-    runtime = project_task_runtime_state(
-        "video",
-        status=state.status,
-        error_message=state.error_message,
-        progress=state.progress,
-        result_url=state.result_url,
-        created_at=task.created_at,
-    )
-
-    latest_credits = await get_user_credits(db, current_user.id)
-
-    return success(
-        {
-            "task_id": task.id,
-            "scenario": task.scenario,
-            "status": runtime.status,
-            "result_url": runtime.result_url,
-            "prompt": task.prompt,
-            "prompt_snapshot": parse_prompt_snapshot(task.prompt_snapshot_json),
-            "settings_snapshot": parse_json_or_none(task.settings_snapshot_json),
-            "input_mode": task.input_mode,
-            "input_images": parse_json_or_none(task.input_images_json) or [],
-            "input_video_url": task.input_video_url,
-            "duration": task.duration,
-            "resolution": task.resolution,
-            "aspect_ratio": task.aspect_ratio,
-            "created_at": to_utc_iso(task.created_at),
-            "error_message": runtime.error_message,
-            "progress": runtime.progress,
-            "credit_cost": task.credit_cost,
-            "credits": latest_credits,
-        }
-    )
+    return success(details)
 
 
 @router.delete("/task/{task_id}", response_model=Response)
@@ -357,25 +310,13 @@ async def delete_video_task(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """软删除单个视频任务（仅标记 archived，不物理删除 OSS 文件）。"""
-    result = await db.execute(
-        select(VideoTask).where(
-            VideoTask.id == task_id,
-            VideoTask.user_id == current_user.id,
-        )
+    error_message = await archive_video_task(
+        db,
+        user_id=current_user.id,
+        task_id=task_id,
     )
-    task = result.scalar_one_or_none()
-    if not task:
-        return fail("视频不存在")
-
-    task.archived = True
-    task.archived_at = utc_now()
-    try:
-        await db.commit()
-    except Exception:
-        await db.rollback()
-        return fail("删除失败，请稍后重试")
-
+    if error_message:
+        return fail(error_message)
     return success({"task_id": task_id})
 
 
@@ -385,13 +326,11 @@ async def download_video_task(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(
-        select(VideoTask).where(
-            VideoTask.id == task_id,
-            VideoTask.user_id == current_user.id,
-        )
+    task = await get_user_video_task(
+        db,
+        user_id=current_user.id,
+        task_id=task_id,
     )
-    task = result.scalar_one_or_none()
     if not task or not task.result_url:
         return fail("视频不存在或尚未生成完成")
 
