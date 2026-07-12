@@ -16,26 +16,26 @@ import { buildProductAnalyzeImages, hasUploadingImages } from "@/utils/analyzeIm
 import { getApiErrorMessage } from "@/utils/apiError.js";
 import {
   cloneGenerationSettingsSnapshot,
+  cloneUploadedImages,
   createGenerationSettingsSnapshot,
   getSnapshotScene,
   restoreImageGenerationSettings,
   syncImageQuality,
 } from "@/utils/generationSnapshots.js";
+import {
+  buildProductImageQueue as createProductImageQueue,
+  buildProductImageStrategySnapshot as createProductImageStrategySnapshot,
+  buildProductImageUserPrompt,
+  createDefaultSelectedModules,
+  findProductImageModuleContent as resolveProductImageModuleContent,
+  getActiveProductImageModuleIds,
+  getProductImageModuleName,
+  getProductImageModuleStrategy,
+  normalizeProductImageModules,
+  resolveSelectedProductModules,
+} from "@/utils/productImageStrategy.js";
 import { generateImageStrategy } from "@/api/image.js";
 import { useCatalogStore } from "@/stores/catalog.js";
-
-const DEFAULT_SELECTED_MODULES = [
-  "first-screen",
-  "core-selling",
-  "use-scenario",
-  "multi-angle",
-  "detail-zoom",
-  "ambient-scene",
-];
-
-function createDefaultSelectedModules() {
-  return [...DEFAULT_SELECTED_MODULES];
-}
 
 export function useProductImageGenerator({ onJobCreated } = {}) {
   const toast = useToast();
@@ -197,11 +197,7 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
   }
 
   function resolveSelectedModules(moduleIds) {
-    const catalogIds = availableModules.value.map((module) => module.id);
-    const selected = moduleIds.filter((id) => catalogIds.includes(id));
-    if (selected.length > 0) return selected;
-    const defaults = DEFAULT_SELECTED_MODULES.filter((id) => catalogIds.includes(id));
-    return defaults.length > 0 ? defaults : catalogIds.slice(0, 6);
+    return resolveSelectedProductModules(moduleIds, availableModules.value);
   }
 
   function restoreProductImageJobData(data) {
@@ -363,14 +359,7 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
 
     const snapshotPayload = {
       settings: baseSettingsSnapshot,
-      source_images: uploadedImages.value.map((img) => ({
-        id: img.id,
-        url: img.url,
-        objectKey: img.objectKey,
-        contentType: img.contentType,
-        size: img.size,
-        previewUrl: img.url || img.previewUrl,
-      })),
+      source_images: cloneUploadedImages(uploadedImages.value),
       input_text: settings.productInput,
       structure: moduleContents.value,
     };
@@ -408,69 +397,43 @@ export function useProductImageGenerator({ onJobCreated } = {}) {
   }
 
   function buildProductImageStrategySnapshot() {
-    return {
-      scenario: "product_image",
-      images: buildProductAnalyzeImages(uploadedImages.value, mainImageIndex.value),
-      platform: settings.platform,
-      language: settings.language,
-      ratio: settings.ratio,
-      quality: settings.quality,
-      productInput: settings.productInput,
-      moduleIds: [...selectedModules.value],
-    };
-  }
-
-  function getActiveStrategyModuleIds() {
-    return moduleContents.value.map((module) => module.id).filter(Boolean);
-  }
-
-  function buildProductImageQueue() {
-    return moduleContents.value.map((item, index) => ({
-      ...item,
-      moduleName: item.moduleName || getModuleName(item.id),
-      content: item.content || "",
-      strategy: item.strategy || "",
-      index: index + 1,
-    }));
-  }
-
-  function buildUserPromptForItem(item) {
-    const lines = [
-      `【图种】${item.moduleName}`,
-      item.strategy ? `【视觉策略】${item.strategy}` : "",
-      item.content ? `【模块内容】${item.content}` : "",
-    ];
-    return lines.filter(Boolean).join("\n");
-  }
-
-  function normalizeStrategyModules(modules) {
-    return modules.map((module, index) => {
-      const fallback = catalog.findModule(module.id);
-      return {
-        id: module.id || fallback?.id || `module-${index + 1}`,
-        moduleName: module.moduleName || fallback?.name || `模块 ${index + 1}`,
-        content: module.content || "",
-        strategy: module.strategy || fallback?.strategy || "",
-      };
+    return createProductImageStrategySnapshot({
+      settings,
+      uploadedImages: uploadedImages.value,
+      mainImageIndex: mainImageIndex.value,
+      selectedModules: selectedModules.value,
     });
   }
 
+  function getActiveStrategyModuleIds() {
+    return getActiveProductImageModuleIds(moduleContents.value);
+  }
+
+  function buildProductImageQueue() {
+    return createProductImageQueue(moduleContents.value, availableModules.value);
+  }
+
+  function buildUserPromptForItem(item) {
+    return buildProductImageUserPrompt(item);
+  }
+
+  function normalizeStrategyModules(modules) {
+    return normalizeProductImageModules(modules, availableModules.value);
+  }
+
   function getModuleName(id) {
-    return catalog.findModule(id)?.name || id || "详情图";
+    return getProductImageModuleName(availableModules.value, id);
   }
 
   function getModuleStrategy(id) {
-    return catalog.findModule(id)?.strategy || "";
+    return getProductImageModuleStrategy(availableModules.value, id);
   }
 
   function findModuleContent(typeId) {
-    return (
-      moduleContents.value.find((module) => module.id === typeId) || {
-        id: typeId,
-        moduleName: getModuleName(typeId),
-        content: getModuleStrategy(typeId),
-        strategy: getModuleStrategy(typeId),
-      }
+    return resolveProductImageModuleContent(
+      moduleContents.value,
+      availableModules.value,
+      typeId,
     );
   }
 
