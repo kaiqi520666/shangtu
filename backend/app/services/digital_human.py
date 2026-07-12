@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import httpx
 import uuid
 
 from sqlalchemy import select, update
@@ -8,7 +7,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.json_utils import dump_json_or_none, parse_json_or_none
 from app.core.prompt_snapshot import build_prompt_snapshot, dump_prompt_snapshot, parse_prompt_snapshot
-from app.core.providers.heygen_provider import get_video
 from app.core.scenarios import SCENARIO_TITLE_PREFIX
 from app.core.system_settings import get_effective_digital_human_credit_costs, get_effective_digital_human_precharge_cost
 from app.core.task_timeout import project_task_runtime_state
@@ -26,24 +24,13 @@ from app.services.generation_tasks import deduct_credits_or_fail, enqueue_or_com
 from app.services.heygen_task_lifecycle import (
     clean_text,
     get_or_create_video_job,
-    provider_task_status,
-    refund_video_task_if_needed,
     sync_video_job_status,
-    task_progress,
 )
 
 SCENARIO = "digital_human"
 QUALITY_TIERS = {"standard", "premium"}
 SUPPORTED_RESOLUTIONS = {"720p", "1080p"}
 SUPPORTED_ASPECT_RATIOS = {"16:9", "9:16", "1:1"}
-
-
-def should_sync_provider_task(task: VideoTask) -> bool:
-    if not task.provider_task_id:
-        return False
-    if task.status not in {"done", "failed", "timeout"}:
-        return True
-    return task.status == "done" and int(task.duration or 0) < 1
 
 
 def task_payload(task: VideoTask) -> dict:
@@ -377,38 +364,3 @@ async def settle_task_credits_if_needed(db: AsyncSession, task: VideoTask) -> bo
         )
     task.credit_cost = final_cost
     return True
-
-
-async def sync_task_from_provider(db: AsyncSession, task: VideoTask) -> VideoTask:
-    if not task.provider_task_id:
-        return task
-    async with httpx.AsyncClient(timeout=60) as client:
-        data = await get_video(client, video_id=task.provider_task_id)
-
-    video_url = clean_text(data.get("video_url") or data.get("url") or data.get("result_url")) or None
-    error_message = clean_text(
-        data.get("error_message") or data.get("failure_reason") or data.get("message")
-    ) or None
-    status = provider_task_status(
-        clean_text(data.get("status") or data.get("video_status")),
-        video_url=video_url,
-        failure_message=error_message,
-    )
-    try:
-        duration = max(0, int(float(data.get("duration") or data.get("video_duration") or 0)))
-    except (TypeError, ValueError):
-        duration = task.duration
-
-    task.status = status
-    task.progress = task_progress(status)
-    task.result_url = video_url
-    task.error_message = error_message
-    task.duration = duration
-    if status == "failed":
-        await refund_video_task_if_needed(db, task, note=f"数字人任务失败退回 · {task.id}")
-    elif status == "done":
-        await settle_task_credits_if_needed(db, task)
-    await sync_job_status(db, task.job_id)
-    await db.commit()
-    await db.refresh(task)
-    return task

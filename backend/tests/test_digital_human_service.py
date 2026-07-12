@@ -2,14 +2,12 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
-import httpx
 from app.core.json_utils import dump_json
 
 from app.services.digital_human import (
     archive_task,
     get_task_details,
     settle_task_credits_if_needed,
-    sync_task_from_provider,
 )
 
 
@@ -65,16 +63,6 @@ async def test_settlement_charges_underpayment():
 @pytest.mark.asyncio
 async def test_settlement_skips_refunded_task():
     assert await settle_task_credits_if_needed(AsyncMock(), make_task(credit_refunded=True)) is False
-
-
-@pytest.mark.asyncio
-async def test_provider_error_propagates_without_committing():
-    db = AsyncMock()
-    task = make_task(provider_task_id="provider-1")
-    with patch("app.services.digital_human.get_video", AsyncMock(side_effect=httpx.ConnectError("offline"))):
-        with pytest.raises(httpx.ConnectError):
-            await sync_task_from_provider(db, task)
-    db.commit.assert_not_awaited()
 
 
 @pytest.mark.asyncio
