@@ -3,6 +3,8 @@ from app.models.credit_order import CreditOrder
 from app.models.credit_transaction import CreditTransaction
 from app.models.commission_transaction import CommissionTransaction
 from app.models.commission_withdrawal import CommissionWithdrawal
+from app.models.coupon_code import CouponCode
+from app.models.coupon_redemption import CouponRedemption
 from app.models.cosyvoice_voice import CosyVoiceVoice
 from app.models.generation_job import GenerationJob
 from app.models.heygen_avatar import HeygenAvatar
@@ -26,6 +28,8 @@ __all__ = [
     "CreditTransaction",
     "CommissionTransaction",
     "CommissionWithdrawal",
+    "CouponCode",
+    "CouponRedemption",
     "CosyVoiceVoice",
     "GenerationJob",
     "HeygenAvatar",

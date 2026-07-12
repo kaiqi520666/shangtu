@@ -24,6 +24,22 @@ export function adjustAdminUserCredits(userId, payload) {
   return request.post(`/admin/users/${userId}/credits/adjust`, payload, { timeout: 15000 });
 }
 
+export function getAdminCouponCodes(params = {}) {
+  return request.get("/admin/coupon-codes", { params, timeout: 15000 });
+}
+
+export function createAdminCouponCode(payload) {
+  return request.post("/admin/coupon-codes", payload, { timeout: 15000 });
+}
+
+export function updateAdminCouponCode(couponId, payload) {
+  return request.patch(`/admin/coupon-codes/${couponId}`, payload, { timeout: 15000 });
+}
+
+export function deleteAdminCouponCode(couponId) {
+  return request.delete(`/admin/coupon-codes/${couponId}`, { timeout: 15000 });
+}
+
 export function getAdminCommissionWithdrawals(params = {}) {
   return request.get("/admin/commission-withdrawals", { params, timeout: 15000 });
 }

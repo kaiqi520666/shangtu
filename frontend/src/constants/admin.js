@@ -3,6 +3,7 @@ export const adminTabs = [
   { key: "users", label: "用户", to: "/admin/users" },
   { key: "orders", label: "订单", to: "/admin/orders" },
   { key: "transactions", label: "流水", to: "/admin/transactions" },
+  { key: "couponCodes", label: "优惠码", to: "/admin/coupon-codes" },
   { key: "commissionWithdrawals", label: "提现审核", to: "/admin/commission-withdrawals" },
   { key: "imageTasks", label: "生成任务", to: "/admin/image-tasks" },
   { key: "assets", label: "管理资产", to: "/admin/assets" },
@@ -41,6 +42,14 @@ export const transactionTypeOptions = [
   { label: "消费", value: "consume" },
   { label: "退款", value: "refund" },
   { label: "后台调整", value: "admin_adjust" },
+  { label: "优惠码兑换", value: "coupon_redeem" },
+];
+
+export const couponStatusOptions = [
+  { label: "全部状态", value: "" },
+  { label: "启用", value: "enabled" },
+  { label: "停用", value: "disabled" },
+  { label: "已删除", value: "deleted" },
 ];
 
 export const imageTaskStatusOptions = [
@@ -74,6 +83,10 @@ export const auditActionOptions = [
   { label: "更新用户", value: "update_user" },
   { label: "调整积分", value: "adjust_credits" },
   { label: "更新用户业务设置", value: "update_user_business" },
+  { label: "创建优惠码", value: "create_coupon_code" },
+  { label: "更新优惠码", value: "update_coupon_code" },
+  { label: "启停优惠码", value: "toggle_coupon_code" },
+  { label: "删除优惠码", value: "delete_coupon_code" },
   { label: "通过提现审核", value: "approve_commission_withdrawal" },
   { label: "驳回提现", value: "reject_commission_withdrawal" },
   { label: "确认佣金打款", value: "pay_commission_withdrawal" },

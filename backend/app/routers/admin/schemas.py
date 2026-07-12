@@ -3,6 +3,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
+from app.core.coupons import normalize_coupon_code
+
 RoleValue = Literal["user", "super_admin"]
 StatusValue = Literal["active", "disabled"]
 
@@ -35,6 +37,24 @@ class AdjustCreditsRequest(BaseModel):
 
 class ResetUserPasswordRequest(BaseModel):
     new_password: str
+
+
+class CreateCouponCodeRequest(BaseModel):
+    code: str
+    credits: int = Field(..., ge=1, le=10000000)
+    usage_limit: int | None = Field(default=None, ge=1, le=1000000)
+    enabled: bool = True
+
+    @field_validator("code")
+    @classmethod
+    def normalize_code(cls, value: str) -> str:
+        return normalize_coupon_code(value)
+
+
+class UpdateCouponCodeRequest(BaseModel):
+    credits: int | None = Field(default=None, ge=1, le=10000000)
+    usage_limit: int | None = Field(default=None, ge=1, le=1000000)
+    enabled: bool | None = None
 
 
 class RechargePackageConfig(BaseModel):

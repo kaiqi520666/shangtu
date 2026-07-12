@@ -11,6 +11,7 @@ import {
   WalletCards,
 } from "lucide-vue-next";
 import { createBillingOrder, getBillingOrder, getBillingPackages } from "@/api/billing.js";
+import CouponRedeemPanel from "@/components/billing/CouponRedeemPanel.vue";
 import AppModal from "@/components/ui/AppModal.vue";
 import { useAuthStore } from "@/stores/auth.js";
 import { useToast } from "@/composables/useToast.js";
@@ -30,6 +31,7 @@ const authStore = useAuthStore();
 const toast = useToast();
 
 const loadingPackages = ref(false);
+const mode = ref("packages");
 const packages = ref([]);
 const imageCreditCosts = ref({});
 const videoCreditCosts = ref({});
@@ -177,6 +179,7 @@ async function createOrder() {
 
 function resetToPackages() {
   clearPolling();
+  mode.value = "packages";
   currentOrder.value = null;
   qrDataUrl.value = "";
   pollError.value = "";
@@ -275,40 +278,48 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <div v-if="loadingPackages" class="flex h-48 items-center justify-center text-sm text-slate-400">
-        <LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
-        正在加载套餐...
+      <div class="grid grid-cols-2 rounded-xl bg-slate-100 p-1">
+        <button type="button" class="rounded-lg px-4 py-2 text-xs font-black transition-colors" :class="mode === 'packages' ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-500'" @click="mode = 'packages'">充值套餐</button>
+        <button type="button" class="rounded-lg px-4 py-2 text-xs font-black transition-colors" :class="mode === 'coupon' ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-500'" @click="mode = 'coupon'">优惠码兑换</button>
       </div>
 
-      <div v-else-if="packages.length" class="grid gap-2 sm:grid-cols-3">
+      <template v-if="mode === 'packages'">
+        <div v-if="loadingPackages" class="flex h-48 items-center justify-center text-sm text-slate-400">
+          <LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
+          正在加载套餐...
+        </div>
+
+        <div v-else-if="packages.length" class="grid gap-2 sm:grid-cols-3">
+          <button
+            v-for="pkg in packages"
+            :key="pkg.id"
+            type="button"
+            class="group relative flex min-h-[112px] flex-col items-center justify-center rounded-2xl border px-4 py-4 text-center transition-all duration-200"
+            :class="selectedPackageId === pkg.id ? 'border-emerald-400 bg-emerald-50/80 text-slate-950 shadow-[0_14px_34px_rgba(16,185,129,0.16)] ring-1 ring-emerald-200' : 'border-slate-200 bg-white text-slate-950 shadow-sm hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-[0_14px_32px_rgba(15,23,42,0.10)]'"
+            @click="selectedPackageId = pkg.id"
+          >
+            <CheckCircle2 v-if="selectedPackageId === pkg.id" class="absolute right-3 top-3 h-4 w-4 text-emerald-500" />
+            <p class="text-xl font-black tracking-normal text-slate-950">{{ formatCredits(pkg.credits) }} 积分</p>
+            <p class="mt-2 text-sm font-bold text-slate-500">{{ formatMoney(pkg.amount_cents) }}</p>
+          </button>
+        </div>
+
+        <div v-else class="flex h-40 items-center justify-center rounded-2xl border border-dashed border-slate-200 text-sm font-semibold text-slate-400">
+          暂无可用充值套餐
+        </div>
+
         <button
-          v-for="pkg in packages"
-          :key="pkg.id"
           type="button"
-          class="group relative flex min-h-[112px] flex-col items-center justify-center rounded-2xl border px-4 py-4 text-center transition-all duration-200"
-          :class="selectedPackageId === pkg.id ? 'border-emerald-400 bg-emerald-50/80 text-slate-950 shadow-[0_14px_34px_rgba(16,185,129,0.16)] ring-1 ring-emerald-200' : 'border-slate-200 bg-white text-slate-950 shadow-sm hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-[0_14px_32px_rgba(15,23,42,0.10)]'"
-          @click="selectedPackageId = pkg.id"
+          class="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-black text-white shadow-[0_12px_28px_rgba(15,23,42,0.20)] transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+          :disabled="!selectedPackage || creatingOrder"
+          @click="createOrder"
         >
-          <CheckCircle2 v-if="selectedPackageId === pkg.id" class="absolute right-3 top-3 h-4 w-4 text-emerald-500" />
-          <p class="text-xl font-black tracking-normal text-slate-950">{{ formatCredits(pkg.credits) }} 积分</p>
-          <p class="mt-2 text-sm font-bold text-slate-500">{{ formatMoney(pkg.amount_cents) }}</p>
+          <LoaderCircle v-if="creatingOrder" class="h-4 w-4 animate-spin" />
+          <CreditCard v-else class="h-4 w-4 text-emerald-300" />
+          {{ creatingOrder ? "正在创建订单..." : selectedPackage ? `微信支付 ${formatMoney(selectedPackage.amount_cents)}` : "选择套餐" }}
         </button>
-      </div>
-
-      <div v-else class="flex h-40 items-center justify-center rounded-2xl border border-dashed border-slate-200 text-sm font-semibold text-slate-400">
-        暂无可用充值套餐
-      </div>
-
-      <button
-        type="button"
-        class="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-black text-white shadow-[0_12px_28px_rgba(15,23,42,0.20)] transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-        :disabled="!selectedPackage || creatingOrder"
-        @click="createOrder"
-      >
-        <LoaderCircle v-if="creatingOrder" class="h-4 w-4 animate-spin" />
-        <CreditCard v-else class="h-4 w-4 text-emerald-300" />
-        {{ creatingOrder ? "正在创建订单..." : selectedPackage ? `微信支付 ${formatMoney(selectedPackage.amount_cents)}` : "选择套餐" }}
-      </button>
+      </template>
+      <CouponRedeemPanel v-else />
     </div>
 
     <div v-else-if="currentOrder.status === 'paid'" class="flex flex-col items-center gap-4 bg-white p-8 text-center">

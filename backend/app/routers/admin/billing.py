@@ -65,7 +65,7 @@ async def list_credit_transactions(
     page = max(1, page)
     page_size = min(max(1, page_size), 100)
     conditions = []
-    if type in {"recharge", "consume", "refund", "admin_adjust"}:
+    if type in {"recharge", "consume", "refund", "admin_adjust", "coupon_redeem"}:
         conditions.append(CreditTransaction.type == type)
     if keyword:
         like = f"%{keyword.strip()}%"

@@ -26,6 +26,11 @@ export const adminRoutes = [
         component: () => import("@/views/admin/AdminTransactionsView.vue"),
       },
       {
+        path: "coupon-codes",
+        name: "admin-coupon-codes",
+        component: () => import("@/views/admin/AdminCouponCodesView.vue"),
+      },
+      {
         path: "commission-withdrawals",
         name: "admin-commission-withdrawals",
         component: () => import("@/views/admin/AdminCommissionWithdrawalsView.vue"),

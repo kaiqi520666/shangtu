@@ -11,3 +11,7 @@ export function createBillingOrder(packageId) {
 export function getBillingOrder(orderId) {
   return request.get(`/billing/orders/${orderId}`, { timeout: 15000 });
 }
+
+export function redeemCouponCode(code) {
+  return request.post("/account/coupon-redemptions", { code }, { timeout: 15000 });
+}
