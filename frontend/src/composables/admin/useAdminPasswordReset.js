@@ -1,4 +1,5 @@
 import { ref } from "vue";
+import { useRouter } from "vue-router";
 import { resetAdminUserPassword } from "@/api/admin.js";
 import { useAuthStore } from "@/stores/auth.js";
 import { useToast } from "@/composables/useToast.js";
@@ -6,6 +7,7 @@ import { getApiErrorMessage } from "@/utils/apiError.js";
 import { validateNewPassword } from "@/utils/password.js";
 
 export function useAdminPasswordReset(loadUsers) {
+  const router = useRouter();
   const toast = useToast();
   const open = ref(false);
   const target = ref(null);
@@ -27,7 +29,6 @@ export function useAdminPasswordReset(loadUsers) {
       const authStore = useAuthStore();
       if (Number(target.value.id) === Number(authStore.user?.userId)) {
         authStore.logout();
-        const { default: router } = await import("@/router/index.js");
         await router.replace({ path: "/login", query: { passwordChanged: "1" } });
         return;
       }

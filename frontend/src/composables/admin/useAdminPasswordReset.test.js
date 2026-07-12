@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/api/admin.js", () => ({ resetAdminUserPassword: mocks.resetPassword }));
-vi.mock("@/router/index.js", () => ({ default: { replace: mocks.replace } }));
+vi.mock("vue-router", () => ({ useRouter: () => ({ replace: mocks.replace }) }));
 vi.mock("@/composables/useToast.js", () => ({
   useToast: () => ({ success: mocks.success, error: mocks.error }),
 }));
