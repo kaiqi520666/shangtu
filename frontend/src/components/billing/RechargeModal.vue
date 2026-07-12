@@ -1,213 +1,20 @@
 <script setup>
-import { computed, onBeforeUnmount, ref, watch } from "vue";
-import {
-  BadgeDollarSign,
-  CheckCircle2,
-  CreditCard,
-  ExternalLink,
-  LoaderCircle,
-  QrCode,
-  RefreshCw,
-  TicketPercent,
-  WalletCards,
-} from "lucide-vue-next";
-import { createBillingOrder, getBillingOrder, getBillingPackages } from "@/api/billing.js";
-import CouponRedeemPanel from "@/components/billing/CouponRedeemPanel.vue";
-import AppModal from "@/components/ui/AppModal.vue";
-import { useAuthStore } from "@/stores/auth.js";
-import { useToast } from "@/composables/useToast.js";
-import { getApiErrorMessage } from "@/utils/apiError.js";
+import { toRef } from 'vue'
+import { BadgeDollarSign, WalletCards } from 'lucide-vue-next'
+import RechargePackageStep from '@/components/billing/RechargePackageStep.vue'
+import RechargePaymentStep from '@/components/billing/RechargePaymentStep.vue'
+import RechargeStatusStep from '@/components/billing/RechargeStatusStep.vue'
+import AppModal from '@/components/ui/AppModal.vue'
+import { formatCredits, useRechargeOrder } from '@/composables/billing/useRechargeOrder.js'
 
-const props = defineProps({
-  open: {
-    type: Boolean,
-    default: false,
-  },
-});
-
-const emit = defineEmits(["close"]);
-
-const authStore = useAuthStore();
-const toast = useToast();
-
-const loadingPackages = ref(false);
-const mode = ref("packages");
-const packages = ref([]);
-const selectedPackageId = ref("");
-const creatingOrder = ref(false);
-const currentOrder = ref(null);
-const qrDataUrl = ref("");
-const pollTimer = ref(null);
-const pollError = ref("");
-const pollStartedAt = ref(0);
-const paymentTimedOut = ref(false);
-
-const PAYMENT_POLL_TIMEOUT_MS = 10 * 60 * 1000;
-
-const selectedPackage = computed(
-  () => packages.value.find((item) => item.id === selectedPackageId.value) || null,
-);
-
-const modalTitle = computed(() => {
-  if (currentOrder.value?.status === "paid") return "充值成功";
-  if (currentOrder.value?.status === "failed") return "支付订单失败";
-  if (paymentTimedOut.value) return "等待支付超时";
-  if (currentOrder.value) return "微信扫码支付";
-  return "积分中心";
-});
-
-function formatMoney(amountCents) {
-  return `¥${(Number(amountCents || 0) / 100).toFixed(2)}`;
-}
-
-function formatCredits(credits) {
-  return Number(credits || 0).toLocaleString("en-US");
-}
-
-async function loadPackages() {
-  loadingPackages.value = true;
-  try {
-    const result = await getBillingPackages();
-    if (result.code !== 0) {
-      toast.error(result.message || "加载充值套餐失败");
-      return;
-    }
-    packages.value = result.data?.packages || [];
-    selectedPackageId.value = packages.value[0]?.id || "";
-  } catch (error) {
-    toast.error(getApiErrorMessage(error, "加载充值套餐失败"));
-  } finally {
-    loadingPackages.value = false;
-  }
-}
-
-async function refreshQr(order) {
-  qrDataUrl.value = "";
-  const source = order?.qrcode || order?.pay_url || "";
-  if (!source || order?.img) return;
-  try {
-    const { default: QRCode } = await import("qrcode");
-    qrDataUrl.value = await QRCode.toDataURL(source, {
-      width: 240,
-      margin: 1,
-      color: {
-        dark: "#0f172a",
-        light: "#ffffff",
-      },
-    });
-  } catch {
-    qrDataUrl.value = "";
-  }
-}
-
-function clearPolling() {
-  if (pollTimer.value) {
-    window.clearInterval(pollTimer.value);
-    pollTimer.value = null;
-  }
-}
-
-async function pollOrderOnce() {
-  if (!currentOrder.value?.order_id) return;
-  if (pollStartedAt.value && Date.now() - pollStartedAt.value > PAYMENT_POLL_TIMEOUT_MS) {
-    clearPolling();
-    paymentTimedOut.value = true;
-    pollError.value = "等待支付超时，可重新创建订单或稍后再试。";
-    return;
-  }
-  try {
-    const result = await getBillingOrder(currentOrder.value.order_id);
-    if (result.code !== 0) {
-      pollError.value = result.message || "订单状态查询失败";
-      return;
-    }
-    currentOrder.value = result.data;
-    pollError.value = "";
-    if (result.data?.status === "paid") {
-      clearPolling();
-      if (result.data?.credits !== undefined) {
-        authStore.updateCredits(result.data.credits);
-      }
-      toast.success("充值成功，积分已到账");
-    } else if (result.data?.status === "failed") {
-      clearPolling();
-      pollError.value = result.data?.error_message || "支付订单失败，请重新创建订单。";
-    }
-  } catch {
-    pollError.value = "订单状态查询失败";
-  }
-}
-
-function startPolling() {
-  clearPolling();
-  pollStartedAt.value = Date.now();
-  paymentTimedOut.value = false;
-  pollTimer.value = window.setInterval(() => {
-    pollOrderOnce();
-  }, 2500);
-}
-
-async function createOrder() {
-  if (!selectedPackage.value || creatingOrder.value) return;
-  creatingOrder.value = true;
-  try {
-    const result = await createBillingOrder(selectedPackage.value.id);
-    if (result.code !== 0) {
-      if (result.data?.order_id) {
-        currentOrder.value = result.data;
-      }
-      toast.error(result.message || "创建支付订单失败");
-      return;
-    }
-    currentOrder.value = result.data;
-    await refreshQr(result.data);
-    startPolling();
-  } catch (error) {
-    toast.error(getApiErrorMessage(error, "创建支付订单失败"));
-  } finally {
-    creatingOrder.value = false;
-  }
-}
-
-function resetToPackages() {
-  clearPolling();
-  mode.value = "packages";
-  currentOrder.value = null;
-  qrDataUrl.value = "";
-  pollError.value = "";
-  pollStartedAt.value = 0;
-  paymentTimedOut.value = false;
-}
+const props = defineProps({ open: { type: Boolean, default: false } })
+const emit = defineEmits(['close'])
+const order = useRechargeOrder(toRef(props, 'open'))
 
 function closeModal() {
-  clearPolling();
-  emit("close");
+  order.clearPolling()
+  emit('close')
 }
-
-watch(
-  () => props.open,
-  (visible) => {
-    if (visible) {
-      resetToPackages();
-      loadPackages();
-    } else {
-      clearPolling();
-    }
-  },
-  { immediate: true },
-);
-
-watch(
-  currentOrder,
-  (order) => {
-    refreshQr(order);
-  },
-  { deep: false },
-);
-
-onBeforeUnmount(() => {
-  clearPolling();
-});
 </script>
 
 <template>
@@ -219,159 +26,58 @@ onBeforeUnmount(() => {
     <template #header>
       <div class="flex min-w-0 flex-1 items-center justify-between gap-4 pr-4">
         <div class="flex min-w-0 items-center gap-3">
-          <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-950 text-emerald-300 shadow-sm">
+          <div
+            class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-950 text-emerald-300 shadow-sm"
+          >
             <WalletCards class="h-5 w-5" />
           </div>
           <div class="min-w-0">
-            <h3 class="text-base font-black text-slate-950">{{ modalTitle }}</h3>
-            <p class="mt-0.5 text-xs font-medium text-slate-500">当前 {{ formatCredits(authStore.credits) }} 点</p>
+            <h3 class="text-base font-black text-slate-950">{{ order.modalTitle.value }}</h3>
+            <p class="mt-0.5 text-xs font-medium text-slate-500">
+              当前 {{ formatCredits(order.authStore.credits) }} 点
+            </p>
           </div>
         </div>
-        <RouterLink to="/account/pricing" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50" @click="closeModal">
-          <BadgeDollarSign class="h-4 w-4 text-emerald-600" />
-          计费标准
-        </RouterLink>
+        <RouterLink
+          to="/account/pricing"
+          class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
+          @click="closeModal"
+          ><BadgeDollarSign class="h-4 w-4 text-emerald-600" />计费标准</RouterLink
+        >
       </div>
     </template>
 
-    <div v-if="!currentOrder" class="min-h-0 space-y-3 overflow-y-auto bg-gradient-to-b from-slate-50/70 to-white p-4">
-      <div class="mx-auto grid w-full max-w-sm grid-cols-2 rounded-lg border border-slate-200 bg-slate-100 p-1 shadow-inner">
-        <button type="button" class="flex h-10 items-center justify-center gap-2 rounded-md px-4 text-xs font-black transition-all" :class="mode === 'packages' ? 'bg-white text-slate-950 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700'" @click="mode = 'packages'">
-          <CreditCard class="h-4 w-4" :class="mode === 'packages' ? 'text-emerald-600' : 'text-slate-400'" />
-          充值积分
-        </button>
-        <button type="button" class="flex h-10 items-center justify-center gap-2 rounded-md px-4 text-xs font-black transition-all" :class="mode === 'coupon' ? 'bg-white text-slate-950 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700'" @click="mode = 'coupon'">
-          <TicketPercent class="h-4 w-4" :class="mode === 'coupon' ? 'text-emerald-600' : 'text-slate-400'" />
-          优惠码兑换
-        </button>
-      </div>
-
-      <div v-if="mode === 'packages'" class="min-h-[420px] space-y-3">
-        <div v-if="loadingPackages" class="flex h-48 items-center justify-center text-sm text-slate-400">
-          <LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
-          正在加载套餐...
-        </div>
-
-        <div v-else-if="packages.length" class="grid gap-2 sm:grid-cols-3">
-          <button
-            v-for="pkg in packages"
-            :key="pkg.id"
-            type="button"
-            class="group relative flex min-h-[112px] flex-col items-center justify-center rounded-2xl border px-4 py-4 text-center transition-all duration-200"
-            :class="selectedPackageId === pkg.id ? 'border-emerald-400 bg-emerald-50/80 text-slate-950 shadow-[0_14px_34px_rgba(16,185,129,0.16)] ring-1 ring-emerald-200' : 'border-slate-200 bg-white text-slate-950 shadow-sm hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-[0_14px_32px_rgba(15,23,42,0.10)]'"
-            @click="selectedPackageId = pkg.id"
-          >
-            <CheckCircle2 v-if="selectedPackageId === pkg.id" class="absolute right-3 top-3 h-4 w-4 text-emerald-500" />
-            <p class="text-xl font-black tracking-normal text-slate-950">{{ formatCredits(pkg.credits) }} 积分</p>
-            <p class="mt-2 text-sm font-bold text-slate-500">{{ formatMoney(pkg.amount_cents) }}</p>
-          </button>
-        </div>
-
-        <div v-else class="flex h-40 items-center justify-center rounded-2xl border border-dashed border-slate-200 text-sm font-semibold text-slate-400">
-          暂无可用充值套餐
-        </div>
-
-        <button
-          type="button"
-          class="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-black text-white shadow-[0_12px_28px_rgba(15,23,42,0.20)] transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-          :disabled="!selectedPackage || creatingOrder"
-          @click="createOrder"
-        >
-          <LoaderCircle v-if="creatingOrder" class="h-4 w-4 animate-spin" />
-          <CreditCard v-else class="h-4 w-4 text-emerald-300" />
-          {{ creatingOrder ? "正在创建订单..." : selectedPackage ? `微信支付 ${formatMoney(selectedPackage.amount_cents)}` : "选择套餐" }}
-        </button>
-      </div>
-      <CouponRedeemPanel v-else />
-    </div>
-
-    <div v-else-if="currentOrder.status === 'paid'" class="flex flex-col items-center gap-4 bg-white p-8 text-center">
-      <div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
-        <CheckCircle2 class="h-9 w-9" />
-      </div>
-      <div>
-        <h3 class="text-lg font-black text-slate-950">充值成功</h3>
-        <p class="mt-1 text-sm text-slate-500">
-          已到账 {{ currentOrder.credits_to_add }} 点，当前余额 {{ authStore.credits }} 点
-        </p>
-      </div>
-      <button type="button" class="rounded-xl bg-slate-950 px-5 py-2.5 text-sm font-bold text-white hover:bg-slate-800" @click="closeModal">
-        完成
-      </button>
-    </div>
-
-    <div v-else-if="currentOrder.status === 'failed' || paymentTimedOut" class="flex flex-col items-center gap-4 bg-white p-8 text-center">
-      <div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
-        <RefreshCw class="h-8 w-8" />
-      </div>
-      <div>
-        <h3 class="text-lg font-black text-slate-950">{{ paymentTimedOut ? "等待支付超时" : "支付订单失败" }}</h3>
-        <p class="mt-1 text-sm text-slate-500">
-          {{ pollError || currentOrder.error_message || "请更换套餐或重新创建支付订单。" }}
-        </p>
-      </div>
-      <button type="button" class="rounded-xl bg-slate-950 px-5 py-2.5 text-sm font-bold text-white hover:bg-slate-800" @click="resetToPackages">
-        重新选择套餐
-      </button>
-    </div>
-
-    <div v-else class="grid gap-6 bg-white p-5 sm:p-6 md:grid-cols-[280px_1fr]">
-      <div class="flex flex-col items-center rounded-2xl border border-slate-200 bg-slate-50 p-5">
-        <div class="mb-4 inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-[11px] font-black text-slate-600 shadow-sm">
-          <QrCode class="h-3.5 w-3.5 text-emerald-600" />
-          微信扫码支付
-        </div>
-        <div class="flex h-60 w-60 items-center justify-center rounded-2xl border border-slate-200 bg-white p-3 shadow-inner">
-          <img v-if="currentOrder.img" :src="currentOrder.img" class="h-full w-full object-contain" alt="微信支付二维码" />
-          <img v-else-if="qrDataUrl" :src="qrDataUrl" class="h-full w-full object-contain" alt="微信支付二维码" />
-          <LoaderCircle v-else class="h-6 w-6 animate-spin text-slate-300" />
-        </div>
-        <p class="mt-3 text-xs font-semibold text-slate-500">支付成功后自动到账</p>
-      </div>
-
-      <div class="flex flex-col justify-between gap-5">
-        <div class="space-y-3">
-          <div class="rounded-2xl border border-slate-200 bg-white p-4">
-            <p class="text-xs text-slate-400">订单号</p>
-            <p class="mt-1 break-all text-xs font-bold text-slate-700">{{ currentOrder.out_trade_no }}</p>
-          </div>
-          <div class="grid grid-cols-2 gap-3">
-            <div class="rounded-2xl border border-slate-200 bg-white p-4">
-              <p class="text-xs text-slate-400">充值积分</p>
-              <p class="mt-1 text-lg font-black text-emerald-600">{{ currentOrder.credits_to_add }} 点</p>
-            </div>
-            <div class="rounded-2xl border border-slate-200 bg-white p-4">
-              <p class="text-xs text-slate-400">支付金额</p>
-              <p class="mt-1 text-lg font-black text-slate-950">{{ formatMoney(currentOrder.amount_cents) }}</p>
-            </div>
-          </div>
-          <p class="rounded-xl bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">
-            支付成功后会自动到账；如果页面未更新，请稍等几秒。
-          </p>
-          <p v-if="pollError" class="rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-600">{{ pollError }}</p>
-        </div>
-
-        <div class="flex gap-2">
-          <a
-            v-if="currentOrder.pay_url || currentOrder.qrcode"
-            :href="currentOrder.pay_url || currentOrder.qrcode"
-            target="_blank"
-            rel="noreferrer"
-            class="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
-          >
-            <ExternalLink class="h-4 w-4" />
-            打开支付页
-          </a>
-          <button
-            type="button"
-            class="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
-            @click="resetToPackages"
-          >
-            <RefreshCw class="h-4 w-4" />
-            更换套餐
-          </button>
-        </div>
-      </div>
-    </div>
+    <RechargePackageStep
+      v-if="!order.currentOrder.value"
+      :mode="order.mode.value"
+      :loading="order.loadingPackages.value"
+      :packages="order.packages.value"
+      :selected-id="order.selectedPackageId.value"
+      :selected-package="order.selectedPackage.value"
+      :creating="order.creatingOrder.value"
+      @update:mode="order.mode.value = $event"
+      @select="order.selectedPackageId.value = $event"
+      @create="order.createOrder"
+    />
+    <RechargeStatusStep
+      v-else-if="
+        order.currentOrder.value.status === 'paid' ||
+        order.currentOrder.value.status === 'failed' ||
+        order.paymentTimedOut.value
+      "
+      :order="order.currentOrder.value"
+      :credits="order.authStore.credits"
+      :timed-out="order.paymentTimedOut.value"
+      :error="order.pollError.value"
+      @close="closeModal"
+      @retry="order.resetToPackages"
+    />
+    <RechargePaymentStep
+      v-else
+      :order="order.currentOrder.value"
+      :qr-data-url="order.qrDataUrl.value"
+      :error="order.pollError.value"
+      @retry="order.resetToPackages"
+    />
   </AppModal>
 </template>
