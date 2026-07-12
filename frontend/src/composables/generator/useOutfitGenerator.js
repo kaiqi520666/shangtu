@@ -23,6 +23,14 @@ import {
   restoreImageGenerationSettings,
   syncImageQuality,
 } from "@/utils/generationSnapshots.js";
+import {
+  buildOutfitQueue as createOutfitQueue,
+  buildOutfitUserPrompt,
+  findOutfitStrategyItem as resolveOutfitStrategyItem,
+  getOutfitSceneName,
+  getOutfitSceneStrategy,
+  normalizeOutfitStrategyItems as normalizeOutfitStrategy,
+} from "@/utils/outfitStrategy.js";
 import { buildOutfitAnalyzeImages, hasUploadingImages } from "@/utils/analyzeImages.js";
 import { useCatalogStore } from "@/stores/catalog.js";
 
@@ -442,74 +450,31 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
   }
 
   function buildOutfitQueue() {
-    return outfitStrategyItems.value.map((item, index) => ({
-      ...item,
-      id: item.id,
-      name: item.name || getSceneName(item.id),
-      content: item.content || item.strategy || getSceneStrategy(item.id),
-      strategy: item.strategy || getSceneStrategy(item.id),
-      index: index + 1,
-    }));
+    return createOutfitQueue(outfitStrategyItems.value, outfitScenes.value);
   }
 
   function buildUserPromptForItem(item) {
-    const lines = [
-      `【拍摄场景】${item.name}`,
-      item.content ? `【穿搭方案】${item.content}` : "",
-    ];
-    return lines.filter(Boolean).join("\n");
+    return buildOutfitUserPrompt(item);
   }
 
   function normalizeOutfitStrategyItems(items) {
-    return items.map((item, index) => {
-      const scene = findScene(item.id);
-      const fidelity =
-        item.fidelity ||
-        "服装保真约束：保持上传服装的颜色、版型、材质、图案、长度、领口、袖型、廓形和核心外观一致，不换款不改款。";
-      const content = [
-        item.content,
-        item.pose && `模特姿态：${item.pose}`,
-        item.camera && `镜头角度：${item.camera}`,
-        fidelity,
-        item.atmosphere && `画面氛围：${item.atmosphere}`,
-      ]
-        .filter(Boolean)
-        .join("\n");
-      return {
-        id: item.id || scene.id || `outfit-${index + 1}`,
-        name: item.name || scene.label || `场景 ${index + 1}`,
-        description: item.description || scene.description || "",
-        strategy: item.strategy || scene.strategy || "",
-        content,
-      };
-    });
-  }
-
-  function findScene(id) {
-    const preset = catalog.findOutfitScene(id);
-    return {
-      id,
-      label: preset?.label || id || "服饰穿搭图",
-      description: preset?.desc || "",
-      strategy: preset?.strategy || getSceneStrategy(id),
-    };
+    return normalizeOutfitStrategy(items, outfitScenes.value);
   }
 
   function getSceneName(id) {
-    return findScene(id).label;
+    return getOutfitSceneName(outfitScenes.value, id);
   }
 
   function getSceneStrategy(id) {
-    return catalog.findOutfitScene(id)?.strategy || "服饰穿搭场景生成";
+    return getOutfitSceneStrategy(outfitScenes.value, id);
   }
 
   function findOutfitStrategyItem(typeId) {
-    return outfitStrategyItems.value.find((item) => item.id === typeId) || {
-      id: typeId,
-      name: getSceneName(typeId),
-      content: getSceneStrategy(typeId),
-      strategy: getSceneStrategy(typeId),
-    };
+    return resolveOutfitStrategyItem(
+      outfitStrategyItems.value,
+      outfitScenes.value,
+      typeId,
+    );
   }
 
   onMounted(() => {
