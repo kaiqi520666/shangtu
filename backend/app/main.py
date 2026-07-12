@@ -51,7 +51,7 @@ async def handle_unexpected_exception(request: Request, exc: Exception):
         exc_info=exc,
     )
     return JSONResponse(
-        status_code=200,
+        status_code=500,
         content=fail("系统异常，请稍后重试").model_dump(),
     )
 

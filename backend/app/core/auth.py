@@ -1,12 +1,12 @@
 from datetime import timedelta
-import os
 
 from jose import jwt
 from passlib.context import CryptContext
 
+from app.core.config import require_env
 from app.core.time import utc_now
 
-SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
+SECRET_KEY = require_env("SECRET_KEY")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_DAYS = 30
 
