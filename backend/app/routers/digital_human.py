@@ -424,7 +424,7 @@ async def upload_photo_avatar(
             data={
                 "task_id": task.id,
                 "credits": refunded_credits if refunded_credits is not None else await get_user_credits(db, current_user.id),
-                "credit_cost": credit_cost,
+                "credit_cost": int(task.credit_cost or 0),
             },
         )
     except httpx.HTTPError as exc:
@@ -442,7 +442,7 @@ async def upload_photo_avatar(
             data={
                 "task_id": task.id,
                 "credits": refunded_credits if refunded_credits is not None else await get_user_credits(db, current_user.id),
-                "credit_cost": credit_cost,
+                "credit_cost": int(task.credit_cost or 0),
             },
         )
     except Exception:
@@ -459,13 +459,13 @@ async def upload_photo_avatar(
             data={
                 "task_id": task.id,
                 "credits": refunded_credits if refunded_credits is not None else await get_user_credits(db, current_user.id),
-                "credit_cost": credit_cost,
+                "credit_cost": int(task.credit_cost or 0),
             },
         )
 
     asset_map = await _get_user_avatars_by_ids(db, [task.result_avatar_id or ""])
     payload = _user_avatar_task_payload(task, asset_map.get(task.result_avatar_id or ""))
-    payload["credits"] = await get_user_credits(db, current_user.id) if task.credit_refunded else remaining_credits
+    payload["credits"] = await get_user_credits(db, current_user.id)
     return success(payload)
 
 
