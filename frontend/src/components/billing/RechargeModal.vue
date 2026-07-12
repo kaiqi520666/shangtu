@@ -199,6 +199,7 @@ watch(
       clearPolling();
     }
   },
+  { immediate: true },
 );
 
 watch(
