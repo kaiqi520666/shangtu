@@ -17,9 +17,13 @@ Thumbs.db
 *.pyo
 .cache/
 
-# 比赛/交付材料（产物体积大，不入库）
+# 比赛/交付/运行产物（体积大或可重新生成，不入库）
 deliverables/
+exports/
 deploy/exports/
+backend/logs/
+*.dump
+*.dump.sha256
 
 # Office 临时锁文件
 ~$*
