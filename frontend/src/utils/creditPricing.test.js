@@ -9,5 +9,6 @@ describe("creditPricing", () => {
 
   it("can adjust fixed per-task price maps", () => {
     expect(multiplyCreditCosts({ "1K": 1, "2K": 2 }, 0.8, true)).toEqual({ "1K": 1, "2K": 2 });
+    expect(multiplyCreditCosts({ "720p": 36 }, 1.2)).toEqual({ "720p": 43.2 });
   });
 });

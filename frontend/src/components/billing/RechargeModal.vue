@@ -1,13 +1,14 @@
 <script setup>
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import {
+  BadgeDollarSign,
   CheckCircle2,
   CreditCard,
   ExternalLink,
   LoaderCircle,
   QrCode,
   RefreshCw,
-  ShieldCheck,
+  TicketPercent,
   WalletCards,
 } from "lucide-vue-next";
 import { createBillingOrder, getBillingOrder, getBillingPackages } from "@/api/billing.js";
@@ -16,7 +17,6 @@ import AppModal from "@/components/ui/AppModal.vue";
 import { useAuthStore } from "@/stores/auth.js";
 import { useToast } from "@/composables/useToast.js";
 import { getApiErrorMessage } from "@/utils/apiError.js";
-import { multiplyCreditCosts } from "@/utils/creditPricing.js";
 
 const props = defineProps({
   open: {
@@ -33,10 +33,6 @@ const toast = useToast();
 const loadingPackages = ref(false);
 const mode = ref("packages");
 const packages = ref([]);
-const imageCreditCosts = ref({});
-const videoCreditCosts = ref({});
-const digitalHumanCreditCosts = ref({});
-const digitalHumanPrechargeCosts = ref({});
 const selectedPackageId = ref("");
 const creatingOrder = ref(false);
 const currentOrder = ref(null);
@@ -57,7 +53,7 @@ const modalTitle = computed(() => {
   if (currentOrder.value?.status === "failed") return "支付订单失败";
   if (paymentTimedOut.value) return "等待支付超时";
   if (currentOrder.value) return "微信扫码支付";
-  return "积分充值";
+  return "积分中心";
 });
 
 function formatMoney(amountCents) {
@@ -77,10 +73,6 @@ async function loadPackages() {
       return;
     }
     packages.value = result.data?.packages || [];
-    imageCreditCosts.value = multiplyCreditCosts(result.data?.image_credit_costs, result.data?.consumption_multiplier, true);
-    videoCreditCosts.value = multiplyCreditCosts(result.data?.video_credit_costs, result.data?.consumption_multiplier);
-    digitalHumanCreditCosts.value = multiplyCreditCosts(result.data?.digital_human_credit_costs, result.data?.consumption_multiplier);
-    digitalHumanPrechargeCosts.value = multiplyCreditCosts(result.data?.digital_human_precharge_costs, result.data?.consumption_multiplier, true);
     selectedPackageId.value = packages.value[0]?.id || "";
   } catch (error) {
     toast.error(getApiErrorMessage(error, "加载充值套餐失败"));
@@ -221,69 +213,40 @@ onBeforeUnmount(() => {
 <template>
   <AppModal
     :open="open"
-    panel-class="w-full max-w-5xl border-slate-200/80 shadow-[0_28px_90px_rgba(15,23,42,0.32)]"
+    panel-class="w-full max-w-3xl border-slate-200/80 shadow-[0_28px_90px_rgba(15,23,42,0.32)]"
     @close="closeModal"
   >
     <template #header>
-      <div class="flex min-w-0 items-center gap-3">
-        <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-950 text-emerald-300 shadow-sm">
-          <WalletCards class="h-5 w-5" />
+      <div class="flex min-w-0 flex-1 items-center justify-between gap-4 pr-4">
+        <div class="flex min-w-0 items-center gap-3">
+          <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-950 text-emerald-300 shadow-sm">
+            <WalletCards class="h-5 w-5" />
+          </div>
+          <div class="min-w-0">
+            <h3 class="text-base font-black text-slate-950">{{ modalTitle }}</h3>
+            <p class="mt-0.5 text-xs font-medium text-slate-500">当前 {{ formatCredits(authStore.credits) }} 点</p>
+          </div>
         </div>
-        <div class="min-w-0">
-          <h3 class="text-base font-black text-slate-950">{{ modalTitle }}</h3>
-          <p class="mt-0.5 text-xs font-medium text-slate-500">积分实时到账，可用于图片和视频生成</p>
-        </div>
+        <RouterLink to="/account/pricing" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50" @click="closeModal">
+          <BadgeDollarSign class="h-4 w-4 text-emerald-600" />
+          计费标准
+        </RouterLink>
       </div>
     </template>
 
     <div v-if="!currentOrder" class="min-h-0 space-y-3 overflow-y-auto bg-gradient-to-b from-slate-50/70 to-white p-4">
-      <div class="rounded-2xl border border-emerald-100 bg-white px-4 py-3 shadow-[0_12px_32px_rgba(15,23,42,0.06)]">
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div class="flex items-start gap-3">
-            <div class="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100">
-              <ShieldCheck class="h-4 w-4" />
-            </div>
-            <div>
-              <p class="text-xs font-black text-emerald-700">微信支付 · 实时到账</p>
-              <p class="mt-0.5 text-xl font-black text-slate-950">当前 {{ formatCredits(authStore.credits) }} 点</p>
-              <p class="mt-1 text-xs font-semibold text-slate-500">生成时自动扣积分，失败会退回。</p>
-            </div>
-          </div>
-          <div class="grid gap-2 text-xs font-bold text-slate-600 sm:grid-cols-2 lg:w-[600px]">
-            <div class="rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2.5">
-              <p class="text-[11px] font-black text-slate-400">图片按张扣费</p>
-              <div class="mt-1.5 flex flex-wrap gap-1.5">
-                <span class="rounded-full bg-white px-2.5 py-1 text-slate-700 shadow-sm">1K {{ imageCreditCosts["1K"] || "-" }} 积分/张</span>
-                <span class="rounded-full bg-white px-2.5 py-1 text-slate-700 shadow-sm">2K {{ imageCreditCosts["2K"] || "-" }} 积分/张</span>
-                <span class="rounded-full bg-white px-2.5 py-1 text-slate-700 shadow-sm">4K {{ imageCreditCosts["4K"] || "-" }} 积分/张</span>
-              </div>
-            </div>
-            <div class="rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2.5">
-              <p class="text-[11px] font-black text-slate-400">视频按秒扣费</p>
-              <div class="mt-1.5 flex flex-wrap gap-1.5">
-                <span class="rounded-full bg-white px-2.5 py-1 text-slate-700 shadow-sm">720p {{ videoCreditCosts["720p"] || "-" }} 积分/秒</span>
-                <span class="rounded-full bg-white px-2.5 py-1 text-slate-700 shadow-sm">1080p {{ videoCreditCosts["1080p"] || "-" }} 积分/秒</span>
-              </div>
-            </div>
-            <div class="rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2.5 sm:col-span-2">
-              <p class="text-[11px] font-black text-slate-400">数字人按档收费</p>
-              <div class="mt-1.5 flex flex-wrap gap-1.5">
-                <span class="rounded-full bg-white px-2.5 py-1 text-slate-700 shadow-sm">标准档 {{ digitalHumanCreditCosts.standard || "-" }} 积分/秒</span>
-                <span class="rounded-full bg-white px-2.5 py-1 text-slate-700 shadow-sm">高质档 {{ digitalHumanCreditCosts.premium || "-" }} 积分/秒</span>
-                <span class="rounded-full bg-white px-2.5 py-1 text-slate-700 shadow-sm">标准档预扣 {{ digitalHumanPrechargeCosts.standard || "-" }} 积分</span>
-                <span class="rounded-full bg-white px-2.5 py-1 text-slate-700 shadow-sm">高质档预扣 {{ digitalHumanPrechargeCosts.premium || "-" }} 积分</span>
-              </div>
-            </div>
-          </div>
-        </div>
+      <div class="mx-auto grid w-full max-w-sm grid-cols-2 rounded-lg border border-slate-200 bg-slate-100 p-1 shadow-inner">
+        <button type="button" class="flex h-10 items-center justify-center gap-2 rounded-md px-4 text-xs font-black transition-all" :class="mode === 'packages' ? 'bg-white text-slate-950 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700'" @click="mode = 'packages'">
+          <CreditCard class="h-4 w-4" :class="mode === 'packages' ? 'text-emerald-600' : 'text-slate-400'" />
+          充值积分
+        </button>
+        <button type="button" class="flex h-10 items-center justify-center gap-2 rounded-md px-4 text-xs font-black transition-all" :class="mode === 'coupon' ? 'bg-white text-slate-950 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700'" @click="mode = 'coupon'">
+          <TicketPercent class="h-4 w-4" :class="mode === 'coupon' ? 'text-emerald-600' : 'text-slate-400'" />
+          优惠码兑换
+        </button>
       </div>
 
-      <div class="grid grid-cols-2 rounded-xl bg-slate-100 p-1">
-        <button type="button" class="rounded-lg px-4 py-2 text-xs font-black transition-colors" :class="mode === 'packages' ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-500'" @click="mode = 'packages'">充值套餐</button>
-        <button type="button" class="rounded-lg px-4 py-2 text-xs font-black transition-colors" :class="mode === 'coupon' ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-500'" @click="mode = 'coupon'">优惠码兑换</button>
-      </div>
-
-      <template v-if="mode === 'packages'">
+      <div v-if="mode === 'packages'" class="min-h-[420px] space-y-3">
         <div v-if="loadingPackages" class="flex h-48 items-center justify-center text-sm text-slate-400">
           <LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
           正在加载套餐...
@@ -318,7 +281,7 @@ onBeforeUnmount(() => {
           <CreditCard v-else class="h-4 w-4 text-emerald-300" />
           {{ creatingOrder ? "正在创建订单..." : selectedPackage ? `微信支付 ${formatMoney(selectedPackage.amount_cents)}` : "选择套餐" }}
         </button>
-      </template>
+      </div>
       <CouponRedeemPanel v-else />
     </div>
 

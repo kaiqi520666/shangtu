@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ChevronDown, LogOut, ReceiptText, UserRound, WalletCards } from 'lucide-vue-next'
+import { BadgeDollarSign, ChevronDown, LogOut, ReceiptText, UserRound, WalletCards } from 'lucide-vue-next'
 import { useRechargeModal } from '@/composables/useRechargeModal.js'
 import { useAuthStore } from '@/stores/auth.js'
 
@@ -87,6 +87,10 @@ onBeforeUnmount(() => {
         <button type="button" class="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-medium text-slate-600 hover:bg-slate-50" @click="goAccount('/account/credits')">
           <ReceiptText class="h-4 w-4 text-slate-400" />
           积分明细
+        </button>
+        <button type="button" class="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-medium text-slate-600 hover:bg-slate-50" @click="goAccount('/account/pricing')">
+          <BadgeDollarSign class="h-4 w-4 text-slate-400" />
+          计费标准
         </button>
       </div>
 

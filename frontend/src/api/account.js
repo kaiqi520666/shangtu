@@ -4,6 +4,10 @@ export function getAccountProfile() {
   return request.get("/account/profile", { timeout: 15000 });
 }
 
+export function getAccountPricing() {
+  return request.get("/account/pricing", { timeout: 15000 });
+}
+
 export function changeAccountPassword(payload) {
   return request.put("/account/password", payload, { timeout: 15000 });
 }

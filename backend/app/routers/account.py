@@ -8,6 +8,14 @@ from app.core.credit_transactions import transaction_payload
 from app.core.coupons import normalize_coupon_code, redeem_coupon
 from app.core.deps import get_current_user, get_db
 from app.core.pagination import page_payload
+from app.core.system_settings import (
+    get_effective_digital_human_credit_costs,
+    get_effective_digital_human_precharge_costs,
+    get_effective_image_credit_costs,
+    get_effective_video_credit_costs,
+    get_effective_video_translation_credit_costs,
+    get_effective_voiceover_credit_cost,
+)
 from app.core.time import to_utc_iso
 from app.models import CreditTransaction, User
 from app.schemas.response import Response, fail, success
@@ -47,6 +55,33 @@ def account_profile_payload(user: User) -> dict:
 @router.get("/profile", response_model=Response)
 async def account_profile(current_user: User = Depends(get_current_user)):
     return success(account_profile_payload(current_user))
+
+
+@router.get("/pricing", response_model=Response)
+async def account_pricing(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        image_costs = await get_effective_image_credit_costs(db)
+        video_costs = await get_effective_video_credit_costs(db)
+        digital_human_costs = await get_effective_digital_human_credit_costs(db)
+        digital_human_precharges = await get_effective_digital_human_precharge_costs(db)
+        translation_costs = await get_effective_video_translation_credit_costs(db)
+        voiceover_cost = await get_effective_voiceover_credit_cost(db)
+    except ValueError as exc:
+        return fail(str(exc))
+    return success(
+        {
+            "image_credit_costs": image_costs,
+            "video_credit_costs": video_costs,
+            "digital_human_credit_costs": digital_human_costs,
+            "digital_human_precharge_costs": digital_human_precharges,
+            "video_translation_credit_costs": translation_costs,
+            "voiceover_credit_cost_per_100_chars": voiceover_cost,
+            "consumption_multiplier": float(current_user.consumption_multiplier),
+        }
+    )
 
 
 @router.put("/password", response_model=Response)

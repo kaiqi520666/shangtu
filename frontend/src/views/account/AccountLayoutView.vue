@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from "vue";
 import { RouterView, useRoute } from "vue-router";
-import { CreditCard, HandCoins, UserRound } from "lucide-vue-next";
+import { BadgeDollarSign, CreditCard, HandCoins, UserRound } from "lucide-vue-next";
 import GeneratorLayout from "@/components/layout/GeneratorLayout.vue";
 import AppTabNav from "@/components/ui/AppTabNav.vue";
 import { useAuthStore } from "@/stores/auth.js";
@@ -12,12 +12,14 @@ const authStore = useAuthStore();
 const accountTabs = computed(() => [
   { key: "profile", label: "账号中心", to: "/account/profile" },
   { key: "credits", label: "积分明细", to: "/account/credits" },
+  { key: "pricing", label: "计费标准", to: "/account/pricing" },
   ...(authStore.distributionEnabled ? [{ key: "distribution", label: "分销中心", to: "/account/distribution" }] : []),
 ]);
 
 const tabIcons = {
   profile: UserRound,
   credits: CreditCard,
+  pricing: BadgeDollarSign,
   distribution: HandCoins,
 };
 
@@ -29,7 +31,7 @@ const activeTab = computed(() => accountTabs.value.find((tab) => tab.to === rout
     <div class="flex flex-1 flex-col overflow-hidden">
       <header class="border-b border-slate-200 bg-white px-6 py-4">
         <h1 class="text-base font-black text-slate-900">账号中心</h1>
-        <p class="mt-1 text-xs text-slate-500">查看账号资料、积分余额和每一笔积分变动。</p>
+        <p class="mt-1 text-xs text-slate-500">账号、积分与计费信息</p>
       </header>
 
       <div class="border-b border-slate-200 bg-white px-6">

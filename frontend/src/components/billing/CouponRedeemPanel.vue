@@ -32,7 +32,7 @@ async function redeem() {
 </script>
 
 <template>
-  <div class="flex min-h-64 items-center justify-center rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+  <div class="flex min-h-[420px] items-center justify-center rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
     <div class="w-full max-w-lg">
       <div v-if="redemption" class="mb-4 flex items-center gap-3 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3">
         <CircleCheck class="h-6 w-6 shrink-0 text-emerald-600" />

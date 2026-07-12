@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { flushPromises, mount } from "@vue/test-utils";
+import { flushPromises, mount, RouterLinkStub } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import RechargeModal from "./RechargeModal.vue";
@@ -34,10 +34,15 @@ describe("RechargeModal", () => {
   });
 
   it("loads packages immediately and switches to coupon redemption", async () => {
-    const wrapper = mount(RechargeModal, { props: { open: true } });
+    const wrapper = mount(RechargeModal, {
+      props: { open: true },
+      global: { stubs: { RouterLink: RouterLinkStub } },
+    });
     await flushPromises();
     expect(mocks.getPackages).toHaveBeenCalledOnce();
     expect(wrapper.text()).toContain("100 积分");
+    expect(wrapper.text()).not.toContain("图片按张扣费");
+    expect(wrapper.getComponent(RouterLinkStub).props("to")).toBe("/account/pricing");
 
     const modeButtons = wrapper.findAll("button").filter((button) => button.text() === "优惠码兑换");
     expect(modeButtons).toHaveLength(1);

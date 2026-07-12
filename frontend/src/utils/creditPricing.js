@@ -6,7 +6,7 @@ export function multiplyCreditCosts(costs, multiplier = 1, round = false) {
   return Object.fromEntries(
     Object.entries(costs || {}).map(([key, value]) => {
       const adjusted = Number(value) * Number(multiplier || 1);
-      return [key, round ? Math.ceil(adjusted) : adjusted];
+      return [key, round ? Math.ceil(adjusted) : Number(adjusted.toFixed(2))];
     }),
   );
 }
