@@ -2,45 +2,39 @@ import uuid
 
 from fastapi import APIRouter, Depends, File, Request, UploadFile
 from pydantic import BaseModel, Field
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.credits import normalize_video_resolution
 from app.core.deps import get_current_user, get_db
 from app.core.json_utils import dump_json_or_none, parse_json_or_none
 from app.core.media_download import remote_media_download_response
 from app.core.oss import OssConfigError, upload_audio_bytes, upload_video_bytes
-from app.core.scenarios import SCENARIO_TITLE_PREFIX, VIDEO_SCENARIOS
 from app.core.strategy.dashscope_client import (
     DashScopeConfigError,
     optimize_free_video_prompt,
 )
 from app.core.prompt_template_builder import build_strategy_template_prompt
-from app.core.prompt_snapshot import dump_prompt_snapshot, parse_prompt_snapshot
+from app.core.prompt_snapshot import parse_prompt_snapshot
 from app.core.system_settings import (
-    get_effective_video_credit_cost,
     get_effective_video_credit_costs,
 )
 from app.core.task_state import merge_task_state
 from app.core.task_timeout import project_task_runtime_state
 from app.core.time import to_utc_iso, utc_now
-from app.core.user_credits import (
-    get_user_credits,
-    refund_user_credits,
-)
-from app.core.video_prompt_builder import build_video_generate_prompt
+from app.core.user_credits import get_user_credits
 from app.core.video_strategy_generation import generate_video_strategy
-from app.models import GenerationJob, User, UserAudioAsset, VideoTask
+from app.models import User, UserAudioAsset, VideoTask
 from app.schemas.response import Response, fail, success
-from app.services.generation_tasks import deduct_credits_or_fail, enqueue_or_compensate
+from app.services.video_generation import (
+    VideoGeneratePayload,
+    clean_urls,
+    create_video_generation_task,
+    validate_aspect_ratio,
+    validate_video_duration,
+    validate_video_inputs,
+)
 
 router = APIRouter(prefix="/video", tags=["视频生成"])
-
-VIDEO_INPUT_MODES = {"reference_to_video", "multimodal_reference"}
-VIDEO_ASPECT_RATIOS = {"16:9", "9:16", "1:1", "4:3", "3:4"}
-VIDEO_DURATIONS = {4, 8, 10, 12, 15}
-FREE_VIDEO_RESOLUTIONS = {"720p", "1080p"}
-
 
 class VideoGenerateRequest(BaseModel):
     scenario: str = "product_video"
@@ -83,73 +77,6 @@ class FreeVideoOptimizeRequest(BaseModel):
     prompt: str
 
 
-def _clean_image_urls(image_urls: list[str]) -> list[str]:
-    return [str(url).strip() for url in image_urls if str(url).strip()]
-
-
-def _clean_video_url(video_url: str | None) -> str:
-    return str(video_url or "").strip()
-
-
-def _clean_urls(urls: list[str]) -> list[str]:
-    return [str(url).strip() for url in urls if str(url).strip()]
-
-
-def _validate_video_inputs(
-    input_mode: str,
-    image_urls: list[str],
-) -> str | None:
-    if input_mode not in VIDEO_INPUT_MODES:
-        return "不支持的视频素材模式"
-    count = len(image_urls)
-    if input_mode == "reference_to_video" and not 1 <= count <= 9:
-        return "商品视频必须上传 1-9 张参考图"
-    return None
-
-
-def _validate_aspect_ratio(aspect_ratio: str) -> str | None:
-    if aspect_ratio not in VIDEO_ASPECT_RATIOS:
-        supported = " / ".join(sorted(VIDEO_ASPECT_RATIOS))
-        return f"不支持的视频比例：{aspect_ratio}，请选择 {supported}"
-    return None
-
-
-def _validate_video_duration(duration: int) -> str | None:
-    if duration not in VIDEO_DURATIONS:
-        supported = " / ".join(str(item) for item in sorted(VIDEO_DURATIONS))
-        return f"不支持的视频时长：{duration}秒，请选择 {supported} 秒"
-    return None
-
-
-def _video_input_mode_label(input_mode: str) -> str:
-    labels = {
-        "reference_to_video": "参考图生视频",
-        "multimodal_reference": "多模态参考生视频",
-    }
-    return labels.get(input_mode, input_mode)
-
-
-def _video_consume_note(
-    *,
-    scenario: str,
-    title: str | None,
-    input_mode: str,
-    resolution: str,
-    duration: int,
-) -> str:
-    scenario_label = SCENARIO_TITLE_PREFIX.get(scenario, "视频生成")
-    parts = [scenario_label]
-    clean_title = (title or "").strip()
-    if clean_title:
-        parts.append(clean_title)
-    parts.extend([_video_input_mode_label(input_mode), resolution, f"{duration}秒"])
-    return " · ".join(parts)
-
-
-def _normalize_video_scenario(raw: str | None) -> str:
-    return (raw or "product_video").strip() or "product_video"
-
-
 @router.get("/credit-costs", response_model=Response)
 async def video_credit_costs(
     current_user: User = Depends(get_current_user),
@@ -169,16 +96,16 @@ async def video_strategy(
     db: AsyncSession = Depends(get_db),
 ):
     images = [item.model_dump() for item in req.images]
-    image_urls = _clean_image_urls([item["url"] for item in images])
-    input_error = _validate_video_inputs(req.input_mode, image_urls)
+    image_urls = clean_urls([item["url"] for item in images])
+    input_error = validate_video_inputs(req.input_mode, image_urls)
     if input_error:
         return fail(input_error)
 
     aspect_ratio = str(req.aspect_ratio or "").strip()
-    aspect_error = _validate_aspect_ratio(aspect_ratio)
+    aspect_error = validate_aspect_ratio(aspect_ratio)
     if aspect_error:
         return fail(aspect_error)
-    duration_error = _validate_video_duration(req.duration)
+    duration_error = validate_video_duration(req.duration)
     if duration_error:
         return fail(duration_error)
 
@@ -341,192 +268,25 @@ async def create_video_task(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    scenario = _normalize_video_scenario(req.scenario)
-    if scenario not in VIDEO_SCENARIOS:
-        return fail("不支持的视频场景")
-
-    image_urls = _clean_image_urls(req.image_urls)
-    video_urls = _clean_urls(req.video_urls)
-    audio_urls = _clean_urls(req.audio_urls)
-    input_video_url = _clean_video_url(req.input_video_url)
-    effective_input_mode = req.input_mode
-    if scenario == "free_video":
-        effective_input_mode = "multimodal_reference"
-        if not str(req.user_prompt or "").strip():
-            return fail("请输入视频提示词")
-        if len(image_urls) > 9:
-            return fail("参考图最多只能上传 9 张")
-        if len(video_urls) > 3:
-            return fail("参考视频最多只能上传 3 条")
-        if len(audio_urls) > 3:
-            return fail("参考音频最多只能上传 3 条")
-    else:
-        input_error = _validate_video_inputs(
-            req.input_mode,
-            image_urls,
-        )
-        if input_error:
-            return fail(input_error)
-
-    aspect_ratio = str(req.aspect_ratio or "").strip()
-    aspect_error = _validate_aspect_ratio(aspect_ratio)
-    if aspect_error:
-        return fail(aspect_error)
-    duration_error = _validate_video_duration(req.duration)
-    if duration_error:
-        return fail(duration_error)
-
-    try:
-        normalized_resolution = normalize_video_resolution(req.resolution)
-        if scenario == "free_video" and normalized_resolution not in FREE_VIDEO_RESOLUTIONS:
-            return fail("自由生视频清晰度请选择 720p / 1080p")
-        credit_cost = await get_effective_video_credit_cost(
-            db,
-            normalized_resolution,
-            req.duration,
-        )
-    except ValueError as exc:
-        return fail(str(exc))
-
-    job: GenerationJob | None = None
-    if req.job_id:
-        job_result = await db.execute(
-            select(GenerationJob).where(
-                GenerationJob.id == req.job_id,
-                GenerationJob.user_id == current_user.id,
-                GenerationJob.scenario == scenario,
-            )
-        )
-        job = job_result.scalar_one_or_none()
-        if not job:
-            return fail("任务不存在")
-
-    settings_snapshot = {
-        **(req.settings_snapshot or {}),
-        "scenario": scenario,
-        "type_id": req.type_id,
-        "title": req.title,
-        "input_mode": effective_input_mode,
-        "input_video_url": input_video_url,
-        "video_urls": video_urls,
-        "audio_urls": audio_urls,
-        "duration": req.duration,
-        "resolution": normalized_resolution,
-        "aspect_ratio": aspect_ratio,
-        "generate_audio": req.generate_audio,
-        "enable_web_search": req.enable_web_search,
-    }
-
-    try:
-        built_prompt = await build_video_generate_prompt(
-            db,
-            type_id=req.type_id,
-            title=req.title,
-            user_prompt=req.user_prompt,
-            settings=settings_snapshot,
-        )
-    except ValueError as exc:
-        return fail(str(exc))
-
-    charge, fail_response = await deduct_credits_or_fail(
-        db,
-        current_user.id,
-        credit_cost,
-        note=_video_consume_note(
-            scenario=scenario,
-            title=req.title,
-            input_mode=effective_input_mode,
-            resolution=normalized_resolution,
-            duration=req.duration,
-        ),
-    )
-    if fail_response is not None:
-        return fail_response
-    credit_cost = charge.cost
-    remaining_credits = charge.balance_after
-
-    task_id = str(uuid.uuid4())
-    task = VideoTask(
-        id=task_id,
-        user_id=current_user.id,
-        job_id=job.id if job else None,
-        scenario=scenario,
-        type_id=req.type_id,
-        title=req.title,
-        sort_order=req.sort_order,
-        prompt=built_prompt.final_prompt,
-        input_mode=effective_input_mode,
-        input_images_json=dump_json_or_none(image_urls),
-        input_video_url=(video_urls[0] if scenario == "free_video" and video_urls else input_video_url) or None,
-        duration=req.duration,
-        resolution=normalized_resolution,
-        aspect_ratio=aspect_ratio,
-        status="pending",
-        prompt_snapshot_json=dump_prompt_snapshot(built_prompt.prompt_snapshot),
-        settings_snapshot_json=dump_json_or_none(settings_snapshot),
-        credit_cost=credit_cost,
-    )
-    db.add(task)
-    try:
-        await db.commit()
-    except Exception:
-        await db.rollback()
-        return fail("视频任务创建失败，请稍后重试")
-
-    async def mark_video_task_failed(_refunded_credits: int) -> None:
-        await db.execute(
-            update(VideoTask)
-            .where(VideoTask.id == task_id)
-            .values(status="failed", credit_refunded=True)
-        )
-
-    enqueue_fail = await enqueue_or_compensate(
-        get_redis_pool=lambda: request.app.state.redis_pool,
+    result, failure = await create_video_generation_task(
         db=db,
-        job_name="generate_video",
-        job_args=(
-            task_id,
-            built_prompt.final_prompt,
-            req.duration,
-            aspect_ratio,
-            normalized_resolution,
-            image_urls,
-            input_video_url,
-            video_urls,
-            audio_urls,
-            req.generate_audio,
-            req.enable_web_search,
+        current_user=current_user,
+        payload=VideoGeneratePayload(
+            scenario=req.scenario, type_id=req.type_id, title=req.title,
+            input_mode=req.input_mode, image_urls=req.image_urls,
+            input_video_url=req.input_video_url, video_urls=req.video_urls,
+            audio_urls=req.audio_urls, user_prompt=req.user_prompt,
+            duration=req.duration, resolution=req.resolution,
+            aspect_ratio=req.aspect_ratio, generate_audio=req.generate_audio,
+            enable_web_search=req.enable_web_search,
+            settings_snapshot=req.settings_snapshot, sort_order=req.sort_order,
+            job_id=req.job_id,
         ),
-        user_id=current_user.id,
-        credit_cost=credit_cost,
-        remaining_credits=remaining_credits,
-        refund_credits=refund_user_credits,
-        mark_failed=mark_video_task_failed,
-        failure_message="视频任务入队失败，请稍后重试",
-        failure_data={"task_id": task_id},
-        refund_note=f"视频任务入队失败退回 · {task_id}",
+        get_redis_pool=lambda: request.app.state.redis_pool,
     )
-    if enqueue_fail is not None:
-        return enqueue_fail
-
-    if job is not None and job.status != "generating":
-        try:
-            await db.execute(
-                update(GenerationJob)
-                .where(GenerationJob.id == job.id)
-                .values(status="generating")
-            )
-            await db.commit()
-        except Exception:
-            await db.rollback()
-
-    return success(
-        {
-            "task_id": task_id,
-            "credits": remaining_credits,
-            "credit_cost": credit_cost,
-        }
-    )
+    if failure is not None:
+        return failure
+    return success({"task_id": result.task_id, "credits": result.credits, "credit_cost": result.credit_cost})
 
 
 @router.get("/task/{task_id}", response_model=Response)
