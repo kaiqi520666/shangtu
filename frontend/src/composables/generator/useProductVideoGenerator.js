@@ -146,7 +146,6 @@ export function useProductVideoGenerator({ toast, confirm, onJobCreated } = {}) 
     runStrategy,
     setStrategyResult,
     resetStrategy,
-    setStrategyStep,
     updateStrategyItem,
     backToConfig,
   } = strategyFlow;

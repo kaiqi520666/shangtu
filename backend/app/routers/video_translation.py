@@ -4,19 +4,15 @@ import uuid
 
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
-from sqlalchemy import func, select, update
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_user, get_db
-from app.core.json_utils import dump_json_or_none, parse_json_or_none
+from app.core.json_utils import dump_json_or_none
 from app.core.media_projection import video_task_payload
 from app.core.media_download import remote_media_download_response
-from app.core.providers.heygen_provider import (
-    parse_heygen_error_message,
-)
 from app.core.system_settings import get_effective_video_translation_credit_costs
-from app.core.task_timeout import project_task_runtime_state
-from app.core.time import to_utc_iso, utc_now
+from app.core.time import utc_now
 from app.core.user_credits import get_user_credits, refund_user_credits
 from app.models import GenerationJob, HeygenTranslationLanguage, User, VideoTask
 from app.schemas.response import Response, fail, success

@@ -1,5 +1,4 @@
 import hashlib
-import os
 import uuid
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
@@ -11,6 +10,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_env
 from app.core.deps import get_current_user, get_db
 from app.core.distribution import apply_order_commissions, build_distribution_snapshot
 from app.core.json_utils import dump_json
@@ -48,32 +48,32 @@ def _parse_amount_cents(value: str | None) -> int | None:
 
 
 def _zpay_key() -> str:
-    key = os.getenv("ZPAY_KEY")
+    key = get_env("ZPAY_KEY")
     if not key:
         raise ValueError("ZPAY_KEY 未配置")
     return key
 
 
 def _zpay_pid() -> str:
-    pid = os.getenv("ZPAY_PID")
+    pid = get_env("ZPAY_PID")
     if not pid:
         raise ValueError("ZPAY_PID 未配置")
     return pid
 
 
 def _zpay_gateway() -> str:
-    return (os.getenv("ZPAY_GATEWAY") or "https://zpayz.cn").rstrip("/")
+    return get_env("ZPAY_GATEWAY", "https://zpayz.cn").rstrip("/")
 
 
 def _zpay_notify_url() -> str:
-    url = os.getenv("ZPAY_NOTIFY_URL")
+    url = get_env("ZPAY_NOTIFY_URL")
     if not url:
         raise ValueError("ZPAY_NOTIFY_URL 未配置")
     return url
 
 
 def _zpay_return_url() -> str:
-    url = os.getenv("ZPAY_RETURN_URL")
+    url = get_env("ZPAY_RETURN_URL")
     if not url:
         raise ValueError("ZPAY_RETURN_URL 未配置")
     return url

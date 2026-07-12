@@ -1,8 +1,7 @@
-import os
-
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_env
 from app.core.deps import get_current_super_admin, get_db
 from app.core.system_settings import (
     SETTING_DIGITAL_HUMAN_CREDIT_COSTS,
@@ -53,10 +52,10 @@ async def get_settings(
     except ValueError as exc:
         return fail(str(exc))
     payment_config = {
-        "zpay_pid_configured": bool(os.getenv("ZPAY_PID")),
-        "zpay_key_configured": bool(os.getenv("ZPAY_KEY")),
-        "zpay_notify_url_configured": bool(os.getenv("ZPAY_NOTIFY_URL")),
-        "zpay_return_url_configured": bool(os.getenv("ZPAY_RETURN_URL")),
+        "zpay_pid_configured": bool(get_env("ZPAY_PID")),
+        "zpay_key_configured": bool(get_env("ZPAY_KEY")),
+        "zpay_notify_url_configured": bool(get_env("ZPAY_NOTIFY_URL")),
+        "zpay_return_url_configured": bool(get_env("ZPAY_RETURN_URL")),
     }
     return success(
         {

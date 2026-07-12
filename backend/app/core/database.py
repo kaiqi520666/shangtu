@@ -1,12 +1,9 @@
-import os
-
-from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 
-load_dotenv()
+from app.core.config import get_env
 
-DATABASE_URL = os.getenv(
+DATABASE_URL = get_env(
     "DATABASE_URL",
     "postgresql+asyncpg://admin:123456@localhost/shangtu",
 )

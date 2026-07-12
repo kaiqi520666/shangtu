@@ -1,16 +1,13 @@
 from __future__ import annotations
 
-import os
 from collections.abc import AsyncIterator
 from typing import Any
 
 import httpx
-from dotenv import load_dotenv
+from app.core.config import get_env
 
-load_dotenv()
-
-HEYGEN_BASE_URL = (os.getenv("HEYGEN_BASE_URL") or "https://api.heygen.com").rstrip("/")
-HEYGEN_API_KEY = os.getenv("HEYGEN_API_KEY")
+HEYGEN_BASE_URL = get_env("HEYGEN_BASE_URL", "https://api.heygen.com").rstrip("/")
+HEYGEN_API_KEY = get_env("HEYGEN_API_KEY")
 AVATAR_PAGE_SIZE = 20
 VOICE_PAGE_SIZE = 100
 

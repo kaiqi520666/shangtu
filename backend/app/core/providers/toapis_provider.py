@@ -1,19 +1,15 @@
-import os
 from typing import Any
 
-from dotenv import load_dotenv
-
+from app.core.config import get_env
 from app.core.model_config import IMAGE_GENERATE_MODEL, VIDEO_GENERATE_MODEL
 
-load_dotenv()
-
-TOAPIS_BASE_URL = (os.getenv("TOAPIS_URL") or "https://toapis.com").rstrip("/")
-TOAPIS_KEY = os.getenv("TOAPIS_KEY")
+TOAPIS_BASE_URL = get_env("TOAPIS_URL", "https://toapis.com").rstrip("/")
+TOAPIS_KEY = get_env("TOAPIS_KEY")
 TOPENROUTER_BASE_URL = (
-    os.getenv("TOPENROUTER_URL") or "https://tp-api.chinadatapay.com:8000"
+    get_env("TOPENROUTER_URL", "https://tp-api.chinadatapay.com:8000")
 ).rstrip("/")
-TOPENROUTER_KEY = os.getenv("TOPENROUTER_KEY") or os.getenv("TOPENROUTER_API_KEY")
-VIDEO_PROVIDER = (os.getenv("VIDEO_PROVIDER") or "topenrouter").strip().lower()
+TOPENROUTER_KEY = get_env("TOPENROUTER_KEY") or get_env("TOPENROUTER_API_KEY")
+VIDEO_PROVIDER = get_env("VIDEO_PROVIDER", "topenrouter").lower()
 VIDEO_PROVIDER_LABELS = {"toapis": "ToAPIS", "topenrouter": "TopenRouter"}
 
 POLL_INTERVAL_SECONDS = 5

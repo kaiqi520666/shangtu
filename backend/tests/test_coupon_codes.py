@@ -7,7 +7,7 @@ from sqlalchemy.dialects import postgresql
 
 from app.core.coupons import normalize_coupon_code, redeem_coupon
 from app.core.time import utc_now
-from app.models import CouponCode, CouponRedemption, CreditTransaction
+from app.models import CouponRedemption, CreditTransaction
 from app.routers.admin.coupon_codes import delete_coupon_code, update_coupon_code
 from app.routers.admin.schemas import CreateCouponCodeRequest, UpdateCouponCodeRequest
 

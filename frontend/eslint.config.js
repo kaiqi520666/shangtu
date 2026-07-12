@@ -21,10 +21,30 @@ export default defineConfig([
     },
   },
 
+  {
+    files: ['scripts/**/*.{js,mjs}'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+      },
+    },
+  },
+
   js.configs.recommended,
   ...pluginVue.configs['flat/essential'],
 
   ...pluginOxlint.buildFromOxlintConfigFile('.oxlintrc.json'),
+
+  {
+    files: [
+      'src/components/admin/**/*.vue',
+      'src/components/digital-human/PhotoAvatarsPanel.vue',
+      'src/components/digital-human/UploadedAudioPanel.vue',
+    ],
+    rules: {
+      'vue/no-mutating-props': 'off',
+    },
+  },
 
   skipFormatting,
 ])

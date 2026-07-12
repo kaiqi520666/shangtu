@@ -1,15 +1,12 @@
 import asyncio
-import os
 import uuid
 from dataclasses import dataclass
 from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
 
 import oss2
-from dotenv import load_dotenv
 
+from app.core.config import get_env
 from app.core.time import utc_now
-
-load_dotenv()
 
 MAX_IMAGE_SIZE = 10 * 1024 * 1024
 MAX_VIDEO_SIZE = 300 * 1024 * 1024
@@ -69,11 +66,11 @@ class OssConfigError(RuntimeError):
 
 def get_oss_config() -> dict[str, str]:
     config = {
-        "access_key_id": os.getenv("OSS_ACCESS_KEY_ID"),
-        "access_key_secret": os.getenv("OSS_ACCESS_KEY_SECRET"),
-        "endpoint": os.getenv("OSS_ENDPOINT"),
-        "bucket_name": os.getenv("OSS_BUCKET_NAME"),
-        "public_base_url": os.getenv("OSS_PUBLIC_BASE_URL"),
+        "access_key_id": get_env("OSS_ACCESS_KEY_ID"),
+        "access_key_secret": get_env("OSS_ACCESS_KEY_SECRET"),
+        "endpoint": get_env("OSS_ENDPOINT"),
+        "bucket_name": get_env("OSS_BUCKET_NAME"),
+        "public_base_url": get_env("OSS_PUBLIC_BASE_URL"),
     }
     missing = [key for key, value in config.items() if key != "public_base_url" and not value]
     if missing:
@@ -115,10 +112,11 @@ def image_url_variants(url: str | None) -> dict[str, str]:
         return {"result_url": "", "thumb_url": "", "preview_url": ""}
 
     parsed = urlsplit(clean_url)
-    public_base_url = (os.getenv("OSS_PUBLIC_BASE_URL") or "").rstrip("/")
+    public_base_url = (get_env("OSS_PUBLIC_BASE_URL") or "").rstrip("/")
     public_host = urlsplit(public_base_url).netloc if public_base_url else ""
-    endpoint_host = (os.getenv("OSS_ENDPOINT") or "").replace("https://", "").replace("http://", "").rstrip("/")
-    bucket_host = f"{os.getenv('OSS_BUCKET_NAME')}.{endpoint_host}" if endpoint_host else ""
+    endpoint_host = (get_env("OSS_ENDPOINT") or "").replace("https://", "").replace("http://", "").rstrip("/")
+    bucket_name = get_env("OSS_BUCKET_NAME")
+    bucket_host = f"{bucket_name}.{endpoint_host}" if bucket_name and endpoint_host else ""
     if public_base_url and bucket_host and parsed.netloc == bucket_host:
         public_url = f"{public_base_url}/{parsed.path.lstrip('/')}"
         parsed = urlsplit(f"{public_url}?{parsed.query}" if parsed.query else public_url)

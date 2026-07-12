@@ -32,7 +32,6 @@ const {
   totalPages,
   scenarioFilters,
   zoomCard,
-  selectedCards,
   selectedCardsCount,
   toggleCardSelection,
   toggleSelectAllCards,

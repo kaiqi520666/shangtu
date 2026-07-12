@@ -36,12 +36,12 @@ const query = useAssetQuery({
   pageSize: 18,
   onError: (message) => emit("notify", message),
 });
-const { assets, loading, page, mediaType, scenario, totalPages, scenarioFilters } = query;
+const { assets, loading, page, mediaType: assetMediaType, scenario, totalPages, scenarioFilters } = query;
 const selectedAssets = computed(() => Object.values(selectedMap.value));
 const selectedCount = computed(() => selectedAssets.value.length);
 const mediaLabel = computed(() => {
-  if (mediaType.value === "video") return "视频";
-  if (mediaType.value === "audio") return "音频";
+  if (assetMediaType.value === "video") return "视频";
+  if (assetMediaType.value === "audio") return "音频";
   return "图片";
 });
 
@@ -49,7 +49,7 @@ watch(
   [() => props.open, () => props.mediaType],
   ([open, nextMediaType]) => {
     if (!open) return;
-    mediaType.value = nextMediaType;
+    assetMediaType.value = nextMediaType;
     scenario.value = "";
     page.value = 1;
     selectedMap.value = {};

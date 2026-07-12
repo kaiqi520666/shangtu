@@ -2,7 +2,7 @@
 import StrategyReviewShell from "@/components/generation/workspace/StrategyReviewShell.vue";
 import StrategyModuleCard from "@/components/product-image/StrategyModuleCard.vue";
 
-const props = defineProps({
+defineProps({
   loading: {
     type: Boolean,
     default: false,

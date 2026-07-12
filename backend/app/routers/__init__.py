@@ -1,3 +1,3 @@
 from app.routers import auth, image_generation
 
-__all__ = ["auth", "image"]
+__all__ = ["auth", "image_generation"]

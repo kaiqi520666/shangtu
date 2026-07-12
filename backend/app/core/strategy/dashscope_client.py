@@ -1,8 +1,6 @@
-import os
-
 import httpx
-from dotenv import load_dotenv
 
+from app.core.config import get_env
 from app.core.model_config import QWEN_TEXT_MODEL
 from app.core.strategy.parsing import _parse_json_response
 from app.core.strategy.prompts import (
@@ -13,15 +11,12 @@ from app.core.strategy.prompts import (
     build_product_prompt,
 )
 
-load_dotenv()
-
-
 class DashScopeConfigError(RuntimeError):
     pass
 
 
 def get_dashscope_endpoint() -> str:
-    base_url = os.getenv("DASHSCOPE_URL")
+    base_url = get_env("DASHSCOPE_URL")
     if not base_url:
         raise DashScopeConfigError("DASHSCOPE_URL未配置")
 
@@ -32,7 +27,7 @@ def get_dashscope_endpoint() -> str:
 
 
 def get_dashscope_api_key() -> str:
-    api_key = os.getenv("DASHSCOPE_API_KEY")
+    api_key = get_env("DASHSCOPE_API_KEY")
     if not api_key:
         raise DashScopeConfigError("DASHSCOPE_API_KEY未配置")
     return api_key

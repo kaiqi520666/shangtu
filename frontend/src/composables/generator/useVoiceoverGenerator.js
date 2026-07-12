@@ -1,4 +1,4 @@
-import { computed, onBeforeUnmount, reactive, ref } from "vue";
+import { computed, onBeforeUnmount, reactive } from "vue";
 import { getAssetDownloadUrl } from "@/api/assets.js";
 import { createVoiceoverTask, deleteVoiceoverTask, getVoiceoverConfig, getVoiceoverTask } from "@/api/voiceover.js";
 import { useMediaBatchRunner } from "@/composables/generator/batch/useMediaBatchRunner.js";

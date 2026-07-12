@@ -1,8 +1,9 @@
 from datetime import datetime, timezone
 import json
 import logging
-import os
 import re
+
+from app.core.config import get_env
 
 STRUCTURED_FIELDS = (
     "event",
@@ -49,7 +50,7 @@ class JsonLogFormatter(logging.Formatter):
 
 
 def configure_logging() -> None:
-    level_name = os.getenv("LOG_LEVEL", "INFO").upper()
+    level_name = get_env("LOG_LEVEL", "INFO").upper()
     level = getattr(logging, level_name, logging.INFO)
     root = logging.getLogger()
     handler = logging.StreamHandler()

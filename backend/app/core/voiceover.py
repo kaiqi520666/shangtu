@@ -1,8 +1,6 @@
 import math
 import re
 
-from app.core.cosyvoice_catalog import COSYVOICE_V3_FLASH
-
 VOICEOVER_TEXT_LIMIT = 5000
 VOICEOVER_FORMAT = "mp3"
 VOICEOVER_SAMPLE_RATE = 24000

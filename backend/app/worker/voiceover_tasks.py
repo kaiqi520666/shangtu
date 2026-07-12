@@ -1,10 +1,10 @@
 import logging
-import os
 
 import httpx
 from sqlalchemy import select
 
 from app.core.database import SessionLocal
+from app.core.config import get_env
 from app.core.json_utils import parse_json_or_none
 from app.core.oss import upload_audio_bytes
 from app.core.time import utc_now
@@ -63,9 +63,9 @@ async def generate_voiceover(ctx, task_id: str):
         instruction = task.instruction
         settings = parse_json_or_none(task.settings_snapshot_json) or {}
 
-    api_key = os.getenv("DASHSCOPE_API_KEY", "").strip()
-    provider_url = os.getenv("DASHSCOPE_TTS_URL", "").strip()
-    provider_model = os.getenv("DASHSCOPE_TTS_MODEL", "").strip()
+    api_key = get_env("DASHSCOPE_API_KEY")
+    provider_url = get_env("DASHSCOPE_TTS_URL")
+    provider_model = get_env("DASHSCOPE_TTS_MODEL")
     if not api_key or not provider_url or not provider_model:
         await mark_failed(task_id, "语音服务配置缺失")
         return

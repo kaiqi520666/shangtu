@@ -7,7 +7,7 @@ from app.core.providers.toapis_provider import (
     build_create_payload,
     validate_size,
 )
-from app.core.task_state import set_task_progress, set_task_result, set_task_status
+from app.core.task_state import set_task_progress
 from app.worker.task_failures import mark_failed, mark_timeout
 from app.worker.generation_runner import GenerationRunnerConfig, run_generation_task
 from app.worker.task_state_sync import fetch_image_task_context, update_task_in_db

@@ -1,17 +1,12 @@
-import os
-
-from dotenv import load_dotenv
-
-load_dotenv()
+from app.core.config import get_env
 
 
 def _env_model(name: str, default: str) -> str:
-    value = os.getenv(name)
-    return value.strip() if value and value.strip() else default
+    return get_env(name, default)
 
 
 def _video_model_default() -> str:
-    provider = (os.getenv("VIDEO_PROVIDER") or "topenrouter").strip().lower()
+    provider = get_env("VIDEO_PROVIDER", "topenrouter").lower()
     return "seedance-2" if provider == "toapis" else "doubao-seedance-2.0"
 
 
