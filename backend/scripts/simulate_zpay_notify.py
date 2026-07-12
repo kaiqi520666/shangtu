@@ -13,8 +13,13 @@ if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
 from app.core.database import SessionLocal, engine  # noqa: E402
+from app.core.providers.zpay import (  # noqa: E402
+    format_amount,
+    get_zpay_key,
+    get_zpay_pid,
+    sign_params,
+)
 from app.models import CreditOrder  # noqa: E402
-from app.routers.billing import _format_amount, _zpay_key, _zpay_pid, zpay_sign  # noqa: E402
 
 load_dotenv()
 
@@ -33,9 +38,9 @@ async def main() -> None:
             raise SystemExit(f"订单不存在: {out_trade_no}")
 
         params = {
-            "pid": _zpay_pid(),
+            "pid": get_zpay_pid(),
             "name": f"商图AI积分充值-{order.package_name}",
-            "money": _format_amount(order.amount_cents),
+            "money": format_amount(order.amount_cents),
             "out_trade_no": order.out_trade_no,
             "trade_no": f"SIM{order.out_trade_no}",
             "param": order.id,
@@ -43,7 +48,7 @@ async def main() -> None:
             "type": order.pay_type,
             "sign_type": "MD5",
         }
-        params["sign"] = zpay_sign(params, _zpay_key())
+        params["sign"] = sign_params(params, get_zpay_key())
 
     base_url = os.getenv("LOCAL_API_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
     async with httpx.AsyncClient(timeout=10) as client:

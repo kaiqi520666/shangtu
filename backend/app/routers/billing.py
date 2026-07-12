@@ -1,6 +1,4 @@
-import hashlib
 import uuid
-from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
 
 import httpx
@@ -10,10 +8,19 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import get_env
 from app.core.deps import get_current_user, get_db
 from app.core.distribution import apply_order_commissions, build_distribution_snapshot
 from app.core.json_utils import dump_json
+from app.core.providers.zpay import (
+    format_amount,
+    get_zpay_gateway,
+    get_zpay_key,
+    get_zpay_notify_url,
+    get_zpay_pid,
+    get_zpay_return_url,
+    parse_amount_cents,
+    sign_params,
+)
 from app.core.system_settings import (
     get_effective_recharge_packages,
 )
@@ -25,71 +32,6 @@ router = APIRouter(prefix="/billing", tags=["积分充值"])
 
 class CreateOrderRequest(BaseModel):
     package_id: str
-
-
-def _format_amount(amount_cents: int) -> str:
-    amount = (Decimal(amount_cents) / Decimal(100)).quantize(
-        Decimal("0.01"), rounding=ROUND_HALF_UP
-    )
-    return f"{amount:.2f}"
-
-
-def _parse_amount_cents(value: str | None) -> int | None:
-    if not value:
-        return None
-    try:
-        return int(
-            (Decimal(str(value)) * Decimal(100)).quantize(
-                Decimal("1"), rounding=ROUND_HALF_UP
-            )
-        )
-    except Exception:
-        return None
-
-
-def _zpay_key() -> str:
-    key = get_env("ZPAY_KEY")
-    if not key:
-        raise ValueError("ZPAY_KEY 未配置")
-    return key
-
-
-def _zpay_pid() -> str:
-    pid = get_env("ZPAY_PID")
-    if not pid:
-        raise ValueError("ZPAY_PID 未配置")
-    return pid
-
-
-def _zpay_gateway() -> str:
-    return get_env("ZPAY_GATEWAY", "https://zpayz.cn").rstrip("/")
-
-
-def _zpay_notify_url() -> str:
-    url = get_env("ZPAY_NOTIFY_URL")
-    if not url:
-        raise ValueError("ZPAY_NOTIFY_URL 未配置")
-    return url
-
-
-def _zpay_return_url() -> str:
-    url = get_env("ZPAY_RETURN_URL")
-    if not url:
-        raise ValueError("ZPAY_RETURN_URL 未配置")
-    return url
-
-
-def zpay_sign(params: dict[str, Any], key: str) -> str:
-    items = []
-    for name, value in params.items():
-        if name in {"sign", "sign_type"}:
-            continue
-        if value is None or str(value) == "":
-            continue
-        items.append((name, str(value)))
-    items.sort(key=lambda item: item[0])
-    raw = "&".join(f"{name}={value}" for name, value in items)
-    return hashlib.md5(f"{raw}{key}".encode("utf-8")).hexdigest()
 
 
 def _client_ip(request: Request) -> str:
@@ -157,11 +99,11 @@ async def create_order(
         package = next((item for item in packages if item["id"] == req.package_id), None)
         if not package:
             return fail("充值套餐不存在或已下架")
-        pid = _zpay_pid()
-        key = _zpay_key()
-        gateway = _zpay_gateway()
-        notify_url = _zpay_notify_url()
-        return_url = _zpay_return_url()
+        pid = get_zpay_pid()
+        key = get_zpay_key()
+        gateway = get_zpay_gateway()
+        notify_url = get_zpay_notify_url()
+        return_url = get_zpay_return_url()
     except ValueError as exc:
         return fail(str(exc))
 
@@ -197,13 +139,13 @@ async def create_order(
         "notify_url": notify_url,
         "return_url": return_url,
         "name": f"商图AI积分充值-{package['name']}",
-        "money": _format_amount(package["amount_cents"]),
+        "money": format_amount(package["amount_cents"]),
         "clientip": _client_ip(request),
         "device": "pc",
         "param": order.id,
         "sign_type": "MD5",
     }
-    payload["sign"] = zpay_sign(payload, key)
+    payload["sign"] = sign_params(payload, key)
 
     try:
         async with httpx.AsyncClient(timeout=20) as client:
@@ -259,13 +201,13 @@ async def get_order(
 async def zpay_notify(request: Request, db: AsyncSession = Depends(get_db)):
     params = dict(request.query_params)
     try:
-        key = _zpay_key()
-        pid = _zpay_pid()
+        key = get_zpay_key()
+        pid = get_zpay_pid()
     except ValueError:
         return PlainTextResponse("fail")
 
     sign = params.get("sign")
-    if not sign or sign.lower() != zpay_sign(params, key):
+    if not sign or sign.lower() != sign_params(params, key):
         return PlainTextResponse("fail")
     if str(params.get("pid") or "") != str(pid):
         return PlainTextResponse("fail")
@@ -275,7 +217,7 @@ async def zpay_notify(request: Request, db: AsyncSession = Depends(get_db)):
     out_trade_no = params.get("out_trade_no")
     if not out_trade_no:
         return PlainTextResponse("fail")
-    notify_amount_cents = _parse_amount_cents(params.get("money"))
+    notify_amount_cents = parse_amount_cents(params.get("money"))
     if notify_amount_cents is None:
         return PlainTextResponse("fail")
 
