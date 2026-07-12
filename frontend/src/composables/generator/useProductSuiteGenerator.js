@@ -22,16 +22,19 @@ import {
   restoreImageGenerationSettings,
   syncImageQuality,
 } from "@/utils/generationSnapshots.js";
+import {
+  buildSuiteQueue as createSuiteQueue,
+  buildSuiteStrategySnapshot as createSuiteStrategySnapshot,
+  buildSuiteUserPrompt,
+  createSuiteStructureFromCatalog,
+  findSuiteStrategyItem as resolveSuiteStrategyItem,
+  getSuiteStructureName,
+  getSuiteStructureStrategy,
+  normalizeSuiteStrategyItems as normalizeSuiteStrategy,
+  syncSuiteStructureWithCatalog as mergeSuiteStructureWithCatalog,
+} from "@/utils/productSuiteStrategy.js";
 import { generateImageStrategy } from "@/api/image.js";
 import { useCatalogStore } from "@/stores/catalog.js";
-
-function createSuiteStructureFromCatalog(items) {
-  return items.map((item) => ({
-    ...item,
-    enabled: true,
-    count: item.defaultCount,
-  }));
-}
 
 export function useProductSuiteGenerator({ onJobCreated } = {}) {
   const toast = useToast();
@@ -199,18 +202,10 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
   }
 
   function syncSuiteStructureWithCatalog() {
-    suiteStructure.value = suiteCatalog.value.map((catalogItem) => {
-      const current = suiteStructure.value.find((item) => item.id === catalogItem.id);
-      return {
-        ...catalogItem,
-        enabled: current ? Boolean(current.enabled) : true,
-        count: current ? clampStructureCount(current.count, catalogItem.maxCount) : catalogItem.defaultCount,
-      };
-    });
-  }
-
-  function clampStructureCount(count, maxCount) {
-    return Math.min(Math.max(1, Number(count) || 1), maxCount);
+    suiteStructure.value = mergeSuiteStructureWithCatalog(
+      suiteStructure.value,
+      suiteCatalog.value,
+    );
   }
 
   function restoreSuiteJobData(data) {
@@ -399,78 +394,40 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
   }
 
   function buildSuiteStrategySnapshot() {
-    return {
-      scenario: "product_suite",
-      images: buildProductAnalyzeImages(uploadedImages.value, mainImageIndex.value),
-      platform: settings.platform,
-      language: settings.language,
-      ratio: settings.ratio,
-      quality: settings.quality,
-      productInput: settings.productInput,
-      structure: suiteStructure.value.map((item) => ({
-        id: item.id,
-        enabled: !!item.enabled,
-        count: Number(item.count) || 0,
-      })),
-    };
+    return createSuiteStrategySnapshot({
+      settings,
+      uploadedImages: uploadedImages.value,
+      mainImageIndex: mainImageIndex.value,
+      structure: suiteStructure.value,
+    });
   }
 
   function buildSuiteQueue() {
-    return suiteStrategyItems.value.flatMap((item) => {
-      const count = Math.max(0, Number(item.count) || 0);
-      return Array.from({ length: count }, (_, index) => ({
-        ...item,
-        name: item.name || getStructureName(item.id),
-        content: item.content || "",
-        strategy: item.strategy || getStructureStrategy(item.id),
-        index: index + 1,
-        total: count,
-        cardTitle: count > 1 ? `${item.name || getStructureName(item.id)} ${index + 1}` : item.name || getStructureName(item.id),
-      }));
-    });
+    return createSuiteQueue(suiteStrategyItems.value, suiteCatalog.value);
   }
 
   function buildUserPromptForItem(item) {
-    const lines = [
-      `【套图类型】${item.name}`,
-      item.strategy ? `【视觉策略】${item.strategy}` : "",
-      item.content ? `【画面要求】${item.content}` : "",
-      item.total > 1 ? `【本张序号】${item.index}/${item.total}，同类型多张图需要构图、角度或场景有区分。` : "",
-    ];
-    return lines.filter(Boolean).join("\n");
+    return buildSuiteUserPrompt(item);
   }
 
   function normalizeSuiteStrategyItems(items) {
-    return items.map((item, index) => {
-      const fallback = catalog.findSuiteStructure(item.id);
-      const count = Math.max(1, Number(item.count) || fallback?.defaultCount || 1);
-      return {
-        id: item.id || fallback?.id || `suite-${index + 1}`,
-        name: item.name || fallback?.name || `套图 ${index + 1}`,
-        description: item.description || fallback?.description || "",
-        strategy: item.strategy || fallback?.strategy || "",
-        content: item.content || "",
-        count,
-        enabled: true,
-      };
-    });
+    return normalizeSuiteStrategy(items, suiteCatalog.value);
   }
 
   function getStructureName(id) {
-    return catalog.findSuiteStructure(id)?.name || id || "商品套图";
+    return getSuiteStructureName(suiteCatalog.value, id);
   }
 
   function getStructureStrategy(id) {
-    return catalog.findSuiteStructure(id)?.strategy || "商品套图生成";
+    return getSuiteStructureStrategy(suiteCatalog.value, id);
   }
 
   function findSuiteStrategyItem(typeId) {
-    return suiteStrategyItems.value.find((item) => item.id === typeId) || {
-      id: typeId,
-      name: getStructureName(typeId),
-      content: getStructureStrategy(typeId),
-      strategy: getStructureStrategy(typeId),
-    };
+    return resolveSuiteStrategyItem(
+      suiteStrategyItems.value,
+      suiteCatalog.value,
+      typeId,
+    );
   }
 
   onBeforeUnmount(() => {
