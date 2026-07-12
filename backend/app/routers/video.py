@@ -1,13 +1,9 @@
-import uuid
-
 from fastapi import APIRouter, Depends, File, Request, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_user, get_db
-from app.core.json_utils import dump_json_or_none
 from app.core.media_download import remote_media_download_response
-from app.core.oss import OssConfigError, upload_audio_bytes, upload_video_bytes
 from app.core.strategy.dashscope_client import (
     DashScopeConfigError,
     optimize_free_video_prompt,
@@ -15,8 +11,9 @@ from app.core.strategy.dashscope_client import (
 from app.core.prompt_template_builder import build_strategy_template_prompt
 from app.core.system_settings import get_effective_video_credit_costs
 from app.core.video_strategy_generation import generate_video_strategy
-from app.models import User, UserAudioAsset, VideoTask
+from app.models import User
 from app.schemas.response import Response, fail, success
+from app.services.video_assets import create_reference_audio, create_uploaded_video
 from app.services.video_generation import (
     VideoGeneratePayload,
     clean_urls,
@@ -156,53 +153,20 @@ async def upload_video(
 ):
     try:
         content = await file.read()
-        uploaded = await upload_video_bytes(
+        outcome = await create_uploaded_video(
+            db,
             user_id=current_user.id,
             content=content,
             content_type=file.content_type or "",
-            source="video-uploads",
+            filename=file.filename,
         )
-        title = (file.filename or "用户上传视频").strip()[:100]
-        task = VideoTask(
-            id=str(uuid.uuid4()),
-            user_id=current_user.id,
-            scenario="upload",
-            type_id="upload",
-            title=title or "用户上传视频",
-            sort_order=0,
-            prompt="用户上传视频",
-            input_mode="upload",
-            input_images_json=None,
-            input_video_url=uploaded.url,
-            duration=0,
-            resolution="upload",
-            aspect_ratio="original",
-            status="done",
-            result_url=uploaded.url,
-            progress=100,
-            provider="upload",
-            provider_task_id=uploaded.object_key,
-            credit_cost=0,
-            prompt_snapshot_json=None,
-            settings_snapshot_json=dump_json_or_none(
-                {
-                    "source": "upload",
-                    "object_key": uploaded.object_key,
-                    "content_type": uploaded.content_type,
-                    "size": uploaded.size,
-                }
-            ),
-        )
-        db.add(task)
-        await db.commit()
-    except (ValueError, OssConfigError) as e:
-        return fail(str(e))
     except Exception:
-        await db.rollback()
         return fail("视频上传失败")
     finally:
         await file.close()
-
+    if outcome.error_message:
+        return fail(outcome.error_message)
+    uploaded = outcome.uploaded
     return success(
         {
             "url": uploaded.url,
@@ -221,39 +185,27 @@ async def upload_reference_audio(
 ):
     try:
         content = await file.read()
-        uploaded = await upload_audio_bytes(
+        outcome = await create_reference_audio(
+            db,
             user_id=current_user.id,
             content=content,
             content_type=file.content_type or "",
-            source="video-audio-uploads",
+            filename=file.filename,
         )
-        asset = UserAudioAsset(
-            user_id=current_user.id,
-            name=(file.filename or "参考音频").strip()[:255] or "参考音频",
-            audio_url=uploaded.url,
-            object_key=uploaded.object_key,
-            duration_seconds=0,
-            size=uploaded.size,
-            content_type=uploaded.content_type,
-            source="upload",
-        )
-        db.add(asset)
-        await db.commit()
-    except (ValueError, OssConfigError) as e:
-        return fail(str(e))
     except Exception:
-        await db.rollback()
         return fail("音频上传失败")
     finally:
         await file.close()
-
+    if outcome.error_message:
+        return fail(outcome.error_message)
+    uploaded = outcome.uploaded
     return success(
         {
             "url": uploaded.url,
             "object_key": uploaded.object_key,
             "content_type": uploaded.content_type,
             "size": uploaded.size,
-            "asset_id": asset.id,
+            "asset_id": outcome.asset_id,
         }
     )
 
