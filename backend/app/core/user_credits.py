@@ -1,3 +1,6 @@
+from dataclasses import dataclass
+from decimal import Decimal, ROUND_CEILING
+
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -41,57 +44,51 @@ def add_credit_transaction(
     )
 
 
-async def deduct_user_credits(
+@dataclass(frozen=True)
+class CreditCharge:
+    cost: int
+    balance_after: int
+    multiplier: Decimal
+
+
+def calculate_user_credit_cost(base_cost: int, multiplier: Decimal | str | float) -> int:
+    return int(
+        (Decimal(int(base_cost)) * Decimal(str(multiplier))).to_integral_value(
+            rounding=ROUND_CEILING
+        )
+    )
+
+
+async def charge_user_credits(
     db: AsyncSession,
     user_id: int,
-    cost: int,
+    base_cost: int,
     note: str | None = None,
-) -> int | None:
-    result = await db.execute(
-        update(User)
-        .where(User.id == user_id, User.credits >= cost)
-        .values(credits=User.credits - cost)
-        .returning(User.credits)
-        .execution_options(synchronize_session=False)
-    )
-    value = result.scalar_one_or_none()
-    if value is None:
+    *,
+    multiplier: Decimal | str | float | None = None,
+    allow_negative: bool = False,
+) -> CreditCharge | None:
+    user = (
+        await db.execute(select(User).where(User.id == user_id).with_for_update())
+    ).scalar_one()
+    applied_multiplier = Decimal(str(multiplier or user.consumption_multiplier))
+    cost = calculate_user_credit_cost(base_cost, applied_multiplier)
+    if not allow_negative and user.credits < cost:
         return None
-    balance_after = int(value)
+    user.credits -= cost
     add_credit_transaction(
         db,
         user_id=user_id,
         tx_type="consume",
-        credits_delta=-abs(int(cost)),
-        balance_after=balance_after,
+        credits_delta=-cost,
+        balance_after=user.credits,
         note=note,
     )
-    return balance_after
-
-
-async def deduct_user_credits_allow_negative(
-    db: AsyncSession,
-    user_id: int,
-    cost: int,
-    note: str | None = None,
-) -> int:
-    result = await db.execute(
-        update(User)
-        .where(User.id == user_id)
-        .values(credits=User.credits - cost)
-        .returning(User.credits)
-        .execution_options(synchronize_session=False)
+    return CreditCharge(
+        cost=cost,
+        balance_after=user.credits,
+        multiplier=applied_multiplier,
     )
-    balance_after = int(result.scalar_one())
-    add_credit_transaction(
-        db,
-        user_id=user_id,
-        tx_type="consume",
-        credits_delta=-abs(int(cost)),
-        balance_after=balance_after,
-        note=note,
-    )
-    return balance_after
 
 
 async def refund_user_credits(

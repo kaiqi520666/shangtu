@@ -1,6 +1,7 @@
 import { computed, ref } from "vue";
 import { getDigitalHumanConfig } from "@/api/digitalHuman.js";
 import { useToast } from "@/composables/useToast.js";
+import { multiplyCreditCosts } from "@/utils/creditPricing.js";
 
 const DEFAULT_PRECHARGE_COSTS = {
   standard: 2000,
@@ -33,11 +34,11 @@ export function useDigitalHumanPricing() {
       }
       pricingState.creditCosts.value = {
         ...DEFAULT_CREDIT_COSTS,
-        ...result.data?.credit_costs,
+        ...multiplyCreditCosts(result.data?.credit_costs, result.data?.consumption_multiplier),
       };
       pricingState.prechargeCosts.value = {
         ...DEFAULT_PRECHARGE_COSTS,
-        ...result.data?.precharge_costs,
+        ...multiplyCreditCosts(result.data?.precharge_costs, result.data?.consumption_multiplier, true),
       };
       pricingState.loaded.value = true;
     } catch {

@@ -12,6 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_user, get_db
+from app.core.distribution import apply_order_commissions, build_distribution_snapshot
 from app.core.json_utils import dump_json
 from app.core.system_settings import (
     get_effective_digital_human_credit_costs,
@@ -155,6 +156,7 @@ async def list_packages(
             "digital_human_precharge_costs": digital_human_precharge_costs,
             "video_translation_credit_costs": video_translation_credit_costs,
             "credits": current_user.credits,
+            "consumption_multiplier": float(current_user.consumption_multiplier),
         }
     )
 
@@ -180,12 +182,17 @@ async def create_order(
         return fail(str(exc))
 
     out_trade_no = _make_out_trade_no()
+    distribution_snapshot_json, distribution_root_user_id = await build_distribution_snapshot(
+        db, current_user.id
+    )
     order = CreditOrder(
         user_id=current_user.id,
         out_trade_no=out_trade_no,
         package_id=package["id"],
         package_name=package["name"],
         package_snapshot_json=dump_json(package),
+        distribution_snapshot_json=distribution_snapshot_json,
+        distribution_root_user_id=distribution_root_user_id,
         credits=package["credits"],
         amount_cents=package["amount_cents"],
         pay_type="wxpay",
@@ -328,6 +335,7 @@ async def zpay_notify(request: Request, db: AsyncSession = Depends(get_db)):
                 note=f"{order.package_name} 充值到账",
             )
         )
+        await apply_order_commissions(db, order)
 
     return PlainTextResponse("success")
 

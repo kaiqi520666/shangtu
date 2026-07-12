@@ -1,6 +1,8 @@
 from app.models.admin_audit_log import AdminAuditLog
 from app.models.credit_order import CreditOrder
 from app.models.credit_transaction import CreditTransaction
+from app.models.commission_transaction import CommissionTransaction
+from app.models.commission_withdrawal import CommissionWithdrawal
 from app.models.cosyvoice_voice import CosyVoiceVoice
 from app.models.generation_job import GenerationJob
 from app.models.heygen_avatar import HeygenAvatar
@@ -22,6 +24,8 @@ __all__ = [
     "AdminAuditLog",
     "CreditOrder",
     "CreditTransaction",
+    "CommissionTransaction",
+    "CommissionWithdrawal",
     "CosyVoiceVoice",
     "GenerationJob",
     "HeygenAvatar",

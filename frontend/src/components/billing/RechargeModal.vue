@@ -15,6 +15,7 @@ import AppModal from "@/components/ui/AppModal.vue";
 import { useAuthStore } from "@/stores/auth.js";
 import { useToast } from "@/composables/useToast.js";
 import { getApiErrorMessage } from "@/utils/apiError.js";
+import { multiplyCreditCosts } from "@/utils/creditPricing.js";
 
 const props = defineProps({
   open: {
@@ -74,10 +75,10 @@ async function loadPackages() {
       return;
     }
     packages.value = result.data?.packages || [];
-    imageCreditCosts.value = result.data?.image_credit_costs || {};
-    videoCreditCosts.value = result.data?.video_credit_costs || {};
-    digitalHumanCreditCosts.value = result.data?.digital_human_credit_costs || {};
-    digitalHumanPrechargeCosts.value = result.data?.digital_human_precharge_costs || {};
+    imageCreditCosts.value = multiplyCreditCosts(result.data?.image_credit_costs, result.data?.consumption_multiplier, true);
+    videoCreditCosts.value = multiplyCreditCosts(result.data?.video_credit_costs, result.data?.consumption_multiplier);
+    digitalHumanCreditCosts.value = multiplyCreditCosts(result.data?.digital_human_credit_costs, result.data?.consumption_multiplier);
+    digitalHumanPrechargeCosts.value = multiplyCreditCosts(result.data?.digital_human_precharge_costs, result.data?.consumption_multiplier, true);
     selectedPackageId.value = packages.value[0]?.id || "";
   } catch (error) {
     toast.error(getApiErrorMessage(error, "加载充值套餐失败"));

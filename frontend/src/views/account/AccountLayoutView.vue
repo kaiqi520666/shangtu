@@ -1,23 +1,27 @@
 <script setup>
 import { computed } from "vue";
 import { RouterView, useRoute } from "vue-router";
-import { CreditCard, UserRound } from "lucide-vue-next";
+import { CreditCard, HandCoins, UserRound } from "lucide-vue-next";
 import GeneratorLayout from "@/components/layout/GeneratorLayout.vue";
 import AppTabNav from "@/components/ui/AppTabNav.vue";
+import { useAuthStore } from "@/stores/auth.js";
 
 const route = useRoute();
+const authStore = useAuthStore();
 
-const accountTabs = [
+const accountTabs = computed(() => [
   { key: "profile", label: "账号中心", to: "/account/profile" },
   { key: "credits", label: "积分明细", to: "/account/credits" },
-];
+  ...(authStore.distributionEnabled ? [{ key: "distribution", label: "分销中心", to: "/account/distribution" }] : []),
+]);
 
 const tabIcons = {
   profile: UserRound,
   credits: CreditCard,
+  distribution: HandCoins,
 };
 
-const activeTab = computed(() => accountTabs.find((tab) => tab.to === route.path)?.key || "profile");
+const activeTab = computed(() => accountTabs.value.find((tab) => tab.to === route.path)?.key || "profile");
 </script>
 
 <template>

@@ -12,8 +12,34 @@ export function updateAdminUser(userId, payload) {
   return request.patch(`/admin/users/${userId}`, payload, { timeout: 15000 });
 }
 
+export function updateAdminUserBusiness(userId, payload) {
+  return request.patch(`/admin/users/${userId}/business`, payload, { timeout: 15000 });
+}
+
 export function adjustAdminUserCredits(userId, payload) {
   return request.post(`/admin/users/${userId}/credits/adjust`, payload, { timeout: 15000 });
+}
+
+export function getAdminCommissionWithdrawals(params = {}) {
+  return request.get("/admin/commission-withdrawals", { params, timeout: 15000 });
+}
+
+export function approveAdminCommissionWithdrawal(withdrawalId) {
+  return request.post(`/admin/commission-withdrawals/${withdrawalId}/approve`, {}, { timeout: 15000 });
+}
+
+export function rejectAdminCommissionWithdrawal(withdrawalId, reason) {
+  return request.post(`/admin/commission-withdrawals/${withdrawalId}/reject`, { reason }, { timeout: 15000 });
+}
+
+export function payAdminCommissionWithdrawal(withdrawalId, { paymentReference, voucher }) {
+  const formData = new FormData();
+  formData.append("payment_reference", paymentReference);
+  if (voucher) formData.append("voucher", voucher);
+  return request.post(`/admin/commission-withdrawals/${withdrawalId}/pay`, formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+    timeout: 60000,
+  });
 }
 
 export function getAdminCreditOrders(params = {}) {

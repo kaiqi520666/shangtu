@@ -22,10 +22,7 @@ from app.core.task_state import (
     set_task_status,
 )
 from app.core.time import utc_now
-from app.core.user_credits import (
-    insufficient_credits_message,
-    refund_user_credits,
-)
+from app.core.user_credits import refund_user_credits
 from app.models import GenerationJob, ImageTask, User
 from app.schemas.response import Response, fail
 from app.services.generation_tasks import deduct_credits_or_fail, enqueue_or_compensate
@@ -146,9 +143,6 @@ async def create_image_generation_task(
     except ValueError as exc:
         return None, fail(str(exc))
     normalized_resolution = normalize_image_resolution(payload.resolution)
-    if current_user.credits < credit_cost:
-        return None, fail(insufficient_credits_message(credit_cost, current_user.credits))
-
     job: GenerationJob | None = None
     if payload.job_id:
         job_result = await db.execute(
@@ -178,7 +172,7 @@ async def create_image_generation_task(
         return None, fail(str(exc))
 
     # 原子扣积分 + 建任务同一事务，避免并发超扣和一致性漂移
-    remaining_credits, fail_response = await deduct_credits_or_fail(
+    charge, fail_response = await deduct_credits_or_fail(
         db,
         current_user.id,
         credit_cost,
@@ -190,6 +184,8 @@ async def create_image_generation_task(
     )
     if fail_response is not None:
         return None, fail_response
+    credit_cost = charge.cost
+    remaining_credits = charge.balance_after
 
     task = ImageTask(
         id=task_id,
@@ -302,9 +298,6 @@ async def regenerate_image_generation_task(
     except ValueError as exc:
         return None, fail(str(exc))
     normalized_resolution = normalize_image_resolution(resolution)
-    if current_user.credits < credit_cost:
-        return None, fail(insufficient_credits_message(credit_cost, current_user.credits))
-
     old_result_url = task.result_url
     prompt_snapshot = parse_prompt_snapshot(task.prompt_snapshot_json)
     if task.job_id:
@@ -342,7 +335,7 @@ async def regenerate_image_generation_task(
     new_task_id = str(uuid.uuid4())
 
     # 原子扣积分 + 新建重生任务 + 标记旧任务被替换，放在同一事务
-    remaining_credits, fail_response = await deduct_credits_or_fail(
+    charge, fail_response = await deduct_credits_or_fail(
         db,
         current_user.id,
         credit_cost,
@@ -365,6 +358,8 @@ async def regenerate_image_generation_task(
     )
     if fail_response is not None:
         return None, fail_response
+    credit_cost = charge.cost
+    remaining_credits = charge.balance_after
 
     new_task = ImageTask(
         id=new_task_id,

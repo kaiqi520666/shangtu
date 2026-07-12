@@ -26,7 +26,6 @@ from app.core.task_timeout import project_task_runtime_state
 from app.core.time import to_utc_iso, utc_now
 from app.core.user_credits import (
     get_user_credits,
-    insufficient_credits_message,
     refund_user_credits,
 )
 from app.core.video_prompt_builder import build_video_generate_prompt
@@ -160,7 +159,7 @@ async def video_credit_costs(
         costs = await get_effective_video_credit_costs(db)
     except ValueError as exc:
         return fail(str(exc))
-    return success({"costs": costs})
+    return success({"costs": costs, "consumption_multiplier": float(current_user.consumption_multiplier)})
 
 
 @router.post("/strategy", response_model=Response)
@@ -389,9 +388,6 @@ async def create_video_task(
     except ValueError as exc:
         return fail(str(exc))
 
-    if current_user.credits < credit_cost:
-        return fail(insufficient_credits_message(credit_cost, current_user.credits))
-
     job: GenerationJob | None = None
     if req.job_id:
         job_result = await db.execute(
@@ -432,7 +428,7 @@ async def create_video_task(
     except ValueError as exc:
         return fail(str(exc))
 
-    remaining_credits, fail_response = await deduct_credits_or_fail(
+    charge, fail_response = await deduct_credits_or_fail(
         db,
         current_user.id,
         credit_cost,
@@ -446,6 +442,8 @@ async def create_video_task(
     )
     if fail_response is not None:
         return fail_response
+    credit_cost = charge.cost
+    remaining_credits = charge.balance_after
 
     task_id = str(uuid.uuid4())
     task = VideoTask(

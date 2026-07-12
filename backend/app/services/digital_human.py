@@ -13,7 +13,7 @@ from app.core.scenarios import SCENARIO_TITLE_PREFIX
 from app.core.system_settings import get_effective_digital_human_credit_costs, get_effective_digital_human_precharge_cost
 from app.core.task_timeout import project_task_runtime_state
 from app.core.time import to_utc_iso, utc_now
-from app.core.user_credits import deduct_user_credits_allow_negative, refund_user_credits
+from app.core.user_credits import calculate_user_credit_cost, charge_user_credits, refund_user_credits
 from app.models import VideoTask
 from app.schemas.response import fail, success
 from app.services.digital_human_assets import get_available_audio_asset, get_enabled_voice, resolve_avatar
@@ -246,9 +246,12 @@ async def create_task(
     if job_id and job is None:
         return fail("任务不存在")
     quality_label = "高质档" if quality_tier == "premium" else "标准档"
-    remaining_credits, failure = await deduct_credits_or_fail(db, user_id, credit_cost, note=f"数字人 · {quality_label} · {title}")
+    charge, failure = await deduct_credits_or_fail(db, user_id, credit_cost, note=f"数字人 · {quality_label} · {title}")
     if failure is not None:
         return failure
+    credit_cost = charge.cost
+    remaining_credits = charge.balance_after
+    snapshot["billing"] = {"consumption_multiplier": f"{charge.multiplier:.2f}"}
 
     prompt = script or f"自定义音频：{audio_asset.name}"
     task = VideoTask(
@@ -310,7 +313,9 @@ async def settle_task_credits_if_needed(db: AsyncSession, task: VideoTask) -> bo
     if per_second_cost is None:
         return False
 
-    final_cost = int(per_second_cost) * duration
+    snapshot = parse_json_or_none(task.settings_snapshot_json)
+    multiplier = snapshot["billing"]["consumption_multiplier"]
+    final_cost = calculate_user_credit_cost(int(per_second_cost) * duration, multiplier)
     delta = final_cost - int(task.credit_cost or 0)
     if delta == 0:
         return False
@@ -322,11 +327,13 @@ async def settle_task_credits_if_needed(db: AsyncSession, task: VideoTask) -> bo
             note=f"数字人结算退回 · {task.id}",
         )
     else:
-        await deduct_user_credits_allow_negative(
+        await charge_user_credits(
             db,
             task.user_id,
             delta,
             note=f"数字人结算补扣 · {task.id}",
+            multiplier="1.00",
+            allow_negative=True,
         )
     task.credit_cost = final_cost
     return True

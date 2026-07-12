@@ -129,5 +129,5 @@ export function getVideoCreditCost({ resolution = "720p", duration = 8, costs = 
   const seconds = Number(duration);
   if (!Number.isFinite(unitCost) || unitCost <= 0) return null;
   if (!Number.isFinite(seconds) || seconds < 4 || seconds > 15) return null;
-  return unitCost * seconds;
+  return Math.ceil(unitCost * seconds);
 }

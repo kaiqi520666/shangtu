@@ -16,6 +16,7 @@ import { useMediaBatchRunner } from "@/composables/generator/batch/useMediaBatch
 import { useGenerationStrategyFlow } from "@/composables/generator/strategy/useGenerationStrategyFlow.js";
 import { buildVideoAnalyzeImages } from "@/utils/analyzeImages.js";
 import { getApiErrorMessage } from "@/utils/apiError.js";
+import { multiplyCreditCosts } from "@/utils/creditPricing.js";
 import {
   createVideoSettingsSnapshot,
   getSnapshotScene,
@@ -156,7 +157,7 @@ export function useProductVideoGenerator({ toast, confirm, onJobCreated } = {}) 
       if (result.code === 0 && result.data?.costs) {
         creditCosts.value = {
           ...defaultVideoCreditCosts,
-          ...result.data.costs,
+          ...multiplyCreditCosts(result.data.costs, result.data.consumption_multiplier),
         };
       }
     } catch {

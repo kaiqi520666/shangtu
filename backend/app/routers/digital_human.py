@@ -138,7 +138,6 @@ async def list_digital_human_avatars(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    _ = current_user
     page = max(1, page)
     page_size = min(max(1, page_size), 100)
     conditions = [HeygenAvatar.enabled == True]  # noqa: E712
@@ -629,6 +628,7 @@ async def get_digital_human_config(
         {
             "credit_costs": credit_costs,
             "precharge_costs": precharge_costs,
+            "consumption_multiplier": float(current_user.consumption_multiplier),
         }
     )
 

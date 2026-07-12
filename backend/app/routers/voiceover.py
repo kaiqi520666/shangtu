@@ -130,6 +130,7 @@ async def get_config(
         {
             "text_limit": VOICEOVER_TEXT_LIMIT,
             "credit_cost_per_100_chars": await get_effective_voiceover_credit_cost(db),
+            "consumption_multiplier": float(current_user.consumption_multiplier),
             "format": VOICEOVER_FORMAT,
             "sample_rate": VOICEOVER_SAMPLE_RATE,
         }
@@ -180,11 +181,13 @@ async def create_task(
 
     unit_cost = await get_effective_voiceover_credit_cost(db)
     credit_cost = calculate_voiceover_credit_cost(character_count, unit_cost)
-    remaining_credits, failure = await deduct_credits_or_fail(
+    charge, failure = await deduct_credits_or_fail(
         db, current_user.id, credit_cost, note=f"AI配音 · {voice.name}"
     )
     if failure:
         return failure
+    credit_cost = charge.cost
+    remaining_credits = charge.balance_after
 
     snapshot = {
         "model": COSYVOICE_V3_FLASH,

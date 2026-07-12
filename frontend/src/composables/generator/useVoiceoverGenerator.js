@@ -7,6 +7,7 @@ import { useCardActions } from "@/composables/useCardActions.js";
 import { useConfirm } from "@/composables/useConfirm.js";
 import { useToast } from "@/composables/useToast.js";
 import { useAuthStore } from "@/stores/auth.js";
+import { applyConsumptionMultiplier } from "@/utils/creditPricing.js";
 
 const POLL_INTERVAL_MS = 5000;
 
@@ -16,7 +17,7 @@ export function useVoiceoverGenerator({ onJobCreated } = {}) {
   const toast = useToast();
   const confirm = useConfirm();
   const authStore = useAuthStore();
-  const config = reactive({ textLimit: 5000, creditCostPer100Chars: 1, format: "mp3", sampleRate: 24000 });
+  const config = reactive({ textLimit: 5000, creditCostPer100Chars: 1, consumptionMultiplier: 1, format: "mp3", sampleRate: 24000 });
   const settings = reactive({ text: "", voice: null, rate: 1, pitch: 1, volume: 100, instruction: "" });
 
   async function pollTask(taskId) {
@@ -83,6 +84,7 @@ export function useVoiceoverGenerator({ onJobCreated } = {}) {
       if (result.code !== 0) return toast.error(result.message || "配音配置加载失败");
       config.textLimit = Number(result.data?.text_limit || 5000);
       config.creditCostPer100Chars = Number(result.data?.credit_cost_per_100_chars || 1);
+      config.consumptionMultiplier = Number(result.data?.consumption_multiplier || 1);
       config.format = result.data?.format || "mp3";
       config.sampleRate = Number(result.data?.sample_rate || 24000);
     } catch { toast.error("配音配置加载失败"); }
@@ -105,7 +107,7 @@ export function useVoiceoverGenerator({ onJobCreated } = {}) {
       buildSettingsSnapshot: () => ({ ...snapshot }),
       createCard({ item, sortOrder, batchRunId, settingsSnapshot }) {
         const card = cards.createCard({ typeId: "voiceover", strategyTitle: item.title, strategyContent: settings.text, sortOrder, batchRunId, settingsSnapshot });
-        card.creditCost = Math.ceil(countVoiceoverCharacters(settings.text) / 100) * config.creditCostPer100Chars;
+        card.creditCost = applyConsumptionMultiplier(Math.ceil(countVoiceoverCharacters(settings.text) / 100) * config.creditCostPer100Chars, config.consumptionMultiplier);
         return card;
       },
       async createTask({ jobId }) {

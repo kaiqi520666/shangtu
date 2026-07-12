@@ -192,6 +192,7 @@ async def get_video_translation_config(
             "languages": [_translation_language_payload(item) for item in result.scalars().all()],
             "credit_costs": credit_costs,
             "credits": current_user.credits,
+            "consumption_multiplier": float(current_user.consumption_multiplier),
         }
     )
 
@@ -248,7 +249,7 @@ async def create_video_translation_task(
     if not job:
         return fail("任务不存在")
 
-    remaining_credits, fail_response = await deduct_credits_or_fail(
+    charge, fail_response = await deduct_credits_or_fail(
         db,
         current_user.id,
         credit_cost,
@@ -256,6 +257,8 @@ async def create_video_translation_task(
     )
     if fail_response is not None:
         return fail_response
+    credit_cost = charge.cost
+    remaining_credits = charge.balance_after
 
     task = VideoTask(
         id=str(uuid.uuid4()),

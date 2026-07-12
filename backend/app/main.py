@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse
 from app.core.database import Base, SessionLocal, engine
 from app.core.logging_config import configure_logging
 from app.core.system_settings import seed_default_billing_settings
-from app.routers import account, admin, asset, auth, billing, digital_human, generation, image_generation, outfit, video, video_translation, voiceover
+from app.routers import account, admin, asset, auth, billing, digital_human, distribution, generation, image_generation, outfit, video, video_translation, voiceover
 from app.schemas.response import fail
 import app.models
 
@@ -57,6 +57,7 @@ async def handle_unexpected_exception(request: Request, exc: Exception):
 
 app.include_router(admin.router)
 app.include_router(account.router)
+app.include_router(distribution.router)
 app.include_router(auth.router)
 app.include_router(billing.router)
 app.include_router(image_generation.router)

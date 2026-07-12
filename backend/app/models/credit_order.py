@@ -13,6 +13,7 @@ class CreditOrder(Base):
     __table_args__ = (
         Index("ix_credit_orders_user_created", "user_id", "created_at"),
         Index("ix_credit_orders_out_trade_no", "out_trade_no", unique=True),
+        Index("ix_credit_orders_distribution_root_status", "distribution_root_user_id", "status"),
     )
 
     id: Mapped[str] = mapped_column(
@@ -25,6 +26,10 @@ class CreditOrder(Base):
     package_id: Mapped[str] = mapped_column(String(64), nullable=False)
     package_name: Mapped[str] = mapped_column(String(100), nullable=False)
     package_snapshot_json: Mapped[str] = mapped_column(Text, nullable=False)
+    distribution_snapshot_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    distribution_root_user_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=True
+    )
     credits: Mapped[int] = mapped_column(Integer, nullable=False)
     amount_cents: Mapped[int] = mapped_column(Integer, nullable=False)
     pay_type: Mapped[str] = mapped_column(String(20), default="wxpay", nullable=False)

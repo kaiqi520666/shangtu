@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { register } from "@/api/auth.js";
 import AuthForm from "@/components/auth/AuthForm.vue";
 import AuthPageShell from "@/components/auth/AuthPageShell.vue";
@@ -8,6 +8,7 @@ import { useToast } from "@/composables/useToast.js";
 import { useAuthStore } from "@/stores/auth.js";
 
 const router = useRouter();
+const route = useRoute();
 const authStore = useAuthStore();
 const toast = useToast();
 const loading = ref(false);
@@ -20,6 +21,7 @@ async function handleRegister(payload) {
       username: payload.username,
       email: payload.email,
       password: payload.password,
+      invite_code: typeof route.query.invite === "string" ? route.query.invite : undefined,
     });
 
     if (result.code !== 0) {
@@ -33,6 +35,9 @@ async function handleRegister(payload) {
       token: result.data?.token,
       userId: result.data?.user_id,
       credits: result.data?.credits,
+      consumption_multiplier: result.data?.consumption_multiplier,
+      distribution_level: result.data?.distribution_level,
+      distribution_enabled: result.data?.distribution_enabled,
     });
     toast.success("注册成功");
     router.push("/generator");
@@ -46,6 +51,9 @@ async function handleRegister(payload) {
 
 <template>
   <AuthPageShell>
-    <AuthForm mode="register" :loading="loading" @submit="handleRegister" />
+    <div>
+      <p v-if="route.query.invite" class="mb-3 text-center text-xs font-bold text-primary">邀请注册</p>
+      <AuthForm mode="register" :loading="loading" @submit="handleRegister" />
+    </div>
   </AuthPageShell>
 </template>

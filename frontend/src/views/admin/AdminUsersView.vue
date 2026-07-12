@@ -2,6 +2,7 @@
 import { onMounted } from "vue";
 import AdjustCreditsModal from "@/components/admin/users/AdjustCreditsModal.vue";
 import AdminUsersPanel from "@/components/admin/users/AdminUsersPanel.vue";
+import UserBusinessSettingsModal from "@/components/admin/users/UserBusinessSettingsModal.vue";
 import { useAdminUsers } from "@/composables/admin/useAdminUsers.js";
 
 const {
@@ -9,6 +10,9 @@ const {
   adjustModalOpen,
   adjustTarget,
   adjustSaving,
+  businessModalOpen,
+  businessTarget,
+  businessSaving,
   loadUsers,
   applyUsersFilter,
   changeUserRole,
@@ -16,6 +20,9 @@ const {
   openAdjustModal,
   closeAdjustModal,
   submitAdjustCredits,
+  openBusinessModal,
+  closeBusinessModal,
+  submitBusinessSettings,
   changePage,
 } = useAdminUsers();
 
@@ -29,10 +36,12 @@ onMounted(() => {
     :state="usersState"
     @apply-filter="applyUsersFilter"
     @adjust-credits="openAdjustModal"
+    @business-settings="openBusinessModal"
     @change-role="changeUserRole"
     @change-status="changeUserStatus"
     @change-page="changePage(usersState, loadUsers, $event)"
   />
+  <UserBusinessSettingsModal :open="businessModalOpen" :target="businessTarget" :saving="businessSaving" @close="closeBusinessModal" @submit="submitBusinessSettings" />
   <AdjustCreditsModal
     :open="adjustModalOpen"
     :target="adjustTarget"

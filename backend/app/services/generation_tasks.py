@@ -4,10 +4,13 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.user_credits import (
-    deduct_user_credits,
+    CreditCharge,
+    calculate_user_credit_cost,
+    charge_user_credits,
     get_user_credits,
     insufficient_credits_message,
 )
+from app.models import User
 from app.schemas.response import Response, fail
 
 FailureMarker = Callable[[int], Awaitable[None]]
@@ -21,13 +24,15 @@ async def deduct_credits_or_fail(
     user_id: int,
     cost: int,
     note: str | None = None,
-) -> tuple[int | None, Response | None]:
-    remaining_credits = await deduct_user_credits(db, user_id, cost, note=note)
-    if remaining_credits is None:
+) -> tuple[CreditCharge | None, Response | None]:
+    user = await db.get(User, user_id)
+    required = calculate_user_credit_cost(cost, user.consumption_multiplier)
+    charge = await charge_user_credits(db, user_id, cost, note=note)
+    if charge is None:
         await db.rollback()
         latest_credits = await get_user_credits(db, user_id)
-        return None, fail(insufficient_credits_message(cost, latest_credits))
-    return remaining_credits, None
+        return None, fail(insufficient_credits_message(required, latest_credits))
+    return charge, None
 
 
 async def enqueue_or_compensate(

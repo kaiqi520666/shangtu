@@ -50,6 +50,9 @@ router.beforeEach(async (to) => {
   if (to.path.startsWith("/admin") && !authStore.isSuperAdmin) {
     return "/generator/product-suite";
   }
+  if (to.path === "/account/distribution" && !authStore.distributionEnabled) {
+    return "/account/profile";
+  }
   if (
     (to.path === "/login" || to.path === "/register") &&
     authStore.isAuthenticated &&

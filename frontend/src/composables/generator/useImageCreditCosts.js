@@ -6,6 +6,7 @@ import {
   normalizeImageQuality,
 } from "@/constants/generator.js";
 import { useAuthStore } from "@/stores/auth.js";
+import { multiplyCreditCosts } from "@/utils/creditPricing.js";
 
 let pendingCreditCosts = null;
 
@@ -33,7 +34,11 @@ export async function loadImageCreditCosts() {
       if (result.code !== 0) {
         throw createBusinessError(result.message || "计费配置异常");
       }
-      return normalizeCosts(result.data?.costs) || defaultImageCreditCosts;
+      return multiplyCreditCosts(
+        normalizeCosts(result.data?.costs) || defaultImageCreditCosts,
+        result.data?.consumption_multiplier,
+        true,
+      );
     })
     .catch((error) => {
       if (error?.isBusinessError) throw error;
@@ -52,7 +57,7 @@ export async function ensureEnoughImageCredits({
   toast,
   actionText = "生成",
 } = {}) {
-  let costs = defaultImageCreditCosts;
+  let costs;
   try {
     costs = await loadImageCreditCosts();
   } catch (error) {

@@ -14,6 +14,9 @@ function normalizeUser(payload, currentUser = null) {
     : Number(currentUser?.credits || 0);
   const role = payload.role || currentUser?.role || "user";
   const status = payload.status || currentUser?.status || "active";
+  const consumptionMultiplier = Number(payload.consumption_multiplier ?? currentUser?.consumptionMultiplier ?? 1);
+  const distributionLevel = payload.distribution_level ?? currentUser?.distributionLevel ?? null;
+  const distributionEnabled = Boolean(payload.distribution_enabled ?? currentUser?.distributionEnabled ?? false);
 
   return {
     email,
@@ -23,6 +26,9 @@ function normalizeUser(payload, currentUser = null) {
     credits,
     role,
     status,
+    consumptionMultiplier,
+    distributionLevel,
+    distributionEnabled,
     plan: payload.plan || currentUser?.plan || "SaaS Pro",
     created_at: payload.created_at || currentUser?.created_at || "",
   };
@@ -40,6 +46,7 @@ export const useAuthStore = defineStore(
     const isAuthenticated = computed(() => Boolean(token.value));
     const isLoggedIn = computed(() => Boolean(user.value?.email));
     const isSuperAdmin = computed(() => role.value === "super_admin" && status.value === "active");
+    const distributionEnabled = computed(() => Boolean(user.value?.distributionEnabled));
 
     function setAuthUser(payload) {
       user.value = normalizeUser(payload, user.value);
@@ -70,6 +77,7 @@ export const useAuthStore = defineStore(
       isAuthenticated,
       isLoggedIn,
       isSuperAdmin,
+      distributionEnabled,
       setAuthUser,
       login,
       logout,

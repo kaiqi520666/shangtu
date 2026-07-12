@@ -3,11 +3,12 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_super_admin, get_db
+from app.core.distribution import update_root_distribution
 from app.core.time import utc_now
 from app.models import CreditTransaction, User
 from app.schemas.response import Response, fail, success
 
-from .schemas import AdjustCreditsRequest, UpdateUserRequest
+from .schemas import AdjustCreditsRequest, UpdateUserBusinessRequest, UpdateUserRequest
 from .utils import audit_log, page_payload, super_admin_count, user_payload
 
 router = APIRouter()
@@ -96,6 +97,49 @@ async def update_user(
                 "old_status": old_status,
                 "new_status": target.status,
             },
+        )
+    )
+    await db.commit()
+    await db.refresh(target)
+    return success(user_payload(target))
+
+
+@router.patch("/users/{user_id}/business", response_model=Response)
+async def update_user_business(
+    user_id: int,
+    req: UpdateUserBusinessRequest,
+    current_admin: User = Depends(get_current_super_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    target = (
+        await db.execute(select(User).where(User.id == user_id).with_for_update())
+    ).scalar_one_or_none()
+    if not target:
+        return fail("用户不存在")
+    old_values = user_payload(target)
+    changed = False
+    if req.consumption_multiplier is not None and req.consumption_multiplier != target.consumption_multiplier:
+        target.consumption_multiplier = req.consumption_multiplier
+        changed = True
+    if req.distribution_enabled is not None or req.commission_rate is not None:
+        try:
+            changed = await update_root_distribution(
+                db,
+                target,
+                enabled=req.distribution_enabled,
+                rate=req.commission_rate,
+            ) or changed
+        except ValueError as exc:
+            return fail(str(exc))
+    if not changed:
+        return success(user_payload(target))
+    db.add(
+        audit_log(
+            current_admin,
+            "update_user_business",
+            "user",
+            str(target.id),
+            {"old": old_values, "new": user_payload(target)},
         )
     )
     await db.commit()

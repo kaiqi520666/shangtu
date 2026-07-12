@@ -14,6 +14,11 @@ export const accountRoutes = [
         name: "account-credits",
         component: () => import("@/views/account/AccountCreditsView.vue"),
       },
+      {
+        path: "distribution",
+        name: "account-distribution",
+        component: () => import("@/views/account/AccountDistributionView.vue"),
+      },
     ],
   },
 ];

@@ -1,5 +1,5 @@
 import { reactive, ref } from "vue";
-import { adjustAdminUserCredits, getAdminUsers, updateAdminUser } from "@/api/admin.js";
+import { adjustAdminUserCredits, getAdminUsers, updateAdminUser, updateAdminUserBusiness } from "@/api/admin.js";
 import { roleLabel } from "@/constants/admin.js";
 import { createAdminPageState, useAdminPageLoader } from "@/composables/admin/useAdminPageState.js";
 import { useAdminOverview } from "@/composables/admin/useAdminOverview.js";
@@ -12,6 +12,9 @@ export function useAdminUsers() {
   const adjustModalOpen = ref(false);
   const adjustTarget = ref(null);
   const adjustSaving = ref(false);
+  const businessModalOpen = ref(false);
+  const businessTarget = ref(null);
+  const businessSaving = ref(false);
   const confirm = useConfirm();
   const toast = useToast();
   const { loadPage, applyFilter, changePage } = useAdminPageLoader(toast);
@@ -81,6 +84,36 @@ export function useAdminUsers() {
     adjustModalOpen.value = false;
   }
 
+  function openBusinessModal(user) {
+    businessTarget.value = user;
+    businessModalOpen.value = true;
+  }
+
+  function closeBusinessModal() {
+    businessModalOpen.value = false;
+  }
+
+  async function submitBusinessSettings(payload) {
+    const multiplier = Number(payload.consumption_multiplier);
+    const rate = Number(payload.commission_rate);
+    if (multiplier < 0.01 || multiplier > 9.99 || (payload.commission_rate !== undefined && (rate < 0 || rate > 100))) {
+      toast.error("请输入有效的倍率和佣金比例");
+      return;
+    }
+    businessSaving.value = true;
+    try {
+      const result = await updateAdminUserBusiness(businessTarget.value.id, payload);
+      if (result.code !== 0) return toast.error(result.message || "更新业务设置失败");
+      toast.success("业务设置已更新");
+      businessModalOpen.value = false;
+      await loadUsers();
+    } catch {
+      toast.error("更新业务设置失败");
+    } finally {
+      businessSaving.value = false;
+    }
+  }
+
   async function submitAdjustCredits(payload) {
     const amount = Number(payload?.amount);
     if (!Number.isInteger(amount) || amount === 0) {
@@ -119,12 +152,18 @@ export function useAdminUsers() {
     adjustModalOpen,
     adjustTarget,
     adjustSaving,
+    businessModalOpen,
+    businessTarget,
+    businessSaving,
     loadUsers,
     applyUsersFilter,
     changeUserRole,
     changeUserStatus,
     openAdjustModal,
     closeAdjustModal,
+    openBusinessModal,
+    closeBusinessModal,
+    submitBusinessSettings,
     submitAdjustCredits,
     changePage,
   };

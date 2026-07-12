@@ -15,6 +15,7 @@ import { useCardActions } from "@/composables/useCardActions.js";
 import { useMediaBatchRunner } from "@/composables/generator/batch/useMediaBatchRunner.js";
 import { useToast } from "@/composables/useToast.js";
 import { getApiErrorMessage } from "@/utils/apiError.js";
+import { multiplyCreditCosts } from "@/utils/creditPricing.js";
 import {
   cloneGenerationSettingsSnapshot,
   createGenerationSettingsSnapshot,
@@ -204,7 +205,7 @@ export function useFreeVideoGenerator({ confirm, onJobCreated } = {}) {
       if (result.code === 0 && result.data?.costs) {
         creditCosts.value = {
           ...defaultVideoCreditCosts,
-          ...result.data.costs,
+          ...multiplyCreditCosts(result.data.costs, result.data.consumption_multiplier),
         };
       }
     } catch {

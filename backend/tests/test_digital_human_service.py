@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 import httpx
+from app.core.json_utils import dump_json
 
 from app.services.digital_human import settle_task_credits_if_needed, sync_task_from_provider
 
@@ -17,7 +18,7 @@ def make_task(**overrides):
         "credit_cost": 20,
         "duration": 5,
         "type_id": "standard",
-        "settings_snapshot_json": None,
+        "settings_snapshot_json": dump_json({"billing": {"consumption_multiplier": "1.00"}}),
     }
     values.update(overrides)
     return SimpleNamespace(**values)
@@ -42,10 +43,17 @@ async def test_settlement_charges_underpayment():
     task = make_task(credit_cost=10)
     with (
         patch("app.services.digital_human.get_effective_digital_human_credit_costs", AsyncMock(return_value={"standard": 3})),
-        patch("app.services.digital_human.deduct_user_credits_allow_negative", AsyncMock()) as deduct,
+        patch("app.services.digital_human.charge_user_credits", AsyncMock()) as deduct,
     ):
         assert await settle_task_credits_if_needed(db, task) is True
-    deduct.assert_awaited_once_with(db, 7, 5, note="数字人结算补扣 · task-1")
+    deduct.assert_awaited_once_with(
+        db,
+        7,
+        5,
+        note="数字人结算补扣 · task-1",
+        multiplier="1.00",
+        allow_negative=True,
+    )
     assert task.credit_cost == 15
 
 

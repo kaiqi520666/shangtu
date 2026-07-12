@@ -26,6 +26,11 @@ export const adminRoutes = [
         component: () => import("@/views/admin/AdminTransactionsView.vue"),
       },
       {
+        path: "commission-withdrawals",
+        name: "admin-commission-withdrawals",
+        component: () => import("@/views/admin/AdminCommissionWithdrawalsView.vue"),
+      },
+      {
         path: "image-tasks",
         name: "admin-image-tasks",
         component: () => import("@/views/admin/AdminImageTasksView.vue"),

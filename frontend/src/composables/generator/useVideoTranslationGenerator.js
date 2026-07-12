@@ -16,6 +16,7 @@ import {
   createVideoTranslationSettingsSnapshot,
   getSnapshotScene,
 } from "@/utils/generationSnapshots.js";
+import { applyConsumptionMultiplier } from "@/utils/creditPricing.js";
 
 const DEFAULT_SETTINGS = {
   targetLanguageId: "",
@@ -44,6 +45,7 @@ export function useVideoTranslationGenerator({ toast, confirm, onJobCreated } = 
   const selectedVideo = ref(null);
   const languages = ref([]);
   const creditCosts = ref({ standard: 7, premium: 14 });
+  const consumptionMultiplier = ref(1);
 
   const cards = useGenerationCards({
     getTask: pollVideoTranslationTask,
@@ -159,9 +161,10 @@ export function useVideoTranslationGenerator({ toast, confirm, onJobCreated } = 
     },
   ]);
   const durationSeconds = computed(() => Number(selectedVideo.value?.durationSeconds || 0));
-  const estimatedCreditCost = computed(() =>
+  const estimatedCreditCost = computed(() => applyConsumptionMultiplier(
     durationSeconds.value * Number(creditCosts.value[settings.qualityTier] || 0),
-  );
+    consumptionMultiplier.value,
+  ));
   const feeText = computed(() => {
     if (!durationSeconds.value) return "";
     const unitCost = Number(creditCosts.value[settings.qualityTier] || 0);
@@ -188,6 +191,7 @@ export function useVideoTranslationGenerator({ toast, confirm, onJobCreated } = 
         return;
       }
       languages.value = result.data?.languages || [];
+      consumptionMultiplier.value = Number(result.data?.consumption_multiplier || 1);
       creditCosts.value = {
         ...creditCosts.value,
         ...result.data?.credit_costs,

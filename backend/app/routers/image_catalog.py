@@ -33,4 +33,4 @@ async def image_credit_costs(
         costs = await get_effective_image_credit_costs(db)
     except ValueError as exc:
         return fail(str(exc))
-    return success({"costs": costs})
+    return success({"costs": costs, "consumption_multiplier": float(current_user.consumption_multiplier)})

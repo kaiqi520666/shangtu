@@ -1,3 +1,4 @@
+from decimal import Decimal
 from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
@@ -9,6 +10,14 @@ StatusValue = Literal["active", "disabled"]
 class UpdateUserRequest(BaseModel):
     role: RoleValue | None = None
     status: StatusValue | None = None
+
+
+class UpdateUserBusinessRequest(BaseModel):
+    consumption_multiplier: Decimal | None = Field(
+        default=None, ge=Decimal("0.01"), le=Decimal("9.99"), decimal_places=2
+    )
+    distribution_enabled: bool | None = None
+    commission_rate: Decimal | None = Field(default=None, ge=Decimal("0"), le=Decimal("100"), decimal_places=2)
 
 
 class AdjustCreditsRequest(BaseModel):
