@@ -14,13 +14,18 @@ import {
 import { useCardActions } from "@/composables/useCardActions.js";
 import { useMediaBatchRunner } from "@/composables/generator/batch/useMediaBatchRunner.js";
 import { useGenerationStrategyFlow } from "@/composables/generator/strategy/useGenerationStrategyFlow.js";
-import { buildVideoAnalyzeImages } from "@/utils/analyzeImages.js";
 import { getApiErrorMessage } from "@/utils/apiError.js";
 import { multiplyCreditCosts } from "@/utils/creditPricing.js";
+import { getSnapshotScene } from "@/utils/generationSnapshots.js";
 import {
-  createVideoSettingsSnapshot,
-  getSnapshotScene,
-} from "@/utils/generationSnapshots.js";
+  buildProductVideoSettingsSnapshot,
+  buildProductVideoStrategySnapshot,
+  getConfirmedVideoScript as readConfirmedVideoScript,
+  getRequiredVideoImageMessage,
+  getSelectedVideoSize,
+  getVideoOptionLabel,
+  normalizeVideoStrategyItems as normalizeVideoStrategy,
+} from "@/utils/productVideoStrategy.js";
 import {
   defaultVideoCreditCosts,
   getVideoCreditCost,
@@ -28,54 +33,9 @@ import {
   videoDemoTypes,
   videoLanguageOptions,
   videoMarketOptions,
-  videoSizeOptions,
 } from "@/constants/product-video.js";
 
 const VIDEO_POLL_INTERVAL_MS = 3000;
-
-function getOptionLabel(options, value) {
-  return options.find((item) => item.value === value)?.label || value;
-}
-
-function getSelectedSize(sizePreset) {
-  return videoSizeOptions.find((item) => item.value === sizePreset) || videoSizeOptions[0];
-}
-
-function buildSettingsSnapshot(settings) {
-  const selectedType = getVideoDemoType(settings.videoType);
-  const selectedSize = getSelectedSize(settings.sizePreset);
-  return createVideoSettingsSnapshot({
-    videoType: settings.videoType,
-    title: selectedType.title,
-    inputMode: selectedType.inputMode,
-    market: settings.market,
-    marketLabel: getOptionLabel(videoMarketOptions, settings.market),
-    language: settings.language,
-    languageLabel: getOptionLabel(videoLanguageOptions, settings.language),
-    sizePreset: settings.sizePreset,
-    aspectRatio: selectedSize.aspectRatio,
-    duration: settings.duration,
-    resolution: settings.resolution,
-    productInput: settings.productInput,
-  });
-}
-
-function attachVideoStrategyBrief(snapshot, brief) {
-  return {
-    ...snapshot,
-    scene: {
-      ...snapshot.scene,
-      strategyBrief: brief,
-    },
-  };
-}
-
-function getRequiredImageMessage(inputMode, count) {
-  if (inputMode === "reference_to_video" && (count < 1 || count > 9)) {
-    return "请上传 1-9 张参考图";
-  }
-  return "";
-}
 
 export function useProductVideoGenerator({ toast, confirm, onJobCreated } = {}) {
   const settings = reactive({
@@ -92,7 +52,7 @@ export function useProductVideoGenerator({ toast, confirm, onJobCreated } = {}) 
   const mainImageIndex = ref(0);
   const creditCosts = ref({ ...defaultVideoCreditCosts });
   const selectedType = computed(() => getVideoDemoType(settings.videoType));
-  const selectedSize = computed(() => getSelectedSize(settings.sizePreset));
+  const selectedSize = computed(() => getSelectedVideoSize(settings.sizePreset));
   const estimatedCredits = computed(() =>
     getVideoCreditCost({
       resolution: settings.resolution,
@@ -250,7 +210,7 @@ export function useProductVideoGenerator({ toast, confirm, onJobCreated } = {}) 
   const canGenerateStrategy = computed(() => {
     const images = uploadedImages.value.filter((item) => item?.url);
     return (
-      !getRequiredImageMessage(selectedType.value.inputMode, images.length) &&
+      !getRequiredVideoImageMessage(selectedType.value.inputMode, images.length) &&
       !uploadedImages.value.some((item) => item?.uploading) &&
       !strategyLoading.value &&
       !creatingBatch.value &&
@@ -259,7 +219,7 @@ export function useProductVideoGenerator({ toast, confirm, onJobCreated } = {}) 
   });
   const strategyMetaText = computed(
     () =>
-      `${selectedType.value.title} / ${getOptionLabel(videoMarketOptions, settings.market)} / ${getOptionLabel(videoLanguageOptions, settings.language)} / ${settings.duration}秒 / ${selectedSize.value.aspectRatio} / ${settings.resolution}`,
+      `${selectedType.value.title} / ${getVideoOptionLabel(videoMarketOptions, settings.market)} / ${getVideoOptionLabel(videoLanguageOptions, settings.language)} / ${settings.duration}秒 / ${selectedSize.value.aspectRatio} / ${settings.resolution}`,
   );
 
   function createCard({
@@ -344,7 +304,7 @@ export function useProductVideoGenerator({ toast, confirm, onJobCreated } = {}) 
 
   async function triggerStrategyGeneration() {
     const imageUrls = uploadedImages.value.map((item) => item?.url).filter(Boolean);
-    const requirementMessage = getRequiredImageMessage(selectedType.value.inputMode, imageUrls.length);
+    const requirementMessage = getRequiredVideoImageMessage(selectedType.value.inputMode, imageUrls.length);
     if (requirementMessage) {
       toast?.info?.(requirementMessage);
       return;
@@ -404,7 +364,7 @@ export function useProductVideoGenerator({ toast, confirm, onJobCreated } = {}) 
 
     const selectedType = getVideoDemoType(settings.videoType);
     const imageUrls = uploadedImages.value.map((item) => item?.url).filter(Boolean);
-    const requirementMessage = getRequiredImageMessage(selectedType.inputMode, imageUrls.length);
+    const requirementMessage = getRequiredVideoImageMessage(selectedType.inputMode, imageUrls.length);
     if (requirementMessage) {
       toast?.info?.(requirementMessage);
       return;
@@ -419,7 +379,10 @@ export function useProductVideoGenerator({ toast, confirm, onJobCreated } = {}) 
       return;
     }
 
-    const settingsSnapshot = attachVideoStrategyBrief(buildSettingsSnapshot(settings), strategyBrief.value);
+    const settingsSnapshot = buildProductVideoSettingsSnapshot(
+      settings,
+      strategyBrief.value,
+    );
     const queue = [{ ...selectedType }];
 
     await enqueueMediaBatch({
@@ -477,29 +440,11 @@ export function useProductVideoGenerator({ toast, confirm, onJobCreated } = {}) 
   }
 
   function buildVideoStrategySnapshot() {
-    return {
-      scenario: "product_video",
-      type_id: selectedType.value.typeId,
-      input_mode: selectedType.value.inputMode,
-      market: settings.market,
-      language: settings.language,
-      duration: settings.duration,
-      aspect_ratio: selectedSize.value.aspectRatio,
-      product_input: settings.productInput,
-      images: buildVideoAnalyzeImages(selectedType.value.inputMode, uploadedImages.value),
-    };
+    return buildProductVideoStrategySnapshot(settings, uploadedImages.value);
   }
 
   function normalizeVideoStrategyItems(items) {
-    const source = Array.isArray(items) ? items : [];
-    return source.slice(0, 1).map((item) => {
-      const type = getVideoDemoType(item.id || settings.videoType);
-      return {
-        id: item.id || type.typeId,
-        name: item.name || type.title,
-        content: item.content || "",
-      };
-    });
+    return normalizeVideoStrategy(items, settings.videoType);
   }
 
   function updateVideoScript(content) {
@@ -507,7 +452,7 @@ export function useProductVideoGenerator({ toast, confirm, onJobCreated } = {}) 
   }
 
   function getConfirmedVideoScript() {
-    return (videoStrategyItems.value[0]?.content || "").trim();
+    return readConfirmedVideoScript(videoStrategyItems.value);
   }
 
   async function removeCard(card) {
