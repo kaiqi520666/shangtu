@@ -19,7 +19,8 @@ from app.core.user_credits import (
 )
 from app.models import VideoTask
 from app.schemas.response import fail, success
-from app.services.digital_human_assets import get_available_audio_asset, get_enabled_voice, resolve_avatar
+from app.services.digital_human_assets import get_enabled_voice, resolve_avatar
+from app.services.digital_human_audio import get_available_audio_asset
 from app.services.generation_tasks import deduct_credits_or_fail, enqueue_or_compensate
 from app.services.heygen_task_lifecycle import (
     clean_text,

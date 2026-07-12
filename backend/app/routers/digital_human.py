@@ -32,7 +32,7 @@ from app.services.digital_human import (
     get_task as _get_task,
     get_task_details as _get_task_details,
 )
-from app.services.digital_human_assets import (
+from app.services.digital_human_audio import (
     archive_audio_asset as _archive_audio_asset,
     audio_asset_payload as _audio_asset_payload,
 )

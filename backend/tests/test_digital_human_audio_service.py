@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.services.digital_human_assets import archive_audio_asset, audio_asset_payload
+from app.services.digital_human_audio import archive_audio_asset, audio_asset_payload
 
 
 def test_audio_asset_payload_normalizes_persisted_fields():
@@ -37,7 +37,7 @@ async def test_archive_audio_asset_marks_owned_asset():
     db = SimpleNamespace(commit=AsyncMock(), rollback=AsyncMock())
 
     with patch(
-        "app.services.digital_human_assets.get_available_audio_asset",
+        "app.services.digital_human_audio.get_available_audio_asset",
         AsyncMock(return_value=asset),
     ):
         error_message = await archive_audio_asset(

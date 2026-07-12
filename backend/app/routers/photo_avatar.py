@@ -9,15 +9,16 @@ from app.core.pagination import page_payload
 from app.core.time import utc_now
 from app.models import User, UserAvatar, UserAvatarTask
 from app.schemas.response import Response, fail, success
-from app.services.digital_human_assets import (
+from app.services.photo_avatar import (
+    create_photo_avatar_task,
     get_photo_avatar_asset,
     get_user_avatar_task,
     get_user_avatars_by_ids,
+    poll_photo_avatar_task as poll_task,
     user_avatar_payload,
     user_avatar_task_payload,
 )
 from app.services.heygen_task_lifecycle import clean_text
-from app.services.photo_avatar import create_photo_avatar_task, poll_photo_avatar_task as poll_task
 
 router = APIRouter()
 
