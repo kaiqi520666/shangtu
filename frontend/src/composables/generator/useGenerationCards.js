@@ -122,6 +122,7 @@ export function useGenerationCards({
     if (!card.taskId) return;
     stopPollingCard(card.id);
     card.stalledWarning = "";
+    card.pollFailureCount = 0;
     const timer = window.setInterval(() => {
       pollCardOnce(card).catch(() => {});
     }, pollIntervalMs);
@@ -139,7 +140,9 @@ export function useGenerationCards({
     pollInFlight.add(card.id);
     try {
       const result = await getTask(card.taskId);
-      if (result.code !== 0) return;
+      if (result.code !== 0) throw new Error(result.message || "任务状态查询失败");
+      card.pollFailureCount = 0;
+      card.stalledWarning = "";
 
       // 处理本次响应前再校验一次终态，避免并发响应叠加导致 generatedCount 重复 +1
       if (TERMINAL_STATUSES.has(card.status)) {
@@ -226,7 +229,10 @@ export function useGenerationCards({
 
       maybeFinishBatch(card.batchRunId);
     } catch {
-      // 单次轮询异常不停止该任务，等下一次 tick
+      card.pollFailureCount += 1;
+      if (card.pollFailureCount >= 3) {
+        card.stalledWarning = "连接异常，正在重试";
+      }
     } finally {
       pollInFlight.delete(card.id);
     }
@@ -313,6 +319,7 @@ export function useGenerationCards({
       assetId: "",
       progress: 0,
       stalledWarning: "",
+      pollFailureCount: 0,
     });
   }
 
@@ -339,6 +346,7 @@ export function useGenerationCards({
       assetId: item.asset_id || "",
       progress: typeof item.progress === "number" ? item.progress : 0,
       stalledWarning: "",
+      pollFailureCount: 0,
     });
   }
 

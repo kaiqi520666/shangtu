@@ -26,9 +26,21 @@ request.interceptors.response.use(
     }
     return payload;
   },
-  (error) => {
-    return Promise.reject(error);
-  },
+  handleResponseError,
 );
+
+export function handleResponseError(
+  error,
+  redirect = (url) => window.location.assign(url),
+) {
+  if (error.response?.status === 401) {
+    useAuthStore().logout();
+    if (!['/login', '/register'].includes(window.location.pathname)) {
+      const currentPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      redirect(`/login?redirect=${encodeURIComponent(currentPath)}`);
+    }
+  }
+  return Promise.reject(error);
+}
 
 export default request;
