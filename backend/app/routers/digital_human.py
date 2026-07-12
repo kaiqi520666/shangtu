@@ -15,8 +15,7 @@ from app.core.system_settings import (
     get_effective_digital_human_credit_costs,
     get_effective_digital_human_precharge_costs,
 )
-from app.core.time import to_utc_iso, utc_now
-from app.core.user_credits import get_user_credits
+from app.core.time import utc_now
 from app.core.deps import get_current_user, get_db
 from app.models import (
     HeygenAvatar,
@@ -28,13 +27,14 @@ from app.routers.admin.utils import heygen_avatar_payload, heygen_voice_payload
 from app.routers.photo_avatar import router as photo_avatar_router
 from app.schemas.response import Response, fail, success
 from app.services.digital_human import (
+    archive_task as _archive_task,
     create_task as _create_task,
     get_task as _get_task,
-    sync_job_status as _sync_job_status,
-    task_payload as _digital_human_task_payload,
+    get_task_details as _get_task_details,
 )
 from app.services.digital_human_assets import (
-    get_available_audio_asset as _get_available_audio_asset,
+    archive_audio_asset as _archive_audio_asset,
+    audio_asset_payload as _audio_asset_payload,
 )
 
 router = APIRouter(prefix="/digital-human", tags=["数字人"])
@@ -80,22 +80,6 @@ def _clean_audio_asset_name(filename: str | None) -> str:
     if stem:
         return stem[:255]
     return f"音频_{utc_now():%Y%m%d_%H%M%S}"
-
-
-def _audio_asset_payload(asset: UserAudioAsset) -> dict:
-    return {
-        "id": asset.id,
-        "name": asset.name,
-        "audio_url": asset.audio_url,
-        "object_key": asset.object_key,
-        "duration_seconds": int(asset.duration_seconds or 0),
-        "size": int(asset.size or 0),
-        "content_type": asset.content_type,
-        "source": asset.source,
-        "enabled": bool(asset.enabled),
-        "created_at": to_utc_iso(asset.created_at),
-        "updated_at": to_utc_iso(asset.updated_at),
-    }
 
 
 @router.get("/avatars", response_model=Response)
@@ -274,22 +258,13 @@ async def delete_digital_human_audio_asset(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    asset = await _get_available_audio_asset(
+    error_message = await _archive_audio_asset(
         db,
         audio_asset_id=audio_asset_id,
         user_id=current_user.id,
     )
-    if not asset:
-        return fail("音频不存在")
-
-    asset.enabled = False
-    asset.archived_at = utc_now()
-    try:
-        await db.commit()
-    except Exception:
-        await db.rollback()
-        return fail("删除失败，请稍后重试")
-
+    if error_message:
+        return fail(error_message)
     return success({"id": audio_asset_id})
 
 
@@ -346,11 +321,9 @@ async def get_digital_human_task(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    task = await _get_task(db, task_id=task_id, user_id=current_user.id)
-    if not task:
+    payload = await _get_task_details(db, task_id=task_id, user_id=current_user.id)
+    if payload is None:
         return fail("数字人任务不存在")
-    payload = _digital_human_task_payload(task)
-    payload["credits"] = await get_user_credits(db, current_user.id)
     return success(payload)
 
 
@@ -360,19 +333,13 @@ async def delete_digital_human_task(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    task = await _get_task(db, task_id=task_id, user_id=current_user.id)
-    if not task:
-        return fail("数字人视频不存在")
-
-    task.archived = True
-    task.archived_at = utc_now()
-    await _sync_job_status(db, task.job_id)
-    try:
-        await db.commit()
-    except Exception:
-        await db.rollback()
-        return fail("删除失败，请稍后重试")
-
+    error_message = await _archive_task(
+        db,
+        task_id=task_id,
+        user_id=current_user.id,
+    )
+    if error_message:
+        return fail(error_message)
     return success({"task_id": task_id})
 
 
@@ -399,9 +366,7 @@ async def poll_digital_human_task(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    task = await _get_task(db, task_id=task_id, user_id=current_user.id)
-    if not task:
+    payload = await _get_task_details(db, task_id=task_id, user_id=current_user.id)
+    if payload is None:
         return fail("数字人任务不存在")
-    payload = _digital_human_task_payload(task)
-    payload["credits"] = await get_user_credits(db, current_user.id)
     return success(payload)

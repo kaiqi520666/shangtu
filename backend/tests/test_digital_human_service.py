@@ -5,7 +5,12 @@ import pytest
 import httpx
 from app.core.json_utils import dump_json
 
-from app.services.digital_human import settle_task_credits_if_needed, sync_task_from_provider
+from app.services.digital_human import (
+    archive_task,
+    get_task_details,
+    settle_task_credits_if_needed,
+    sync_task_from_provider,
+)
 
 
 def make_task(**overrides):
@@ -70,3 +75,35 @@ async def test_provider_error_propagates_without_committing():
         with pytest.raises(httpx.ConnectError):
             await sync_task_from_provider(db, task)
     db.commit.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_get_task_details_includes_latest_credits():
+    db = AsyncMock()
+    task = make_task()
+    payload = {"task_id": task.id, "status": "done"}
+    with (
+        patch("app.services.digital_human.get_task", AsyncMock(return_value=task)),
+        patch("app.services.digital_human.task_payload", return_value=payload.copy()),
+        patch("app.services.digital_human.get_user_credits", AsyncMock(return_value=80)),
+    ):
+        details = await get_task_details(db, task_id=task.id, user_id=task.user_id)
+
+    assert details == {"task_id": task.id, "status": "done", "credits": 80}
+
+
+@pytest.mark.asyncio
+async def test_archive_task_syncs_job_before_commit():
+    db = AsyncMock()
+    task = make_task(job_id="job-1", archived=False, archived_at=None)
+    with (
+        patch("app.services.digital_human.get_task", AsyncMock(return_value=task)),
+        patch("app.services.digital_human.sync_job_status", AsyncMock()) as sync_job,
+    ):
+        error_message = await archive_task(db, task_id=task.id, user_id=task.user_id)
+
+    assert error_message is None
+    assert task.archived is True
+    assert task.archived_at is not None
+    sync_job.assert_awaited_once_with(db, "job-1")
+    db.commit.assert_awaited_once()

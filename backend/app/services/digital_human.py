@@ -13,7 +13,12 @@ from app.core.scenarios import SCENARIO_TITLE_PREFIX
 from app.core.system_settings import get_effective_digital_human_credit_costs, get_effective_digital_human_precharge_cost
 from app.core.task_timeout import project_task_runtime_state
 from app.core.time import to_utc_iso, utc_now
-from app.core.user_credits import calculate_user_credit_cost, charge_user_credits, refund_user_credits
+from app.core.user_credits import (
+    calculate_user_credit_cost,
+    charge_user_credits,
+    get_user_credits,
+    refund_user_credits,
+)
 from app.models import VideoTask
 from app.schemas.response import fail, success
 from app.services.digital_human_assets import get_available_audio_asset, get_enabled_voice, resolve_avatar
@@ -122,6 +127,41 @@ async def get_task(db: AsyncSession, *, task_id: str, user_id: int) -> VideoTask
         )
     )
     return result.scalar_one_or_none()
+
+
+async def get_task_details(
+    db: AsyncSession,
+    *,
+    task_id: str,
+    user_id: int,
+) -> dict | None:
+    task = await get_task(db, task_id=task_id, user_id=user_id)
+    if not task:
+        return None
+    payload = task_payload(task)
+    payload["credits"] = await get_user_credits(db, user_id)
+    return payload
+
+
+async def archive_task(
+    db: AsyncSession,
+    *,
+    task_id: str,
+    user_id: int,
+) -> str | None:
+    task = await get_task(db, task_id=task_id, user_id=user_id)
+    if not task:
+        return "数字人视频不存在"
+
+    task.archived = True
+    task.archived_at = utc_now()
+    await sync_job_status(db, task.job_id)
+    try:
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        return "删除失败，请稍后重试"
+    return None
 
 
 def _default_title(script: str, audio_name: str | None) -> str:
