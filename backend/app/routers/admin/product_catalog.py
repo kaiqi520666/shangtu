@@ -3,12 +3,13 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_super_admin, get_db
+from app.core.pagination import PaginationParams, execute_pagination, page_payload, pagination_params
 from app.core.time import utc_now
 from app.models import ProductCatalog, User
 from app.schemas.response import Response, fail, success
 
 from .schemas import ProductCatalogRequest
-from .utils import audit_log, page_payload, product_catalog_payload
+from .utils import audit_log, product_catalog_payload
 
 router = APIRouter()
 
@@ -17,16 +18,13 @@ VALID_CATALOG_SCENARIOS = {"product_image", "product_suite", "outfit"}
 
 @router.get("/product-catalog", response_model=Response)
 async def list_product_catalog(
-    page: int = 1,
-    page_size: int = 20,
+    pagination: PaginationParams = Depends(pagination_params),
     scenario: str | None = None,
     enabled: str | None = None,
     keyword: str | None = None,
     current_admin: User = Depends(get_current_super_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    page = max(1, page)
-    page_size = min(max(1, page_size), 100)
     conditions = []
     if scenario in VALID_CATALOG_SCENARIOS:
         conditions.append(ProductCatalog.scenario == scenario)
@@ -53,10 +51,14 @@ async def list_product_catalog(
         total_stmt = total_stmt.where(condition)
         data_stmt = data_stmt.where(condition)
 
-    total = int((await db.execute(total_stmt)).scalar_one() or 0)
-    result = await db.execute(data_stmt.offset((page - 1) * page_size).limit(page_size))
+    total, result = await execute_pagination(
+        db,
+        count_statement=total_stmt,
+        data_statement=data_stmt,
+        pagination=pagination,
+    )
     items = [product_catalog_payload(item) for item in result.scalars().all()]
-    return success(page_payload(items, total, page, page_size))
+    return success(page_payload(items, total, pagination.page, pagination.page_size))
 
 
 @router.patch("/product-catalog/{catalog_id}", response_model=Response)

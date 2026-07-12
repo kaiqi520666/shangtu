@@ -4,6 +4,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_super_admin, get_db
+from app.core.pagination import PaginationParams, execute_pagination, page_payload, pagination_params
 from app.core.time import utc_now
 from app.models import HeygenAvatar, HeygenVoice, User
 from app.schemas.response import Response, fail, success
@@ -15,7 +16,6 @@ from .utils import (
     audit_log,
     heygen_avatar_payload,
     heygen_voice_payload,
-    page_payload,
 )
 
 router = APIRouter()
@@ -23,8 +23,7 @@ router = APIRouter()
 
 @router.get("/heygen-avatars", response_model=Response)
 async def list_heygen_avatars(
-    page: int = 1,
-    page_size: int = 20,
+    pagination: PaginationParams = Depends(pagination_params),
     active: str | None = None,
     gender: str | None = None,
     orientation: str | None = None,
@@ -33,8 +32,6 @@ async def list_heygen_avatars(
     current_admin: User = Depends(get_current_super_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    page = max(1, page)
-    page_size = min(max(1, page_size), 100)
     conditions = []
     if active in {"true", "false"}:
         conditions.append(HeygenAvatar.enabled == (active == "true"))
@@ -65,10 +62,14 @@ async def list_heygen_avatars(
         total_stmt = total_stmt.where(condition)
         data_stmt = data_stmt.where(condition)
 
-    total = int((await db.execute(total_stmt)).scalar_one() or 0)
-    result = await db.execute(data_stmt.offset((page - 1) * page_size).limit(page_size))
+    total, result = await execute_pagination(
+        db,
+        count_statement=total_stmt,
+        data_statement=data_stmt,
+        pagination=pagination,
+    )
     items = [heygen_avatar_payload(item) for item in result.scalars().all()]
-    return success(page_payload(items, total, page, page_size))
+    return success(page_payload(items, total, pagination.page, pagination.page_size))
 
 
 @router.patch("/heygen-avatars/{avatar_row_id}", response_model=Response)
@@ -113,8 +114,7 @@ async def update_heygen_avatar(
 
 @router.get("/heygen-voices", response_model=Response)
 async def list_heygen_voices(
-    page: int = 1,
-    page_size: int = 20,
+    pagination: PaginationParams = Depends(pagination_params),
     active: str | None = None,
     gender: str | None = None,
     language: str | None = None,
@@ -124,8 +124,6 @@ async def list_heygen_voices(
     current_admin: User = Depends(get_current_super_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    page = max(1, page)
-    page_size = min(max(1, page_size), 100)
     conditions = []
     if active in {"true", "false"}:
         conditions.append(HeygenVoice.enabled == (active == "true"))
@@ -160,10 +158,14 @@ async def list_heygen_voices(
         total_stmt = total_stmt.where(condition)
         data_stmt = data_stmt.where(condition)
 
-    total = int((await db.execute(total_stmt)).scalar_one() or 0)
-    result = await db.execute(data_stmt.offset((page - 1) * page_size).limit(page_size))
+    total, result = await execute_pagination(
+        db,
+        count_statement=total_stmt,
+        data_statement=data_stmt,
+        pagination=pagination,
+    )
     items = [heygen_voice_payload(item) for item in result.scalars().all()]
-    return success(page_payload(items, total, page, page_size))
+    return success(page_payload(items, total, pagination.page, pagination.page_size))
 
 
 @router.patch("/heygen-voices/{voice_row_id}", response_model=Response)

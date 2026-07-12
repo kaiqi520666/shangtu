@@ -3,11 +3,11 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_super_admin, get_db
-from app.core.pagination import PaginationParams, execute_pagination, pagination_params
+from app.core.pagination import PaginationParams, execute_pagination, page_payload, pagination_params
 from app.models import AdminAuditLog, User
 from app.schemas.response import Response, success
 
-from .utils import audit_log_payload, page_payload
+from .utils import audit_log_payload
 
 router = APIRouter()
 

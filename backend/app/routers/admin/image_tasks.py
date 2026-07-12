@@ -10,19 +10,17 @@ from app.core.media_projection import (
     includes_video,
     video_admin_select,
 )
+from app.core.pagination import PaginationParams, execute_pagination, page_payload, pagination_params
 from app.core.scenarios import IMAGE_SCENARIOS, VIDEO_SCENARIOS
 from app.models import GenerationJob, ImageTask, User, VideoTask
 from app.schemas.response import Response, success
-
-from .utils import page_payload
 
 router = APIRouter()
 
 
 @router.get("/image-tasks", response_model=Response)
 async def list_image_tasks(
-    page: int = 1,
-    page_size: int = 20,
+    pagination: PaginationParams = Depends(pagination_params),
     status: str | None = None,
     scenario: str | None = None,
     media_type: str | None = None,
@@ -30,8 +28,6 @@ async def list_image_tasks(
     current_admin: User = Depends(get_current_super_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    page = max(1, page)
-    page_size = min(max(1, page_size), 100)
     image_stmt = image_admin_select()
     video_stmt = video_admin_select()
     if status in {"pending", "processing", "done", "failed", "timeout"}:
@@ -73,15 +69,16 @@ async def list_image_tasks(
         selects.append(video_stmt)
 
     if not selects:
-        return success(page_payload([], 0, page, page_size))
+        return success(page_payload([], 0, pagination.page, pagination.page_size))
 
     task_rows = (union_all(*selects) if len(selects) > 1 else selects[0]).subquery()
-    total = int((await db.execute(select(func.count()).select_from(task_rows))).scalar_one() or 0)
-    result = await db.execute(
-        select(task_rows)
-        .order_by(task_rows.c.created_at.desc(), task_rows.c.id.desc())
-        .offset((page - 1) * page_size)
-        .limit(page_size)
+    total, result = await execute_pagination(
+        db,
+        count_statement=select(func.count()).select_from(task_rows),
+        data_statement=select(task_rows).order_by(
+            task_rows.c.created_at.desc(), task_rows.c.id.desc()
+        ),
+        pagination=pagination,
     )
     items = [admin_task_payload(row) for row in result.mappings().all()]
-    return success(page_payload(items, total, page, page_size))
+    return success(page_payload(items, total, pagination.page, pagination.page_size))

@@ -6,7 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_super_admin, get_db
-from app.core.pagination import page_payload
+from app.core.pagination import PaginationParams, execute_pagination, page_payload, pagination_params
 from app.core.time import to_utc_iso, utc_now
 from app.models import CouponCode, User
 from app.schemas.response import Response, fail, success
@@ -35,15 +35,12 @@ def coupon_payload(coupon: CouponCode, creator: User | None = None) -> dict:
 
 @router.get("/coupon-codes", response_model=Response)
 async def list_coupon_codes(
-    page: int = 1,
-    page_size: int = 20,
+    pagination: PaginationParams = Depends(pagination_params),
     keyword: str | None = None,
     status: str | None = None,
     current_admin: User = Depends(get_current_super_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    page = max(1, page)
-    page_size = min(max(1, page_size), 100)
     conditions = []
     if keyword:
         conditions.append(CouponCode.code.ilike(f"%{keyword.strip()}%"))
@@ -56,24 +53,21 @@ async def list_coupon_codes(
         elif status == "disabled":
             conditions.append(CouponCode.enabled.is_(False))
 
-    total = int(
-        (
-            await db.execute(
-                select(func.count()).select_from(CouponCode).where(*conditions)
-            )
-        ).scalar_one()
-        or 0
-    )
-    result = await db.execute(
+    count_stmt = select(func.count()).select_from(CouponCode).where(*conditions)
+    data_stmt = (
         select(CouponCode, User)
         .join(User, User.id == CouponCode.created_by_user_id)
         .where(*conditions)
         .order_by(CouponCode.created_at.desc())
-        .offset((page - 1) * page_size)
-        .limit(page_size)
+    )
+    total, result = await execute_pagination(
+        db,
+        count_statement=count_stmt,
+        data_statement=data_stmt,
+        pagination=pagination,
     )
     items = [coupon_payload(coupon, creator) for coupon, creator in result.all()]
-    return success(page_payload(items, total, page, page_size))
+    return success(page_payload(items, total, pagination.page, pagination.page_size))
 
 
 @router.post("/coupon-codes", response_model=Response)

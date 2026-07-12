@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth import set_user_password
 from app.core.deps import get_current_super_admin, get_db
 from app.core.distribution import update_root_distribution
+from app.core.pagination import PaginationParams, execute_pagination, page_payload, pagination_params
 from app.core.time import utc_now
 from app.models import CreditTransaction, User
 from app.schemas.response import Response, fail, success
@@ -15,7 +16,7 @@ from .schemas import (
     UpdateUserBusinessRequest,
     UpdateUserRequest,
 )
-from .utils import audit_log, page_payload, super_admin_count, user_payload
+from .utils import audit_log, super_admin_count, user_payload
 
 router = APIRouter()
 
@@ -43,16 +44,13 @@ async def reset_user_password(
 
 @router.get("/users", response_model=Response)
 async def list_users(
-    page: int = 1,
-    page_size: int = 20,
+    pagination: PaginationParams = Depends(pagination_params),
     keyword: str | None = None,
     role: str | None = None,
     status: str | None = None,
     current_admin: User = Depends(get_current_super_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    page = max(1, page)
-    page_size = min(max(1, page_size), 100)
     conditions = []
     if keyword:
         like = f"%{keyword.strip()}%"
@@ -67,10 +65,14 @@ async def list_users(
     for condition in conditions:
         total_stmt = total_stmt.where(condition)
         data_stmt = data_stmt.where(condition)
-    total = int((await db.execute(total_stmt)).scalar_one() or 0)
-    result = await db.execute(data_stmt.offset((page - 1) * page_size).limit(page_size))
+    total, result = await execute_pagination(
+        db,
+        count_statement=total_stmt,
+        data_statement=data_stmt,
+        pagination=pagination,
+    )
     users = result.scalars().all()
-    return success(page_payload([user_payload(user) for user in users], total, page, page_size))
+    return success(page_payload([user_payload(user) for user in users], total, pagination.page, pagination.page_size))
 
 
 @router.patch("/users/{user_id}", response_model=Response)

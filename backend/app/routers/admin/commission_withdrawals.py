@@ -6,11 +6,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.commissions import add_wallet_transaction, withdrawal_payload
 from app.core.deps import get_current_super_admin, get_db
 from app.core.oss import OssConfigError, upload_image_bytes
+from app.core.pagination import PaginationParams, execute_pagination, page_payload, pagination_params
 from app.core.time import utc_now
 from app.models import CommissionWithdrawal, User
 from app.schemas.response import Response, fail, success
 
-from .utils import audit_log, page_payload
+from .utils import audit_log
 
 router = APIRouter()
 
@@ -44,14 +45,12 @@ async def _upload_voucher(file: UploadFile | None, admin_id: int):
 
 @router.get("/commission-withdrawals", response_model=Response)
 async def list_withdrawals(
-    page: int = 1,
-    page_size: int = 20,
+    pagination: PaginationParams = Depends(pagination_params),
     status: str | None = None,
     keyword: str | None = None,
     current_admin: User = Depends(get_current_super_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    page, page_size = max(1, page), min(max(1, page_size), 100)
     conditions = []
     if status in {"pending_review", "pending_payment", "paid", "rejected"}:
         conditions.append(CommissionWithdrawal.status == status)
@@ -77,11 +76,21 @@ async def list_withdrawals(
     for condition in conditions:
         count_stmt = count_stmt.where(condition)
         data_stmt = data_stmt.where(condition)
-    total = int((await db.scalar(count_stmt)) or 0)
-    rows = (
-        await db.execute(data_stmt.offset((page - 1) * page_size).limit(page_size))
-    ).all()
-    return success(page_payload([withdrawal_payload(item, user) for item, user in rows], total, page, page_size))
+    total, result = await execute_pagination(
+        db,
+        count_statement=count_stmt,
+        data_statement=data_stmt,
+        pagination=pagination,
+    )
+    rows = result.all()
+    return success(
+        page_payload(
+            [withdrawal_payload(item, user) for item, user in rows],
+            total,
+            pagination.page,
+            pagination.page_size,
+        )
+    )
 
 
 @router.post("/commission-withdrawals/{withdrawal_id}/approve", response_model=Response)

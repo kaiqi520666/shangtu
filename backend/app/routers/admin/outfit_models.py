@@ -4,27 +4,25 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_super_admin, get_db
 from app.core.oss import OssConfigError, upload_image_bytes
+from app.core.pagination import PaginationParams, execute_pagination, page_payload, pagination_params
 from app.core.time import utc_now
 from app.models import OutfitModel, User
 from app.schemas.response import Response, fail, success
 
 from .schemas import UpdateOutfitModelRequest
-from .utils import audit_log, outfit_model_payload, page_payload
+from .utils import audit_log, outfit_model_payload
 
 router = APIRouter()
 
 
 @router.get("/outfit-models", response_model=Response)
 async def list_system_outfit_models(
-    page: int = 1,
-    page_size: int = 20,
+    pagination: PaginationParams = Depends(pagination_params),
     active: str | None = None,
     keyword: str | None = None,
     current_admin: User = Depends(get_current_super_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    page = max(1, page)
-    page_size = min(max(1, page_size), 100)
     conditions = [OutfitModel.user_id.is_(None)]
     if active in {"true", "false"}:
         conditions.append(OutfitModel.active == (active == "true"))
@@ -48,10 +46,14 @@ async def list_system_outfit_models(
         total_stmt = total_stmt.where(condition)
         data_stmt = data_stmt.where(condition)
 
-    total = int((await db.execute(total_stmt)).scalar_one() or 0)
-    result = await db.execute(data_stmt.offset((page - 1) * page_size).limit(page_size))
+    total, result = await execute_pagination(
+        db,
+        count_statement=total_stmt,
+        data_statement=data_stmt,
+        pagination=pagination,
+    )
     items = [outfit_model_payload(item) for item in result.scalars().all()]
-    return success(page_payload(items, total, page, page_size))
+    return success(page_payload(items, total, pagination.page, pagination.page_size))
 
 
 @router.post("/outfit-models/upload", response_model=Response)
