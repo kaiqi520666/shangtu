@@ -18,6 +18,8 @@ jobs:
       TENCENT_CLOUD_SECRET_KEY: ci-test-secret-key
       TENCENT_SES_FROM_EMAIL: no-reply@example.com
       TENCENT_SES_TEMPLATE_ID: 1
+      TURNSTILE_SITE_KEY: 1x00000000000000000000AA
+      TURNSTILE_SECRET_KEY: 1x0000000000000000000000000000000AA
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6

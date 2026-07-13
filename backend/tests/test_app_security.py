@@ -5,6 +5,7 @@ import pytest
 
 from app.core.config import require_env, validate_runtime_config
 from app.main import handle_unexpected_exception
+from app.routers.auth import captcha_config
 
 
 def test_required_environment_variable_rejects_empty_value(monkeypatch):
@@ -40,6 +41,27 @@ def test_runtime_config_requires_ses_settings(monkeypatch):
 
     with pytest.raises(RuntimeError, match="TENCENT_CLOUD_SECRET_ID 未配置"):
         validate_runtime_config()
+
+
+def test_runtime_config_requires_turnstile_settings(monkeypatch):
+    monkeypatch.setenv("SECRET_KEY", "test-secret")
+    monkeypatch.setenv("VIDEO_PROVIDER", "topenrouter")
+    monkeypatch.setenv("TOPENROUTER_KEY", "test-video-key")
+    monkeypatch.delenv("TURNSTILE_SECRET_KEY", raising=False)
+
+    with pytest.raises(RuntimeError, match="TURNSTILE_SECRET_KEY 未配置"):
+        validate_runtime_config()
+
+
+@pytest.mark.asyncio
+async def test_captcha_config_exposes_only_site_key(monkeypatch):
+    monkeypatch.setenv("TURNSTILE_SITE_KEY", "public-site-key")
+    monkeypatch.setenv("TURNSTILE_SECRET_KEY", "private-secret-key")
+
+    response = await captcha_config()
+
+    assert response.data == {"site_key": "public-site-key"}
+    assert "private-secret-key" not in response.model_dump_json()
 
 
 @pytest.mark.asyncio

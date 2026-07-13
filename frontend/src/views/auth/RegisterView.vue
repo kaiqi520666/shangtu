@@ -1,7 +1,7 @@
 <script setup>
-import { onBeforeUnmount, ref } from "vue";
+import { onBeforeUnmount, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { register, sendRegistrationEmailCode } from "@/api/auth.js";
+import { getCaptchaConfig, register, sendRegistrationEmailCode } from "@/api/auth.js";
 import AuthForm from "@/components/auth/AuthForm.vue";
 import AuthPageShell from "@/components/auth/AuthPageShell.vue";
 import { useToast } from "@/composables/useToast.js";
@@ -14,13 +14,27 @@ const toast = useToast();
 const loading = ref(false);
 const codeLoading = ref(false);
 const codeCooldown = ref(0);
+const captchaSiteKey = ref("");
+const authForm = ref(null);
 let cooldownTimer;
 
-async function handleSendCode(email) {
+onMounted(async () => {
+  try {
+    const result = await getCaptchaConfig();
+    if (result.code === 0) captchaSiteKey.value = result.data?.site_key || "";
+  } catch {
+    toast.error("人机验证配置加载失败");
+  }
+});
+
+async function handleSendCode({ email, captchaToken }) {
   if (codeLoading.value || codeCooldown.value > 0) return;
   codeLoading.value = true;
   try {
-    const result = await sendRegistrationEmailCode(email);
+    const result = await sendRegistrationEmailCode({
+      email,
+      captcha_token: captchaToken,
+    });
     if (result.code !== 0) {
       toast.error(result.message || "验证码发送失败");
       return;
@@ -35,6 +49,7 @@ async function handleSendCode(email) {
     toast.error(error.response?.data?.message || "验证码发送失败，请稍后重试");
   } finally {
     codeLoading.value = false;
+    authForm.value?.resetCaptcha();
   }
 }
 
@@ -82,10 +97,14 @@ async function handleRegister(payload) {
     <div>
       <p v-if="route.query.invite" class="mb-3 text-center text-xs font-bold text-primary">邀请注册</p>
       <AuthForm
+        ref="authForm"
         mode="register"
         :loading="loading"
         :code-loading="codeLoading"
         :code-cooldown="codeCooldown"
+        captcha-required
+        :captcha-site-key="captchaSiteKey"
+        captcha-action="register_email"
         @send-code="handleSendCode"
         @submit="handleRegister"
       />

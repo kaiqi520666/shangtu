@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 
 from app.core.providers import tencent_ses
+from app.core.providers.turnstile import TurnstileVerificationError
 from app.core.time import utc_now
 from app.routers import auth
 from app.services.email_verification import (
@@ -13,37 +14,7 @@ from app.services.email_verification import (
     consume_registration_code,
     issue_registration_code,
 )
-
-
-class FakeRedis:
-    def __init__(self):
-        self.values = {}
-        self.expirations = {}
-
-    async def set(self, key, value, *, ex=None, nx=False):
-        if nx and key in self.values:
-            return False
-        self.values[key] = value
-        if ex is not None:
-            self.expirations[key] = ex
-        return True
-
-    async def get(self, key):
-        return self.values.get(key)
-
-    async def incr(self, key):
-        self.values[key] = int(self.values.get(key, 0)) + 1
-        return self.values[key]
-
-    async def expire(self, key, seconds):
-        self.expirations[key] = seconds
-        return True
-
-    async def delete(self, *keys):
-        for key in keys:
-            self.values.pop(key, None)
-            self.expirations.pop(key, None)
-        return len(keys)
+from tests.fake_redis import FakeRedis
 
 
 def db_with_email(existing=None):
@@ -52,13 +23,47 @@ def db_with_email(existing=None):
     return SimpleNamespace(execute=AsyncMock(return_value=result))
 
 
+async def issue_code(db, redis, email, ip_address, *, send_email):
+    return await issue_registration_code(
+        db,
+        redis,
+        email,
+        ip_address,
+        "captcha-token",
+        send_email=send_email,
+        verify_captcha=AsyncMock(),
+    )
+
+
+@pytest.mark.asyncio
+async def test_issue_code_rejects_invalid_captcha_before_database():
+    db = db_with_email()
+    sender = AsyncMock()
+
+    with pytest.raises(EmailVerificationError, match="人机验证"):
+        await issue_registration_code(
+            db,
+            FakeRedis(),
+            "user@example.com",
+            "127.0.0.1",
+            "invalid-token",
+            send_email=sender,
+            verify_captcha=AsyncMock(
+                side_effect=TurnstileVerificationError("请重新完成人机验证")
+            ),
+        )
+
+    db.execute.assert_not_awaited()
+    sender.assert_not_awaited()
+
+
 @pytest.mark.asyncio
 async def test_issue_code_normalizes_email_and_stores_only_digest(monkeypatch):
     monkeypatch.setenv("SECRET_KEY", "test-secret")
     redis = FakeRedis()
     sender = AsyncMock()
 
-    normalized = await issue_registration_code(
+    normalized = await issue_code(
         db_with_email(),
         redis,
         " User@Example.com ",
@@ -78,7 +83,7 @@ async def test_issue_code_normalizes_email_and_stores_only_digest(monkeypatch):
 async def test_issue_code_rejects_registered_email_and_cooldown(monkeypatch):
     monkeypatch.setenv("SECRET_KEY", "test-secret")
     with pytest.raises(EmailVerificationError, match="邮箱已注册"):
-        await issue_registration_code(
+        await issue_code(
             db_with_email(existing=1),
             FakeRedis(),
             "user@example.com",
@@ -88,11 +93,11 @@ async def test_issue_code_rejects_registered_email_and_cooldown(monkeypatch):
 
     redis = FakeRedis()
     sender = AsyncMock()
-    await issue_registration_code(
+    await issue_code(
         db_with_email(), redis, "user@example.com", "127.0.0.1", send_email=sender
     )
     with pytest.raises(EmailVerificationError, match="稍后再发送"):
-        await issue_registration_code(
+        await issue_code(
             db_with_email(), redis, "user@example.com", "127.0.0.1", send_email=sender
         )
     assert sender.await_count == 1
@@ -104,7 +109,7 @@ async def test_issue_code_cleans_up_after_provider_failure(monkeypatch):
     redis = FakeRedis()
 
     with pytest.raises(EmailVerificationError, match="邮件发送失败"):
-        await issue_registration_code(
+        await issue_code(
             db_with_email(),
             redis,
             "user@example.com",
@@ -121,13 +126,13 @@ async def test_issue_code_enforces_email_and_ip_hourly_limits(monkeypatch):
     redis = FakeRedis()
     sender = AsyncMock()
     for _ in range(5):
-        await issue_registration_code(
+        await issue_code(
             db_with_email(), redis, "user@example.com", "127.0.0.1", send_email=sender
         )
         cooldown_key = next(key for key in redis.values if "cooldown" in key)
         await redis.delete(cooldown_key)
     with pytest.raises(EmailVerificationError, match="邮箱发送过于频繁"):
-        await issue_registration_code(
+        await issue_code(
             db_with_email(), redis, "user@example.com", "127.0.0.1", send_email=sender
         )
     assert sender.await_count == 5
@@ -135,7 +140,7 @@ async def test_issue_code_enforces_email_and_ip_hourly_limits(monkeypatch):
     redis = FakeRedis()
     sender.reset_mock()
     for index in range(20):
-        await issue_registration_code(
+        await issue_code(
             db_with_email(),
             redis,
             f"user{index}@example.com",
@@ -143,7 +148,7 @@ async def test_issue_code_enforces_email_and_ip_hourly_limits(monkeypatch):
             send_email=sender,
         )
     with pytest.raises(EmailVerificationError, match="请求过于频繁"):
-        await issue_registration_code(
+        await issue_code(
             db_with_email(), redis, "blocked@example.com", "127.0.0.1", send_email=sender
         )
     assert sender.await_count == 20
@@ -154,7 +159,7 @@ async def test_consume_code_limits_failures_and_deletes_success(monkeypatch):
     monkeypatch.setenv("SECRET_KEY", "test-secret")
     redis = FakeRedis()
     sender = AsyncMock()
-    await issue_registration_code(
+    await issue_code(
         db_with_email(), redis, "user@example.com", "127.0.0.1", send_email=sender
     )
     sent_code = sender.await_args.args[1]
@@ -165,7 +170,7 @@ async def test_consume_code_limits_failures_and_deletes_success(monkeypatch):
     assert await consume_registration_code(redis, "user@example.com", sent_code) == "user@example.com"
     assert not any("value" in key or "attempts" in key for key in redis.values)
 
-    await issue_registration_code(
+    await issue_code(
         db_with_email(), redis, "other@example.com", "127.0.0.2", send_email=sender
     )
     for attempt in range(5):
@@ -271,7 +276,7 @@ async def test_send_code_route_uses_nginx_real_ip(monkeypatch):
     db = db_with_email()
 
     response = await auth.send_email_code(
-        auth.EmailCodeRequest(email="user@example.com"),
+        auth.EmailCodeRequest(email="user@example.com", captcha_token="captcha-token"),
         request,
         db,
     )
@@ -282,4 +287,5 @@ async def test_send_code_route_uses_nginx_real_ip(monkeypatch):
         redis,
         "user@example.com",
         "203.0.113.8",
+        "captcha-token",
     )

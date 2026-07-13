@@ -9,7 +9,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import require_env
+from app.core.providers.turnstile import TurnstileVerificationError, verify_turnstile
 from app.core.providers.tencent_ses import send_verification_email
+from app.core.rate_limit import hashed_identifier, increment_fixed_window
 from app.models import User
 
 
@@ -32,10 +34,6 @@ def normalize_email(email: str) -> str:
     return normalized
 
 
-def _key_id(value: str) -> str:
-    return hashlib.sha256(value.encode()).hexdigest()
-
-
 def _code_digest(email: str, code: str) -> str:
     return hmac.new(
         require_env("SECRET_KEY").encode(),
@@ -45,9 +43,7 @@ def _code_digest(email: str, code: str) -> str:
 
 
 async def _increment_limit(redis: Any, key: str, limit: int, message: str) -> None:
-    count = await redis.incr(key)
-    if count == 1:
-        await redis.expire(key, 3600)
+    count = await increment_fixed_window(redis, key, 3600)
     if count > limit:
         raise EmailVerificationError(message)
 
@@ -57,15 +53,21 @@ async def issue_registration_code(
     redis: Any,
     email: str,
     ip_address: str,
+    captcha_token: str,
     *,
     send_email: Callable[[str, str], Awaitable[None]] = send_verification_email,
+    verify_captcha: Callable[[str, str, str], Awaitable[None]] = verify_turnstile,
 ) -> str:
+    try:
+        await verify_captcha(captcha_token, ip_address, "register_email")
+    except TurnstileVerificationError as exc:
+        raise EmailVerificationError(str(exc)) from exc
     normalized = normalize_email(email)
     existing = await db.execute(select(User.id).where(User.email == normalized))
     if existing.scalar_one_or_none() is not None:
         raise EmailVerificationError("邮箱已注册")
 
-    email_id = _key_id(normalized)
+    email_id = hashed_identifier(normalized)
     cooldown_key = f"auth:email-code:cooldown:{email_id}"
     if not await redis.set(cooldown_key, "1", ex=COOLDOWN_SECONDS, nx=True):
         raise EmailVerificationError("请稍后再发送验证码")
@@ -81,7 +83,7 @@ async def issue_registration_code(
         )
         await _increment_limit(
             redis,
-            f"auth:email-code:ip-limit:{_key_id(ip_address)}",
+            f"auth:email-code:ip-limit:{hashed_identifier(ip_address)}",
             IP_HOURLY_LIMIT,
             "请求过于频繁，请稍后再试",
         )
@@ -102,7 +104,7 @@ async def consume_registration_code(redis: Any, email: str, code: str) -> str:
     if not re.fullmatch(r"\d{6}", code):
         raise EmailVerificationError("请输入 6 位验证码")
 
-    email_id = _key_id(normalized)
+    email_id = hashed_identifier(normalized)
     code_key = f"auth:email-code:value:{email_id}"
     attempts_key = f"auth:email-code:attempts:{email_id}"
     stored_digest = await redis.get(code_key)

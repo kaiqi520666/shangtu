@@ -4,8 +4,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import create_token, hash_password, validate_password, verify_password
+from app.core.config import require_env
 from app.core.deps import get_current_user, get_db
 from app.core.distribution import generate_invite_code
+from app.core.providers.turnstile import TurnstileVerificationError, verify_turnstile
 from app.core.time import to_utc_iso
 from app.models import User
 from app.schemas.response import Response, fail, success
@@ -15,6 +17,12 @@ from app.services.email_verification import (
     consume_registration_code,
     issue_registration_code,
     normalize_email,
+)
+from app.services.login_security import (
+    LoginSecurityState,
+    clear_login_failures,
+    get_login_security_state,
+    record_login_failure,
 )
 
 router = APIRouter(prefix="/auth", tags=["认证"])
@@ -31,10 +39,25 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: str
     password: str
+    captcha_token: str | None = None
 
 
 class EmailCodeRequest(BaseModel):
     email: str
+    captcha_token: str
+
+
+def _client_ip(request: Request) -> str:
+    return request.headers.get("x-real-ip") or (
+        request.client.host if request.client else "unknown"
+    )
+
+
+def _login_security_payload(state: LoginSecurityState) -> dict:
+    data = {"captcha_required": state.captcha_required}
+    if state.retry_after_seconds is not None:
+        data["retry_after_seconds"] = state.retry_after_seconds
+    return data
 
 
 def _user_payload(user: User) -> dict:
@@ -59,6 +82,11 @@ def _auth_payload(user: User) -> dict:
     }
 
 
+@router.get("/captcha-config", response_model=Response)
+async def captcha_config():
+    return success({"site_key": require_env("TURNSTILE_SITE_KEY")})
+
+
 @router.post("/email-code", response_model=Response)
 async def send_email_code(
     req: EmailCodeRequest,
@@ -70,8 +98,8 @@ async def send_email_code(
             db,
             request.app.state.redis_pool,
             req.email,
-            request.headers.get("x-real-ip")
-            or (request.client.host if request.client else "unknown"),
+            _client_ip(request),
+            req.captcha_token,
         )
     except EmailVerificationError as exc:
         return fail(str(exc))
@@ -127,15 +155,33 @@ async def register(
 
 
 @router.post("/login", response_model=Response)
-async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
+async def login(
+    req: LoginRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
     try:
         email = normalize_email(req.email)
     except EmailVerificationError as exc:
         return fail(str(exc))
+    redis = request.app.state.redis_pool
+    ip_address = _client_ip(request)
+    security = await get_login_security_state(redis, email, ip_address)
+    if security.rate_limited:
+        return fail("登录尝试过于频繁，请稍后再试", data=_login_security_payload(security))
+    if security.captcha_required:
+        try:
+            await verify_turnstile(req.captcha_token or "", ip_address, "login")
+        except TurnstileVerificationError as exc:
+            return fail(str(exc), data=_login_security_payload(security))
+
     result = await db.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
     if not user or not verify_password(req.password, user.password_hash):
-        return fail("邮箱或密码错误")
+        security = await record_login_failure(redis, email, ip_address)
+        message = "登录尝试过于频繁，请稍后再试" if security.rate_limited else "邮箱或密码错误"
+        return fail(message, data=_login_security_payload(security))
+    await clear_login_failures(redis, email, ip_address)
     if user.status != "active":
         return fail("账号已被禁用，请联系管理员")
     return success(_auth_payload(user))

@@ -49,3 +49,5 @@ def validate_runtime_config() -> None:
     template_id = require_env("TENCENT_SES_TEMPLATE_ID")
     if not template_id.isdigit() or int(template_id) <= 0:
         raise RuntimeError("TENCENT_SES_TEMPLATE_ID 必须为正整数")
+    require_env("TURNSTILE_SITE_KEY")
+    require_env("TURNSTILE_SECRET_KEY")

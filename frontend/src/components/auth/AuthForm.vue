@@ -1,6 +1,7 @@
 <script setup>
 import { computed, reactive, ref } from 'vue'
 import { Eye, EyeOff, KeyRound, LoaderCircle, Lock, Mail, UserRound } from 'lucide-vue-next'
+import TurnstileWidget from '@/components/auth/TurnstileWidget.vue'
 import { validateNewPassword } from '@/utils/password.js'
 
 const props = defineProps({
@@ -21,6 +22,18 @@ const props = defineProps({
     type: Number,
     default: 0,
   },
+  captchaRequired: {
+    type: Boolean,
+    default: false,
+  },
+  captchaSiteKey: {
+    type: String,
+    default: '',
+  },
+  captchaAction: {
+    type: String,
+    default: '',
+  },
 })
 
 const emit = defineEmits(['submit', 'send-code'])
@@ -30,9 +43,11 @@ const form = reactive({
   email: '',
   verificationCode: '',
   password: '',
+  captchaToken: '',
 })
 const showPassword = ref(false)
 const message = ref('')
+const captchaResetKey = ref(0)
 
 const isRegister = computed(() => props.mode === 'register')
 const title = computed(() => (isRegister.value ? '创建账号' : '欢迎回来'))
@@ -63,6 +78,11 @@ function handleSubmit() {
     return
   }
 
+  if (!isRegister.value && props.captchaRequired && !form.captchaToken) {
+    message.value = '请完成人机验证'
+    return
+  }
+
   const passwordMessage = isRegister.value
     ? validateNewPassword(form.password, form.password)
     : form.password.length < 6 ? '密码至少 6 位' : ''
@@ -80,8 +100,22 @@ function handleSendCode() {
     message.value = '请先输入有效邮箱'
     return
   }
-  emit('send-code', form.email.trim().toLowerCase())
+  if (props.captchaRequired && !form.captchaToken) {
+    message.value = '请完成人机验证'
+    return
+  }
+  emit('send-code', {
+    email: form.email.trim().toLowerCase(),
+    captchaToken: form.captchaToken,
+  })
 }
+
+function resetCaptcha() {
+  form.captchaToken = ''
+  captchaResetKey.value += 1
+}
+
+defineExpose({ resetCaptcha })
 </script>
 
 <template>
@@ -168,6 +202,16 @@ function handleSendCode() {
           </button>
         </span>
       </label>
+
+      <TurnstileWidget
+        v-if="captchaRequired"
+        :site-key="captchaSiteKey"
+        :action="captchaAction"
+        :reset-key="captchaResetKey"
+        @verified="form.captchaToken = $event; message = ''"
+        @expired="form.captchaToken = ''"
+        @error="form.captchaToken = ''; message = '人机验证加载失败，请刷新重试'"
+      />
 
       <p v-if="message" class="rounded-lg border border-rose-100 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-600">
         {{ message }}
