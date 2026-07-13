@@ -102,7 +102,7 @@ async function handleRegister(payload) {
         :loading="loading"
         :code-loading="codeLoading"
         :code-cooldown="codeCooldown"
-        captcha-required
+        :captcha-required="codeCooldown === 0"
         :captcha-site-key="captchaSiteKey"
         captcha-action="register_email"
         @send-code="handleSendCode"

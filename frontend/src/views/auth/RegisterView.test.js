@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { flushPromises, mount } from "@vue/test-utils";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import RegisterView from "./RegisterView.vue";
 
 const mocks = vi.hoisted(() => ({
@@ -30,8 +30,10 @@ vi.mock("vue-router", () => ({
 
 describe("RegisterView", () => {
   beforeEach(() => vi.clearAllMocks());
+  afterEach(() => vi.useRealTimers());
 
   it("发送验证码并在注册请求中携带验证码", async () => {
+    vi.useFakeTimers();
     mocks.sendCode.mockResolvedValue({ code: 0, data: { cooldown_seconds: 60 } });
     mocks.getCaptchaConfig.mockResolvedValue({ code: 0, data: { site_key: "site-key" } });
     mocks.register.mockResolvedValue({
@@ -63,6 +65,10 @@ describe("RegisterView", () => {
       captcha_token: "captcha-token",
     });
     expect(sendButton.text()).toBe("60s");
+    expect(wrapper.find('[data-testid="captcha"]').exists()).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(wrapper.get('[data-testid="captcha"]').exists()).toBe(true);
 
     await wrapper.find('input[autocomplete="one-time-code"]').setValue("123456");
     await wrapper.find('input[type="password"]').setValue("123456");
