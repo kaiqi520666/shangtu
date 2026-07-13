@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,6 +9,13 @@ from app.core.distribution import generate_invite_code
 from app.core.time import to_utc_iso
 from app.models import User
 from app.schemas.response import Response, fail, success
+from app.services.email_verification import (
+    COOLDOWN_SECONDS,
+    EmailVerificationError,
+    consume_registration_code,
+    issue_registration_code,
+    normalize_email,
+)
 
 router = APIRouter(prefix="/auth", tags=["认证"])
 
@@ -17,12 +24,17 @@ class RegisterRequest(BaseModel):
     username: str
     email: str
     password: str
+    verification_code: str
     invite_code: str | None = None
 
 
 class LoginRequest(BaseModel):
     email: str
     password: str
+
+
+class EmailCodeRequest(BaseModel):
+    email: str
 
 
 def _user_payload(user: User) -> dict:
@@ -47,13 +59,37 @@ def _auth_payload(user: User) -> dict:
     }
 
 
+@router.post("/email-code", response_model=Response)
+async def send_email_code(
+    req: EmailCodeRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        await issue_registration_code(
+            db,
+            request.app.state.redis_pool,
+            req.email,
+            request.headers.get("x-real-ip")
+            or (request.client.host if request.client else "unknown"),
+        )
+    except EmailVerificationError as exc:
+        return fail(str(exc))
+    return success({"cooldown_seconds": COOLDOWN_SECONDS}, "验证码已发送")
+
+
 @router.post("/register", response_model=Response)
-async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
+async def register(
+    req: RegisterRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
     try:
         validate_password(req.password)
+        email = normalize_email(req.email)
     except ValueError as exc:
         return fail(str(exc))
-    result = await db.execute(select(User).where(User.email == req.email))
+    result = await db.execute(select(User).where(User.email == email))
     if result.scalar_one_or_none():
         return fail("邮箱已注册")
 
@@ -65,9 +101,18 @@ async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
         if not inviter or not inviter.distribution_enabled or inviter.distribution_level not in {1, 2}:
             return fail("邀请链接已失效")
 
+    try:
+        await consume_registration_code(
+            request.app.state.redis_pool,
+            email,
+            req.verification_code,
+        )
+    except EmailVerificationError as exc:
+        return fail(str(exc))
+
     user = User(
         username=req.username,
-        email=req.email,
+        email=email,
         password_hash=hash_password(req.password),
         distribution_level=inviter.distribution_level + 1 if inviter else None,
         distribution_parent_id=inviter.id if inviter else None,
@@ -83,7 +128,11 @@ async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
 
 @router.post("/login", response_model=Response)
 async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).where(User.email == req.email))
+    try:
+        email = normalize_email(req.email)
+    except EmailVerificationError as exc:
+        return fail(str(exc))
+    result = await db.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
     if not user or not verify_password(req.password, user.password_hash):
         return fail("邮箱或密码错误")

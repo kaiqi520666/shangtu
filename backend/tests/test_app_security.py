@@ -32,6 +32,16 @@ def test_runtime_config_rejects_invalid_redis_url(monkeypatch):
         validate_runtime_config()
 
 
+def test_runtime_config_requires_ses_settings(monkeypatch):
+    monkeypatch.setenv("SECRET_KEY", "test-secret")
+    monkeypatch.setenv("VIDEO_PROVIDER", "topenrouter")
+    monkeypatch.setenv("TOPENROUTER_KEY", "test-video-key")
+    monkeypatch.delenv("TENCENT_CLOUD_SECRET_ID", raising=False)
+
+    with pytest.raises(RuntimeError, match="TENCENT_CLOUD_SECRET_ID 未配置"):
+        validate_runtime_config()
+
+
 @pytest.mark.asyncio
 async def test_unexpected_exception_returns_http_500():
     request = Mock()

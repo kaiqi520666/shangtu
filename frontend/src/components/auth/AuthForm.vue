@@ -1,6 +1,6 @@
 <script setup>
 import { computed, reactive, ref } from 'vue'
-import { Eye, EyeOff, LoaderCircle, Lock, Mail, UserRound } from 'lucide-vue-next'
+import { Eye, EyeOff, KeyRound, LoaderCircle, Lock, Mail, UserRound } from 'lucide-vue-next'
 import { validateNewPassword } from '@/utils/password.js'
 
 const props = defineProps({
@@ -13,13 +13,22 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  codeLoading: {
+    type: Boolean,
+    default: false,
+  },
+  codeCooldown: {
+    type: Number,
+    default: 0,
+  },
 })
 
-const emit = defineEmits(['submit'])
+const emit = defineEmits(['submit', 'send-code'])
 
 const form = reactive({
   username: '',
   email: '',
+  verificationCode: '',
   password: '',
 })
 const showPassword = ref(false)
@@ -49,6 +58,11 @@ function handleSubmit() {
     return
   }
 
+  if (isRegister.value && !/^\d{6}$/.test(form.verificationCode)) {
+    message.value = '请输入 6 位验证码'
+    return
+  }
+
   const passwordMessage = isRegister.value
     ? validateNewPassword(form.password, form.password)
     : form.password.length < 6 ? '密码至少 6 位' : ''
@@ -58,6 +72,15 @@ function handleSubmit() {
   }
 
   emit('submit', { ...form })
+}
+
+function handleSendCode() {
+  message.value = ''
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+    message.value = '请先输入有效邮箱'
+    return
+  }
+  emit('send-code', form.email.trim().toLowerCase())
 }
 </script>
 
@@ -100,6 +123,30 @@ function handleSubmit() {
         </span>
       </label>
 
+      <label v-if="isRegister" class="block">
+        <span class="mb-1.5 block text-xs font-bold text-slate-500">邮箱验证码</span>
+        <span class="flex h-12 items-center rounded-2xl border border-slate-200 bg-slate-50/80 px-3 transition-colors focus-within:border-primary focus-within:bg-white focus-within:ring-2 focus-within:ring-primary/15">
+          <KeyRound class="h-4 w-4 shrink-0 text-slate-400" />
+          <input
+            v-model="form.verificationCode"
+            type="text"
+            inputmode="numeric"
+            autocomplete="one-time-code"
+            maxlength="6"
+            class="min-w-0 flex-1 bg-transparent px-2.5 text-sm font-semibold text-slate-800 outline-none placeholder:font-medium placeholder:text-slate-400"
+            placeholder="6 位验证码"
+          />
+          <button
+            type="button"
+            class="shrink-0 text-xs font-bold text-primary disabled:cursor-not-allowed disabled:text-slate-400"
+            :disabled="codeLoading || codeCooldown > 0"
+            @click="handleSendCode"
+          >
+            {{ codeLoading ? '发送中...' : codeCooldown > 0 ? `${codeCooldown}s` : '发送验证码' }}
+          </button>
+        </span>
+      </label>
+
       <label class="block">
         <span class="mb-1.5 block text-xs font-bold text-slate-500">密码</span>
         <span class="flex h-12 items-center rounded-2xl border border-slate-200 bg-slate-50/80 px-3 transition-colors focus-within:border-primary focus-within:bg-white focus-within:ring-2 focus-within:ring-primary/15">
@@ -107,7 +154,7 @@ function handleSubmit() {
           <input
             v-model="form.password"
             :type="showPassword ? 'text' : 'password'"
-            autocomplete="current-password"
+            :autocomplete="isRegister ? 'new-password' : 'current-password'"
             class="min-w-0 flex-1 bg-transparent px-2.5 text-sm font-semibold text-slate-800 outline-none placeholder:font-medium placeholder:text-slate-400"
             placeholder="至少 6 位密码"
           />

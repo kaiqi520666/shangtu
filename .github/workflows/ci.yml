@@ -14,6 +14,10 @@ jobs:
       SECRET_KEY: ci-test-secret
       VIDEO_PROVIDER: topenrouter
       TOPENROUTER_KEY: ci-test-key
+      TENCENT_CLOUD_SECRET_ID: ci-test-secret-id
+      TENCENT_CLOUD_SECRET_KEY: ci-test-secret-key
+      TENCENT_SES_FROM_EMAIL: no-reply@example.com
+      TENCENT_SES_TEMPLATE_ID: 1
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6

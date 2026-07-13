@@ -43,3 +43,9 @@ def validate_runtime_config() -> None:
         require_env("TOAPIS_KEY")
     elif not (get_env("TOPENROUTER_KEY") or get_env("TOPENROUTER_API_KEY")):
         raise RuntimeError("TOPENROUTER_KEY 未配置")
+    require_env("TENCENT_CLOUD_SECRET_ID")
+    require_env("TENCENT_CLOUD_SECRET_KEY")
+    require_env("TENCENT_SES_FROM_EMAIL")
+    template_id = require_env("TENCENT_SES_TEMPLATE_ID")
+    if not template_id.isdigit() or int(template_id) <= 0:
+        raise RuntimeError("TENCENT_SES_TEMPLATE_ID 必须为正整数")
