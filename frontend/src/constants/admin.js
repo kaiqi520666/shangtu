@@ -1,20 +1,48 @@
-export const adminTabs = [
-  { key: "overview", label: "概览", to: "/admin/overview" },
-  { key: "users", label: "用户", to: "/admin/users" },
-  { key: "orders", label: "订单", to: "/admin/orders" },
-  { key: "transactions", label: "流水", to: "/admin/transactions" },
-  { key: "couponCodes", label: "优惠码", to: "/admin/coupon-codes" },
-  { key: "commissionWithdrawals", label: "提现审核", to: "/admin/commission-withdrawals" },
-  { key: "imageTasks", label: "生成任务", to: "/admin/image-tasks" },
-  { key: "assets", label: "管理资产", to: "/admin/assets" },
-  { key: "settings", label: "系统配置", to: "/admin/settings" },
-  { key: "productCatalog", label: "商品目录", to: "/admin/product-catalog" },
-  { key: "promptTemplates", label: "提示词", to: "/admin/prompt-templates" },
-  { key: "outfitModels", label: "模特库", to: "/admin/outfit-models" },
-  { key: "heygenAvatars", label: "系统数字人", to: "/admin/heygen-avatars" },
-  { key: "heygenVoices", label: "系统声音", to: "/admin/heygen-voices" },
-  { key: "heygenTranslationLanguages", label: "翻译语言", to: "/admin/heygen-translation-languages" },
-  { key: "auditLogs", label: "审计日志", to: "/admin/audit-logs" },
+export const adminMenuGroups = [
+  {
+    key: "overview",
+    label: "总览",
+    items: [{ key: "overview", label: "概览", to: "/admin/overview" }],
+  },
+  {
+    key: "finance",
+    label: "用户与财务",
+    items: [
+      { key: "users", label: "用户", to: "/admin/users" },
+      { key: "orders", label: "订单", to: "/admin/orders" },
+      { key: "transactions", label: "流水", to: "/admin/transactions" },
+      { key: "couponCodes", label: "优惠码", to: "/admin/coupon-codes" },
+      { key: "commissionWithdrawals", label: "提现审核", to: "/admin/commission-withdrawals" },
+    ],
+  },
+  {
+    key: "content",
+    label: "内容管理",
+    items: [
+      { key: "imageTasks", label: "生成任务", to: "/admin/image-tasks" },
+      { key: "assets", label: "管理资产", to: "/admin/assets" },
+      { key: "productCatalog", label: "商品目录", to: "/admin/product-catalog" },
+      { key: "promptTemplates", label: "提示词", to: "/admin/prompt-templates" },
+      { key: "outfitModels", label: "模特库", to: "/admin/outfit-models" },
+    ],
+  },
+  {
+    key: "capabilities",
+    label: "能力配置",
+    items: [
+      { key: "heygenAvatars", label: "系统数字人", to: "/admin/heygen-avatars" },
+      { key: "heygenVoices", label: "系统声音", to: "/admin/heygen-voices" },
+      { key: "heygenTranslationLanguages", label: "翻译语言", to: "/admin/heygen-translation-languages" },
+    ],
+  },
+  {
+    key: "system",
+    label: "系统",
+    items: [
+      { key: "settings", label: "系统配置", to: "/admin/settings" },
+      { key: "auditLogs", label: "审计日志", to: "/admin/audit-logs" },
+    ],
+  },
 ];
 
 export const userRoleOptions = [

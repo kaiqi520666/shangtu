@@ -17,14 +17,22 @@ import {
   UsersRound,
 } from "lucide-vue-next";
 import { computed, ref } from "vue";
-import { RouterView, useRoute } from "vue-router";
+import { RouterLink, RouterView, useRoute } from "vue-router";
 import GeneratorLayout from "@/components/layout/GeneratorLayout.vue";
 import AppTabNav from "@/components/ui/AppTabNav.vue";
-import { adminTabs } from "@/constants/admin.js";
+import { adminMenuGroups } from "@/constants/admin.js";
 
 const route = useRoute();
 const refreshKey = ref(0);
-const activeTab = computed(() => adminTabs.find((tab) => tab.to === route.path)?.key || "overview");
+const activeGroup = computed(() => adminMenuGroups.find((group) => group.items.some((item) => item.to === route.path)) || adminMenuGroups[0]);
+const activeTab = computed(() => activeGroup.value.items.find((item) => item.to === route.path)?.key || activeGroup.value.items[0].key);
+const groupIcons = {
+  overview: LayoutDashboard,
+  finance: UsersRound,
+  content: PackageSearch,
+  capabilities: UserRoundCheck,
+  system: Settings,
+};
 const tabIcons = {
   overview: LayoutDashboard,
   users: UsersRound,
@@ -68,7 +76,21 @@ function refreshCurrentView() {
       </header>
 
       <div class="border-b border-slate-200 bg-white px-6">
-        <AppTabNav :tabs="adminTabs" :active-key="activeTab" :icons="tabIcons" />
+        <nav aria-label="后台一级导航" class="flex gap-6 overflow-x-auto py-2.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <RouterLink
+            v-for="group in adminMenuGroups"
+            :key="group.key"
+            :to="group.items[0].to"
+            class="flex h-9 shrink-0 items-center gap-2 border-b-2 px-1 text-xs font-black transition-colors"
+            :class="activeGroup.key === group.key ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-800'"
+          >
+            <component :is="groupIcons[group.key]" class="h-4 w-4" />
+            {{ group.label }}
+          </RouterLink>
+        </nav>
+      </div>
+      <div aria-label="后台二级导航" class="border-b border-slate-200 bg-slate-50/80 px-6">
+        <AppTabNav :tabs="activeGroup.items" :active-key="activeTab" :icons="tabIcons" />
       </div>
 
       <main class="flex-1 overflow-y-auto p-6">
