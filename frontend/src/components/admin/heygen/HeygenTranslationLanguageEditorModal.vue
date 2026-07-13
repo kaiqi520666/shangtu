@@ -39,12 +39,12 @@ const emit = defineEmits(["close", "submit"]);
         <AppCheckbox v-model="form.enabled" label="启用语言" />
       </div>
 
-      <div class="mt-5 flex justify-end gap-2">
-        <button type="button" class="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50" @click="emit('close')">取消</button>
-        <button type="button" class="rounded-xl bg-primary px-4 py-2 text-xs font-black text-white disabled:opacity-50" :disabled="saving" @click="emit('submit', form)">
-          {{ saving ? "保存中..." : "保存" }}
-        </button>
-      </div>
     </div>
+    <template #footer>
+      <button type="button" class="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50" @click="emit('close')">取消</button>
+      <button type="button" class="rounded-xl bg-primary px-4 py-2 text-xs font-black text-white disabled:opacity-50" :disabled="saving" @click="emit('submit', form)">
+        {{ saving ? "保存中..." : "保存" }}
+      </button>
+    </template>
   </AppModal>
 </template>

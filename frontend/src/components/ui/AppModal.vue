@@ -38,6 +38,9 @@ const emit = defineEmits(['close'])
         </button>
       </div>
       <slot />
+      <div v-if="$slots.footer" class="flex shrink-0 items-center justify-end gap-2 border-t border-slate-100 bg-white px-5 py-4">
+        <slot name="footer" />
+      </div>
     </div>
   </div>
 </template>

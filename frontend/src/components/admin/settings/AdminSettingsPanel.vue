@@ -1,153 +1,22 @@
 <script setup>
-import AppCheckbox from "@/components/ui/AppCheckbox.vue";
+import AdminCreditCostSettings from "@/components/admin/settings/AdminCreditCostSettings.vue";
+import AdminPaymentStatus from "@/components/admin/settings/AdminPaymentStatus.vue";
+import AdminRechargePackageSettings from "@/components/admin/settings/AdminRechargePackageSettings.vue";
 
 defineProps({
-  state: {
-    type: Object,
-    required: true,
-  },
+  state: { type: Object, required: true },
 });
 
 const emit = defineEmits(["save", "add-package", "remove-package"]);
-
-const paymentConfigLabels = {
-  zpay_pid_configured: "商户 ID",
-  zpay_key_configured: "商户密钥",
-  zpay_notify_url_configured: "异步回调地址",
-  zpay_return_url_configured: "支付返回地址",
-};
 </script>
 
 <template>
   <section class="space-y-4">
-    <div v-if="state.loading" class="rounded-xl border border-slate-200 bg-white px-4 py-10 text-center text-sm text-slate-400">
-      正在加载配置...
-    </div>
-
+    <div v-if="state.loading" class="rounded-xl border border-slate-200 bg-white px-4 py-10 text-center text-sm text-slate-400">正在加载配置...</div>
     <template v-else>
-      <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div class="mb-4 flex items-center justify-between">
-          <div>
-            <h2 class="text-sm font-black text-slate-800">生图扣费</h2>
-            <p class="mt-1 text-xs text-slate-400">按分辨率配置每张图消耗积分。</p>
-          </div>
-        </div>
-        <div class="grid gap-3 md:grid-cols-3">
-          <label v-for="resolution in ['1K', '2K', '4K']" :key="resolution" class="block">
-            <span class="text-xs font-bold text-slate-600">{{ resolution }} 扣费</span>
-            <input v-model.number="state.imageCreditCosts[resolution]" type="number" min="1" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary" />
-          </label>
-        </div>
-      </div>
-
-      <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div class="mb-4 flex items-center justify-between">
-          <div>
-            <h2 class="text-sm font-black text-slate-800">商品视频扣费</h2>
-            <p class="mt-1 text-xs text-slate-400">按清晰度配置每秒消耗积分，实际扣费 = 时长 × 每秒积分。</p>
-          </div>
-        </div>
-        <div class="grid gap-3 md:grid-cols-2">
-          <label v-for="resolution in ['720p', '1080p']" :key="resolution" class="block">
-            <span class="text-xs font-bold text-slate-600">{{ resolution }} 每秒扣费</span>
-            <input v-model.number="state.videoCreditCosts[resolution]" type="number" min="1" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary" />
-          </label>
-        </div>
-      </div>
-
-      <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div class="mb-4 flex items-center justify-between">
-          <div>
-            <h2 class="text-sm font-black text-slate-800">数字人每秒扣费</h2>
-            <p class="mt-1 text-xs text-slate-400">数字人独立收费体系，按档位配置每秒积分。</p>
-          </div>
-        </div>
-        <div class="grid gap-3 md:grid-cols-2">
-          <label v-for="tier in [{ key: 'standard', label: '标准档每秒扣费' }, { key: 'premium', label: '高质档每秒扣费' }]" :key="tier.key" class="block">
-            <span class="text-xs font-bold text-slate-600">{{ tier.label }}</span>
-            <input v-model.number="state.digitalHumanCreditCosts[tier.key]" type="number" min="1" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary" />
-          </label>
-        </div>
-      </div>
-
-      <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div class="mb-4 flex items-center justify-between">
-          <div>
-            <h2 class="text-sm font-black text-slate-800">数字人预扣费</h2>
-            <p class="mt-1 text-xs text-slate-400">按档位配置预扣积分，创建任务时先扣，失败自动退回。</p>
-          </div>
-        </div>
-        <div class="grid gap-3 md:grid-cols-2">
-          <label v-for="tier in [{ key: 'standard', label: '标准档预扣' }, { key: 'premium', label: '高质档预扣' }]" :key="tier.key" class="block">
-            <span class="text-xs font-bold text-slate-600">{{ tier.label }}</span>
-            <input v-model.number="state.digitalHumanPrechargeCosts[tier.key]" type="number" min="1" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary" />
-          </label>
-        </div>
-      </div>
-
-      <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div class="mb-4 flex items-center justify-between">
-          <div>
-            <h2 class="text-sm font-black text-slate-800">视频翻译扣费</h2>
-            <p class="mt-1 text-xs text-slate-400">视频翻译独立收费体系，按档位配置每秒积分。</p>
-          </div>
-        </div>
-        <div class="grid gap-3 md:grid-cols-2">
-          <label v-for="tier in [{ key: 'standard', label: '标准翻译每秒扣费' }, { key: 'premium', label: '高质翻译每秒扣费' }]" :key="tier.key" class="block">
-            <span class="text-xs font-bold text-slate-600">{{ tier.label }}</span>
-            <input v-model.number="state.videoTranslationCreditCosts[tier.key]" type="number" min="1" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary" />
-          </label>
-        </div>
-      </div>
-
-      <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div class="mb-4">
-          <h2 class="text-sm font-black text-slate-800">AI 配音扣费</h2>
-          <p class="mt-1 text-xs text-slate-400">按每100个非空白字符配置积分，不足100字符按100字符计。</p>
-        </div>
-        <label class="block max-w-sm">
-          <span class="text-xs font-bold text-slate-600">每100字符扣费</span>
-          <input v-model.number="state.voiceoverCreditCostPer100Chars" type="number" min="1" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary" />
-        </label>
-      </div>
-
-      <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div class="mb-4 flex items-center justify-between gap-3">
-          <div>
-            <h2 class="text-sm font-black text-slate-800">充值套餐</h2>
-            <p class="mt-1 text-xs text-slate-400">金额单位为分，保存后用户充值弹窗立即读取新配置。</p>
-          </div>
-          <button type="button" class="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50" @click="emit('add-package')">
-            新增套餐
-          </button>
-        </div>
-        <div class="space-y-3">
-          <div v-for="(pkg, index) in state.rechargePackages" :key="pkg.id || index" class="grid gap-2 rounded-xl border border-slate-100 bg-slate-50 p-3 md:grid-cols-[1fr_1.2fr_0.8fr_0.8fr_0.8fr_auto_auto]">
-            <input v-model="pkg.id" type="text" class="rounded-lg border border-slate-200 px-2.5 py-2 text-xs outline-none focus:border-primary" placeholder="套餐ID" />
-            <input v-model="pkg.name" type="text" class="rounded-lg border border-slate-200 px-2.5 py-2 text-xs outline-none focus:border-primary" placeholder="套餐名称" />
-            <input v-model.number="pkg.credits" type="number" min="1" class="rounded-lg border border-slate-200 px-2.5 py-2 text-xs outline-none focus:border-primary" placeholder="积分" />
-            <input v-model.number="pkg.amount_cents" type="number" min="1" class="rounded-lg border border-slate-200 px-2.5 py-2 text-xs outline-none focus:border-primary" placeholder="金额(分)" />
-            <input v-model="pkg.badge" type="text" class="rounded-lg border border-slate-200 px-2.5 py-2 text-xs outline-none focus:border-primary" placeholder="标签" />
-            <div class="flex items-center justify-center">
-              <AppCheckbox v-model="pkg.enabled" label="启用" />
-            </div>
-            <button type="button" class="rounded-lg border border-rose-200 px-2.5 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50" @click="emit('remove-package', index)">
-              删除
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <h2 class="text-sm font-black text-slate-800">支付配置状态</h2>
-        <div class="mt-3 grid gap-3 md:grid-cols-4">
-          <div v-for="(value, key) in state.paymentConfig" :key="key" class="rounded-lg bg-slate-50 px-3 py-2">
-            <p class="text-[11px] font-semibold text-slate-400">{{ paymentConfigLabels[key] || key }}</p>
-            <p class="mt-1 text-xs font-bold" :class="value ? 'text-emerald-600' : 'text-rose-600'">{{ value ? '已配置' : '未配置' }}</p>
-          </div>
-        </div>
-      </div>
-
+      <AdminCreditCostSettings :state="state" />
+      <AdminRechargePackageSettings :packages="state.rechargePackages" @add="emit('add-package')" @remove="emit('remove-package', $event)" />
+      <AdminPaymentStatus :config="state.paymentConfig" />
       <div class="flex justify-end">
         <button type="button" class="rounded-xl bg-primary px-5 py-2 text-xs font-black text-white disabled:opacity-50" :disabled="state.saving" @click="emit('save')">
           {{ state.saving ? '保存中...' : '保存配置' }}

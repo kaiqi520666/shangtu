@@ -9,10 +9,12 @@ import {
   heygenAvatarOrientationOptions,
   heygenGenderOptions,
 } from "@/constants/admin.js";
+import AdminFilterBar from "@/components/admin/common/AdminFilterBar.vue";
+import AdminSearchInput from "@/components/admin/common/AdminSearchInput.vue";
 import AppCheckbox from "@/components/ui/AppCheckbox.vue";
 import AppModal from "@/components/ui/AppModal.vue";
 import AppSelect from "@/components/ui/AppSelect.vue";
-import AdminPagination from "@/components/admin/AdminPagination.vue";
+import AppPagination from "@/components/ui/AppPagination.vue";
 
 defineProps({
   state: {
@@ -33,8 +35,8 @@ const previewItem = defineModel("previewItem", { type: Object, default: null });
 
 <template>
   <section class="space-y-4">
-    <div class="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-      <input v-model="state.keyword" type="text" class="min-w-72 rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none" placeholder="搜索名称、avatar_id、group_id、默认声音" @keyup.enter="emit('apply-filter')" />
+    <AdminFilterBar :total="state.total" total-label="个系统数字人" @apply-filter="emit('apply-filter')">
+      <AdminSearchInput v-model="state.keyword" placeholder="搜索名称、avatar_id、group_id、默认声音" @search="emit('apply-filter')" />
       <div class="w-28">
         <AppSelect v-model="state.gender" :options="heygenGenderOptions" @update:model-value="emit('apply-filter')" />
       </div>
@@ -47,14 +49,14 @@ const previewItem = defineModel("previewItem", { type: Object, default: null });
       <div class="w-32">
         <AppSelect v-model="state.active" :options="activeStatusOptions" @update:model-value="emit('apply-filter')" />
       </div>
-      <button type="button" class="rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white" @click="emit('apply-filter')">查询</button>
-      <button type="button" class="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50" :disabled="syncing || state.loading" @click="emit('sync')">
-        <LoaderCircle v-if="syncing" class="h-3.5 w-3.5 animate-spin" />
-        <RefreshCw v-else class="h-3.5 w-3.5" />
-        {{ syncing ? "同步中..." : "同步 HeyGen" }}
-      </button>
-      <span class="ml-auto text-xs text-slate-400">共 {{ state.total }} 个系统数字人</span>
-    </div>
+      <template #actions>
+        <button type="button" class="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50" :disabled="syncing || state.loading" @click="emit('sync')">
+          <LoaderCircle v-if="syncing" class="h-3.5 w-3.5 animate-spin" />
+          <RefreshCw v-else class="h-3.5 w-3.5" />
+          {{ syncing ? "同步中..." : "同步 HeyGen" }}
+        </button>
+      </template>
+    </AdminFilterBar>
 
     <div class="grid gap-4 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
       <div v-if="state.loading" class="col-span-full rounded-xl border border-slate-200 bg-white px-4 py-10 text-center text-sm text-slate-400">加载中...</div>
@@ -97,7 +99,7 @@ const previewItem = defineModel("previewItem", { type: Object, default: null });
       </article>
     </div>
 
-    <AdminPagination :state="state" @change-page="emit('change-page', $event)" />
+    <AppPagination :state="state" @change-page="emit('change-page', $event)" />
 
     <AppModal :open="previewOpen" title="数字人预览" panel-class="w-full max-w-3xl" @close="previewOpen = false">
       <div v-if="previewItem" class="space-y-4 p-5">

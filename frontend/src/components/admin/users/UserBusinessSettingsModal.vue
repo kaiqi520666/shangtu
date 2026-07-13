@@ -48,10 +48,10 @@ function submit() {
         </label>
       </div>
       <p v-else class="border-t border-slate-100 pt-4 text-xs font-semibold text-slate-500">该用户是 {{ target.distribution_level }} 级分销用户，比例由其直接上级管理。</p>
-      <div class="flex justify-end gap-2">
-        <button type="button" class="rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600" @click="emit('close')">取消</button>
-        <button type="button" class="rounded-lg bg-primary px-4 py-2 text-xs font-bold text-white disabled:opacity-50" :disabled="saving" @click="submit">{{ saving ? '保存中...' : '保存' }}</button>
-      </div>
     </div>
+    <template #footer>
+      <button type="button" class="rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600" @click="emit('close')">取消</button>
+      <button type="button" class="rounded-lg bg-primary px-4 py-2 text-xs font-bold text-white disabled:opacity-50" :disabled="saving" @click="submit">{{ saving ? '保存中...' : '保存' }}</button>
+    </template>
   </AppModal>
 </template>

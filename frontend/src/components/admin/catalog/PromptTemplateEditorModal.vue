@@ -137,15 +137,13 @@ function submit() {
         ></textarea>
       </label>
 
-      <div class="flex items-center justify-between border-t border-slate-100 pt-4">
-        <AppCheckbox v-model="localForm.active" label="启用模板" />
-        <div class="flex gap-2">
-          <button type="button" class="rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50" @click="emit('close')">取消</button>
-          <button type="button" class="rounded-lg bg-primary px-4 py-2 text-xs font-bold text-white disabled:opacity-50" :disabled="saving" @click="submit">
-            {{ saving ? '保存中...' : '保存' }}
-          </button>
-        </div>
-      </div>
     </div>
+    <template #footer>
+      <AppCheckbox v-model="localForm.active" class="mr-auto" label="启用模板" />
+      <button type="button" class="rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50" @click="emit('close')">取消</button>
+      <button type="button" class="rounded-lg bg-primary px-4 py-2 text-xs font-bold text-white disabled:opacity-50" :disabled="saving" @click="submit">
+        {{ saving ? '保存中...' : '保存' }}
+      </button>
+    </template>
   </AppModal>
 </template>

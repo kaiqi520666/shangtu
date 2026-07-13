@@ -1,7 +1,7 @@
 <script setup>
 import { Download, ImageOff, LayoutGrid, LoaderCircle, Search } from "lucide-vue-next";
 import { taskMediaTypeOptions } from "@/constants/admin.js";
-import AdminPagination from "@/components/admin/AdminPagination.vue";
+import AppPagination from "@/components/ui/AppPagination.vue";
 import AssetCardGrid from "@/components/assets/AssetCardGrid.vue";
 import AppCheckbox from "@/components/ui/AppCheckbox.vue";
 import AppModal from "@/components/ui/AppModal.vue";
@@ -64,7 +64,7 @@ const scenarioIcons = {
       </div>
       <AssetCardGrid v-else :cards="state.items" :scenario-label="scenarioLabel" :meta-label="metaLabel" :downloading="downloading" :show-delete="false" @toggle-card="emit('toggle-card', $event)" @download-card="emit('download', $event)" @zoom-card="emit('preview', $event)" />
     </div>
-    <AdminPagination v-if="state.total > state.pageSize" :state="state" @change-page="emit('change-page', $event)" />
+    <AppPagination :state="state" @change-page="emit('change-page', $event)" />
     <AppModal :open="!!preview" panel-class="max-w-[90vw] max-h-[90vh] w-auto" @close="emit('close-preview')">
       <div v-if="preview" class="flex items-center justify-center p-2">
         <video v-if="preview.mediaType === 'video'" :src="preview.dataUrl" class="max-h-[85vh] max-w-full object-contain" controls autoplay playsinline></video>

@@ -1,5 +1,4 @@
 <script setup>
-import { LoaderCircle, Search } from "lucide-vue-next";
 import {
   formatTime,
   roleLabel,
@@ -7,8 +6,11 @@ import {
   userRoleOptions,
   userStatusOptions,
 } from "@/constants/admin.js";
+import AdminFilterBar from "@/components/admin/common/AdminFilterBar.vue";
+import AdminSearchInput from "@/components/admin/common/AdminSearchInput.vue";
+import AdminTableStateRow from "@/components/admin/common/AdminTableStateRow.vue";
 import AppSelect from "@/components/ui/AppSelect.vue";
-import AdminPagination from "../AdminPagination.vue";
+import AppPagination from "@/components/ui/AppPagination.vue";
 
 defineProps({
   state: {
@@ -30,28 +32,15 @@ const emit = defineEmits([
 
 <template>
   <section class="space-y-4">
-    <div class="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-      <div class="flex min-w-64 items-center gap-2 rounded-lg border border-slate-200 px-3 py-2">
-        <Search class="h-4 w-4 text-slate-300" />
-        <input
-          v-model="state.keyword"
-          type="text"
-          class="w-full border-0 bg-transparent text-xs outline-none"
-          placeholder="搜索邮箱或用户名"
-          @keyup.enter="emit('apply-filter')"
-        />
-      </div>
+    <AdminFilterBar :total="state.total" total-label="个用户" @apply-filter="emit('apply-filter')">
+      <AdminSearchInput v-model="state.keyword" placeholder="搜索邮箱或用户名" @search="emit('apply-filter')" />
       <div class="w-36">
         <AppSelect v-model="state.role" :options="userRoleOptions" @update:model-value="emit('apply-filter')" />
       </div>
       <div class="w-36">
         <AppSelect v-model="state.status" :options="userStatusOptions" @update:model-value="emit('apply-filter')" />
       </div>
-      <button type="button" class="rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white" @click="emit('apply-filter')">
-        查询
-      </button>
-      <span class="ml-auto text-xs text-slate-400">共 {{ state.total }} 个用户</span>
-    </div>
+    </AdminFilterBar>
 
     <div class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       <table class="w-full text-left text-xs">
@@ -68,15 +57,7 @@ const emit = defineEmits([
           </tr>
         </thead>
         <tbody>
-          <tr v-if="state.loading">
-            <td colspan="8" class="px-4 py-10 text-center text-slate-400">
-              <LoaderCircle class="mx-auto mb-2 h-5 w-5 animate-spin" />
-              加载中...
-            </td>
-          </tr>
-          <tr v-else-if="!state.items.length">
-            <td colspan="8" class="px-4 py-10 text-center text-slate-400">暂无用户</td>
-          </tr>
+          <AdminTableStateRow v-if="state.loading || !state.items.length" :loading="state.loading" :empty="!state.items.length" :colspan="8" empty-text="暂无用户" />
           <tr v-for="user in state.items" v-else :key="user.id" class="border-t border-slate-100">
             <td class="px-4 py-3">
               <p class="font-bold text-slate-800">{{ user.email }}</p>
@@ -116,6 +97,6 @@ const emit = defineEmits([
       </table>
     </div>
 
-    <AdminPagination :state="state" @change-page="emit('change-page', $event)" />
+    <AppPagination :state="state" @change-page="emit('change-page', $event)" />
   </section>
 </template>

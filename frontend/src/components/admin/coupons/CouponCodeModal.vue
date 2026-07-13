@@ -29,7 +29,7 @@ watch(
 
 <template>
   <AppModal :open="open" :title="target ? '编辑优惠码' : '创建优惠码'" :subtitle="target ? '修改只影响未来兑换' : '优惠码创建后不可修改码值'" @close="emit('close')">
-    <form class="space-y-4 p-5" @submit.prevent="emit('submit', { ...form })">
+    <form id="coupon-code-form" class="space-y-4 p-5" @submit.prevent="emit('submit', { ...form })">
       <label class="block">
         <span class="text-xs font-bold text-slate-600">优惠码</span>
         <input v-model.trim="form.code" type="text" maxlength="32" :disabled="Boolean(target)" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold uppercase outline-none focus:border-primary disabled:bg-slate-100 disabled:text-slate-500" placeholder="例如 SUMMER2026" />
@@ -47,10 +47,10 @@ watch(
         </label>
         <AppCheckbox v-model="form.enabled" label="启用优惠码" />
       </div>
-      <div class="flex justify-end gap-2 pt-1">
-        <button type="button" class="rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600" @click="emit('close')">取消</button>
-        <button type="submit" class="rounded-lg bg-primary px-4 py-2 text-xs font-bold text-white disabled:opacity-50" :disabled="saving">{{ saving ? "保存中..." : "保存" }}</button>
-      </div>
     </form>
+    <template #footer>
+      <button type="button" class="rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600" @click="emit('close')">取消</button>
+      <button type="submit" form="coupon-code-form" class="rounded-lg bg-primary px-4 py-2 text-xs font-bold text-white disabled:opacity-50" :disabled="saving">{{ saving ? "保存中..." : "保存" }}</button>
+    </template>
   </AppModal>
 </template>

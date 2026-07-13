@@ -6,9 +6,12 @@ import {
   productCatalogScenarioLabel,
   scenarioOptions,
 } from "@/constants/admin.js";
+import AdminFilterBar from "@/components/admin/common/AdminFilterBar.vue";
+import AdminSearchInput from "@/components/admin/common/AdminSearchInput.vue";
+import AdminTableStateRow from "@/components/admin/common/AdminTableStateRow.vue";
 import AppCheckbox from "@/components/ui/AppCheckbox.vue";
 import AppSelect from "@/components/ui/AppSelect.vue";
-import AdminPagination from "../AdminPagination.vue";
+import AppPagination from "@/components/ui/AppPagination.vue";
 
 const catalogScenarioOptions = [
   { label: "全部目录", value: "" },
@@ -27,23 +30,15 @@ const emit = defineEmits(["apply-filter", "change-page", "edit", "toggle"]);
 
 <template>
   <section class="space-y-4">
-    <div class="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-      <input
-        v-model="state.keyword"
-        type="text"
-        class="min-w-72 rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none"
-        placeholder="搜索名称、ID、描述或策略"
-        @keyup.enter="emit('apply-filter')"
-      />
+    <AdminFilterBar :total="state.total" total-label="个目录项" @apply-filter="emit('apply-filter')">
+      <AdminSearchInput v-model="state.keyword" placeholder="搜索名称、ID、描述或策略" @search="emit('apply-filter')" />
       <div class="w-36">
         <AppSelect v-model="state.scenario" :options="catalogScenarioOptions" @update:model-value="emit('apply-filter')" />
       </div>
       <div class="w-32">
         <AppSelect v-model="state.enabled" :options="activeStatusOptions" @update:model-value="emit('apply-filter')" />
       </div>
-      <button type="button" class="rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white" @click="emit('apply-filter')">查询</button>
-      <span class="ml-auto text-xs text-slate-400">共 {{ state.total }} 个目录项</span>
-    </div>
+    </AdminFilterBar>
 
     <div class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       <table class="w-full text-left text-xs">
@@ -61,12 +56,7 @@ const emit = defineEmits(["apply-filter", "change-page", "edit", "toggle"]);
           </tr>
         </thead>
         <tbody>
-          <tr v-if="state.loading">
-            <td colspan="9" class="px-4 py-10 text-center text-slate-400">加载中...</td>
-          </tr>
-          <tr v-else-if="!state.items.length">
-            <td colspan="9" class="px-4 py-10 text-center text-slate-400">暂无商品目录</td>
-          </tr>
+          <AdminTableStateRow v-if="state.loading || !state.items.length" :loading="state.loading" :empty="!state.items.length" :colspan="9" empty-text="暂无商品目录" />
           <tr v-for="item in state.items" v-else :key="item.id" class="border-t border-slate-100 align-top">
             <td class="px-4 py-3">
               <p class="font-bold text-slate-800">{{ item.name }}</p>
@@ -102,6 +92,6 @@ const emit = defineEmits(["apply-filter", "change-page", "edit", "toggle"]);
       </table>
     </div>
 
-    <AdminPagination :state="state" @change-page="emit('change-page', $event)" />
+    <AppPagination :state="state" @change-page="emit('change-page', $event)" />
   </section>
 </template>

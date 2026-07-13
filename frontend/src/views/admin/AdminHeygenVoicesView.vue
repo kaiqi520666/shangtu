@@ -1,7 +1,7 @@
 <script setup>
 import { onMounted } from "vue";
+import AdminNamedResourceModal from "@/components/admin/common/AdminNamedResourceModal.vue";
 import AdminHeygenVoicesPanel from "@/components/admin/heygen/AdminHeygenVoicesPanel.vue";
-import HeygenResourceEditorModal from "@/components/admin/heygen/HeygenResourceEditorModal.vue";
 import { useAdminHeygenVoices } from "@/composables/admin/useAdminHeygenVoices.js";
 
 const {
@@ -35,7 +35,7 @@ onMounted(() => {
     @toggle="toggleItem"
     @sync="syncItems"
   />
-  <HeygenResourceEditorModal
+  <AdminNamedResourceModal
     :open="editorOpen"
     :form="form"
     :saving="editorSaving"

@@ -1,9 +1,11 @@
 <script setup>
 import { reactive, ref, watch } from "vue";
 import { activeStatusLabel, activeStatusOptions, formatTime } from "@/constants/admin.js";
+import AdminFilterBar from "@/components/admin/common/AdminFilterBar.vue";
+import AdminSearchInput from "@/components/admin/common/AdminSearchInput.vue";
 import AppCheckbox from "@/components/ui/AppCheckbox.vue";
 import AppSelect from "@/components/ui/AppSelect.vue";
-import AdminPagination from "../AdminPagination.vue";
+import AppPagination from "@/components/ui/AppPagination.vue";
 
 const props = defineProps({
   state: {
@@ -80,14 +82,12 @@ function submitUpload() {
       </div>
     </div>
 
-    <div class="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-      <input v-model="state.keyword" type="text" class="min-w-72 rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none" placeholder="搜索名称、OSS key 或 URL" @keyup.enter="emit('apply-filter')" />
+    <AdminFilterBar :total="state.total" total-label="个系统模特" @apply-filter="emit('apply-filter')">
+      <AdminSearchInput v-model="state.keyword" placeholder="搜索名称、OSS key 或 URL" @search="emit('apply-filter')" />
       <div class="w-32">
         <AppSelect v-model="state.active" :options="activeStatusOptions" @update:model-value="emit('apply-filter')" />
       </div>
-      <button type="button" class="rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white" @click="emit('apply-filter')">查询</button>
-      <span class="ml-auto text-xs text-slate-400">共 {{ state.total }} 个系统模特</span>
-    </div>
+    </AdminFilterBar>
 
     <div class="grid gap-4 md:grid-cols-3 xl:grid-cols-5">
       <div v-if="state.loading" class="col-span-full rounded-xl border border-slate-200 bg-white px-4 py-10 text-center text-sm text-slate-400">加载中...</div>
@@ -114,6 +114,6 @@ function submitUpload() {
       </article>
     </div>
 
-    <AdminPagination :state="state" @change-page="emit('change-page', $event)" />
+    <AppPagination :state="state" @change-page="emit('change-page', $event)" />
   </section>
 </template>

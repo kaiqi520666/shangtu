@@ -7,8 +7,11 @@ import {
   scenarioOptions,
   taskMediaTypeOptions,
 } from "@/constants/admin.js";
+import AdminFilterBar from "@/components/admin/common/AdminFilterBar.vue";
+import AdminSearchInput from "@/components/admin/common/AdminSearchInput.vue";
+import AdminTableStateRow from "@/components/admin/common/AdminTableStateRow.vue";
 import AppSelect from "@/components/ui/AppSelect.vue";
-import AdminPagination from "./AdminPagination.vue";
+import AppPagination from "@/components/ui/AppPagination.vue";
 
 defineProps({
   state: {
@@ -22,8 +25,8 @@ const emit = defineEmits(["apply-filter", "change-page"]);
 
 <template>
   <section class="space-y-4">
-    <div class="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-      <input v-model="state.keyword" type="text" class="min-w-72 rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none" placeholder="搜索邮箱、任务ID、标题或上游ID" @keyup.enter="emit('apply-filter')" />
+    <AdminFilterBar :total="state.total" total-label="个任务" @apply-filter="emit('apply-filter')">
+      <AdminSearchInput v-model="state.keyword" placeholder="搜索邮箱、任务ID、标题或上游ID" @search="emit('apply-filter')" />
       <div class="w-36">
         <AppSelect v-model="state.status" :options="imageTaskStatusOptions" @update:model-value="emit('apply-filter')" />
       </div>
@@ -33,9 +36,7 @@ const emit = defineEmits(["apply-filter", "change-page"]);
       <div class="w-32">
         <AppSelect v-model="state.mediaType" :options="taskMediaTypeOptions" @update:model-value="emit('apply-filter')" />
       </div>
-      <button type="button" class="rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white" @click="emit('apply-filter')">查询</button>
-      <span class="ml-auto text-xs text-slate-400">共 {{ state.total }} 个任务</span>
-    </div>
+    </AdminFilterBar>
 
     <div class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       <table class="w-full text-left text-xs">
@@ -51,12 +52,7 @@ const emit = defineEmits(["apply-filter", "change-page"]);
           </tr>
         </thead>
         <tbody>
-          <tr v-if="state.loading">
-            <td colspan="7" class="px-4 py-10 text-center text-slate-400">加载中...</td>
-          </tr>
-          <tr v-else-if="!state.items.length">
-            <td colspan="7" class="px-4 py-10 text-center text-slate-400">暂无生成任务</td>
-          </tr>
+          <AdminTableStateRow v-if="state.loading || !state.items.length" :loading="state.loading" :empty="!state.items.length" :colspan="7" empty-text="暂无生成任务" />
           <tr v-for="task in state.items" v-else :key="task.id" class="border-t border-slate-100 align-top">
             <td class="px-4 py-3">
               <p class="font-bold text-slate-800">{{ task.title || task.type_id || '未命名任务' }}</p>
@@ -91,6 +87,6 @@ const emit = defineEmits(["apply-filter", "change-page"]);
       </table>
     </div>
 
-    <AdminPagination :state="state" @change-page="emit('change-page', $event)" />
+    <AppPagination :state="state" @change-page="emit('change-page', $event)" />
   </section>
 </template>

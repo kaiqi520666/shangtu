@@ -29,10 +29,10 @@ function submit() {
         <label class="block"><span class="text-xs font-bold text-slate-600">打款流水号</span><input v-model="form.paymentReference" class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary" /></label>
         <label class="block"><span class="text-xs font-bold text-slate-600">打款凭证（可选）</span><input type="file" accept="image/jpeg,image/png,image/webp" class="mt-1 block w-full text-xs text-slate-500" @change="form.voucher = $event.target.files?.[0] || null" /></label>
       </template>
-      <div class="flex justify-end gap-2">
-        <button type="button" class="rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600" @click="emit('close')">取消</button>
-        <button type="button" class="rounded-lg bg-primary px-4 py-2 text-xs font-bold text-white disabled:opacity-50" :disabled="saving || (action === 'reject' ? !form.reason.trim() : !form.paymentReference.trim())" @click="submit">{{ saving ? '处理中...' : '确认' }}</button>
-      </div>
     </div>
+    <template #footer>
+      <button type="button" class="rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600" @click="emit('close')">取消</button>
+      <button type="button" class="rounded-lg bg-primary px-4 py-2 text-xs font-bold text-white disabled:opacity-50" :disabled="saving || (action === 'reject' ? !form.reason.trim() : !form.paymentReference.trim())" @click="submit">{{ saving ? '处理中...' : '确认' }}</button>
+    </template>
   </AppModal>
 </template>

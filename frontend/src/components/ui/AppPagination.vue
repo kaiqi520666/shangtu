@@ -14,7 +14,7 @@ function totalPages(state) {
 </script>
 
 <template>
-  <div class="flex items-center justify-center gap-3 text-xs text-slate-500">
+  <div v-if="props.state.total > props.state.pageSize" class="flex items-center justify-center gap-3 text-xs text-slate-500">
     <button
       type="button"
       class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 font-semibold disabled:opacity-40"

@@ -67,19 +67,12 @@ function submit() {
           placeholder="例如：客服补偿、异常扣回"
         ></textarea>
       </label>
-      <div class="flex justify-end gap-2">
-        <button type="button" class="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600" @click="emit('close')">
-          取消
-        </button>
-        <button
-          type="button"
-          class="rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
-          :disabled="saving"
-          @click="submit"
-        >
-          {{ saving ? '保存中...' : '确认调整' }}
-        </button>
-      </div>
     </div>
+    <template #footer>
+      <button type="button" class="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600" @click="emit('close')">取消</button>
+      <button type="button" class="rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white disabled:opacity-50" :disabled="saving" @click="submit">
+        {{ saving ? '保存中...' : '确认调整' }}
+      </button>
+    </template>
   </AppModal>
 </template>

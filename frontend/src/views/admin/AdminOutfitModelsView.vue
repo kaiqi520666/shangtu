@@ -1,7 +1,7 @@
 <script setup>
 import { onMounted } from "vue";
+import AdminNamedResourceModal from "@/components/admin/common/AdminNamedResourceModal.vue";
 import AdminOutfitModelsPanel from "@/components/admin/outfit/AdminOutfitModelsPanel.vue";
-import OutfitModelEditorModal from "@/components/admin/outfit/OutfitModelEditorModal.vue";
 import { useAdminOutfitModels } from "@/composables/admin/useAdminOutfitModels.js";
 
 const {
@@ -39,10 +39,14 @@ onMounted(() => {
     @toggle="toggleModel"
     @delete="deleteModel"
   />
-  <OutfitModelEditorModal
+  <AdminNamedResourceModal
     :open="editorOpen"
     :form="form"
     :saving="editorSaving"
+    title="编辑系统模特"
+    name-label="模特名称"
+    enabled-label="启用模特"
+    status-field="active"
     @close="closeEditor"
     @submit="saveModel"
   />
