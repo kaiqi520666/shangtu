@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Depends, File, Request, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,6 +15,7 @@ from app.core.system_settings import get_effective_video_credit_costs
 from app.core.video_strategy_generation import generate_video_strategy
 from app.models import User
 from app.schemas.response import Response, fail, success
+from app.services.llm_rate_limit import LLM_RATE_LIMIT_MESSAGE, allow_llm_request
 from app.services.video_assets import create_reference_audio, create_uploaded_video
 from app.services.video_generation import (
     VideoGeneratePayload,
@@ -29,6 +32,7 @@ from app.services.video_tasks import (
 )
 
 router = APIRouter(prefix="/video", tags=["视频生成"])
+logger = logging.getLogger("app.routers.video")
 
 class VideoGenerateRequest(BaseModel):
     scenario: str = "product_video"
@@ -86,6 +90,7 @@ async def video_credit_costs(
 @router.post("/strategy", response_model=Response)
 async def video_strategy(
     req: VideoStrategyRequest,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -102,6 +107,10 @@ async def video_strategy(
     duration_error = validate_video_duration(req.duration)
     if duration_error:
         return fail(duration_error)
+    if not await allow_llm_request(
+        request.app.state.redis_pool, current_user.id, "video-strategy"
+    ):
+        return fail(LLM_RATE_LIMIT_MESSAGE)
 
     try:
         template_prompt = await build_strategy_template_prompt(
@@ -125,6 +134,7 @@ async def video_strategy(
     except (ValueError, DashScopeConfigError, RuntimeError) as e:
         return fail(str(e))
     except Exception:
+        logger.exception("Unexpected video strategy failure user_id=%s", current_user.id)
         return fail("视频提示词生成失败")
 
     return success(strategy)
@@ -133,13 +143,19 @@ async def video_strategy(
 @router.post("/free-video/optimize", response_model=Response)
 async def free_video_optimize(
     req: FreeVideoOptimizeRequest,
+    request: Request,
     current_user: User = Depends(get_current_user),
 ):
+    if not await allow_llm_request(
+        request.app.state.redis_pool, current_user.id, "prompt-optimize"
+    ):
+        return fail(LLM_RATE_LIMIT_MESSAGE)
     try:
         content = await optimize_free_video_prompt(req.prompt)
     except (ValueError, DashScopeConfigError, RuntimeError) as e:
         return fail(str(e))
     except Exception:
+        logger.exception("Unexpected video prompt optimization failure user_id=%s", current_user.id)
         return fail("视频提示词优化失败")
 
     return success({"prompt": content})

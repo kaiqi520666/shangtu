@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends
+import logging
+
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,8 +18,10 @@ from app.core.strategy.dashscope_client import (
 )
 from app.models import User
 from app.schemas.response import Response, fail, success
+from app.services.llm_rate_limit import LLM_RATE_LIMIT_MESSAGE, allow_llm_request
 
 router = APIRouter()
+logger = logging.getLogger("app.routers.image_strategy")
 
 
 class ImageLabelItem(BaseModel):
@@ -52,9 +56,14 @@ class FreeImageOptimizeRequest(BaseModel):
 @router.post("/analyze", response_model=Response)
 async def analyze_image(
     req: AnalyzeImageRequest,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    if not await allow_llm_request(
+        request.app.state.redis_pool, current_user.id, "image-analyze"
+    ):
+        return fail(LLM_RATE_LIMIT_MESSAGE)
     try:
         template_prompt = await build_ai_write_prompt(
             db,
@@ -70,6 +79,7 @@ async def analyze_image(
     except (ValueError, DashScopeConfigError, RuntimeError) as e:
         return fail(str(e))
     except Exception:
+        logger.exception("Unexpected image analysis failure user_id=%s", current_user.id)
         return fail("图片分析失败")
 
     return success({"content": content})
@@ -78,12 +88,17 @@ async def analyze_image(
 @router.post("/strategy", response_model=Response)
 async def image_strategy(
     req: StrategyRequest,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     scenario = req.scenario.strip()
     if scenario not in {"product_image", "product_suite", "outfit"}:
         return fail("不支持的策略场景")
+    if not await allow_llm_request(
+        request.app.state.redis_pool, current_user.id, "image-strategy"
+    ):
+        return fail(LLM_RATE_LIMIT_MESSAGE)
 
     try:
         template_prompt = await build_strategy_template_prompt(
@@ -110,6 +125,11 @@ async def image_strategy(
     except (ValueError, DashScopeConfigError, RuntimeError) as e:
         return fail(str(e))
     except Exception:
+        logger.exception(
+            "Unexpected image strategy failure scenario=%s user_id=%s",
+            scenario,
+            current_user.id,
+        )
         messages = {
             "product_image": "详情页策略生成失败",
             "product_suite": "套图策略生成失败",
@@ -123,13 +143,19 @@ async def image_strategy(
 @router.post("/free-image/optimize", response_model=Response)
 async def free_image_optimize(
     req: FreeImageOptimizeRequest,
+    request: Request,
     current_user: User = Depends(get_current_user),
 ):
+    if not await allow_llm_request(
+        request.app.state.redis_pool, current_user.id, "prompt-optimize"
+    ):
+        return fail(LLM_RATE_LIMIT_MESSAGE)
     try:
         content = await optimize_free_image_prompt(req.prompt)
     except (ValueError, DashScopeConfigError, RuntimeError) as e:
         return fail(str(e))
     except Exception:
+        logger.exception("Unexpected image prompt optimization failure user_id=%s", current_user.id)
         return fail("提示词优化失败")
 
     return success({"prompt": content})
