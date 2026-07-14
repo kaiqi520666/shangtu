@@ -1,8 +1,10 @@
+import logging
 from collections.abc import Awaitable, Callable, Sequence
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.logging_config import task_log_extra
 from app.core.user_credits import (
     CreditCharge,
     calculate_user_credit_cost,
@@ -12,6 +14,8 @@ from app.core.user_credits import (
 )
 from app.models import User
 from app.schemas.response import Response, fail
+
+logger = logging.getLogger("app.services.generation_tasks")
 
 FailureMarker = Callable[[int], Awaitable[None]]
 BeforeEnqueue = Callable[[Any], Awaitable[None]]
@@ -57,6 +61,20 @@ async def enqueue_or_compensate(
             await before_enqueue(redis_pool)
         await redis_pool.enqueue_job(job_name, *job_args)
     except Exception:
+        logger.warning(
+            "Generation enqueue failed; starting compensation job=%s user_id=%s cost=%s",
+            job_name,
+            user_id,
+            credit_cost,
+            exc_info=True,
+            extra=task_log_extra(
+                event="generation_enqueue_failed",
+                task_id=failure_data.get("task_id"),
+                job_id=failure_data.get("job_id"),
+                phase="enqueue",
+                status="failed",
+            ),
+        )
         try:
             refunded_credits = await refund_credits(db, user_id, credit_cost, refund_note)
             await mark_failed(refunded_credits)
@@ -64,6 +82,21 @@ async def enqueue_or_compensate(
         except Exception:
             await db.rollback()
             refunded_credits = remaining_credits
+            logger.error(
+                "Generation compensation failed job=%s user_id=%s cost=%s; "
+                "credits and task state may be inconsistent",
+                job_name,
+                user_id,
+                credit_cost,
+                exc_info=True,
+                extra=task_log_extra(
+                    event="generation_compensation_failed",
+                    task_id=failure_data.get("task_id"),
+                    job_id=failure_data.get("job_id"),
+                    phase="compensation",
+                    status="failed",
+                ),
+            )
         return fail(
             failure_message,
             data={
