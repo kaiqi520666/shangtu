@@ -25,6 +25,13 @@ class FakeRedis:
     async def ttl(self, key):
         return self.expirations.get(key, -1)
 
+    async def eval(self, _script, numkeys, key, window_seconds):
+        assert numkeys == 1
+        count = await self.incr(key)
+        if await self.ttl(key) < 0:
+            await self.expire(key, int(window_seconds))
+        return count
+
     async def delete(self, *keys):
         for key in keys:
             self.values.pop(key, None)
