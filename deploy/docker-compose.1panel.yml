@@ -25,7 +25,7 @@ services:
       - ./data/redis:/data
 
   backend:
-    image: kaiqi520666/shangtu-backend:20260713-2
+    image: kaiqi520666/shangtu-backend:20260714-1
     restart: unless-stopped
     env_file: .env
     environment:
@@ -38,7 +38,7 @@ services:
         condition: service_started
 
   worker:
-    image: kaiqi520666/shangtu-backend:20260713-2
+    image: kaiqi520666/shangtu-backend:20260714-1
     restart: unless-stopped
     command: ["arq", "app.worker.settings.WorkerSettings"]
     env_file: .env
