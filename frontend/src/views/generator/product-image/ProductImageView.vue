@@ -12,7 +12,6 @@ import { useGeneratorRouteJob } from '@/composables/generator/restore/useGenerat
 import { useProductImageGenerator } from '@/composables/generator/useProductImageGenerator.js'
 import { useConfirm } from '@/composables/useConfirm.js'
 import { useToast } from '@/composables/useToast.js'
-import { productDetailPreviewSlides } from '@/constants/product-image.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -123,7 +122,8 @@ function closePreview() {
       title-badge="本次详情图任务"
       empty-title="商品详情图"
       empty-subtitle="上传商品图，生成策略后输出多张电商详情页模块图。"
-      :empty-slides="productDetailPreviewSlides"
+      empty-image="https://image.nodepass.net/generated/2/2026/07/e8ee8a5e756345069c726814ddf2fe80.png"
+      empty-image-alt="无线耳机主图、细节和使用场景组成的商品详情图"
       loading-title="AI 商品详情图生成中"
       progress-text="正在生成商品详情图"
       @update:current-task-title="generator.updateCurrentJobTitle"

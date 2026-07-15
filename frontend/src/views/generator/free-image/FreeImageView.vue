@@ -1,6 +1,5 @@
 <script setup>
 import { useRoute, useRouter } from 'vue-router'
-import freeImagePreview from '@/assets/generator-previews/free-image.webp'
 import ImageEditModal from '@/components/generation/image/ImageEditModal.vue'
 import GenerationHistoryDrawer from '@/components/generation/workspace/GenerationHistoryDrawer.vue'
 import GenerationPreviewModal from '@/components/generation/workspace/GenerationPreviewModal.vue'
@@ -102,8 +101,8 @@ function closePreview() {
       title-badge="本次自由生图"
       empty-title="自由生图"
       empty-subtitle="输入提示词，可选参考图，直接生成你想要的画面。"
-      :empty-image="freeImagePreview"
-      empty-image-alt="富有创造力的抽象艺术纹理"
+      empty-image="https://image.nodepass.net/generated/2/2026/07/ee32441dfbfa43988f25d797d3548646.png"
+      empty-image-alt="运动鞋与未来城市结合的创意画面"
       loading-title="AI 自由生图生成中"
       progress-text="正在生成自由生图"
       @update:current-task-title="generator.updateCurrentJobTitle"

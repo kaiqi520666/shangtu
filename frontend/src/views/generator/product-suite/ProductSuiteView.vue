@@ -12,7 +12,6 @@ import { useGeneratorRouteJob } from '@/composables/generator/restore/useGenerat
 import { useProductSuiteGenerator } from '@/composables/generator/useProductSuiteGenerator.js'
 import { useConfirm } from '@/composables/useConfirm.js'
 import { useToast } from '@/composables/useToast.js'
-import { productSuitePreviewSlides } from '@/constants/product-suite.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -124,7 +123,8 @@ function closePreview() {
       title-badge="本次套图任务"
       empty-title="AI商品套图"
       empty-subtitle="上传商品图，AI 即刻生成符合多电商平台规范的高转化率商品套图。"
-      :empty-slides="productSuitePreviewSlides"
+      empty-image="https://image.nodepass.net/generated/2/2026/07/df6ac4a0876b43f3a6baa3702d8aa4d8.png"
+      empty-image-alt="同一护肤品的白底、场景和细节商品套图"
       loading-title="AI 商品套图生成中"
       progress-text="正在生成商品套图"
       @update:current-task-title="suite.updateCurrentJobTitle"

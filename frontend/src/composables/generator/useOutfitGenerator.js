@@ -3,7 +3,6 @@ import {
   createDefaultGenerationSettings,
   formatImageLabel,
 } from "@/constants/generator.js";
-import { outfitPreviewSlides } from "@/constants/outfit.js";
 import { generateImageStrategy } from "@/api/image.js";
 import { useCardActions } from "@/composables/useCardActions.js";
 import {
@@ -188,16 +187,6 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
     syncImageQuality(settings);
     return formatImageLabel({ ratio: settings.ratio, quality: settings.quality });
   });
-  const previewSlides = computed(() => {
-    const uploadedImage = garmentImages.value[mainGarmentIndex.value];
-    const src = getImageSrc(uploadedImage);
-    if (!src) return outfitPreviewSlides;
-    return outfitPreviewSlides.map((slide) => ({
-      ...slide,
-      sourceImage: src,
-    }));
-  });
-
   function createDefaultSelectedScenes() {
     return outfitScenes.value[0]?.id ? [outfitScenes.value[0].id] : [];
   }
@@ -530,7 +519,6 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
     configuredTotalCount,
     strategyTotalCount,
     selectedImageLabel,
-    previewSlides,
     outfitScenes,
     catalogLoading,
     showNotice: toast.info,
@@ -556,10 +544,4 @@ export function useOutfitGenerator({ onJobCreated } = {}) {
     loadGenerationJob,
     startPollingCard,
   };
-}
-
-function getImageSrc(image) {
-  if (!image) return "";
-  if (typeof image === "string") return image;
-  return image.previewUrl || image.url || "";
 }
