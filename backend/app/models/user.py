@@ -51,7 +51,11 @@ class User(Base):
     commission_available_cents: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     commission_frozen_cents: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     commission_withdrawn_cents: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    role: Mapped[str] = mapped_column(String(32), default="user", nullable=False)
-    status: Mapped[str] = mapped_column(String(20), default="active", nullable=False)
+    role: Mapped[str] = mapped_column(
+        String(32), default="user", server_default="user", nullable=False
+    )
+    status: Mapped[str] = mapped_column(
+        String(20), default="active", server_default="active", nullable=False
+    )
     disabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)

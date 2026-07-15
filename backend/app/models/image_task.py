@@ -36,7 +36,7 @@ class ImageTask(Base):
     progress: Mapped[int] = mapped_column(Integer, default=0)
     provider: Mapped[str] = mapped_column(String(32), default="toapis")
     provider_task_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    credit_cost: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    credit_cost: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
     credit_refunded: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     prompt_snapshot_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     settings_snapshot_json: Mapped[str | None] = mapped_column(Text, nullable=True)

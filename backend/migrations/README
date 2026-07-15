@@ -1,0 +1,9 @@
+ShangTu 数据库迁移目录。
+
+在 backend 目录执行：
+
+    uv run alembic upgrade head
+    uv run alembic revision --autogenerate -m "变更说明"
+    uv run alembic check
+
+自动生成的迁移必须人工审查后才能执行。
