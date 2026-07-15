@@ -108,7 +108,6 @@ function closeHistoryDrawer() {
       loading-title="AI 商品视频生成中"
       loading-description="正在创建商品视频任务，稍后会在右侧显示生成进度"
       progress-text="正在生成商品视频"
-      poll-hint="每 3 秒轮询任务状态"
       @update:current-task-title="video.updateCurrentJobTitle"
       @select-all-cards="video.toggleSelectAllCards"
       @batch-download="video.batchDownload"

@@ -47,17 +47,17 @@ function toggleVideo(slide, index) {
 </script>
 
 <template>
-  <div class="flex min-h-full flex-col items-center justify-center px-8 py-12 text-center">
-    <h1 class="text-2xl font-black tracking-normal text-slate-950">{{ title }}</h1>
-    <p class="mt-3 text-sm font-medium text-slate-500">{{ subtitle }}</p>
+  <div class="flex min-h-full flex-col items-center justify-center px-6 py-10 text-center">
+    <h1 class="text-xl font-bold tracking-normal text-slate-950">{{ title }}</h1>
+    <p class="mt-2 text-sm font-medium text-slate-500">{{ subtitle }}</p>
 
-    <div v-if="imageUrl" class="mt-8 w-full max-w-4xl overflow-hidden rounded-lg bg-slate-100 shadow-sm">
+    <div v-if="imageUrl" class="mt-6 w-full max-w-3xl overflow-hidden rounded-lg bg-slate-100">
       <img :src="imageUrl" :alt="imageAlt" class="aspect-[16/9] w-full object-cover" />
     </div>
 
     <div
       v-else-if="mediaType === 'video' && slides.length > 0"
-      class="mt-10 grid w-full max-w-7xl gap-6 md:grid-cols-2 xl:grid-cols-4"
+      class="mt-8 grid w-full max-w-6xl gap-4 md:grid-cols-2 xl:grid-cols-4"
     >
       <article
         v-for="(slide, index) in slides"
@@ -65,7 +65,7 @@ function toggleVideo(slide, index) {
         class="group cursor-pointer"
         @click="toggleVideo(slide, index)"
       >
-        <div class="relative aspect-[9/16] overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 shadow-sm transition-all group-hover:-translate-y-1 group-hover:shadow-md">
+        <div class="relative aspect-[9/16] overflow-hidden rounded-lg border border-slate-200 bg-slate-100 shadow-sm">
           <video
             v-if="playingSlideKey === getSlideKey(slide, index)"
             :src="slide.videoUrl"
@@ -96,7 +96,7 @@ function toggleVideo(slide, index) {
       </article>
     </div>
 
-    <div v-else-if="activeSlide" class="mt-12 w-full max-w-3xl rounded-3xl bg-white p-6 text-left shadow-sm">
+    <div v-else-if="activeSlide" class="mt-8 w-full max-w-3xl rounded-lg bg-white p-5 text-left shadow-sm">
       <p class="mb-4 text-sm font-bold text-slate-800">{{ activeSlide.caption }}</p>
       <div class="flex items-stretch gap-3">
         <div class="flex w-32 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-slate-100">

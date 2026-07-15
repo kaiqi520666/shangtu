@@ -112,10 +112,6 @@ defineProps({
     type: String,
     default: '正在生成图片',
   },
-  pollHint: {
-    type: String,
-    default: '每 5 秒轮询任务状态',
-  },
 })
 
 const emit = defineEmits([
@@ -134,7 +130,7 @@ const emit = defineEmits([
 
 <template>
   <GeneratorWorkspaceShell
-    :content-class="outputCards.length > 0 || generating || creatingBatch ? 'p-6' : 'p-0'"
+    :content-class="outputCards.length > 0 || generating || creatingBatch ? 'p-4 sm:p-5' : 'p-0'"
   >
     <template #header>
       <GenerationWorkspaceHeader
@@ -158,16 +154,10 @@ const emit = defineEmits([
     <template #default>
       <div
         v-if="creatingBatch && outputCards.length === 0"
-        class="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white/95 p-8"
+        class="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white/95 p-6"
       >
-        <div class="w-full max-w-md space-y-6 text-center">
-          <div class="relative mx-auto flex h-24 w-24 items-center justify-center">
-            <div class="absolute inset-0 animate-ping rounded-full bg-primary/10"></div>
-            <div
-              class="absolute inset-2 animate-spin rounded-full border border-dashed border-primary/40"
-            ></div>
-            <RefreshCw class="h-10 w-10 animate-pulse text-primary" />
-          </div>
+        <div class="w-full max-w-sm space-y-3 text-center">
+          <RefreshCw class="mx-auto h-6 w-6 animate-spin text-primary" />
           <div class="space-y-2">
             <h4 class="text-base font-bold text-slate-800">{{ loadingTitle }}</h4>
             <p class="text-xs text-slate-500">
@@ -182,15 +172,6 @@ const emit = defineEmits([
               </slot>
             </p>
           </div>
-          <div
-            class="h-28 space-y-1.5 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-3 text-left font-mono text-xs text-slate-500 shadow-inner"
-          >
-            <div v-for="(log, idx) in genLogs" :key="idx" class="flex items-center gap-2">
-              <span class="font-bold text-primary">▶</span>
-              <span>{{ log }}</span>
-            </div>
-          </div>
-          <p class="text-xs font-bold text-slate-400">正在创建任务 ...</p>
         </div>
       </div>
 
@@ -207,7 +188,7 @@ const emit = defineEmits([
       <div v-else-if="outputCards.length > 0" class="space-y-4">
         <div
           v-if="generating"
-          class="flex items-center justify-between rounded-xl border border-primary/20 bg-primary/5 px-4 py-2 text-xs"
+          class="flex items-center rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs"
         >
           <div class="flex items-center gap-2 text-slate-700">
             <RefreshCw class="h-3.5 w-3.5 animate-spin text-primary" />
@@ -223,7 +204,6 @@ const emit = defineEmits([
               </template>
             </span>
           </div>
-          <span class="font-mono text-slate-400">{{ pollHint }}</span>
         </div>
         <VideoGeneratedCardGrid
           v-if="mediaType === 'video'"

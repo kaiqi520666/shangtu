@@ -94,7 +94,6 @@ onMounted(() => {
       loading-title="视频翻译中"
       loading-description="正在提交 HeyGen 翻译任务，稍后会在这里显示状态和成片结果。"
       progress-text="正在翻译视频"
-      poll-hint="每 3 秒轮询任务状态"
       @update:current-task-title="videoTranslation.updateCurrentJobTitle"
       @select-all-cards="videoTranslation.toggleSelectAllCards"
       @batch-download="videoTranslation.batchDownload"

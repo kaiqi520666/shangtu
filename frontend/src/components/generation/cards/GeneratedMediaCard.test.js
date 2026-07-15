@@ -26,7 +26,8 @@ describe("GeneratedMediaCard", () => {
   it("shows the failure reason and disables download", () => {
     const wrapper = mountCard({ id: "2", status: "failed", dataUrl: "", errorMessage: "供应商失败", selected: false });
 
-    expect(wrapper.text()).toContain("原因：供应商失败");
+    expect(wrapper.text().match(/供应商失败/g)).toHaveLength(1);
+    expect(wrapper.text()).not.toContain("本次失败未消耗额度");
     expect(wrapper.get('button:not([title])').attributes("disabled")).toBeDefined();
   });
 });

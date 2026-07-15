@@ -15,9 +15,9 @@ defineEmits(['update:title', 'select-all', 'download', 'create', 'history'])
 
 <template>
   <div
-    class="z-10 flex h-14 shrink-0 items-center justify-between border-b border-slate-200 bg-white/80 px-6 shadow-sm backdrop-blur-sm"
+    class="z-10 flex min-h-14 shrink-0 flex-wrap items-center gap-2 border-b border-slate-200 bg-white/90 px-4 py-2 sm:flex-nowrap sm:px-6"
   >
-    <div class="flex items-center gap-3">
+    <div class="flex min-w-0 flex-1 basis-full items-center gap-3 sm:basis-auto">
       <span
         class="rounded-full border border-slate-200 bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600"
         >{{ titleBadge }}</span
@@ -25,12 +25,12 @@ defineEmits(['update:title', 'select-all', 'download', 'create', 'history'])
       <input
         :value="title"
         type="text"
-        class="w-64 border-b border-transparent bg-transparent py-0.5 text-xs font-bold text-slate-800 hover:border-slate-300 focus:border-primary focus:outline-none"
+        class="min-w-0 flex-1 border-b border-transparent bg-transparent py-0.5 text-xs font-bold text-slate-800 hover:border-slate-300 focus:border-primary focus:outline-none sm:max-w-64"
         @input="$emit('update:title', $event.target.value)"
       />
     </div>
-    <div class="flex items-center gap-3">
-      <template v-if="hasCards">
+    <div class="ml-auto flex flex-wrap items-center justify-end gap-2">
+      <template v-if="hasCards && selectedCount > 0">
         <slot name="extra"></slot>
         <div class="flex items-center gap-2">
           <button
@@ -50,7 +50,7 @@ defineEmits(['update:title', 'select-all', 'download', 'create', 'history'])
         </div>
         <button
           type="button"
-          class="flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-1.5 text-xs font-bold text-white shadow-md hover:bg-secondary disabled:opacity-60"
+          class="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white hover:bg-secondary disabled:opacity-60"
           :disabled="selectedCount === 0 || downloading"
           @click="$emit('download')"
         >

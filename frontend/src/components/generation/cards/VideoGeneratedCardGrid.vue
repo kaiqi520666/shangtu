@@ -28,7 +28,7 @@ function metaText(card) {
 </script>
 
 <template>
-  <div class="grid grid-cols-2 gap-5 md:grid-cols-3 xl:grid-cols-4">
+  <div class="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
     <GeneratedMediaCard v-for="card in cards" :key="card.id" :card="card" :label="getModuleName(card.typeId)" :meta-text="metaText(card)" media-label="视频" aspect-class="aspect-[9/16]" :downloading="downloading" @toggle="emit('toggle-card', $event)" @download="emit('download-card', $event)" @activate="togglePlay" @delete="emit('delete-card', $event)">
       <template #preview="{ card: item }">
         <video :src="item.dataUrl" class="h-full w-full object-cover" :muted="playingCardId !== item.id" :autoplay="playingCardId === item.id" :controls="playingCardId === item.id" playsinline preload="metadata" @click.stop></video>

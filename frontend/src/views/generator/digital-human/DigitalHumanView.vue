@@ -118,7 +118,6 @@ onMounted(() => {
       loading-title="数字人视频生成中"
       loading-description="正在提交 HeyGen 任务，稍后会在这里显示状态和成片结果。"
       progress-text="正在生成数字人视频"
-      poll-hint="每 3 秒轮询任务状态"
       :language="digitalHuman.voiceLanguage.value"
       platform=""
       @update:current-task-title="digitalHuman.updateCurrentJobTitle"

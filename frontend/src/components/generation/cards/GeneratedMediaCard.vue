@@ -33,22 +33,21 @@ function failureReason() {
 </script>
 
 <template>
-  <article class="group relative flex flex-col justify-between overflow-hidden rounded-2xl border bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md" :class="card.selected ? 'border-primary ring-2 ring-primary/10' : 'border-slate-200'">
-    <div class="absolute left-2.5 top-2.5 z-10 flex items-center gap-2">
+  <article class="group relative flex flex-col justify-between overflow-hidden rounded-lg border bg-white shadow-sm" :class="card.selected ? 'border-primary ring-2 ring-primary/10' : 'border-slate-200'">
+    <div class="absolute left-2.5 right-20 top-2.5 z-10 flex min-w-0 items-center gap-2">
       <AppCheckbox :model-value="card.selected" @change="emit('toggle', card.id)" />
-      <span class="rounded-full border border-slate-200 bg-white/90 px-2 py-0.5 text-xs font-bold text-slate-700 shadow-sm backdrop-blur-sm">{{ label }}</span>
+      <span class="min-w-0 truncate rounded-full border border-slate-200 bg-white/90 px-2 py-0.5 text-xs font-bold text-slate-700 shadow-sm backdrop-blur-sm">{{ label }}</span>
     </div>
 
-    <div class="absolute right-2.5 top-2.5 z-10 flex gap-1.5 opacity-0 transition-opacity group-hover:opacity-100">
-      <button v-if="editable && card.status === 'done' && card.dataUrl" type="button" class="rounded-lg border border-slate-200 bg-white/95 p-1.5 text-slate-600 shadow hover:text-primary" :title="`编辑${mediaLabel}`" @click="emit('edit', card)"><Pencil class="h-3.5 w-3.5" /></button>
-      <button v-if="!isRunning()" type="button" class="rounded-lg border border-slate-200 bg-white/95 p-1.5 text-slate-600 shadow hover:text-rose-500" :title="`删除${mediaLabel}`" @click="emit('delete', card)"><Trash2 class="h-3.5 w-3.5" /></button>
+    <div class="absolute right-2.5 top-2.5 z-10 flex gap-1.5">
+      <button v-if="editable && card.status === 'done' && card.dataUrl" type="button" class="rounded-md border border-slate-200 bg-white/95 p-1.5 text-slate-600 shadow-sm hover:text-primary" :title="`编辑${mediaLabel}`" @click="emit('edit', card)"><Pencil class="h-3.5 w-3.5" /></button>
+      <button v-if="!isRunning()" type="button" class="rounded-md border border-slate-200 bg-white/95 p-1.5 text-slate-600 shadow-sm hover:text-rose-500" :title="`删除${mediaLabel}`" @click="emit('delete', card)"><Trash2 class="h-3.5 w-3.5" /></button>
     </div>
 
     <div role="button" tabindex="0" class="relative flex cursor-pointer items-center justify-center overflow-hidden bg-slate-100" :class="aspectClass" @click="canDownload() && emit('activate', card)" @keyup.enter="canDownload() && emit('activate', card)">
       <slot v-if="card.dataUrl" name="preview" :card="card" />
       <div v-else-if="isFailed()" class="flex flex-col items-center gap-1.5 px-4 text-center text-rose-500">
         <TriangleAlert class="h-7 w-7" /><span class="text-xs font-semibold">生成失败</span>
-        <span v-if="card.errorMessage" class="line-clamp-2 text-[11px] font-medium leading-snug text-rose-400" :title="card.errorMessage">{{ card.errorMessage }}</span>
       </div>
       <div v-else class="flex flex-col items-center gap-2 text-primary">
         <LoaderCircle class="h-7 w-7 animate-spin" />
@@ -61,9 +60,8 @@ function failureReason() {
     </div>
 
     <div class="flex flex-1 flex-col justify-between border-t border-slate-100 bg-white p-3">
-      <div v-if="isFailed()" class="mb-1.5 space-y-0.5">
+      <div v-if="isFailed()" class="mb-1.5">
         <p class="line-clamp-2 text-[11px] font-medium leading-snug text-rose-500" :title="failureReason()">原因：{{ failureReason() }}</p>
-        <p class="text-[11px] font-medium text-emerald-600">本次失败未消耗额度</p>
       </div>
       <div class="flex items-center justify-between gap-2">
         <div class="min-w-0">

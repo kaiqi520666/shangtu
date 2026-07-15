@@ -102,7 +102,6 @@ function closeHistoryDrawer() {
       loading-title="AI 自由生视频生成中"
       loading-description="正在创建视频任务，稍后会在右侧显示生成进度"
       progress-text="正在生成自由生视频"
-      poll-hint="每 3 秒轮询任务状态"
       @update:current-task-title="generator.updateCurrentJobTitle"
       @select-all-cards="generator.toggleSelectAllCards"
       @batch-download="generator.batchDownload"
