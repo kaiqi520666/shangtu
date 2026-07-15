@@ -48,10 +48,12 @@ function toggleVideo(slide, index) {
 
 <template>
   <div class="flex min-h-full flex-col items-center justify-center px-6 py-10 text-center">
-    <h1 class="text-xl font-bold tracking-normal text-slate-950">{{ title }}</h1>
-    <p class="mt-2 text-sm font-medium text-slate-500">{{ subtitle }}</p>
+    <template v-if="!imageUrl">
+      <h1 class="text-xl font-bold tracking-normal text-slate-950">{{ title }}</h1>
+      <p class="mt-2 text-sm font-medium text-slate-500">{{ subtitle }}</p>
+    </template>
 
-    <div v-if="imageUrl" class="mt-6 w-full max-w-3xl overflow-hidden rounded-lg bg-slate-100">
+    <div v-if="imageUrl" class="w-full max-w-3xl overflow-hidden rounded-lg bg-slate-100">
       <img :src="imageUrl" :alt="imageAlt" class="aspect-[16/9] w-full object-cover" />
     </div>
 
