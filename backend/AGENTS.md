@@ -45,7 +45,8 @@ uv run python -m compileall app
 - 涉及积分、任务状态和退款时，数据库写入必须处于清晰的 commit/rollback 边界。入队失败必须补偿已扣积分并标记任务失败。
 - 实际扣费写入任务 `credit_cost`；失败退款只通过任务退款标记执行一次，不新增第二套退款判断。
 - 时间统一使用 `app/core/time.py` 的 `utc_now()` 和 `to_utc_iso()`；不要新增 `datetime.now()`、`datetime.utcnow()` 或 `func.now()`。
-- 数据库 schema 以当前 models 为准，干净环境由 `Base.metadata.create_all` 创建。当前 MVP 不维护运行时兼容分支或旧字段解析。
+- 数据库 schema 的目标状态以当前 SQLAlchemy models 为准；所有结构变更必须同步生成并审查 Alembic migration，干净环境统一执行 `uv run alembic upgrade head`。
+- 当前 MVP 不维护数据库旧结构的运行时兼容分支或旧字段解析；结构调整直接通过 Alembic migration 修改现有 schema。
 
 ## 生成任务与快照
 
