@@ -94,7 +94,7 @@ function closeHistoryDrawer() {
       title-badge="本次自由生视频"
       empty-title="自由生视频"
       empty-subtitle="输入提示词，可选参考图、参考视频或参考音频，直接生成动态视频。"
-      empty-image="https://image.nodepass.net/generated/2/2026/07/7bc8339f121044b1a782a7b0e8b122e4.png"
+      empty-image="https://image.nodepass.net/generated/2/2026/07/f5d58bbbf23e4849b38461a756afec84.png"
       empty-image-alt="红色风衣人物在城市中运动的电影视频画面"
       media-type="video"
       media-unit="个"

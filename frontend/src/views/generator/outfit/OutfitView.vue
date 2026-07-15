@@ -141,7 +141,7 @@ async function handleDeleteModel(modelId) {
       title-badge="本次穿搭任务"
       empty-title="服饰穿搭"
       empty-subtitle="上传服装图，选择模特和拍摄场景，一次生成多张穿搭图。"
-      empty-image="https://image.nodepass.net/generated/2/2026/07/88da950d4304413ea4e696b5d304863d.png"
+      empty-image="https://image.nodepass.net/generated/2/2026/07/87aeb94386ad44f98954cbeeee4aa86e.png"
       empty-image-alt="蓝色夹克的多姿势服饰穿搭效果"
       loading-title="AI 服饰穿搭图生成中"
       progress-text="正在生成服饰穿搭图"
