@@ -120,7 +120,6 @@ export function useVoiceoverGenerator({ onJobCreated } = {}) {
       allFailedMessage: "AI配音任务创建失败",
       saveErrorMessage: "保存AI配音配置失败",
       taskIdMissingMessage: "AI配音任务创建失败：后端未返回任务 ID",
-      insertCards: "after-success",
       preferCreateErrorAsToast: true,
     });
   }

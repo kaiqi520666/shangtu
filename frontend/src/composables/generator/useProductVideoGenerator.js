@@ -434,7 +434,6 @@ export function useProductVideoGenerator({ toast, confirm, onJobCreated } = {}) 
       allFailedMessage: "视频任务创建失败，请稍后重试",
       saveErrorMessage: "保存视频任务配置失败",
       taskIdMissingMessage: "视频任务创建失败：后端未返回任务 ID",
-      insertCards: "after-success",
       preferCreateErrorAsToast: true,
     });
   }

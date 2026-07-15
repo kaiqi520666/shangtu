@@ -292,7 +292,6 @@ export function useVideoTranslationGenerator({ toast, confirm, onJobCreated } = 
       allFailedMessage: "视频翻译任务创建失败，请稍后重试",
       saveErrorMessage: "保存视频翻译任务配置失败",
       taskIdMissingMessage: "视频翻译任务创建失败：后端未返回任务 ID",
-      insertCards: "after-success",
       preferCreateErrorAsToast: true,
     });
   }

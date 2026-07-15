@@ -212,11 +212,9 @@ export function useMediaBatchRunner({
     });
   }
 
-  function markTaskCreateFailed({ card, item, message, insertCards, getFailLogName }) {
-    if (insertCards === "before") {
-      card.status = "failed";
-      card.errorMessage = message;
-    }
+  function markTaskCreateFailed({ card, item, message, getFailLogName }) {
+    card.status = "failed";
+    card.errorMessage = message;
     genLogs.value.push(
       `[${getFailLogName?.(item, card) || card.strategyTitle}] 创建失败：${message}`,
     );
@@ -228,8 +226,6 @@ export function useMediaBatchRunner({
     createTask,
     jobId,
     batchRunId,
-    insertCards,
-    startBatch,
     getCreateLog,
     getFailLogName,
     taskIdMissingMessage,
@@ -242,7 +238,6 @@ export function useMediaBatchRunner({
           card,
           item,
           message: result.message || "任务创建失败",
-          insertCards,
           getFailLogName,
         });
       }
@@ -253,7 +248,6 @@ export function useMediaBatchRunner({
           card,
           item,
           message: taskIdMissingMessage,
-          insertCards,
           getFailLogName,
         });
       }
@@ -262,16 +256,12 @@ export function useMediaBatchRunner({
       if (typeof result.data?.credit_cost === "number") {
         card.creditCost = result.data.credit_cost;
       }
-      if (insertCards === "after-success") {
-        startBatch();
-        outputCards.value = sortOutputCards([...outputCards.value, card]);
-      }
       genLogs.value.push(getCreateLog?.(item, card) || `正在生成 [${card.strategyTitle}]...`);
       startPollingCard(card);
       return { ok: true, message: "" };
     } catch (error) {
       const message = getApiErrorMessage(error, "任务创建失败");
-      return markTaskCreateFailed({ card, item, message, insertCards, getFailLogName });
+      return markTaskCreateFailed({ card, item, message, getFailLogName });
     }
   }
 
@@ -291,7 +281,6 @@ export function useMediaBatchRunner({
     creatingMessage = "正在创建任务，请稍候",
     saveErrorMessage = "保存任务配置失败，请稍后重试",
     taskIdMissingMessage = "任务创建失败：后端未返回任务 ID",
-    insertCards = "before",
     preferCreateErrorAsToast = false,
   }) {
     if (creatingBatch.value) {
@@ -330,14 +319,12 @@ export function useMediaBatchRunner({
         createCard,
       });
 
-      if (insertCards === "before") {
-        outputCards.value = sortOutputCards([
-          ...createdCards.map((created) => created.card),
-          ...outputCards.value,
-        ]);
-        if (createdCards.length > 0) {
-          startBatch();
-        }
+      outputCards.value = sortOutputCards([
+        ...createdCards.map((created) => created.card),
+        ...outputCards.value,
+      ]);
+      if (createdCards.length > 0) {
+        startBatch();
       }
 
       let successfullyEnqueued = 0;
@@ -348,8 +335,6 @@ export function useMediaBatchRunner({
           createTask,
           jobId,
           batchRunId,
-          insertCards,
-          startBatch,
           getCreateLog,
           getFailLogName,
           taskIdMissingMessage,
@@ -418,7 +403,6 @@ export function useMediaBatchRunner({
       createdCountLog: (count) => `已创建 ${count} 个图片任务`,
       creatingMessage: "正在创建图片任务，请稍候",
       saveErrorMessage: "保存任务配置失败，请稍后重试",
-      insertCards: "before",
       beforeCreate: () =>
         ensureEnoughImageCredits({
           quality: resolution,

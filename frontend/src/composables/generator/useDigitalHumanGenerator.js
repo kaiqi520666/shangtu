@@ -342,7 +342,6 @@ export function useDigitalHumanGenerator({ toast, confirm, onJobCreated } = {}) 
       allFailedMessage: "数字人任务创建失败，请稍后重试",
       saveErrorMessage: "保存数字人任务配置失败",
       taskIdMissingMessage: "数字人任务创建失败：后端未返回任务 ID",
-      insertCards: "after-success",
       preferCreateErrorAsToast: true,
     });
   }
