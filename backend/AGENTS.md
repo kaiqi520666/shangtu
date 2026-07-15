@@ -26,13 +26,13 @@ uv run python -m compileall app
 
 ## 应用架构
 
-- `app/main.py` 是 API 入口：启动时按当前 models 创建表、写入默认计费设置、连接 Redis，并聚合业务路由。
+- `app/main.py` 是 API 入口：启动时写入默认计费设置、连接 Redis，并聚合业务路由；数据库结构统一通过 Alembic 迁移。
 - `app/routers/` 是 HTTP 边界，负责鉴权依赖、请求校验、资源归属检查、事务编排和响应组装。
 - `app/routers/admin/` 按后台资源拆文件，由 `admin/__init__.py` 聚合；所有后台接口使用超级管理员依赖并记录必要审计日志。
 - `app/services/` 放跨路由或包含多步业务编排的服务，例如生成任务入队补偿、数字人资产和 HeyGen 生命周期。
 - `app/core/` 放跨模块领域规则和基础设施适配，包括数据库、鉴权、积分、时间、OSS、供应商、提示词、目录、任务状态和媒体投影。
 - `app/core/providers/` 只封装供应商协议；业务路由和 Worker 不应散写供应商 URL、鉴权头或错误解析。
-- `app/models/` 是 SQLAlchemy model 的唯一事实来源；新增 model 后同步在 `app/models/__init__.py` 导出，确保启动建表能加载 metadata。
+- `app/models/` 是 SQLAlchemy model 的唯一事实来源；新增 model 后同步在 `app/models/__init__.py` 导出，并生成、审查对应 Alembic 迁移。
 - `app/worker/` 放 arq 入口和任务实现。`settings.py` 注册可入队函数，图片、视频、HeyGen 和配音任务按领域拆文件。
 - `app/schemas/` 放跨路由响应或请求模型；仅供单个后台模块使用的 schema 可留在 `routers/admin/schemas.py`。
 

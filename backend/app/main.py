@@ -7,13 +7,12 @@ from fastapi import FastAPI
 from fastapi.requests import Request
 from fastapi.responses import JSONResponse
 
-from app.core.database import Base, SessionLocal, engine
+from app.core.database import SessionLocal
 from app.core.config import get_env, validate_runtime_config
 from app.core.logging_config import configure_logging
 from app.core.system_settings import seed_default_billing_settings
 from app.routers import account, admin, asset, auth, billing, digital_human, distribution, generation, image_generation, outfit, video, video_translation, voiceover
 from app.schemas.response import fail
-import app.models
 
 configure_logging()
 
@@ -23,9 +22,6 @@ logger = logging.getLogger("app.api")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     validate_runtime_config()
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
     async with SessionLocal() as db:
         await seed_default_billing_settings(db)
         await db.commit()

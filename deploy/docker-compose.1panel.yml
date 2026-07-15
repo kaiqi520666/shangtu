@@ -24,21 +24,33 @@ services:
     volumes:
       - ./data/redis:/data
 
+  migrate:
+    image: kaiqi520666/shangtu-backend:20260715-1
+    command: ["alembic", "upgrade", "head"]
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+    depends_on:
+      db:
+        condition: service_healthy
+
   backend:
-    image: kaiqi520666/shangtu-backend:20260714-1
+    image: kaiqi520666/shangtu-backend:20260715-1
     restart: unless-stopped
     env_file: .env
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       REDIS_URL: redis://redis:6379
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       db:
         condition: service_healthy
       redis:
         condition: service_started
 
   worker:
-    image: kaiqi520666/shangtu-backend:20260714-1
+    image: kaiqi520666/shangtu-backend:20260715-1
     restart: unless-stopped
     command: ["arq", "app.worker.settings.WorkerSettings"]
     env_file: .env
@@ -47,6 +59,8 @@ services:
       REDIS_URL: redis://redis:6379
       ARQ_MAX_JOBS: ${ARQ_MAX_JOBS:-5}
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       db:
         condition: service_healthy
       redis:

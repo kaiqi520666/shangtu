@@ -104,7 +104,7 @@ docker buildx build --platform linux/amd64,linux/arm64 \
 
 - 名称：`shangtu`
 - 路径：选择上传的目录 `/opt/1panel/apps/shangtu`
-- 创建后点 **启动**，会自动 `docker compose pull` 拉取镜像并启动 5 个容器（db / redis / backend / worker / frontend）
+- 创建后点 **启动**，会自动拉取镜像，先运行一次 `migrate`，成功后再启动 backend / worker / frontend
 
 `frontend` 容器监听服务器的 `FRONTEND_PORT`（`.env` 里配置，默认 `8090`，整站含 `/api` 反代）。如果该端口在服务器上被其它项目占用，改 `.env` 里的 `FRONTEND_PORT` 即可。
 
@@ -114,7 +114,7 @@ docker buildx build --platform linux/amd64,linux/arm64 \
 
 ### 第五步：首次初始化数据
 
-数据库表由 `create_all` 自动建好，但提示词模板、模特库需要种子数据：
+数据库结构由 `migrate` 服务执行 `alembic upgrade head`，提示词模板、模特库仍需种子数据：
 
 ```bash
 docker exec -it <backend容器名> python scripts/seed_prompt_templates.py
@@ -139,6 +139,6 @@ docker buildx build --platform linux/amd64,linux/arm64 \
 docker buildx build --platform linux/amd64,linux/arm64 \
   -t kaiqi520666/shangtu-frontend:latest --push ./frontend
 
-# 1Panel：编排页面点「重新拉取镜像」，或在服务器上执行
+# 1Panel：编排页面点「重新拉取镜像」，或在服务器上执行；迁移失败时 backend / worker 不会启动
 docker compose pull && docker compose up -d
 ```
