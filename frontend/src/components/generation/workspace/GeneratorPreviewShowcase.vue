@@ -53,7 +53,7 @@ function toggleVideo(slide, index) {
       <p class="mt-2 text-sm font-medium text-slate-500">{{ subtitle }}</p>
     </template>
 
-    <div v-if="imageUrl" class="w-full max-w-3xl overflow-hidden rounded-lg bg-slate-100">
+    <div v-if="imageUrl" class="w-full max-w-5xl overflow-hidden rounded-lg bg-slate-100">
       <img :src="imageUrl" :alt="imageAlt" class="aspect-[16/9] w-full object-cover" />
     </div>
 
