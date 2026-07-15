@@ -67,7 +67,7 @@ services:
         condition: service_started
 
   frontend:
-    image: kaiqi520666/shangtu-frontend:20260713-2
+    image: kaiqi520666/shangtu-frontend:20260715-1
     restart: unless-stopped
     ports:
       - "${FRONTEND_PORT:-8088}:80"
