@@ -68,8 +68,7 @@ function closePreview() {
       :settings="generator.settings"
       :reference-images="generator.referenceImages.value"
       :main-image-index="generator.mainImageIndex.value"
-      :optimizing="generator.optimizing.value"
-      :can-optimize="generator.canOptimize.value"
+      :optimize-prompt="generator.optimizePrompt"
       :can-generate="generator.canGenerate.value"
       :creating-batch="generator.creatingBatch.value"
       :has-running-tasks="generator.hasRunningTasks.value"
@@ -78,7 +77,6 @@ function closePreview() {
       @update:reference-images="generator.referenceImages.value = $event"
       @update:main-image-index="generator.mainImageIndex.value = $event"
       @notify="generator.showNotice"
-      @optimize="generator.optimizePrompt"
       @generate="generator.generateFreeImage"
     />
 

@@ -1,11 +1,12 @@
 <script setup>
 import { computed, watch } from "vue";
-import { ImagePlus, LoaderCircle, Sparkles } from "lucide-vue-next";
+import { ImagePlus, LoaderCircle } from "lucide-vue-next";
 import AppSelect from "@/components/ui/AppSelect.vue";
 import ImageQualitySelector from "@/components/generation/image/ImageQualitySelector.vue";
 import GeneratorActionFooter from "@/components/generation/workspace/GeneratorActionFooter.vue";
 import GeneratorPanelSection from "@/components/generation/workspace/GeneratorPanelSection.vue";
 import GeneratorSidePanelShell from "@/components/generation/workspace/GeneratorSidePanelShell.vue";
+import AiAssistedTextarea from "@/components/generation/workspace/AiAssistedTextarea.vue";
 import ImageUploader from "@/components/generation/image/ImageUploader.vue";
 import { ratioOptions, resolveQuality } from "@/constants/generator.js";
 
@@ -22,13 +23,9 @@ const props = defineProps({
     type: Number,
     required: true,
   },
-  optimizing: {
-    type: Boolean,
-    default: false,
-  },
-  canOptimize: {
-    type: Boolean,
-    default: false,
+  optimizePrompt: {
+    type: Function,
+    required: true,
   },
   canGenerate: {
     type: Boolean,
@@ -53,7 +50,6 @@ const emit = defineEmits([
   "update:referenceImages",
   "update:mainImageIndex",
   "notify",
-  "optimize",
   "generate",
 ]);
 
@@ -103,27 +99,16 @@ function updateSetting(key, value) {
     />
 
     <GeneratorPanelSection title="生成设置">
-      <div>
-        <div class="mb-1.5 flex items-center justify-between">
-          <label class="text-xs font-bold text-slate-800">提示词</label>
-          <button
-            type="button"
-            class="flex cursor-pointer items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-primary shadow-sm transition-colors hover:border-primary/30 hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-50"
-            :disabled="!canOptimize"
-            @click="emit('optimize')"
-          >
-            <LoaderCircle v-if="optimizing" class="h-3.5 w-3.5 animate-spin" />
-            <Sparkles v-else class="h-3.5 w-3.5" />
-            {{ optimizing ? "AI优化中..." : "AI优化" }}
-          </button>
-        </div>
-        <textarea
-          :value="settings.prompt"
-          class="h-36 w-full resize-none rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs leading-relaxed text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-primary focus:ring-1 focus:ring-primary"
-          placeholder="输入你想生成的画面，例如：一只透明玻璃杯放在木质餐桌上，柔和自然光，真实摄影风格"
-          @input="updateSetting('prompt', $event.target.value)"
-        ></textarea>
-      </div>
+      <AiAssistedTextarea
+        :model-value="settings.prompt"
+        label="提示词"
+        action-label="AI 优化"
+        loading-label="AI 优化中..."
+        :rows="6"
+        :generate-draft="optimizePrompt"
+        placeholder="输入你想生成的画面，例如：一只透明玻璃杯放在木质餐桌上，柔和自然光，真实摄影风格"
+        @update:model-value="updateSetting('prompt', $event)"
+      />
 
       <div>
         <label class="mb-1.5 block text-xs font-bold text-slate-500">图片比例</label>

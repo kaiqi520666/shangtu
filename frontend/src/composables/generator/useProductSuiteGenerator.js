@@ -98,7 +98,7 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
     backToConfig,
   } = strategyFlow;
 
-  const { aiLoading, generateSellingPointsWithAI } = useAiSellingPointsWriter({
+  const { generateSellingPointsWithAI } = useAiSellingPointsWriter({
     toast,
     buildImages: () => buildProductAnalyzeImages(uploadedImages.value, mainImageIndex.value),
     getUploadedImages: () => uploadedImages.value,
@@ -441,7 +441,6 @@ export function useProductSuiteGenerator({ onJobCreated } = {}) {
   return {
     uploadedImages,
     mainImageIndex,
-    aiLoading,
     workflowStep,
     strategyBrief,
     strategySnapshot,

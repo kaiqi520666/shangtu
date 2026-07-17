@@ -60,7 +60,6 @@ export function useFreeVideoGenerator({ confirm, onJobCreated } = {}) {
   const uploadedVideos = ref([]);
   const uploadedAudios = ref([]);
   const mainImageIndex = ref(0);
-  const optimizing = ref(false);
   const creditCosts = ref({ ...defaultVideoCreditCosts });
   const settings = reactive({
     prompt: "",
@@ -187,7 +186,6 @@ export function useFreeVideoGenerator({ confirm, onJobCreated } = {}) {
       costs: creditCosts.value,
     }),
   );
-  const canOptimize = computed(() => hasPrompt.value && !optimizing.value);
   const canGenerate = computed(() => {
     if (!hasPrompt.value || hasUploadingImages.value || hasUploadingVideos.value || hasUploadingAudios.value || creatingBatch.value) return false;
     const imageCount = uploadedImages.value.filter((img) => img?.url).length;
@@ -270,30 +268,29 @@ export function useFreeVideoGenerator({ confirm, onJobCreated } = {}) {
     return "";
   }
 
-  async function optimizePrompt() {
+  async function optimizePrompt({ signal, onChunk }) {
     const prompt = settings.prompt.trim();
     if (!prompt) {
       toast.info("请先输入视频提示词");
-      return;
+      return false;
     }
-    optimizing.value = true;
     try {
-      const result = await optimizeFreeVideoPrompt(prompt);
+      const result = await optimizeFreeVideoPrompt(prompt, { signal });
       if (result.code !== 0) {
         toast.error(result.message || "AI优化失败");
-        return;
+        return false;
       }
       const optimized = result.data?.prompt?.trim();
       if (!optimized) {
         toast.error("AI未返回有效提示词");
-        return;
+        return false;
       }
-      settings.prompt = optimized;
-      toast.success("AI优化已覆盖提示词");
+      onChunk(optimized);
+      return true;
     } catch (error) {
+      if (signal.aborted) return false;
       toast.error(getApiErrorMessage(error, "AI优化失败，请稍后重试"));
-    } finally {
-      optimizing.value = false;
+      return false;
     }
   }
 
@@ -467,10 +464,8 @@ export function useFreeVideoGenerator({ confirm, onJobCreated } = {}) {
     uploadedVideos,
     uploadedAudios,
     mainImageIndex,
-    optimizing,
     creditCosts,
     estimatedCredits,
-    canOptimize,
     canGenerate,
     hasRunningTasks,
     selectedVideoLabel,

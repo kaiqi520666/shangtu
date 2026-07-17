@@ -14,8 +14,8 @@ export function uploadImage(file) {
   });
 }
 
-export function analyzeImage({ images = [], platform = "", scenario = null, type_id = null }) {
-  return request.post("/image/analyze", { images, platform, scenario, type_id }, { timeout: 120000 });
+export function analyzeImage({ images = [], platform = "", scenario = null, type_id = null }, { signal } = {}) {
+  return request.post("/image/analyze", { images, platform, scenario, type_id }, { timeout: 120000, signal });
 }
 
 export function generateImageStrategy({
@@ -48,8 +48,8 @@ export function generateImageStrategy({
   );
 }
 
-export function optimizeFreeImagePrompt(prompt) {
-  return request.post("/image/free-image/optimize", { prompt }, { timeout: 120000 });
+export function optimizeFreeImagePrompt(prompt, { signal } = {}) {
+  return request.post("/image/free-image/optimize", { prompt }, { timeout: 120000, signal });
 }
 
 export function getImageCreditCosts() {

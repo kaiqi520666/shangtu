@@ -88,7 +88,6 @@ function closePreview() {
       :main-image-index="suite.mainImageIndex.value"
       :suite-structure="suite.suiteStructure.value"
       :catalog-loading="suite.catalogLoading.value"
-      :ai-loading="suite.aiLoading.value"
       :can-generate-strategy="suite.canGenerateStrategy.value"
       :creating-batch="suite.creatingBatch.value"
       :has-running-tasks="suite.hasRunningTasks.value"

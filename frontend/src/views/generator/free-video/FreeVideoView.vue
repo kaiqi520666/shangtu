@@ -59,8 +59,7 @@ function closeHistoryDrawer() {
       :uploaded-audios="generator.uploadedAudios.value"
       :main-image-index="generator.mainImageIndex.value"
       :credit-costs="generator.creditCosts.value"
-      :optimizing="generator.optimizing.value"
-      :can-optimize="generator.canOptimize.value"
+      :optimize-prompt="generator.optimizePrompt"
       :can-generate="generator.canGenerate.value"
       :creating-batch="generator.creatingBatch.value"
       :has-running-tasks="generator.hasRunningTasks.value"
@@ -71,7 +70,6 @@ function closeHistoryDrawer() {
       @update:uploaded-audios="generator.uploadedAudios.value = $event"
       @update:main-image-index="generator.mainImageIndex.value = $event"
       @notify="generator.showNotice"
-      @optimize="generator.optimizePrompt"
       @generate="generator.generateFreeVideo"
     />
 

@@ -70,8 +70,8 @@ export function generateVideo({
   );
 }
 
-export function optimizeFreeVideoPrompt(prompt) {
-  return request.post("/video/free-video/optimize", { prompt }, { timeout: 120000 });
+export function optimizeFreeVideoPrompt(prompt, { signal } = {}) {
+  return request.post("/video/free-video/optimize", { prompt }, { timeout: 120000, signal });
 }
 
 export function getVideoTask(taskId) {

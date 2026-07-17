@@ -53,8 +53,6 @@ export function useFreeImageGenerator({ onJobCreated } = {}) {
 
   const referenceImages = ref([]);
   const mainImageIndex = ref(0);
-  const optimizing = ref(false);
-
   const settings = reactive({
     ratio: "1:1",
     quality: "1K",
@@ -125,7 +123,6 @@ export function useFreeImageGenerator({ onJobCreated } = {}) {
   const hasUploadingReference = computed(() =>
     referenceImages.value.some((image) => image?.uploading),
   );
-  const canOptimize = computed(() => hasPrompt.value && !optimizing.value);
   const canGenerate = computed(
     () => hasPrompt.value && !hasUploadingReference.value && !creatingBatch.value,
   );
@@ -165,36 +162,35 @@ export function useFreeImageGenerator({ onJobCreated } = {}) {
     }
   }
 
-  async function optimizePrompt() {
+  async function optimizePrompt({ signal, onChunk }) {
     const prompt = settings.prompt.trim();
     if (!prompt) {
       toast.info("请先输入提示词");
-      return;
+      return false;
     }
 
-    optimizing.value = true;
     try {
-      const result = await optimizeFreeImagePrompt(prompt);
+      const result = await optimizeFreeImagePrompt(prompt, { signal });
       if (result.code !== 0) {
         toast.error(result.message || "AI优化失败");
-        return;
+        return false;
       }
       const optimized = result.data?.prompt?.trim();
       if (!optimized) {
         toast.error("AI未返回有效提示词");
-        return;
+        return false;
       }
-      settings.prompt = optimized;
-      toast.success("AI优化已覆盖提示词");
+      onChunk(optimized);
+      return true;
     } catch (error) {
+      if (signal.aborted) return false;
       const status = error.response?.status;
       if (status === 401) {
         toast.error("登录已过期，请重新登录");
       } else {
         toast.error(error.response?.data?.message || "AI优化失败，请稍后重试");
       }
-    } finally {
-      optimizing.value = false;
+      return false;
     }
   }
 
@@ -297,7 +293,6 @@ export function useFreeImageGenerator({ onJobCreated } = {}) {
   return {
     referenceImages,
     mainImageIndex,
-    optimizing,
     settings,
     currentJobId,
     currentTaskTitle,
@@ -319,7 +314,6 @@ export function useFreeImageGenerator({ onJobCreated } = {}) {
     selectedCards,
     selectedCardsCount,
     totalCount,
-    canOptimize,
     canGenerate,
     selectedImageLabel,
     showNotice,

@@ -1,4 +1,3 @@
-import { ref } from "vue";
 import { analyzeImage } from "@/api/image.js";
 import { hasUploadingImages } from "@/utils/analyzeImages.js";
 
@@ -11,59 +10,55 @@ export function useAiSellingPointsWriter({
   emptyMessage = "请先上传商品图，等待图片上传完成后再让 AI 帮写",
   uploadingMessage = "商品图还在上传中，请稍候",
 } = {}) {
-  const aiLoading = ref(false);
-
-  async function generateSellingPointsWithAI() {
+  async function generateSellingPointsWithAI({ signal, onChunk }) {
     const validationMessage = validate?.() || "";
     if (validationMessage) {
       toast?.info?.(validationMessage);
-      return "";
+      return false;
     }
 
     const images = buildImages?.() || [];
     if (images.length === 0) {
       toast?.info?.(emptyMessage);
-      return "";
+      return false;
     }
 
     const uploadedImages = getUploadedImages?.() || [];
     if (hasUploadingImages(uploadedImages)) {
       toast?.info?.(uploadingMessage);
-      return "";
+      return false;
     }
 
-    aiLoading.value = true;
     try {
       const result = await analyzeImage({
         images,
         ...getAnalyzePayload?.(),
-      });
+      }, { signal });
       if (result.code !== 0) {
         toast?.error?.(result.message || "AI 分析失败，请稍后重试");
-        return "";
+        return false;
       }
 
       const content = result.data?.content?.trim();
       if (!content) {
         toast?.error?.("AI 未返回有效内容");
-        return "";
+        return false;
       }
-      return content;
+      onChunk(content);
+      return true;
     } catch (error) {
+      if (signal.aborted) return false;
       const status = error.response?.status;
       if (status === 401) {
         toast?.error?.("登录已过期，请重新登录");
       } else {
         toast?.error?.(error.response?.data?.message || "AI 分析失败，请稍后重试");
       }
-      return "";
-    } finally {
-      aiLoading.value = false;
+      return false;
     }
   }
 
   return {
-    aiLoading,
     generateSellingPointsWithAI,
   };
 }

@@ -1,11 +1,12 @@
 <script setup>
 import { computed } from "vue";
-import { Clapperboard, LoaderCircle, Search, Sparkles, Volume2 } from "lucide-vue-next";
+import { Clapperboard, LoaderCircle, Search, Volume2 } from "lucide-vue-next";
 import AppSelect from "@/components/ui/AppSelect.vue";
 import AppCheckbox from "@/components/ui/AppCheckbox.vue";
 import GeneratorActionFooter from "@/components/generation/workspace/GeneratorActionFooter.vue";
 import GeneratorPanelSection from "@/components/generation/workspace/GeneratorPanelSection.vue";
 import GeneratorSidePanelShell from "@/components/generation/workspace/GeneratorSidePanelShell.vue";
+import AiAssistedTextarea from "@/components/generation/workspace/AiAssistedTextarea.vue";
 import ImageUploader from "@/components/generation/image/ImageUploader.vue";
 import MediaUploader from "@/components/generation/media/MediaUploader.vue";
 import VideoDurationSlider from "@/components/product-video/VideoDurationSlider.vue";
@@ -38,13 +39,9 @@ const props = defineProps({
     type: Object,
     required: true,
   },
-  optimizing: {
-    type: Boolean,
-    default: false,
-  },
-  canOptimize: {
-    type: Boolean,
-    default: false,
+  optimizePrompt: {
+    type: Function,
+    required: true,
   },
   canGenerate: {
     type: Boolean,
@@ -71,7 +68,6 @@ const emit = defineEmits([
   "update:uploadedAudios",
   "update:mainImageIndex",
   "notify",
-  "optimize",
   "generate",
 ]);
 
@@ -138,27 +134,16 @@ function updateSetting(key, value) {
     />
 
     <GeneratorPanelSection title="生成设置">
-      <div>
-        <div class="mb-1.5 flex items-center justify-between gap-3">
-          <label class="text-xs font-bold text-slate-800">视频提示词</label>
-          <button
-            type="button"
-            class="flex cursor-pointer items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-primary shadow-sm transition-colors hover:border-primary/30 hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-50"
-            :disabled="!canOptimize"
-            @click="emit('optimize')"
-          >
-            <LoaderCircle v-if="optimizing" class="h-3.5 w-3.5 animate-spin" />
-            <Sparkles v-else class="h-3.5 w-3.5" />
-            {{ optimizing ? "AI优化中..." : "AI优化" }}
-          </button>
-        </div>
-        <textarea
-          :value="settings.prompt"
-          class="h-40 w-full resize-none rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs leading-relaxed text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-primary focus:ring-1 focus:ring-primary"
-          placeholder="描述你想生成的视频内容、动作、镜头和氛围。例如：咖啡杯在晨光中的木桌上轻轻旋转，镜头缓慢推近，水汽升起，真实摄影风格。"
-          @input="updateSetting('prompt', $event.target.value)"
-        ></textarea>
-      </div>
+      <AiAssistedTextarea
+        :model-value="settings.prompt"
+        label="视频提示词"
+        action-label="AI 优化"
+        loading-label="AI 优化中..."
+        :rows="7"
+        :generate-draft="optimizePrompt"
+        placeholder="描述你想生成的视频内容、动作、镜头和氛围。例如：咖啡杯在晨光中的木桌上轻轻旋转，镜头缓慢推近，水汽升起，真实摄影风格。"
+        @update:model-value="updateSetting('prompt', $event)"
+      />
 
       <div>
         <label class="mb-1.5 block text-xs font-bold text-slate-500">视频比例</label>

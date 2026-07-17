@@ -88,7 +88,6 @@ function closePreview() {
       :selected-modules="generator.selectedModules.value"
       :modules="generator.availableModules.value"
       :catalog-loading="generator.catalogLoading.value"
-      :ai-loading="generator.aiLoading.value"
       :can-generate-strategy="generator.canGenerateStrategy.value"
       :creating-batch="generator.creatingBatch.value"
       :has-running-tasks="generator.hasRunningTasks.value"

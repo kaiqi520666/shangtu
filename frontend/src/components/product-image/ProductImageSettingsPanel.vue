@@ -32,10 +32,6 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
-  aiLoading: {
-    type: Boolean,
-    default: false,
-  },
   canGenerateStrategy: {
     type: Boolean,
     default: false,
@@ -98,7 +94,6 @@ const primaryText = computed(() => {
 
     <ProductGenerationBasics
       :settings="settings"
-      :ai-loading="aiLoading"
       :selected-image-label="selectedImageLabel"
       :generate-selling-points="generateSellingPoints"
       @update:settings="emit('update:settings', $event)"
