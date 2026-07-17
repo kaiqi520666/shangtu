@@ -70,7 +70,6 @@ onBeforeUnmount(() => {
           </span>
           <div class="min-w-0">
             <p class="truncate text-sm font-bold text-slate-800">{{ email }}</p>
-            <p class="text-xs text-slate-400">商图 AI · SaaS Pro</p>
           </div>
         </div>
       </div>

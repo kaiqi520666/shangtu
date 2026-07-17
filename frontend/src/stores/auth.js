@@ -29,7 +29,6 @@ function normalizeUser(payload, currentUser = null) {
     consumptionMultiplier,
     distributionLevel,
     distributionEnabled,
-    plan: payload.plan || currentUser?.plan || "SaaS Pro",
     created_at: payload.created_at || currentUser?.created_at || "",
   };
 }

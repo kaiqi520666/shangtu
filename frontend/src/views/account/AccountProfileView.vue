@@ -34,7 +34,6 @@ onMounted(() => {
           </span>
           <div class="min-w-0">
             <p class="truncate text-lg font-black text-slate-950">{{ account.email || "-" }}</p>
-            <p class="mt-1 text-sm font-semibold text-slate-500">商图 AI · {{ account.plan || "SaaS Pro" }}</p>
           </div>
         </div>
         <button
