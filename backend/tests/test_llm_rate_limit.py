@@ -1,6 +1,6 @@
 import logging
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
@@ -121,8 +121,8 @@ async def test_image_route_logs_unexpected_failure(caplog):
         patch.object(image_strategy, "build_ai_write_prompt", AsyncMock(return_value="")),
         patch.object(
             image_strategy,
-            "analyze_product_image",
-            AsyncMock(side_effect=KeyError("unexpected")),
+            "stream_product_image_analysis",
+            Mock(side_effect=KeyError("unexpected")),
         ),
         caplog.at_level(logging.ERROR, logger="app.routers.image_strategy"),
     ):
@@ -142,8 +142,8 @@ async def test_video_route_logs_unexpected_failure(caplog):
         patch.object(video, "allow_llm_request", AsyncMock(return_value=True)),
         patch.object(
             video,
-            "optimize_free_video_prompt",
-            AsyncMock(side_effect=KeyError("unexpected")),
+            "stream_free_video_prompt",
+            Mock(side_effect=KeyError("unexpected")),
         ),
         caplog.at_level(logging.ERROR, logger="app.routers.video"),
     ):

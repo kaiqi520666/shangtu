@@ -1,4 +1,5 @@
 import request from "./request.js";
+import { postSse } from "./sse.js";
 
 export function getVideoCreditCosts() {
   return request.get("/video/credit-costs", { timeout: 15000 });
@@ -70,8 +71,8 @@ export function generateVideo({
   );
 }
 
-export function optimizeFreeVideoPrompt(prompt, { signal } = {}) {
-  return request.post("/video/free-video/optimize", { prompt }, { timeout: 120000, signal });
+export function optimizeFreeVideoPrompt(prompt, { signal, onChunk }) {
+  return postSse("/video/free-video/optimize", { prompt }, { signal, onChunk });
 }
 
 export function getVideoTask(taskId) {

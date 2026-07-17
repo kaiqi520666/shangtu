@@ -30,21 +30,10 @@ export function useAiSellingPointsWriter({
     }
 
     try {
-      const result = await analyzeImage({
+      await analyzeImage({
         images,
         ...getAnalyzePayload?.(),
-      }, { signal });
-      if (result.code !== 0) {
-        toast?.error?.(result.message || "AI 分析失败，请稍后重试");
-        return false;
-      }
-
-      const content = result.data?.content?.trim();
-      if (!content) {
-        toast?.error?.("AI 未返回有效内容");
-        return false;
-      }
-      onChunk(content);
+      }, { signal, onChunk });
       return true;
     } catch (error) {
       if (signal.aborted) return false;

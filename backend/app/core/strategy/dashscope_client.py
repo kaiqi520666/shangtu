@@ -1,3 +1,7 @@
+import codecs
+import json
+from collections.abc import AsyncIterable, AsyncIterator
+
 import httpx
 
 from app.core.config import get_env
@@ -33,12 +37,12 @@ def get_dashscope_api_key() -> str:
     return api_key
 
 
-async def analyze_product_image(
+def stream_product_image_analysis(
     *,
     images: list[dict],
     platform: str = "",
     prompt: str | None = None,
-) -> str:
+) -> AsyncIterator[str]:
     final_prompt = "\n\n".join(
         part
         for part in [
@@ -61,29 +65,10 @@ async def analyze_product_image(
         ],
     }
 
-    async with httpx.AsyncClient(timeout=60) as client:
-        response = await client.post(
-            get_dashscope_endpoint(),
-            headers={"Authorization": f"Bearer {get_dashscope_api_key()}"},
-            json=payload,
-        )
-
-    if response.status_code >= 400:
-        raise RuntimeError(f"DashScope请求失败: {response.status_code} {response.text[:300]}")
-
-    result = response.json()
-    try:
-        content = result["choices"][0]["message"]["content"]
-    except (KeyError, IndexError, TypeError) as exc:
-        raise RuntimeError("DashScope响应格式异常") from exc
-
-    if not content or not content.strip():
-        raise RuntimeError("DashScope未返回有效内容")
-
-    return content.strip()
+    return _stream_dashscope_content(payload)
 
 
-async def optimize_free_image_prompt(prompt: str) -> str:
+def stream_free_image_prompt(prompt: str) -> AsyncIterator[str]:
     normalized_prompt = prompt.strip()
     if not normalized_prompt:
         raise ValueError("请输入需要优化的提示词")
@@ -104,29 +89,10 @@ async def optimize_free_image_prompt(prompt: str) -> str:
         ],
     }
 
-    async with httpx.AsyncClient(timeout=60) as client:
-        response = await client.post(
-            get_dashscope_endpoint(),
-            headers={"Authorization": f"Bearer {get_dashscope_api_key()}"},
-            json=payload,
-        )
-
-    if response.status_code >= 400:
-        raise RuntimeError(f"DashScope请求失败: {response.status_code} {response.text[:300]}")
-
-    result = response.json()
-    try:
-        content = result["choices"][0]["message"]["content"]
-    except (KeyError, IndexError, TypeError) as exc:
-        raise RuntimeError("DashScope响应格式异常") from exc
-
-    if not content or not content.strip():
-        raise RuntimeError("DashScope未返回有效内容")
-
-    return content.strip()
+    return _stream_dashscope_content(payload)
 
 
-async def optimize_free_video_prompt(prompt: str) -> str:
+def stream_free_video_prompt(prompt: str) -> AsyncIterator[str]:
     normalized_prompt = prompt.strip()
     if not normalized_prompt:
         raise ValueError("请输入需要优化的视频提示词")
@@ -147,26 +113,75 @@ async def optimize_free_video_prompt(prompt: str) -> str:
         ],
     }
 
+    return _stream_dashscope_content(payload)
+
+
+async def _iter_sse_data(chunks: AsyncIterable[bytes]) -> AsyncIterator[str]:
+    decoder = codecs.getincrementaldecoder("utf-8")()
+    buffer = ""
+    data_lines: list[str] = []
+    iterator = chunks.__aiter__()
+
+    try:
+        async for chunk in iterator:
+            buffer += decoder.decode(chunk)
+            while "\n" in buffer:
+                line, buffer = buffer.split("\n", 1)
+                line = line.rstrip("\r")
+                if not line:
+                    if data_lines:
+                        yield "\n".join(data_lines)
+                        data_lines = []
+                elif line.startswith("data:"):
+                    data_lines.append(line[5:].lstrip())
+    finally:
+        close = getattr(iterator, "aclose", None)
+        if close:
+            await close()
+
+    buffer += decoder.decode(b"", final=True)
+    if buffer.rstrip("\r").startswith("data:"):
+        data_lines.append(buffer.rstrip("\r")[5:].lstrip())
+    if data_lines:
+        yield "\n".join(data_lines)
+
+
+async def _stream_dashscope_content(payload: dict) -> AsyncIterator[str]:
+    payload = {**payload, "stream": True}
+    received_content = False
+    received_done = False
+
     async with httpx.AsyncClient(timeout=60) as client:
-        response = await client.post(
+        async with client.stream(
+            "POST",
             get_dashscope_endpoint(),
             headers={"Authorization": f"Bearer {get_dashscope_api_key()}"},
             json=payload,
-        )
+        ) as response:
+            if response.status_code >= 400:
+                raise RuntimeError(f"DashScope请求失败: {response.status_code}")
 
-    if response.status_code >= 400:
-        raise RuntimeError(f"DashScope请求失败: {response.status_code} {response.text[:300]}")
+            events = _iter_sse_data(response.aiter_bytes())
+            try:
+                async for data in events:
+                    if data == "[DONE]":
+                        received_done = True
+                        break
+                    try:
+                        event = json.loads(data)
+                        content = event["choices"][0]["delta"].get("content")
+                    except (json.JSONDecodeError, KeyError, IndexError, TypeError) as exc:
+                        raise RuntimeError("DashScope流式响应格式异常") from exc
+                    if isinstance(content, str) and content:
+                        received_content = True
+                        yield content
+            finally:
+                await events.aclose()
 
-    result = response.json()
-    try:
-        content = result["choices"][0]["message"]["content"]
-    except (KeyError, IndexError, TypeError) as exc:
-        raise RuntimeError("DashScope响应格式异常") from exc
-
-    if not content or not content.strip():
+    if not received_content:
         raise RuntimeError("DashScope未返回有效内容")
-
-    return content.strip()
+    if not received_done:
+        raise RuntimeError("DashScope流式响应未正常结束")
 
 
 async def _request_dashscope_strategy_json(*, images: list[dict], prompt: str) -> dict:

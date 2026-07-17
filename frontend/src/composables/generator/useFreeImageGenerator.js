@@ -170,17 +170,7 @@ export function useFreeImageGenerator({ onJobCreated } = {}) {
     }
 
     try {
-      const result = await optimizeFreeImagePrompt(prompt, { signal });
-      if (result.code !== 0) {
-        toast.error(result.message || "AI优化失败");
-        return false;
-      }
-      const optimized = result.data?.prompt?.trim();
-      if (!optimized) {
-        toast.error("AI未返回有效提示词");
-        return false;
-      }
-      onChunk(optimized);
+      await optimizeFreeImagePrompt(prompt, { signal, onChunk });
       return true;
     } catch (error) {
       if (signal.aborted) return false;

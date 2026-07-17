@@ -64,6 +64,17 @@ describe("AiAssistedTextarea", () => {
     expect(wrapper.get('[data-testid="ai-confirm"]').attributes("disabled")).toBeUndefined();
   });
 
+  it("appends incremental chunks to the draft", async () => {
+    const wrapper = mountTextarea(async ({ onChunk }) => {
+      onChunk("第一段");
+      onChunk("第二段");
+      return true;
+    });
+
+    await wrapper.get('[data-testid="ai-action"]').trigger("click");
+    expect(wrapper.get('[data-testid="ai-draft"]').element.value).toBe("第一段第二段");
+  });
+
   it("aborts and isolates a late response when retrying", async () => {
     const first = deferred();
     const signals = [];

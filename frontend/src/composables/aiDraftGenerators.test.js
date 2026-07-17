@@ -42,7 +42,9 @@ describe("AI draft generators", () => {
   });
 
   it("supplies image analysis as a draft", async () => {
-    mocks.analyzeImage.mockResolvedValue({ code: 0, data: { content: "商品卖点草稿" } });
+    mocks.analyzeImage.mockImplementation(async (_payload, { onChunk }) => {
+      onChunk("商品卖点草稿");
+    });
     const writer = useAiSellingPointsWriter({
       toast: mocks.toast,
       buildImages: () => [{ url: "https://example.com/product.jpg" }],
@@ -56,14 +58,16 @@ describe("AI draft generators", () => {
 
     expect(mocks.analyzeImage).toHaveBeenCalledWith(
       expect.objectContaining({ scenario: "product_image" }),
-      { signal: controller.signal },
+      { signal: controller.signal, onChunk },
     );
     expect(onChunk).toHaveBeenCalledWith("商品卖点草稿");
     expect(ok).toBe(true);
   });
 
   it("supplies optimized image text without overwriting the source", async () => {
-    mocks.optimizeImage.mockResolvedValue({ code: 0, data: { prompt: "图片优化草稿" } });
+    mocks.optimizeImage.mockImplementation(async (_prompt, { onChunk }) => {
+      onChunk("图片优化草稿");
+    });
     const generator = useFreeImageGenerator();
     generator.settings.prompt = "图片原文";
     const onChunk = vi.fn();
@@ -71,7 +75,10 @@ describe("AI draft generators", () => {
 
     const ok = await generator.optimizePrompt({ signal: controller.signal, onChunk });
 
-    expect(mocks.optimizeImage).toHaveBeenCalledWith("图片原文", { signal: controller.signal });
+    expect(mocks.optimizeImage).toHaveBeenCalledWith("图片原文", {
+      signal: controller.signal,
+      onChunk,
+    });
     expect(onChunk).toHaveBeenCalledWith("图片优化草稿");
     expect(generator.settings.prompt).toBe("图片原文");
     expect(ok).toBe(true);
@@ -82,13 +89,17 @@ describe("AI draft generators", () => {
     generator.settings.prompt = "视频原文";
     const controller = new AbortController();
     const onChunk = vi.fn();
-    mocks.optimizeVideo.mockResolvedValueOnce({ code: 0, data: { prompt: "视频优化草稿" } });
+    mocks.optimizeVideo.mockImplementationOnce(async (_prompt, { onChunk: writeChunk }) => {
+      writeChunk("视频优化草稿");
+    });
 
     expect(await generator.optimizePrompt({ signal: controller.signal, onChunk })).toBe(true);
     expect(onChunk).toHaveBeenCalledWith("视频优化草稿");
     expect(generator.settings.prompt).toBe("视频原文");
 
-    mocks.optimizeVideo.mockResolvedValueOnce({ code: 1, message: "优化服务忙" });
+    const error = new Error("优化服务忙");
+    error.response = { data: { message: "优化服务忙" } };
+    mocks.optimizeVideo.mockRejectedValueOnce(error);
     expect(await generator.optimizePrompt({ signal: controller.signal, onChunk })).toBe(false);
     expect(mocks.toast.error).toHaveBeenCalledWith("优化服务忙");
   });

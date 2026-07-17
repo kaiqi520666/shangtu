@@ -1,4 +1,5 @@
 import request from "./request.js";
+import { postSse } from "./sse.js";
 
 function buildPublicApiUrl(path) {
   const baseURL = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/$/, "");
@@ -14,8 +15,11 @@ export function uploadImage(file) {
   });
 }
 
-export function analyzeImage({ images = [], platform = "", scenario = null, type_id = null }, { signal } = {}) {
-  return request.post("/image/analyze", { images, platform, scenario, type_id }, { timeout: 120000, signal });
+export function analyzeImage(
+  { images = [], platform = "", scenario = null, type_id = null },
+  { signal, onChunk },
+) {
+  return postSse("/image/analyze", { images, platform, scenario, type_id }, { signal, onChunk });
 }
 
 export function generateImageStrategy({
@@ -48,8 +52,8 @@ export function generateImageStrategy({
   );
 }
 
-export function optimizeFreeImagePrompt(prompt, { signal } = {}) {
-  return request.post("/image/free-image/optimize", { prompt }, { timeout: 120000, signal });
+export function optimizeFreeImagePrompt(prompt, { signal, onChunk }) {
+  return postSse("/image/free-image/optimize", { prompt }, { signal, onChunk });
 }
 
 export function getImageCreditCosts() {

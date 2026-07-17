@@ -11,10 +11,11 @@ from app.core.prompt_template_builder import (
     build_ai_write_prompt,
     build_strategy_template_prompt,
 )
+from app.core.sse import text_streaming_response
 from app.core.strategy.dashscope_client import (
     DashScopeConfigError,
-    analyze_product_image,
-    optimize_free_image_prompt,
+    stream_free_image_prompt,
+    stream_product_image_analysis,
 )
 from app.models import User
 from app.schemas.response import Response, fail, success
@@ -53,7 +54,7 @@ class FreeImageOptimizeRequest(BaseModel):
     prompt: str
 
 
-@router.post("/analyze", response_model=Response)
+@router.post("/analyze")
 async def analyze_image(
     req: AnalyzeImageRequest,
     request: Request,
@@ -71,7 +72,7 @@ async def analyze_image(
             platform=req.platform,
             type_id=req.type_id,
         )
-        content = await analyze_product_image(
+        content = stream_product_image_analysis(
             images=[item.model_dump() for item in req.images],
             platform=req.platform,
             prompt=template_prompt or None,
@@ -82,7 +83,12 @@ async def analyze_image(
         logger.exception("Unexpected image analysis failure user_id=%s", current_user.id)
         return fail("图片分析失败")
 
-    return success({"content": content})
+    return text_streaming_response(
+        content,
+        logger=logger,
+        error_log=f"Image analysis stream failed user_id={current_user.id}",
+        error_message="图片分析失败，请稍后重试",
+    )
 
 
 @router.post("/strategy", response_model=Response)
@@ -140,7 +146,7 @@ async def image_strategy(
     return success(strategy)
 
 
-@router.post("/free-image/optimize", response_model=Response)
+@router.post("/free-image/optimize")
 async def free_image_optimize(
     req: FreeImageOptimizeRequest,
     request: Request,
@@ -151,11 +157,16 @@ async def free_image_optimize(
     ):
         return fail(LLM_RATE_LIMIT_MESSAGE)
     try:
-        content = await optimize_free_image_prompt(req.prompt)
+        content = stream_free_image_prompt(req.prompt)
     except (ValueError, DashScopeConfigError, RuntimeError) as e:
         return fail(str(e))
     except Exception:
         logger.exception("Unexpected image prompt optimization failure user_id=%s", current_user.id)
         return fail("提示词优化失败")
 
-    return success({"prompt": content})
+    return text_streaming_response(
+        content,
+        logger=logger,
+        error_log=f"Image prompt optimization stream failed user_id={current_user.id}",
+        error_message="提示词优化失败，请稍后重试",
+    )

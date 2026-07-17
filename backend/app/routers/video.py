@@ -6,9 +6,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_user, get_db
 from app.core.media_download import remote_media_download_response
+from app.core.sse import text_streaming_response
 from app.core.strategy.dashscope_client import (
     DashScopeConfigError,
-    optimize_free_video_prompt,
+    stream_free_video_prompt,
 )
 from app.core.prompt_template_builder import build_strategy_template_prompt
 from app.core.system_settings import get_effective_video_credit_costs
@@ -140,7 +141,7 @@ async def video_strategy(
     return success(strategy)
 
 
-@router.post("/free-video/optimize", response_model=Response)
+@router.post("/free-video/optimize")
 async def free_video_optimize(
     req: FreeVideoOptimizeRequest,
     request: Request,
@@ -151,14 +152,19 @@ async def free_video_optimize(
     ):
         return fail(LLM_RATE_LIMIT_MESSAGE)
     try:
-        content = await optimize_free_video_prompt(req.prompt)
+        content = stream_free_video_prompt(req.prompt)
     except (ValueError, DashScopeConfigError, RuntimeError) as e:
         return fail(str(e))
     except Exception:
         logger.exception("Unexpected video prompt optimization failure user_id=%s", current_user.id)
         return fail("视频提示词优化失败")
 
-    return success({"prompt": content})
+    return text_streaming_response(
+        content,
+        logger=logger,
+        error_log=f"Video prompt optimization stream failed user_id={current_user.id}",
+        error_message="视频提示词优化失败，请稍后重试",
+    )
 
 
 @router.post("/upload", response_model=Response)
