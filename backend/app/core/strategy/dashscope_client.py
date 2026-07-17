@@ -169,7 +169,10 @@ async def _stream_dashscope_content(payload: dict) -> AsyncIterator[str]:
                         break
                     try:
                         event = json.loads(data)
-                        content = event["choices"][0]["delta"].get("content")
+                        choices = event["choices"]
+                        if choices == [] and isinstance(event.get("usage"), dict):
+                            continue
+                        content = choices[0]["delta"].get("content")
                     except (json.JSONDecodeError, KeyError, IndexError, TypeError) as exc:
                         raise RuntimeError("DashScope流式响应格式异常") from exc
                     if isinstance(content, str) and content:

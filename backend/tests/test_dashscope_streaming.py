@@ -82,6 +82,19 @@ async def test_stream_parser_handles_arbitrary_utf8_chunks_and_merged_frames():
 
 
 @pytest.mark.asyncio
+async def test_stream_ignores_usage_frame_before_done():
+    chunks = [
+        frame({"choices": [{"delta": {"content": "完整内容"}}]}),
+        frame({"choices": [], "usage": {"total_tokens": 12}}),
+        frame("[DONE]"),
+    ]
+
+    content, _requests = await collect_stream(chunks)
+
+    assert content == ["完整内容"]
+
+
+@pytest.mark.asyncio
 async def test_stream_rejects_upstream_http_error_without_response_body():
     with pytest.raises(RuntimeError, match="DashScope请求失败: 503") as exc_info:
         await collect_stream([b"private provider response"], status_code=503)
@@ -93,6 +106,12 @@ async def test_stream_rejects_upstream_http_error_without_response_body():
 async def test_stream_rejects_malformed_events():
     with pytest.raises(RuntimeError, match="流式响应格式异常"):
         await collect_stream([frame("not-json")])
+
+
+@pytest.mark.asyncio
+async def test_stream_rejects_empty_choices_without_usage():
+    with pytest.raises(RuntimeError, match="流式响应格式异常"):
+        await collect_stream([frame({"choices": []})])
 
 
 @pytest.mark.asyncio
